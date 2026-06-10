@@ -1,0 +1,47 @@
+syntax = "v1"
+
+info (
+	title:   "数据管道服务接口"
+	desc:    "数据管道服务接口, 包含数据管道的创建、查询、更新、删除等"
+	author:  "susu"
+	version: "v1.0.0"
+)
+
+// ==================== 请求类型定义 ====================
+type (
+	// UploadDocumentReq 文档上传请求对象
+	UploadDocumentReq {
+		DocumentName       string // 文档名称
+		OperatorId         string // 操作人ID
+		KnowledgeScopeCode string // 知识范围编码
+		KnowledgeScopeName string // 知识范围名称
+		BusinessCategory   string // 业务分类
+		DocumentTags       string // 文档标签
+	}
+)
+
+// ==================== 响应类型定义 ====================
+type (
+	// UploadDocumentResp 文档上传响应对象
+	UploadDocumentResp {
+		DocumentId     int64 // 文档ID
+		TaskId         int64 // 任务ID
+		DocumentName   string // 文档名称
+		ParseStatus    int // 解析状态
+		StrategyStatus int // 策略状态
+		IndexStatus    int // 索引状态
+	}
+)
+
+// ==================== 数据管道服务 ====================
+@server (
+	group:  document
+	desc:   "文档服务"
+	prefix: /manage/document
+)
+service document {
+	@doc "上传文档"
+	@handler UploadDocument
+	post /upload (UploadDocumentReq) returns (UploadDocumentResp)
+}
+
