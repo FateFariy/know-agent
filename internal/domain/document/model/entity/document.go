@@ -1,9 +1,7 @@
 package entity
 
-import "github.com/swiftbit/know-agent/common"
-
 type Document struct {
-	common.Model
+	ID                  int64  `gorm:"column:id;primaryKey"`         // 主键ID
 	DocumentName        string `gorm:"column:document_name"`         // 文档名称
 	OriginalFileName    string `gorm:"column:original_file_name"`    // 原始文件名
 	FileType            int    `gorm:"column:file_type"`             // 文件类型
@@ -30,4 +28,5 @@ type Document struct {
 	LastParseTaskId     int64  `gorm:"column:last_parse_task_id"`    // 上一次解析任务ID
 	StructureNodeCount  int    `gorm:"column:structure_node_count"`  // 结构化节点数
 	LastIndexTaskId     int64  `gorm:"column:last_index_task_id"`    // 上一次索引任务ID
+	OperatorId          int64  `gorm:"-"`                            // 操作人ID
 }

@@ -8,6 +8,7 @@ type Config struct {
 	common.BaseConfig
 	Minio MinioConf
 	Neo4j Neo4jConf
+	MQ    MQConf
 }
 type MinioConf struct {
 	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
@@ -26,6 +27,12 @@ type Neo4jConf struct {
 	Password            string `json:",omitempty,default=neo4j"`
 	Database            string `json:",omitempty,default=neo4j"`
 	QueryTimeoutSeconds int    `json:",omitempty,default=5"`
+}
+
+type MQConf struct {
+	ParseTopic string `json:",omitempty,default=know-agent-document"`
+	IndexTopic string `json:",omitempty,default=know-agent-index"`
+	Enabled    bool   `json:",omitempty,default=false"`
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {
