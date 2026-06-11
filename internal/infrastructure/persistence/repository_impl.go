@@ -8,7 +8,9 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/cache"
 	"gorm.io/gorm"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	errorx "github.com/swiftbit/know-agent/internal/error"
@@ -27,7 +29,7 @@ type DocumentRepositoryImpl struct {
 	cache cache.Cache
 }
 
-var _ document.Repository = (*DocumentRepositoryImpl)(nil)
+var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
 func NewDocumentRepository(db *gorm.DB, rdb *redis.Client, cache cache.Cache) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
@@ -65,7 +67,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documen
 
 func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documentId int64) (*entity.Document, error) {
 	var document = entity.Document{ID: documentId}
-	if err := d.db.WithContext(ctx).First(&document).Error; err != nil {
+	if err := d.db.WithContext(ctx).Model(&entity.Document{}).First(&document).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrDocumentNotFound
 		}
@@ -74,11 +76,18 @@ func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documen
 	return &document, nil
 }
 
+// SelectDocumentPage 获取文档分页列表
 func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
-	// TODO implement me
-	panic("implement me")
+	var documents []*entity.Document
+	query := d.db.WithContext(ctx).Model(&entity.Document{}).Scopes(utils.Paginate(pageNo, pageSize))
+	if keyword != "" {
+		query = query.Where("document_name LIKE %?% or original_file_name LIKE %?%", keyword, keyword)
+	}
+	res := query.Find(&documents)
+	return documents, res.RowsAffected, res.Error
 }
 
+// InsertTask 插入任务
 func (d *DocumentRepositoryImpl) InsertTask(ctx context.Context, task *entity.DocumentTask) error {
 	// TODO implement me
 	panic("implement me")

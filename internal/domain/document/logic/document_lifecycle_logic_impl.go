@@ -161,25 +161,15 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 }
 
 // QueryDocumentPage 分页查询文档列表
-func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, req *vo.DocumentPageQuery) (*vo.DocumentPageQuery, error) {
-	pageNo := req.PageNo
-	if pageNo <= 0 {
-		pageNo = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-	keyword := strings.TrimSpace(req.Keyword)
-
-	documentList, total, err := d.repo.QueryDocumentPage(ctx, pageNo, pageSize, keyword)
+func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
+	documentList, total, err := d.repo.SelectDocumentPage(ctx, pageNo, pageSize, keyword)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	latestTaskMap, err := d.getLatestTaskMap(ctx, documentList)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	records := make([]*vo.DocumentListItemVo, 0, len(documentList))

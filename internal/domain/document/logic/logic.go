@@ -14,7 +14,7 @@ type DocumentLifecycleLogic interface {
 	Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, doc *entity.Document) (*vo.DocumentUpload, error)
 
 	// QueryDocumentPage 分页查询文档列表
-	QueryDocumentPage(ctx context.Context, req *vo.DocumentPageQuery) (*vo.DocumentPageVo, error)
+	QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error)
 
 	// QueryDocumentDetail 查询文档详情
 	QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error)

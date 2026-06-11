@@ -4,30 +4,30 @@
 package document
 
 type BuildIndexReq struct {
-	DocumentId int64  // 文档ID
-	PlanId     int64  // 方案ID
-	OperatorId string // 操作人ID
+	DocumentId int64  `json:"documentId"` // 文档ID
+	PlanId     int64  `json:"planId"`     // 方案ID
+	OperatorId string `json:"operatorId"` // 操作人ID
 }
 
 type BuildIndexResp struct {
-	TaskId int64 // 任务ID
+	TaskId int64 `json:"taskId"` // 任务ID
 }
 
 type ConfirmStrategyReq struct {
-	DocumentId  int64              // 文档ID
-	BasePlanId  int64              // 基础方案ID
-	OperatorId  string             // 操作人ID
-	AdjustNote  string             // 调整备注
-	ParentSteps []StrategyStepItem // 父块步骤  // 父块步骤
-	ChildSteps  []StrategyStepItem // 子块步骤  // 子块步骤
+	DocumentId  int64              `json:"documentId"`  // 文档ID
+	BasePlanId  int64              `json:"basePlanId"`  // 基础方案ID
+	OperatorId  string             `json:"operatorId"`  // 操作人ID
+	AdjustNote  string             `json:"adjustNote"`  // 调整备注
+	ParentSteps []StrategyStepItem `json:"parentSteps"` // 父块步骤
+	ChildSteps  []StrategyStepItem `json:"childSteps"`  // 子块步骤
 }
 
 type ConfirmStrategyResp struct {
-	Success bool // 是否成功
+	Success bool `json:"success"` // 是否成功
 }
 
 type DeleteDocumentReq struct {
-	DocumentId string // 文档ID
+	DocumentId int64 `json:"documentId"` // 文档ID
 }
 
 type DeleteDocumentResp struct {
@@ -35,106 +35,128 @@ type DeleteDocumentResp struct {
 }
 
 type DocumentChunk struct {
-	ChunkId    int64  // 块ID
-	DocumentId int64  // 文档ID
-	TaskId     int64  // 任务ID
-	Content    string // 块内容
+	ChunkId    int64  `json:"chunkId"`    // 块ID
+	DocumentId int64  `json:"documentId"` // 文档ID
+	TaskId     int64  `json:"taskId"`     // 任务ID
+	Content    string `json:"content"`    // 块内容
 }
 
 type DocumentListItem struct {
-	DocumentId     int64  // 文档ID
-	TaskId         int64  // 任务ID
-	DocumentName   string // 文档名称
-	ParseStatus    int    // 解析状态
-	StrategyStatus int    // 策略状态
-	IndexStatus    int    // 索引状态
+	DocumentId           int64  `json:"documentId"`           // 文档ID
+	DocumentName         string `json:"documentName"`         // 文档名称
+	OriginalFileName     string `json:"originalFileName"`     // 原始文件名
+	FileType             int    `json:"fileType"`             // 文件类型
+	FileTypeName         string `json:"fileTypeName"`         // 文件类型名
+	FileSize             int64  `json:"fileSize"`             // 文件大小
+	CharCount            int    `json:"charCount"`            // 字符数
+	TokenCount           int    `json:"tokenCount"`           // token数
+	ParseStatus          int    `json:"parseStatus"`          // 解析状态
+	ParseStatusName      string `json:"parseStatusName"`      // 解析状态名
+	StrategyStatus       int    `json:"strategyStatus"`       // 策略状态
+	StrategyStatusName   string `json:"strategyStatusName"`   // 策略状态名
+	IndexStatus          int    `json:"indexStatus"`          // 索引状态
+	IndexStatusName      string `json:"indexStatusName"`      // 索引状态名
+	ParseErrorMsg        string `json:"parseErrorMsg"`        // 解析错误信息
+	KnowledgeScopeCode   string `json:"knowledgeScopeCode"`   // 知识范围编码
+	KnowledgeScopeName   string `json:"knowledgeScopeName"`   // 知识范围名称
+	BusinessCategory     string `json:"businessCategory"`     // 业务分类
+	DocumentTags         string `json:"documentTags"`         // 文档标签
+	CurrentPlanId        int64  `json:"currentPlanId"`        // 当前策略ID
+	LastIndexTaskId      int64  `json:"lastIndexTaskId"`      // 上一次索引任务ID
+	LatestTaskId         int64  `json:"latestTaskId"`         // 最新任务ID
+	LatestTaskType       int    `json:"latestTaskType"`       // 最新任务类型
+	LatestTaskTypeName   string `json:"latestTaskTypeName"`   // 最新任务类型名
+	LatestTaskStatus     int    `json:"latestTaskStatus"`     // 最新任务状态
+	LatestTaskStatusName string `json:"latestTaskStatusName"` // 最新任务状态名
+	CreateTime           string `json:"createTime"`           // 创建时间
+	UpdateTime           string `json:"updateTime"`           // 更新时间
 }
 
 type QueryDocumentChunkDetailReq struct {
-	DocumentId int64 // 文档ID
-	TaskId     int64 // 任务ID
-	ChunkId    int64 // 块ID
+	DocumentId int64 `json:"documentId"` // 文档ID
+	TaskId     int64 `json:"taskId"`     // 任务ID
+	ChunkId    int64 `json:"chunkId"`    // 块ID
 }
 
 type QueryDocumentChunksReq struct {
-	DocumentId int64 // 文档ID
-	TaskId     int64 // 任务ID
-	PageNo     int   // 页码
-	PageSize   int   // 每页大小
+	DocumentId int64 `json:"documentId"` // 文档ID
+	TaskId     int64 `json:"taskId"`     // 任务ID
+	PageNo     int   `json:"pageNo"`     // 页码
+	PageSize   int   `json:"pageSize"`   // 每页大小
 }
 
 type QueryDocumentChunksResp struct {
-	List  []DocumentChunk // chunk列表  // chunk列表
-	Total int             // 总记录数
+	List  []DocumentChunk `json:"list"`  // chunk列表
+	Total int             `json:"total"` // 总记录数
 }
 
 type QueryDocumentDetailReq struct {
-	DocumentId int64 // 文档ID
+	DocumentId int64 `json:"documentId"` // 文档ID
 }
 
 type QueryDocumentPageReq struct {
-	PageNo   int    // 页码
-	PageSize int    // 每页大小
-	Keyword  string // 关键词
+	PageNo   int    `json:"pageNo,optional,default=1"`    // 页码
+	PageSize int    `json:"pageSize,optional,default=10"` // 每页大小
+	Keyword  string `json:"keyword,optional"`             // 关键词
 }
 
 type QueryDocumentPageResp struct {
-	List  []DocumentListItem // 文档列表  // 文档列表
-	Total int                // 总记录数
+	List  []DocumentListItem `json:"list"`  // 文档列表
+	Total int                `json:"total"` // 总记录数
 }
 
 type QueryStrategyPlanReq struct {
-	DocumentId int64 // 文档ID
+	DocumentId int64 `json:"documentId"` // 文档ID
 }
 
 type QueryStrategyPlanResp struct {
-	DocumentId   int64      // 文档ID
-	StrategyList []Strategy // 策略列表  // 策略列表
+	DocumentId   int64      `json:"documentId"`   // 文档ID
+	StrategyList []Strategy `json:"strategyList"` // 策略列表
 }
 
 type QueryTaskLogsReq struct {
-	TaskId   int64 // 任务ID
-	PageNo   int   // 页码
-	PageSize int   // 每页大小
+	TaskId   int64 `json:"taskId"`   // 任务ID
+	PageNo   int   `json:"pageNo"`   // 页码
+	PageSize int   `json:"pageSize"` // 每页大小
 }
 
 type QueryTaskLogsResp struct {
-	List  []TaskLog // 日志列表  // 日志列表
-	Total int       // 总记录数
+	List  []TaskLog `json:"list"`  // 日志列表
+	Total int       `json:"total"` // 总记录数
 }
 
 type Strategy struct {
-	StrategyId   int64  // 策略ID
-	StrategyName string // 策略名称
+	StrategyId   int64  `json:"strategyId"`   // 策略ID
+	StrategyName string `json:"strategyName"` // 策略名称
 }
 
 type StrategyStepItem struct {
-	StepNo       int // 步骤序号
-	StrategyType int // 策略类型
+	StepNo       int `json:"stepNo"`       // 步骤序号
+	StrategyType int `json:"strategyType"` // 策略类型
 }
 
 type TaskLog struct {
-	LogId      int64  // 日志ID
-	TaskId     int64  // 任务ID
-	LogLevel   string // 日志级别
-	LogMessage string // 日志内容
-	CreateTime string // 创建时间
+	LogId      int64  `json:"logId"`      // 日志ID
+	TaskId     int64  `json:"taskId"`     // 任务ID
+	LogLevel   string `json:"logLevel"`   // 日志级别
+	LogMessage string `json:"logMessage"` // 日志内容
+	CreateTime string `json:"createTime"` // 创建时间
 }
 
 type UploadDocumentReq struct {
-	DocumentName       string // 文档名称
-	OperatorId         string // 操作人ID
-	KnowledgeScopeCode string // 知识范围编码
-	KnowledgeScopeName string // 知识范围名称
-	BusinessCategory   string // 业务分类
-	DocumentTags       string // 文档标签
+	DocumentName       string `json:"documentName"`       // 文档名称
+	OperatorId         string `json:"operatorId"`         // 操作人ID
+	KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
+	KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
+	BusinessCategory   string `json:"businessCategory"`   // 业务分类
+	DocumentTags       string `json:"documentTags"`       // 文档标签
 }
 
 type UploadDocumentResp struct {
-	DocumentId     int64  // 文档ID
-	TaskId         int64  // 任务ID
-	DocumentName   string // 文档名称
-	ParseStatus    int    // 解析状态
-	StrategyStatus int    // 策略状态
-	IndexStatus    int    // 索引状态
+	DocumentId     int64  `json:"documentId"`     // 文档ID
+	TaskId         int64  `json:"taskId"`         // 任务ID
+	DocumentName   string `json:"documentName"`   // 文档名称
+	ParseStatus    int    `json:"parseStatus"`    // 解析状态
+	StrategyStatus int    `json:"strategyStatus"` // 策略状态
+	IndexStatus    int    `json:"indexStatus"`    // 索引状态
 }
