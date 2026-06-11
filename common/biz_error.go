@@ -31,6 +31,12 @@ func (e *BizError) Unwrap() error {
 	return e.Err
 }
 
+// Format 格式化错误信息
+func (e *BizError) Format(args ...any) *BizError {
+	e.Msg = fmt.Sprintf(e.Msg, args...)
+	return e
+}
+
 // WrapErr 将底层原始错误，包装为带业务码的错误
 func WrapErr(err error, code int, msg string) *BizError {
 	if err == nil {
