@@ -12,25 +12,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
-	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/dto"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // DocumentManageCode 文档管理错误码
 const (
-	DocumentManageCodeDocumentNotFound      = 20003
-	DocumentManageCodeDocumentStatusInvalid = 20004
-	DocumentManageCodeStrategyPlanNotFound  = 20005
-	DocumentManageCodeStrategyStepEmpty     = 20006
-	DocumentManageCodeIndexTaskRunning      = 20007
+	DocumentManageCodeDocumentNotFound     = 20003
+	DocumentManageCodeStrategyPlanNotFound = 20005
+	DocumentManageCodeStrategyStepEmpty    = 20006
+	DocumentManageCodeIndexTaskRunning     = 20007
 )
 
 // BaseCodeParameterError 参数错误码
@@ -54,32 +53,36 @@ func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.Doc
 	}
 }
 
-// Upload 上传文档
-func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUploadVo, error) {
+// Upload 上传文档：完成文件上传、存储、文档记录创建及解析任务下发
+func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUpload, error) {
+	// 校验文件类型是否支持
 	fileType := vo.DetectFileType(header.Filename)
 	if fileType == vo.FileTypeUnknown {
 		return nil, errorx.ErrUnsupportedFileType.Format(fileType)
 	}
 
-	// 通过读取前 512 字节检测 MIME 类型
+	// 读取文件前512字节用于MIME类型检测
 	buf := make([]byte, 512)
 	n, _ := file.Read(buf)
 	mimeType := http.DetectContentType(buf[:n])
 	_, _ = file.Seek(0, io.SeekStart)
 
-	// 读取文件内容
+	// 读取完整文件内容
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, errorx.ErrEmptyFileContent.Format(err.Error())
 	}
 
+	// 生成全局唯一文档ID
 	documentId := utils.GetSnowflakeNextID()
 
+	// 上传原文件至MinIO存储
 	storedObjectInfo, err := d.port.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, header.Header.Get("Content-Type"))
 	if err != nil {
 		return nil, err
 	}
 
+	// 填充文档实体字段
 	document.ID = documentId
 	document.DocumentName = utils.Ternary(strings.TrimSpace(document.DocumentName) != "", document.DocumentName, header.Filename)
 	document.OriginalFileName = header.Filename
@@ -98,6 +101,7 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 	document.BusinessCategory = strings.TrimSpace(document.BusinessCategory)
 	document.DocumentTags = strings.TrimSpace(document.DocumentTags)
 
+	// 创建解析任务
 	taskId := utils.GetSnowflakeNextID()
 	task := &entity.DocumentTask{
 		ID:            taskId,
@@ -108,6 +112,7 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 		TriggerSource: utils.Ternary(document.OperatorId == 0, vo.TriggerSourceSystem, vo.TriggerSourceUser),
 	}
 
+	// 记录文件上传完成的任务日志
 	detail, _ := json.Marshal(map[string]any{
 		"originalFileName": header.Filename,
 		"fileSize":         len(fileBytes),
@@ -125,17 +130,17 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 		DetailJson:   string(detail),
 	}
 
-	// 插入文档、任务和任务日志
+	// 聚合文档、任务、任务日志并持久化
 	agg := &aggregate.Document{
 		Document: document,
 		Task:     task,
 		TaskLog:  taskLog,
 	}
-	if err = d.repo.InsertDocument(ctx, agg); err != nil {
+	if err = d.repo.InsertDocumentAggregate(ctx, agg); err != nil {
 		return nil, err
 	}
 
-	// 发送解析消息
+	// 发送解析消息至MQ，触发后续解析流程
 	parseMessage := vo.DocumentParseMessage{
 		DocumentId: documentId,
 		TaskId:     taskId,
@@ -144,7 +149,8 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 		return nil, err
 	}
 
-	return &vo.DocumentUploadVo{
+	// 返回上传结果
+	return &vo.DocumentUpload{
 		DocumentId:     documentId,
 		TaskId:         taskId,
 		DocumentName:   document.DocumentName,
@@ -155,7 +161,7 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 }
 
 // QueryDocumentPage 分页查询文档列表
-func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, req *dto.DocumentPageQueryDto) (*vo.DocumentPageQueryVo, error) {
+func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, req *vo.DocumentPageQuery) (*vo.DocumentPageQuery, error) {
 	pageNo := req.PageNo
 	if pageNo <= 0 {
 		pageNo = 1
@@ -177,9 +183,9 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, req 
 	}
 
 	records := make([]*vo.DocumentListItemVo, 0, len(documentList))
-	for _, doc := range documentList {
-		task := latestTaskMap[doc.Id]
-		records = append(records, d.toDocumentListItemVo(doc, task))
+	for _, document := range documentList {
+		task := latestTaskMap[document.Id]
+		records = append(records, d.toDocumentListItemVo(document, task))
 	}
 
 	return &vo.DocumentPageQueryVo{
@@ -191,41 +197,40 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, req 
 }
 
 // QueryDocumentDetail 查询文档详情
-func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, req *dto.DocumentDetailQueryDto) (*vo.DocumentListItemVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error) {
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	task, err := d.repo.GetLatestTask(ctx, document.Id)
+	task, err := d.repo.SelectLatestTask(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return d.toDocumentListItemVo(document, task), nil
+	return document, task, nil
 }
 
 // DeleteDocument 删除文档
-func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, req *dto.DocumentDeleteDto) (*vo.DocumentDeleteVo, error) {
-	documentId := d.parseRequiredLong(req.DocumentId, "文档id")
-	document, err := d.getDocumentOrThrow(ctx, documentId)
+func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// 检查是否有活跃任务
-	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId)
+	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskStatusNew, vo.TaskStatusRunning)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if activeTaskCount > 0 {
-		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档存在进行中的任务，请等待任务结束后再删除。")
+		return "", errorx.ErrDocumentStatusInvalid.Format("当前文档存在进行中的任务，请等待任务结束后再删除")
 	}
 
 	// 删除存储对象
 	err = d.port.DeleteObjects(ctx, []string{document.ObjectName, document.ParseTextPath})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// 删除向量索引（TODO: 实现向量网关）
@@ -236,22 +241,22 @@ func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, req *dt
 	// 删除相关数据
 	err = d.repo.DeleteProfileByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeleteTopicDocumentRelationByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeleteParentBlockByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeleteChunkByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// TODO: 删除结构化节点
@@ -259,38 +264,35 @@ func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, req *dt
 
 	err = d.repo.DeleteTaskLogByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeleteStepByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeleteTaskByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	err = d.repo.DeletePlanByDocumentId(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	err = d.repo.DeleteDocument(ctx, documentId)
+	err = d.repo.DeleteDocumentById(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &vo.DocumentDeleteVo{
-		DocumentId:   documentId,
-		DocumentName: document.DocumentName,
-	}, nil
+	return "", nil
 }
 
 // QueryStrategyPlan 查询策略方案
-func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, req *dto.DocumentStrategyPlanQueryDto) (*vo.DocumentStrategyPlanQueryVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error) {
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +301,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, req 
 	planReady := false
 
 	if document.CurrentPlanId > 0 {
-		plan, err := d.repo.GetPlanById(ctx, document.CurrentPlanId)
+		plan, err := d.repo.SelectPlanById(ctx, document.CurrentPlanId)
 		if err != nil {
 			return nil, err
 		}
@@ -329,7 +331,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, req 
 }
 
 // ConfirmStrategy 确认策略
-func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *dto.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
+func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 	if err != nil {
 		return nil, err
@@ -391,7 +393,7 @@ func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *d
 
 	var targetPlanId int64
 	var targetPlanVersion int
-	var targetStepList []*vo.DocumentStrategyStep
+	var targetStepList []*entity.DocumentStrategyStep
 
 	if !changed {
 		basePlan.PlanStatus = int(vo.PlanStatusConfirmed)
@@ -424,7 +426,7 @@ func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *d
 			newPlanVersion = 1
 		}
 
-		newPlan := &vo.DocumentStrategyPlan{
+		newPlan := &entity.DocumentStrategyPlan{
 			Model: common.Model{
 				Id:         newPlanId,
 				CreateTime: time.Now().UnixMilli(),
@@ -529,7 +531,7 @@ func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *d
 }
 
 // BuildIndex 构建索引
-func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *dto.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
+func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 	if err != nil {
 		return nil, err
@@ -620,7 +622,7 @@ func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *dto.Do
 }
 
 // QueryTaskLogs 查询任务日志
-func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *dto.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
+func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
 	task, err := d.repo.GetTaskById(ctx, req.TaskId)
 	if err != nil {
 		return nil, err
@@ -668,7 +670,7 @@ func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *dto
 }
 
 // QueryDocumentChunks 查询文档块
-func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *dto.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
+func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *entity.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 	if err != nil {
 		return nil, err
@@ -739,7 +741,7 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, re
 }
 
 // QueryDocumentChunkDetail 查询文档块详情
-func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *dto.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
+func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 	if err != nil {
 		return nil, err
@@ -799,28 +801,15 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Contex
 	}, nil
 }
 
-// ===== 辅助方法 =====
-
-func (d *DocumentLifecycleLogicImpl) getDocumentOrThrow(ctx context.Context, documentId int64) (*entity.Document, error) {
-	document, err := d.repo.GetDocumentById(ctx, documentId)
-	if err != nil {
-		return nil, err
-	}
-	if document == nil || document.Status != int(entity.BusinessStatusYes) {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "文档不存在")
-	}
-	return document, nil
-}
-
 func (d *DocumentLifecycleLogicImpl) getLatestTaskMap(ctx context.Context, documentList []*entity.Document) (map[int64]*entity.DocumentTask, error) {
 	if len(documentList) == 0 {
 		return map[int64]*entity.DocumentTask{}, nil
 	}
 
 	documentIds := make([]int64, 0, len(documentList))
-	for _, doc := range documentList {
-		if doc.Id > 0 {
-			documentIds = append(documentIds, doc.Id)
+	for _, document := range documentList {
+		if document.Id > 0 {
+			documentIds = append(documentIds, document.Id)
 		}
 	}
 	if len(documentIds) == 0 {
@@ -913,16 +902,16 @@ func (d *DocumentLifecycleLogicImpl) toDocumentListItemVo(document *entity.Docum
 		DocumentName:       document.DocumentName,
 		OriginalFileName:   document.OriginalFileName,
 		FileType:           document.FileType,
-		FileTypeMsg:        d.enumMsg(vo.FileType(document.FileType)),
+		FileTypeMsg:        d.enumMsg(document.FileType),
 		FileSize:           document.FileSize,
 		CharCount:          document.CharCount,
 		TokenCount:         document.TokenCount,
 		ParseStatus:        document.ParseStatus,
-		ParseStatusMsg:     d.enumMsg(vo.ParseStatus(document.ParseStatus)),
+		ParseStatusMsg:     d.enumMsg(document.ParseStatus),
 		StrategyStatus:     document.StrategyStatus,
-		StrategyStatusMsg:  d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
+		StrategyStatusMsg:  d.enumMsg(document.StrategyStatus),
 		IndexStatus:        document.IndexStatus,
-		IndexStatusMsg:     d.enumMsg(vo.IndexStatus(document.IndexStatus)),
+		IndexStatusMsg:     d.enumMsg(document.IndexStatus),
 		ParseErrorMsg:      document.ParseErrorMsg,
 		KnowledgeScopeCode: document.KnowledgeScopeCode,
 		KnowledgeScopeName: document.KnowledgeScopeName,
@@ -989,7 +978,7 @@ func (d *DocumentLifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *en
 	}
 }
 
-func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *vo.DocumentStrategyPlan, stepList []*vo.DocumentStrategyStep) *vo.DocumentStrategyPlanVo {
+func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *entity.DocumentStrategyPlan, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPlanVo {
 	return &vo.DocumentStrategyPlanVo{
 		PlanId:           plan.Id,
 		PlanVersion:      plan.PlanVersion,
@@ -1004,8 +993,8 @@ func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *vo.DocumentStrategyPlan, ste
 	}
 }
 
-func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, stepList []*vo.DocumentStrategyStep) *vo.DocumentStrategyPipelineVo {
-	pipelineSteps := make([]*vo.DocumentStrategyStep, 0)
+func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPipelineVo {
+	pipelineSteps := make([]*entity.DocumentStrategyStep, 0)
 	for _, step := range stepList {
 		pt := step.PipelineType
 		if pt == "" {
@@ -1036,9 +1025,9 @@ func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, 
 	}
 }
 
-func (d *DocumentLifecycleLogicImpl) toStepVoList(stepList []*vo.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
+func (d *DocumentLifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
 	// 排序
-	sortedSteps := make([]*vo.DocumentStrategyStep, len(stepList))
+	sortedSteps := make([]*entity.DocumentStrategyStep, len(stepList))
 	copy(sortedSteps, stepList)
 	sort.Slice(sortedSteps, func(i, j int) bool {
 		orderI := d.pipelineOrder(sortedSteps[i].PipelineType)
@@ -1089,12 +1078,12 @@ func (d *DocumentLifecycleLogicImpl) toTaskLogVo(logRecord *entity.DocumentTaskL
 
 // ===== 工具方法 =====
 
-func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*dto.DocumentStrategyStepItemDto) []int {
+func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
 	if items == nil {
 		return []int{}
 	}
 	// 按步骤序号排序
-	sortedItems := make([]*dto.DocumentStrategyStepItemDto, len(items))
+	sortedItems := make([]*entity.DocumentStrategyStepItemDto, len(items))
 	copy(sortedItems, items)
 	sort.Slice(sortedItems, func(i, j int) bool {
 		noI := sortedItems[i].StepNo
@@ -1117,8 +1106,8 @@ func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*dto.DocumentS
 	return result
 }
 
-func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*vo.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
-	result := make([]*vo.DocumentStrategyStep, 0)
+func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
+	result := make([]*entity.DocumentStrategyStep, 0)
 	for _, step := range stepList {
 		pt := step.PipelineType
 		if pt == "" {
@@ -1140,7 +1129,7 @@ func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*vo.Documen
 	return types
 }
 
-func (d *DocumentLifecycleLogicImpl) buildStrategySnapshot(stepList []*vo.DocumentStrategyStep) string {
+func (d *DocumentLifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
 	parentVo := d.toPipelineVo(vo.PipelineTypeParent, stepList)
 	childVo := d.toPipelineVo(vo.PipelineTypeChild, stepList)
 	return "PARENT:" + parentVo.StrategySnapshot + ";CHILD:" + childVo.StrategySnapshot

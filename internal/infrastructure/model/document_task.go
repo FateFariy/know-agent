@@ -4,7 +4,8 @@ import "github.com/swiftbit/know-agent/common"
 
 // DocumentTask 文档任务实体
 type DocumentTask struct {
-	common.Model
+	common.AuditModel
+	ID               int64  `gorm:"column:id;primaryKey"`     // 主键ID
 	DocumentId       int64  `gorm:"column:document_id"`       // 文档ID
 	PlanId           int64  `gorm:"column:plan_id"`           // 方案ID
 	TaskType         int    `gorm:"column:task_type"`         // 任务类型

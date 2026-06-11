@@ -8,11 +8,13 @@ import (
 
 type DocumentPort struct {
 	Storage
+	MessageProducer
 }
 
-func NewDocumentPort(storage Storage) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer) *DocumentPort {
 	return &DocumentPort{
-		Storage: storage,
+		Storage:         storage,
+		MessageProducer: messageProducer,
 	}
 }
 
@@ -31,4 +33,8 @@ type Storage interface {
 
 	// DeleteObjects 批量删除存储对象
 	DeleteObjects(ctx context.Context, objectNameList []string) error
+}
+
+type MessageProducer interface {
+	Send(ctx context.Context, topic, key string, message any) error
 }

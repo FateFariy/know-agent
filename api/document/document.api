@@ -1,47 +1,205 @@
 syntax = "v1"
 
 info (
-	title:   "数据管道服务接口"
-	desc:    "数据管道服务接口, 包含数据管道的创建、查询、更新、删除等"
+	title:   "文档管理服务接口"
+	desc:    "文档管理服务接口, 包含文档的上传、查询、删除、策略管理、索引构建等"
 	author:  "susu"
 	version: "v1.0.0"
 )
 
 // ==================== 请求类型定义 ====================
 type (
-	// UploadDocumentReq 文档上传请求对象
+	// 文档上传请求
 	UploadDocumentReq {
-		DocumentName       string // 文档名称
-		OperatorId         string // 操作人ID
-		KnowledgeScopeCode string // 知识范围编码
-		KnowledgeScopeName string // 知识范围名称
-		BusinessCategory   string // 业务分类
-		DocumentTags       string // 文档标签
+		DocumentName       string `json:"documentName"` // 文档名称
+		OperatorId         string `json:"operatorId"` // 操作人ID
+		KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
+		KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
+		BusinessCategory   string `json:"businessCategory"` // 业务分类
+		DocumentTags       string `json:"documentTags"` // 文档标签
+	}
+	// 分页查询文档列表请求
+	QueryDocumentPageReq {
+		PageNo   int `json:"pageNo"` // 页码
+		PageSize int `json:"pageSize"` // 每页大小
+		Keyword  string `json:"keyword"` // 关键词
+	}
+	// 查询文档详情请求
+	QueryDocumentDetailReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+	}
+	// 删除文档请求
+	DeleteDocumentReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+	}
+	// 查询文档策略推荐结果请求
+	QueryStrategyPlanReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+	}
+	// 确认文档策略方案请求
+	ConfirmStrategyReq {
+		DocumentId  int64 `json:"documentId"` // 文档ID
+		BasePlanId  int64 `json:"basePlanId"` // 基础方案ID
+		OperatorId  string `json:"operatorId"` // 操作人ID
+		AdjustNote  string `json:"adjustNote"` // 调整备注
+		ParentSteps []StrategyStepItem `json:"parentSteps"` // 父块步骤
+		ChildSteps  []StrategyStepItem `json:"childSteps"` // 子块步骤
+	}
+	// 策略步骤项
+	StrategyStepItem {
+		StepNo       int `json:"stepNo"` // 步骤序号
+		StrategyType int `json:"strategyType"` // 策略类型
+	}
+	// 执行文档索引构建请求
+	BuildIndexReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+		PlanId     int64 `json:"planId"` // 方案ID
+		OperatorId string `json:"operatorId"` // 操作人ID
+	}
+	// 查询文档chunk列表请求
+	QueryDocumentChunksReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+		TaskId     int64 `json:"taskId"` // 任务ID
+		PageNo     int `json:"pageNo"` // 页码
+		PageSize   int `json:"pageSize"` // 每页大小
+	}
+	// 查询单个文档chunk详情请求
+	QueryDocumentChunkDetailReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+		TaskId     int64 `json:"taskId"` // 任务ID
+		ChunkId    int64 `json:"chunkId"` // 块ID
+	}
+	// 查询任务执行日志请求
+	QueryTaskLogsReq {
+		TaskId   int64 `json:"taskId"` // 任务ID
+		PageNo   int `json:"pageNo"` // 页码
+		PageSize int `json:"pageSize"` // 每页大小
 	}
 )
 
 // ==================== 响应类型定义 ====================
 type (
-	// UploadDocumentResp 文档上传响应对象
+	// 文档上传响应
 	UploadDocumentResp {
-		DocumentId     int64 // 文档ID
-		TaskId         int64 // 任务ID
-		DocumentName   string // 文档名称
-		ParseStatus    int // 解析状态
-		StrategyStatus int // 策略状态
-		IndexStatus    int // 索引状态
+		DocumentId     int64 `json:"documentId"` // 文档ID
+		TaskId         int64 `json:"taskId"` // 任务ID
+		DocumentName   string `json:"documentName"` // 文档名称
+		ParseStatus    int `json:"parseStatus"` // 解析状态
+		StrategyStatus int `json:"strategyStatus"` // 策略状态
+		IndexStatus    int `json:"indexStatus"` // 索引状态
+	}
+	// 分页查询文档列表响应
+	QueryDocumentPageResp {
+		List  []DocumentListItem // 文档列表
+		Total int // 总记录数
+	}
+	// 文档列表项
+	DocumentListItem {
+		DocumentId     int64 `json:"documentId"` // 文档ID
+		TaskId         int64 `json:"taskId"` // 任务ID
+		DocumentName   string `json:"documentName"` // 文档名称
+		ParseStatus    int `json:"parseStatus"` // 解析状态
+		StrategyStatus int `json:"strategyStatus"` // 策略状态
+		IndexStatus    int `json:"indexStatus"` // 索引状态
+	}
+	// 查询文档详情响应
+	QueryDocumentDetailResp DocumentListItem
+	// 删除文档响应
+	DeleteDocumentResp {
+		Success bool // 是否成功
+	}
+	// 查询文档策略推荐结果响应
+	QueryStrategyPlanResp {
+		DocumentId   int64 `json:"documentId"` // 文档ID
+		StrategyList []Strategy `json:"strategyList"` // 策略列表
+	}
+	// 策略信息
+	Strategy {
+		StrategyId   int64 `json:"strategyId"` // 策略ID
+		StrategyName string `json:"strategyName"` // 策略名称
+	}
+	// 确认文档策略方案响应
+	ConfirmStrategyResp {
+		Success bool `json:"success"` // 是否成功
+	}
+	// 执行文档索引构建响应
+	BuildIndexResp {
+		TaskId int64 `json:"taskId"` // 任务ID
+	}
+	// 查询文档chunk列表响应
+	QueryDocumentChunksResp {
+		List  []DocumentChunk `json:"list"` // chunk列表
+		Total int `json:"total"` // 总记录数
+	}
+	// 文档块信息
+	DocumentChunk {
+		ChunkId    int64 `json:"chunkId"` // 块ID
+		DocumentId int64 `json:"documentId"` // 文档ID
+		TaskId     int64 `json:"taskId"` // 任务ID
+		Content    string `json:"content"` // 块内容
+	}
+	// 查询单个文档chunk详情响应
+	QueryDocumentChunkDetailResp DocumentChunk
+	// 查询任务执行日志响应
+	QueryTaskLogsResp {
+		List  []TaskLog `json:"list"` // 日志列表
+		Total int `json:"total"` // 总记录数
+	}
+	// 任务日志
+	TaskLog {
+		LogId      int64 `json:"logId"` // 日志ID
+		TaskId     int64 `json:"taskId"` // 任务ID
+		LogLevel   string `json:"logLevel"` // 日志级别
+		LogMessage string `json:"logMessage"` // 日志内容
+		CreateTime string `json:"createTime"` // 创建时间
 	}
 )
 
-// ==================== 数据管道服务 ====================
+// ==================== 文档管理服务 ====================
 @server (
 	group:  document
-	desc:   "文档服务"
+	desc:   "文档管理服务"
 	prefix: /manage/document
 )
 service document {
 	@doc "上传文档"
 	@handler UploadDocument
 	post /upload (UploadDocumentReq) returns (UploadDocumentResp)
+
+	@doc "分页查询文档列表"
+	@handler QueryDocumentPage
+	post /page/query (QueryDocumentPageReq) returns (QueryDocumentPageResp)
+
+	@doc "查询文档详情"
+	@handler QueryDocumentDetail
+	post /detail/query (QueryDocumentDetailReq) returns (QueryDocumentDetailResp)
+
+	@doc "删除文档及其关联数据"
+	@handler DeleteDocument
+	post /delete (DeleteDocumentReq) returns (DeleteDocumentResp)
+
+	@doc "查询文档策略推荐结果"
+	@handler QueryStrategyPlan
+	post /strategy/plan/query (QueryStrategyPlanReq) returns (QueryStrategyPlanResp)
+
+	@doc "确认文档策略方案"
+	@handler ConfirmStrategy
+	post /strategy/confirm (ConfirmStrategyReq) returns (ConfirmStrategyResp)
+
+	@doc "执行文档索引构建"
+	@handler BuildIndex
+	post /index/build (BuildIndexReq) returns (BuildIndexResp)
+
+	@doc "查询文档chunk列表"
+	@handler QueryDocumentChunks
+	post /chunk/query (QueryDocumentChunksReq) returns (QueryDocumentChunksResp)
+
+	@doc "查询单个文档chunk详情"
+	@handler QueryDocumentChunkDetail
+	post /chunk/detail/query (QueryDocumentChunkDetailReq) returns (QueryDocumentChunkDetailResp)
+
+	@doc "查询任务执行日志"
+	@handler QueryTaskLogs
+	post /task/log/query (QueryTaskLogsReq) returns (QueryTaskLogsResp)
 }
 

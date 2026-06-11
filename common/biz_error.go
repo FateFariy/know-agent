@@ -2,6 +2,10 @@ package common
 
 import "fmt"
 
+var (
+	ErrParm = NewBizError(10001, "参数错误：%s")
+)
+
 type BizError struct {
 	Code int    // 业务错误码
 	Msg  string // 业务错误描述

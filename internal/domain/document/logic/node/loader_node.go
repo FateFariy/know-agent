@@ -7,7 +7,7 @@ import (
 	"github.com/cloudwego/eino/components/document"
 	"github.com/cloudwego/eino/schema"
 
-	"github.com/swiftbit/know-agent/internal/domain/ingestion/logic/load"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/load"
 )
 
 type LoaderNode struct {

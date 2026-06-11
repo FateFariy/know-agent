@@ -3,6 +3,124 @@
 
 package document
 
+type BuildIndexReq struct {
+	DocumentId int64  // 文档ID
+	PlanId     int64  // 方案ID
+	OperatorId string // 操作人ID
+}
+
+type BuildIndexResp struct {
+	TaskId int64 // 任务ID
+}
+
+type ConfirmStrategyReq struct {
+	DocumentId  int64              // 文档ID
+	BasePlanId  int64              // 基础方案ID
+	OperatorId  string             // 操作人ID
+	AdjustNote  string             // 调整备注
+	ParentSteps []StrategyStepItem // 父块步骤  // 父块步骤
+	ChildSteps  []StrategyStepItem // 子块步骤  // 子块步骤
+}
+
+type ConfirmStrategyResp struct {
+	Success bool // 是否成功
+}
+
+type DeleteDocumentReq struct {
+	DocumentId string // 文档ID
+}
+
+type DeleteDocumentResp struct {
+	Success bool // 是否成功
+}
+
+type DocumentChunk struct {
+	ChunkId    int64  // 块ID
+	DocumentId int64  // 文档ID
+	TaskId     int64  // 任务ID
+	Content    string // 块内容
+}
+
+type DocumentListItem struct {
+	DocumentId     int64  // 文档ID
+	TaskId         int64  // 任务ID
+	DocumentName   string // 文档名称
+	ParseStatus    int    // 解析状态
+	StrategyStatus int    // 策略状态
+	IndexStatus    int    // 索引状态
+}
+
+type QueryDocumentChunkDetailReq struct {
+	DocumentId int64 // 文档ID
+	TaskId     int64 // 任务ID
+	ChunkId    int64 // 块ID
+}
+
+type QueryDocumentChunksReq struct {
+	DocumentId int64 // 文档ID
+	TaskId     int64 // 任务ID
+	PageNo     int   // 页码
+	PageSize   int   // 每页大小
+}
+
+type QueryDocumentChunksResp struct {
+	List  []DocumentChunk // chunk列表  // chunk列表
+	Total int             // 总记录数
+}
+
+type QueryDocumentDetailReq struct {
+	DocumentId int64 // 文档ID
+}
+
+type QueryDocumentPageReq struct {
+	PageNo   int    // 页码
+	PageSize int    // 每页大小
+	Keyword  string // 关键词
+}
+
+type QueryDocumentPageResp struct {
+	List  []DocumentListItem // 文档列表  // 文档列表
+	Total int                // 总记录数
+}
+
+type QueryStrategyPlanReq struct {
+	DocumentId int64 // 文档ID
+}
+
+type QueryStrategyPlanResp struct {
+	DocumentId   int64      // 文档ID
+	StrategyList []Strategy // 策略列表  // 策略列表
+}
+
+type QueryTaskLogsReq struct {
+	TaskId   int64 // 任务ID
+	PageNo   int   // 页码
+	PageSize int   // 每页大小
+}
+
+type QueryTaskLogsResp struct {
+	List  []TaskLog // 日志列表  // 日志列表
+	Total int       // 总记录数
+}
+
+type Strategy struct {
+	StrategyId   int64  // 策略ID
+	StrategyName string // 策略名称
+}
+
+type StrategyStepItem struct {
+	StepNo       int // 步骤序号
+	StrategyType int // 策略类型
+}
+
+type TaskLog struct {
+	LogId      int64  // 日志ID
+	TaskId     int64  // 任务ID
+	LogLevel   string // 日志级别
+	LogMessage string // 日志内容
+	CreateTime string // 创建时间
+}
+
 type UploadDocumentReq struct {
 	DocumentName       string // 文档名称
 	OperatorId         string // 操作人ID
