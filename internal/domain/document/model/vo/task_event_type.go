@@ -4,10 +4,26 @@ package vo
 type TaskEventType = int
 
 const (
-	TaskEventUnknown TaskEventType = iota
-	TaskEventStart
+	TaskEventStart TaskEventType = iota + 1
 	TaskEventComplete
 	TaskEventFailed
 	TaskEventUserConfirm
 	TaskEventUserAdjust
 )
+
+func TaskEventTypeName(et TaskEventType) string {
+	switch et {
+	case TaskEventStart:
+		return "开始"
+	case TaskEventComplete:
+		return "完成"
+	case TaskEventFailed:
+		return "失败"
+	case TaskEventUserConfirm:
+		return "用户确认"
+	case TaskEventUserAdjust:
+		return "用户调整"
+	default:
+		return ""
+	}
+}

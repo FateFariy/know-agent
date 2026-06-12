@@ -4,7 +4,17 @@ package vo
 type PipelineType = int
 
 const (
-	PipelineTypeUnknown PipelineType = iota
-	PipelineTypeParent
-	PipelineTypeChild
+	PipelineTypeParent PipelineType = iota + 1 // 父块
+	PipelineTypeChild                          // 子块
 )
+
+func PipelineTypeName(pt PipelineType) string {
+	switch pt {
+	case PipelineTypeParent:
+		return "父块"
+	case PipelineTypeChild:
+		return "子块"
+	default:
+		return ""
+	}
+}

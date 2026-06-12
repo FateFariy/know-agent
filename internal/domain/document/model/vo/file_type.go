@@ -35,3 +35,22 @@ func DetectFileType(fileName string) FileType {
 		return FileTypeUnknown
 	}
 }
+
+func FileTypeName(fileType FileType) string {
+	switch fileType {
+	case FileTypePDF:
+		return "PDF"
+	case FileTypeDOCX:
+		return "DOCX"
+	case FileTypeDOC:
+		return "DOC"
+	case FileTypeTXT:
+		return "TXT"
+	case FileTypeMD:
+		return "MD"
+	case FileTypeHTML:
+		return "HTML"
+	default:
+		return "未知"
+	}
+}

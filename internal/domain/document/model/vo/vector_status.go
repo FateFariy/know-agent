@@ -10,3 +10,18 @@ const (
 	VectorStatusBuilt
 	VectorStatusFailed
 )
+
+func VectorStatusName(vs VectorStatus) string {
+	switch vs {
+	case VectorStatusPending:
+		return "待构建"
+	case VectorStatusBuilding:
+		return "构建中"
+	case VectorStatusBuilt:
+		return "已构建"
+	case VectorStatusFailed:
+		return "构建失败"
+	default:
+		return "未知"
+	}
+}

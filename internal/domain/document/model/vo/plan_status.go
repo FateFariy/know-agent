@@ -9,3 +9,16 @@ const (
 	PlanStatusConfirmed
 	PlanStatusDiscarded
 )
+
+func PlanStatusName(status PlanStatus) string {
+	switch status {
+	case PlanStatusRecommended:
+		return "已推荐"
+	case PlanStatusConfirmed:
+		return "已确认"
+	case PlanStatusDiscarded:
+		return "已废弃"
+	default:
+		return "未知"
+	}
+}
