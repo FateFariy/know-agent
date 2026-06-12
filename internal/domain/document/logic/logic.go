@@ -8,8 +8,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-// DocumentLifecycleLogic 文档生命周期业务逻辑接口
-type DocumentLifecycleLogic interface {
+// LifecycleLogic 生命周期业务逻辑接口
+type LifecycleLogic interface {
 	// Upload 上传文档
 	Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, doc *entity.Document) (*vo.DocumentUpload, error)
 
@@ -27,10 +27,10 @@ type DocumentLifecycleLogic interface {
 
 	// // ConfirmStrategy 确认策略
 	// ConfirmStrategy(ctx context.Context, req *vo.DocumentStrategyConfirm) (*vo.DocumentStrategyConfirmVo, error)
-	//
-	// // BuildIndex 构建索引
-	// BuildIndex(ctx context.Context, req *vo.DocumentIndexBuild) (*vo.DocumentIndexBuildVo, error)
-	//
+
+	// BuildIndex 构建索引
+	BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error)
+
 	// // QueryTaskLogs 查询任务日志
 	// QueryTaskLogs(ctx context.Context, req *vo.DocumentTaskLogQuery) (*vo.DocumentTaskLogQueryVo, error)
 	//
@@ -41,11 +41,15 @@ type DocumentLifecycleLogic interface {
 	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVo, error)
 }
 
-// DocumentAsyncProcessingLogic 文档异步处理业务逻辑接口
-type DocumentAsyncProcessingLogic interface {
+// AsyncProcessingLogic 异步处理业务逻辑接口
+type AsyncProcessingLogic interface {
 	// HandleParseRoute 处理解析路由任务
-	HandleParseRoute(ctx context.Context, documentId, taskId int64)
+	HandleParseRoute(ctx context.Context, documentId, taskId int64) error
 
 	// HandleIndexBuild 处理索引构建任务
-	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64)
+	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) error
+}
+
+type ParserLogic interface {
+	Parse(ctx context.Context, bytes []byte, originalFileName string, mimeType, fileType int) (*vo.DocumentAnalysisResult, error)
 }

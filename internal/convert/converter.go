@@ -15,6 +15,7 @@ import (
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
 // goverter:extend .*
+// goverter:skipCopySameType
 //
 //go:generate goverter gen .
 type DocumentConverter interface {
@@ -28,6 +29,7 @@ type DocumentConverter interface {
 	ToQueryStrategyPlanResp(src *entity.Document) *document.QueryStrategyPlanResp
 	// goverter:map ID PlanId
 	ToDocumentStrategyPlan(src *entity.DocumentStrategyPlan) *document.DocumentStrategyPlan
+	ToBuildIndexResp(src *vo.DocumentIndexBuild) *document.BuildIndexResp
 
 	ToDocumentModel(src *entity.Document) *model.Document
 	ToDocumentTaskModel(src *entity.DocumentTask) *model.DocumentTask

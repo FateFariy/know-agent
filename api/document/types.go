@@ -4,13 +4,20 @@
 package document
 
 type BuildIndexReq struct {
-	DocumentId int64 `json:"documentId"` // 文档ID
-	PlanId     int64 `json:"planId"`     // 方案ID
-	OperatorId int64 `json:"operatorId"` // 操作人ID
+	DocumentId int64 `json:"documentId"`          // 文档ID
+	PlanId     int64 `json:"planId"`              // 方案ID
+	OperatorId int64 `json:"operatorId,optional"` // 操作人ID
 }
 
 type BuildIndexResp struct {
-	TaskId int64 `json:"taskId"` // 任务ID
+	TaskId          int64  `json:"taskId"`          // 任务ID
+	DocumentId      int64  `json:"documentId"`      // 文档ID
+	TaskType        int    `json:"taskType"`        // 任务类型
+	TaskTypeName    string `json:"taskTypeName"`    // 任务类型名
+	TaskStatus      int    `json:"taskStatus"`      // 任务状态
+	TaskStatusName  string `json:"taskStatusName"`  // 任务状态名
+	IndexStatus     int    `json:"indexStatus"`     // 索引状态
+	IndexStatusName string `json:"indexStatusName"` // 索引状态名
 }
 
 type ConfirmStrategyReq struct {

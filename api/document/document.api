@@ -40,7 +40,7 @@ type (
 	ConfirmStrategyReq {
 		DocumentId  int64               `json:"documentId"` // 文档ID
 		BasePlanId  int64               `json:"basePlanId"` // 基础方案ID
-		OperatorId  int64             `json:"operatorId,optional"` // 操作人ID
+		OperatorId  int64               `json:"operatorId,optional"` // 操作人ID
 		AdjustNote  string              `json:"adjustNote,optional"` // 调整备注
 		ParentSteps []*StrategyStepItem `json:"parentSteps"` // 父块步骤
 		ChildSteps  []*StrategyStepItem `json:"childSteps"` // 子块步骤
@@ -52,9 +52,9 @@ type (
 	}
 	// 执行文档索引构建请求
 	BuildIndexReq {
-		DocumentId int64  `json:"documentId"` // 文档ID
-		PlanId     int64  `json:"planId"` // 方案ID
-		OperatorId int64  `json:"operatorId"` // 操作人ID
+		DocumentId int64 `json:"documentId"` // 文档ID
+		PlanId     int64 `json:"planId"` // 方案ID
+		OperatorId int64 `json:"operatorId,optional"` // 操作人ID
 	}
 	// 查询文档chunk列表请求
 	QueryDocumentChunksReq {
@@ -166,18 +166,18 @@ type (
 	}
 	// 策略步骤
 	DocumentStrategyStep {
-		StepNo             int    `json:"stepNo"` // 步骤序号
-		PipelineType       int    `json:"pipelineType"` // 流水线类型
-		PipelineTypeName   string `json:"pipelineTypeName"` // 流水线类型名称
-		StrategyType       int    `json:"strategyType"` // 策略类型
-		StrategyTypeName   string `json:"strategyTypeName"` // 策略类型名称
-		StrategyRole       int    `json:"strategyRole"` // 策略角色
-		StrategyRoleName   string `json:"strategyRoleName"` // 策略角色名称
-		SourceType         int    `json:"sourceType"` // 来源类型
-		SourceTypeName     string `json:"sourceTypeName"` // 来源类型名称
-		ExecuteStatus      int    `json:"executeStatus"` // 执行状态
-		ExecuteStatusName  string `json:"executeStatusName"` // 执行状态名称
-		RecommendReason    string `json:"recommendReason"` // 推荐理由
+		StepNo            int    `json:"stepNo"` // 步骤序号
+		PipelineType      int    `json:"pipelineType"` // 流水线类型
+		PipelineTypeName  string `json:"pipelineTypeName"` // 流水线类型名称
+		StrategyType      int    `json:"strategyType"` // 策略类型
+		StrategyTypeName  string `json:"strategyTypeName"` // 策略类型名称
+		StrategyRole      int    `json:"strategyRole"` // 策略角色
+		StrategyRoleName  string `json:"strategyRoleName"` // 策略角色名称
+		SourceType        int    `json:"sourceType"` // 来源类型
+		SourceTypeName    string `json:"sourceTypeName"` // 来源类型名称
+		ExecuteStatus     int    `json:"executeStatus"` // 执行状态
+		ExecuteStatusName string `json:"executeStatusName"` // 执行状态名称
+		RecommendReason   string `json:"recommendReason"` // 推荐理由
 	}
 	// 确认文档策略方案响应
 	ConfirmStrategyResp {
@@ -192,7 +192,14 @@ type (
 	}
 	// 执行文档索引构建响应
 	BuildIndexResp {
-		TaskId int64 `json:"taskId"` // 任务ID
+		TaskId          int64  `json:"taskId"` // 任务ID
+		DocumentId      int64  `json:"documentId"` // 文档ID
+		TaskType        int    `json:"taskType"` // 任务类型
+		TaskTypeName    string `json:"taskTypeName"` // 任务类型名
+		TaskStatus      int    `json:"taskStatus"` // 任务状态
+		TaskStatusName  string `json:"taskStatusName"` // 任务状态名
+		IndexStatus     int    `json:"indexStatus"` // 索引状态
+		IndexStatusName string `json:"indexStatusName"` // 索引状态名
 	}
 	// 查询文档chunk列表响应
 	QueryDocumentChunksResp {

@@ -8,6 +8,7 @@ import (
 	entity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
+	"time"
 )
 
 func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document {
@@ -23,6 +24,19 @@ func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document 
 		pEntityDocument = &entityDocument
 	}
 	return pEntityDocument
+}
+func ToBuildIndexResp(source *vo.DocumentIndexBuild) *document.BuildIndexResp {
+	var pDocumentBuildIndexResp *document.BuildIndexResp
+	if source != nil {
+		var documentBuildIndexResp document.BuildIndexResp
+		documentBuildIndexResp.TaskId = (*source).TaskId
+		documentBuildIndexResp.DocumentId = (*source).DocumentId
+		documentBuildIndexResp.TaskType = (*source).TaskType
+		documentBuildIndexResp.TaskStatus = (*source).TaskStatus
+		documentBuildIndexResp.IndexStatus = (*source).IndexStatus
+		pDocumentBuildIndexResp = &documentBuildIndexResp
+	}
+	return pDocumentBuildIndexResp
 }
 func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
@@ -154,8 +168,8 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 		modelDocumentTask.TriggerSource = (*source).TriggerSource
 		modelDocumentTask.StrategySnapshot = (*source).StrategySnapshot
 		modelDocumentTask.RetryCount = (*source).RetryCount
-		modelDocumentTask.StartTime = (*source).StartTime
-		modelDocumentTask.FinishTime = (*source).FinishTime
+		modelDocumentTask.StartTime = timeTimeToTimeTime((*source).StartTime)
+		modelDocumentTask.FinishTime = timeTimeToTimeTime((*source).FinishTime)
 		modelDocumentTask.CostMillis = (*source).CostMillis
 		modelDocumentTask.ErrorCode = (*source).ErrorCode
 		modelDocumentTask.ErrorMsg = (*source).ErrorMsg
@@ -232,4 +246,7 @@ func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity.D
 		pDocumentDocumentStrategyStep = &documentDocumentStrategyStep
 	}
 	return pDocumentDocumentStrategyStep
+}
+func timeTimeToTimeTime(source time.Time) time.Time {
+	return source
 }

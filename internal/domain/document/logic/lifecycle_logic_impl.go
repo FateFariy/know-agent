@@ -11,6 +11,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/slice"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -28,7 +29,7 @@ type LifecycleLogicImpl struct {
 	repo adapter.DocumentRepository
 }
 
-var _ DocumentLifecycleLogic = (*LifecycleLogicImpl)(nil)
+var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
 func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
@@ -111,7 +112,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 		LogLevel:     vo.LogLevelInfo,
 		OperatorType: utils.Ternary(document.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
 		OperatorId:   document.OperatorId,
-		Content:      "文件上传完成，已进入解析与策略推荐队列。",
+		Content:      "文件上传完成，已进入解析与策略推荐队列",
 		DetailJson:   string(detail),
 	}
 
@@ -126,10 +127,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	}
 
 	// 发送解析消息至MQ，触发后续解析流程
-	parseMessage := vo.DocumentParseMessage{
-		DocumentId: documentId,
-		TaskId:     taskId,
-	}
+	parseMessage := map[string]any{"documentId": documentId, "taskId": taskId}
 	if err = d.port.Send(ctx, d.conf.MQ.ParseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
 		return nil, err
 	}
@@ -485,7 +483,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 // 			d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
 // 			d.parseOptionalLong(req.OperatorId),
 // 			"用户已确认最终策略方案。",
-// 			map[string]interface{}{
+// 			map[string]any{
 // 				"planId":              targetPlanId,
 // 				"parentStrategyTypes": normalizedParentTypeList,
 // 				"childStrategyTypes":  normalizedChildTypeList,
@@ -506,98 +504,104 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 // 		ChildPipeline:     d.toPipelineVo(vo.PipelineTypeChild, targetStepList),
 // 	}, nil
 // }
-//
-// // BuildIndex 构建索引
-// func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
-// 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	if document.ParseStatus != int(vo.ParseStatusParseSuccess) ||
-// 		document.StrategyStatus != int(vo.StrategyStatusConfirmed) {
-// 		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档尚未完成\"解析成功 + 策略确认\"，不能构建索引。")
-// 	}
-//
-// 	if document.CurrentPlanId != req.PlanId {
-// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的生效方案与请求方案不一致。")
-// 	}
-//
-// 	runningTaskCount, err := d.repo.CountActiveTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if runningTaskCount > 0 {
-// 		return nil, common.NewBizError(DocumentManageCodeIndexTaskRunning, "索引任务正在运行中")
-// 	}
-//
-// 	plan, err := d.repo.GetPlanById(ctx, req.PlanId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if plan == nil || plan.Status != int(entity.BusinessStatusYes) {
-// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
-// 	}
-//
-// 	taskId := utils.GetSnowflakeNextID()
-// 	task := &entity.DocumentTask{
-// 		Model: common.Model{
-// 			Id:         taskId,
-// 			CreateTime: time.Now().UnixMilli(),
-// 			EditTime:   time.Now().UnixMilli(),
-// 			Status:     int(entity.BusinessStatusYes),
-// 		},
-// 		DocumentId:       document.Id,
-// 		PlanId:           req.PlanId,
-// 		TaskType:         int(vo.TaskTypeBuildIndex),
-// 		TaskStatus:       int(vo.TaskStatusNew),
-// 		CurrentStage:     int(vo.TaskStageChunkExecute),
-// 		TriggerSource:    d.resolveTriggerSource(d.parseOptionalLong(req.OperatorId)),
-// 		StrategySnapshot: plan.StrategySnapshot,
-// 		RetryCount:       0,
-// 	}
-//
-// 	err = d.repo.InsertTask(ctx, task)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	document.IndexStatus = int(vo.IndexStatusBuilding)
-// 	err = d.repo.UpdateDocument(ctx, document)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	err = d.saveTaskLog(ctx, taskId, document.Id,
-// 		int(vo.TaskStageChunkExecute),
-// 		int(vo.TaskEventStart),
-// 		int(vo.LogLevelInfo),
-// 		d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-// 		d.parseOptionalLong(req.OperatorId),
-// 		"索引构建任务已创建，等待异步执行。",
-// 		map[string]interface{}{
-// 			"planId":           req.PlanId,
-// 			"strategySnapshot": plan.StrategySnapshot,
-// 		})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	// 发送索引构建消息（TODO: 实现消息发送）
-// 	// d.kafkaProducer.SendIndexBuild(&DocumentIndexBuildMessage{DocumentId: document.Id, TaskId: taskId, PlanId: req.PlanId})
-//
-// 	return &vo.DocumentIndexBuildVo{
-// 		DocumentId:     document.Id,
-// 		TaskId:         taskId,
-// 		TaskType:       task.TaskType,
-// 		TaskTypeMsg:    d.enumMsg(vo.TaskType(task.TaskType)),
-// 		TaskStatus:     task.TaskStatus,
-// 		TaskStatusMsg:  d.enumMsg(vo.TaskStatus(task.TaskStatus)),
-// 		IndexStatus:    document.IndexStatus,
-// 		IndexStatusMsg: d.enumMsg(vo.IndexStatus(document.IndexStatus)),
-// 	}, nil
-// }
-//
+
+// BuildIndex 构建文档索引 - 异步任务模式，创建任务后发送MQ消息触发实际索引构建
+func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error) {
+	// 基础校验：查询文档详情
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 状态校验：文档必须完成解析且策略已确认
+	if document.ParseStatus != vo.ParseStatusParseSuccess || document.StrategyStatus != vo.StrategyStatusConfirmed {
+		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, "当前文档尚未完成\"解析成功 + 策略确认\"，不能构建索引")
+	}
+
+	// 方案一致性校验：请求的方案需与文档当前生效方案一致
+	if document.CurrentPlanId != planId {
+		return nil, common.NewBizError(errorx.ErrStrategyPlanNotFound.Code, "当前文档的生效方案与请求方案不一致。")
+	}
+
+	// 并发控制：检查是否存在同类型的活跃任务，防止重复构建
+	runningTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskTypeBuildIndex, vo.TaskStatusNew, vo.TaskStatusRunning)
+	if err != nil {
+		return nil, err
+	}
+	if runningTaskCount > 0 {
+		return nil, errorx.ErrIndexTaskRunning // 已有索引任务在运行中
+	}
+
+	// 查询策略方案，获取策略快照用于任务执行
+	plan, err := d.repo.SelectPlanById(ctx, planId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 更新文档状态为"构建中"
+	document.IndexStatus = vo.IndexStatusBuilding
+
+	// 创建索引构建任务实体
+	taskId := utils.GetSnowflakeNextID() // 生成全局唯一任务ID
+	task := &entity.DocumentTask{
+		ID:               taskId,
+		DocumentId:       documentId,
+		PlanId:           planId,
+		TaskType:         vo.TaskTypeBuildIndex,                                                       // 任务类型：索引构建
+		TaskStatus:       vo.TaskStatusNew,                                                            // 初始状态：新建
+		CurrentStage:     vo.TaskStageChunkExecute,                                                    // 当前阶段：切分执行
+		TriggerSource:    utils.Ternary(operatorId > 0, vo.TriggerSourceUser, vo.TriggerSourceSystem), // 判断触发来源
+		StrategySnapshot: plan.StrategySnapshot,                                                       // 策略快照，确保任务执行时策略不变
+		RetryCount:       0,                                                                           // 重试次数初始化为0
+	}
+
+	// 构建任务日志详情JSON
+	detail, _ := json.Marshal(map[string]any{
+		"planId":           planId,
+		"strategySnapshot": plan.StrategySnapshot,
+	})
+
+	// 创建任务日志实体
+	taskLog := &entity.DocumentTaskLog{
+		TaskId:       taskId,
+		DocumentId:   documentId,
+		StageType:    vo.TaskStageChunkExecute,
+		EventType:    vo.TaskEventStart, // 事件类型：任务开始
+		LogLevel:     vo.LogLevelInfo,   // 日志级别：信息
+		OperatorType: utils.Ternary(operatorId > 0, vo.OperatorTypeUser, vo.OperatorTypeSystem),
+		Content:      "索引构建任务已创建，等待异步执行",
+		DetailJson:   string(detail),
+	}
+
+	// 聚合文档、任务、日志，执行原子性保存
+	agg := &aggregate.Document{
+		Document: document,
+		Task:     task,
+		TaskLog:  taskLog,
+	}
+	if err = d.repo.InsertOrUpdateDocumentAggregate(ctx, agg); err != nil {
+		return nil, err
+	}
+
+	// 发送MQ消息触发异步索引构建
+	indexBuildMessage := map[string]any{"documentId": documentId, "taskId": taskId, "planId": planId}
+	if err = d.port.Send(ctx, d.conf.MQ.IndexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
+		return nil, err
+	}
+
+	// 组装返回结果，填充枚举名称便于前端展示
+	indexBuild := &vo.DocumentIndexBuild{
+		DocumentId:  documentId,
+		TaskId:      taskId,
+		TaskType:    vo.TaskTypeBuildIndex,
+		TaskStatus:  vo.TaskStatusNew,
+		IndexStatus: vo.IndexStatusBuilding,
+	}
+	indexBuild.FillEnumNames()
+
+	return indexBuild, nil
+}
+
 // // QueryTaskLogs 查询任务日志
 // func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
 // 	task, err := d.repo.GetTaskById(ctx, req.TaskId)
@@ -809,7 +813,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 // 	return result, nil
 // }
 //
-// func (d *LifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]interface{}) error {
+// func (d *LifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]any) error {
 // 	// TODO: 序列化detail为JSON
 // 	detailJson := ""
 // 	if len(detail) > 0 {
@@ -1032,24 +1036,6 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 // 		return int(vo.PipelineTypeParent)
 // 	}
 // 	return int(vo.PipelineTypeChild)
-// }
-//
-// func (d *LifecycleLogicImpl) resolveTriggerSource(operatorId int64) int {
-// 	if operatorId > 0 {
-// 		return vo.TriggerSourceUser
-// 	}
-// 	return vo.TriggerSourceSystem
-// }
-//
-// func (d *LifecycleLogicImpl) parseOptionalLong(rawValue string) int64 {
-// 	if strings.TrimSpace(rawValue) == "" {
-// 		return 0
-// 	}
-// 	value, err := strconv.ParseInt(rawValue, 10, 64)
-// 	if err != nil || value <= 0 {
-// 		return 0
-// 	}
-// 	return value
 // }
 //
 // func (d *LifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {

@@ -11,12 +11,12 @@ import (
 )
 
 type DocumentService struct {
-	l logic.DocumentLifecycleLogic
+	l logic.LifecycleLogic
 }
 
 var _ document.HTTPServer = (*DocumentService)(nil)
 
-func NewDocumentService(l logic.DocumentLifecycleLogic) *DocumentService {
+func NewDocumentService(l logic.LifecycleLogic) *DocumentService {
 	return &DocumentService{
 		l: l,
 	}
@@ -68,9 +68,10 @@ func (d *DocumentService) ConfirmStrategy(ctx context.Context, req *document.Con
 	panic("implement me")
 }
 
+// BuildIndex 构建索引
 func (d *DocumentService) BuildIndex(ctx context.Context, req *document.BuildIndexReq) (*document.BuildIndexResp, error) {
-	// TODO implement me
-	panic("implement me")
+	resp, err := d.l.BuildIndex(ctx, req.DocumentId, req.PlanId, req.OperatorId)
+	return convert.ToBuildIndexResp(resp), err
 }
 
 func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document.QueryDocumentChunksReq) (*document.QueryDocumentChunksResp, error) {
