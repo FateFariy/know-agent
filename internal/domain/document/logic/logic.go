@@ -40,3 +40,12 @@ type DocumentLifecycleLogic interface {
 	// // QueryDocumentChunkDetail 查询文档块详情
 	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVo, error)
 }
+
+// DocumentAsyncProcessingLogic 文档异步处理业务逻辑接口
+type DocumentAsyncProcessingLogic interface {
+	// HandleParseRoute 处理解析路由任务
+	HandleParseRoute(ctx context.Context, documentId, taskId int64)
+
+	// HandleIndexBuild 处理索引构建任务
+	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64)
+}

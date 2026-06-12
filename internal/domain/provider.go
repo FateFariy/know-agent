@@ -9,6 +9,6 @@ import (
 
 var ProviderSet = wire.NewSet(
 	logic.NewDocumentLifecycleLogicImpl,
-	wire.Bind(new(logic.DocumentLifecycleLogic), new(*logic.DocumentLifecycleLogicImpl)),
+	wire.Bind(new(logic.DocumentLifecycleLogic), new(*logic.LifecycleLogicImpl)),
 	adapter.NewDocumentPort,
 )

@@ -12,7 +12,7 @@ type (
 	// 文档上传请求
 	UploadDocumentReq {
 		DocumentName       string `json:"documentName"` // 文档名称
-		OperatorId         string `json:"operatorId"` // 操作人ID
+		OperatorId         int64  `json:"operatorId"` // 操作人ID
 		KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
 		KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
 		BusinessCategory   string `json:"businessCategory"` // 业务分类
@@ -40,7 +40,7 @@ type (
 	ConfirmStrategyReq {
 		DocumentId  int64               `json:"documentId"` // 文档ID
 		BasePlanId  int64               `json:"basePlanId"` // 基础方案ID
-		OperatorId  string              `json:"operatorId,optional"` // 操作人ID
+		OperatorId  int64             `json:"operatorId,optional"` // 操作人ID
 		AdjustNote  string              `json:"adjustNote,optional"` // 调整备注
 		ParentSteps []*StrategyStepItem `json:"parentSteps"` // 父块步骤
 		ChildSteps  []*StrategyStepItem `json:"childSteps"` // 子块步骤
@@ -54,7 +54,7 @@ type (
 	BuildIndexReq {
 		DocumentId int64  `json:"documentId"` // 文档ID
 		PlanId     int64  `json:"planId"` // 方案ID
-		OperatorId string `json:"operatorId"` // 操作人ID
+		OperatorId int64  `json:"operatorId"` // 操作人ID
 	}
 	// 查询文档chunk列表请求
 	QueryDocumentChunksReq {

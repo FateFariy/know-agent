@@ -6,9 +6,24 @@ package convert
 import (
 	document "github.com/swiftbit/know-agent/api/document"
 	entity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	vo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
+func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document {
+	var pEntityDocument *entity.Document
+	if source != nil {
+		var entityDocument entity.Document
+		entityDocument.DocumentName = (*source).DocumentName
+		entityDocument.KnowledgeScopeCode = (*source).KnowledgeScopeCode
+		entityDocument.KnowledgeScopeName = (*source).KnowledgeScopeName
+		entityDocument.BusinessCategory = (*source).BusinessCategory
+		entityDocument.DocumentTags = (*source).DocumentTags
+		entityDocument.OperatorId = (*source).OperatorId
+		pEntityDocument = &entityDocument
+	}
+	return pEntityDocument
+}
 func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
@@ -166,6 +181,20 @@ func ToQueryStrategyPlanResp(source *entity.Document) *document.QueryStrategyPla
 		pDocumentQueryStrategyPlanResp = &documentQueryStrategyPlanResp
 	}
 	return pDocumentQueryStrategyPlanResp
+}
+func ToUploadDocumentResp(source *vo.DocumentUpload) *document.UploadDocumentResp {
+	var pDocumentUploadDocumentResp *document.UploadDocumentResp
+	if source != nil {
+		var documentUploadDocumentResp document.UploadDocumentResp
+		documentUploadDocumentResp.DocumentId = (*source).DocumentId
+		documentUploadDocumentResp.TaskId = (*source).TaskId
+		documentUploadDocumentResp.DocumentName = (*source).DocumentName
+		documentUploadDocumentResp.ParseStatus = (*source).ParseStatus
+		documentUploadDocumentResp.StrategyStatus = (*source).StrategyStatus
+		documentUploadDocumentResp.IndexStatus = (*source).IndexStatus
+		pDocumentUploadDocumentResp = &documentUploadDocumentResp
+	}
+	return pDocumentUploadDocumentResp
 }
 func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline

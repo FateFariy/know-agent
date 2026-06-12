@@ -36,7 +36,7 @@ func (d *DocumentStrategyPlan) FillEnumNames() {
 type DocumentStrategyStep struct {
 	ID                int64  `gorm:"column:id;primaryKey"`    // 主键ID
 	DocumentId        int64  `gorm:"column:document_id"`      // 文档ID
-	PlanId            int    `gorm:"column:plan_id"`          // 方案ID
+	PlanId            int64  `gorm:"column:plan_id"`          // 方案ID
 	StepNo            int    `gorm:"column:step_no"`          // 步骤序号
 	PipelineType      int    `gorm:"column:pipeline_type"`    // 流水线类型
 	StrategyType      int    `gorm:"column:strategy_type"`    // 策略类型

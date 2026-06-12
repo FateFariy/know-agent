@@ -22,9 +22,11 @@ func NewDocumentService(l logic.DocumentLifecycleLogic) *DocumentService {
 	}
 }
 
+// UploadDocument 上传文档
 func (d *DocumentService) UploadDocument(ctx context.Context, file multipart.File, header *multipart.FileHeader, req *document.UploadDocumentReq) (*document.UploadDocumentResp, error) {
-	// TODO implement me
-	panic("implement me")
+	doc := convert.FromUploadDocumentReq(req)
+	documentUpload, err := d.l.Upload(ctx, file, header, doc)
+	return convert.ToUploadDocumentResp(documentUpload), err
 }
 
 // QueryDocumentPage 查询文档分页列表

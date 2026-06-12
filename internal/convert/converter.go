@@ -5,6 +5,7 @@ import (
 
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
@@ -17,6 +18,9 @@ import (
 //
 //go:generate goverter gen .
 type DocumentConverter interface {
+	FromUploadDocumentReq(src *document.UploadDocumentReq) *entity.Document
+
+	ToUploadDocumentResp(src *vo.DocumentUpload) *document.UploadDocumentResp
 	// goverter:map ID DocumentId
 	ToDocumentListItem(src *entity.Document) *document.DocumentListItem
 	ToDocumentListItemList(src []*entity.Document) []*document.DocumentListItem

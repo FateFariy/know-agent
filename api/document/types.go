@@ -4,9 +4,9 @@
 package document
 
 type BuildIndexReq struct {
-	DocumentId int64  `json:"documentId"` // 文档ID
-	PlanId     int64  `json:"planId"`     // 方案ID
-	OperatorId string `json:"operatorId"` // 操作人ID
+	DocumentId int64 `json:"documentId"` // 文档ID
+	PlanId     int64 `json:"planId"`     // 方案ID
+	OperatorId int64 `json:"operatorId"` // 操作人ID
 }
 
 type BuildIndexResp struct {
@@ -16,7 +16,7 @@ type BuildIndexResp struct {
 type ConfirmStrategyReq struct {
 	DocumentId  int64               `json:"documentId"`          // 文档ID
 	BasePlanId  int64               `json:"basePlanId"`          // 基础方案ID
-	OperatorId  string              `json:"operatorId,optional"` // 操作人ID
+	OperatorId  int64               `json:"operatorId,optional"` // 操作人ID
 	AdjustNote  string              `json:"adjustNote,optional"` // 调整备注
 	ParentSteps []*StrategyStepItem `json:"parentSteps"`         // 父块步骤
 	ChildSteps  []*StrategyStepItem `json:"childSteps"`          // 子块步骤
@@ -193,7 +193,7 @@ type TaskLog struct {
 
 type UploadDocumentReq struct {
 	DocumentName       string `json:"documentName"`       // 文档名称
-	OperatorId         string `json:"operatorId"`         // 操作人ID
+	OperatorId         int64  `json:"operatorId"`         // 操作人ID
 	KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
 	KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
 	BusinessCategory   string `json:"businessCategory"`   // 业务分类

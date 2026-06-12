@@ -22,29 +22,16 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// DocumentManageCode 文档管理错误码
-const (
-	DocumentManageCodeDocumentNotFound     = 20003
-	DocumentManageCodeStrategyPlanNotFound = 20005
-	DocumentManageCodeStrategyStepEmpty    = 20006
-	DocumentManageCodeIndexTaskRunning     = 20007
-)
-
-// BaseCodeParameterError 参数错误码
-const (
-	BaseCodeParameterError = 400
-)
-
-type DocumentLifecycleLogicImpl struct {
+type LifecycleLogicImpl struct {
 	conf config.Config
 	port *adapter.DocumentPort
 	repo adapter.DocumentRepository
 }
 
-var _ DocumentLifecycleLogic = (*DocumentLifecycleLogicImpl)(nil)
+var _ DocumentLifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *DocumentLifecycleLogicImpl {
-	return &DocumentLifecycleLogicImpl{
+func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
+	return &LifecycleLogicImpl{
 		conf: svcCtx.Config,
 		port: port,
 		repo: repo,
@@ -52,7 +39,7 @@ func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.Doc
 }
 
 // Upload 上传文档：完成文件上传、存储、文档记录创建及解析任务下发
-func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUpload, error) {
+func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUpload, error) {
 	// 校验文件类型是否支持
 	fileType := vo.DetectFileType(header.Filename)
 	if fileType == vo.FileTypeUnknown {
@@ -159,7 +146,7 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 }
 
 // QueryDocumentPage 分页查询文档列表（含最新任务信息）
-func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
+func (d *LifecycleLogicImpl) QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
 	// 分页查询文档基础列表
 	documentList, total, err := d.repo.SelectDocumentPage(ctx, pageNo, pageSize, keyword)
 	if err != nil || total == 0 {
@@ -195,7 +182,7 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, page
 }
 
 // QueryDocumentDetail 查询文档详情
-func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, error) {
+func (d *LifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, error) {
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
 		return nil, err
@@ -212,7 +199,7 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 }
 
 // // DeleteDocument 删除文档
-// func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
+// func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
 // 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 // 	if err != nil {
 // 		return "", err
@@ -291,7 +278,7 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 // }
 
 // QueryStrategyPlan 查询策略方案
-func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error) {
+func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error) {
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
 		return nil, nil, err
@@ -321,7 +308,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 }
 
 // // ConfirmStrategy 确认策略
-// func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
+// func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
 // 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 // 	if err != nil {
 // 		return nil, err
@@ -521,7 +508,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // }
 //
 // // BuildIndex 构建索引
-// func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
+// func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
 // 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 // 	if err != nil {
 // 		return nil, err
@@ -612,7 +599,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // }
 //
 // // QueryTaskLogs 查询任务日志
-// func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
+// func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
 // 	task, err := d.repo.GetTaskById(ctx, req.TaskId)
 // 	if err != nil {
 // 		return nil, err
@@ -660,7 +647,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // }
 //
 // // QueryDocumentChunks 查询文档块
-// func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *entity.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
+// func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *entity.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
 // 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 // 	if err != nil {
 // 		return nil, err
@@ -731,7 +718,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // }
 //
 // // QueryDocumentChunkDetail 查询文档块详情
-// func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
+// func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
 // 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
 // 	if err != nil {
 // 		return nil, err
@@ -791,7 +778,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	}, nil
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) resolveChunkTaskId(document *entity.Document, requestedTaskId int64) int64 {
+// func (d *LifecycleLogicImpl) resolveChunkTaskId(document *entity.Document, requestedTaskId int64) int64 {
 // 	if requestedTaskId > 0 {
 // 		return requestedTaskId
 // 	}
@@ -805,7 +792,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return task.ID
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) listParentBlockMap(ctx context.Context, parentBlockIds []int64) (map[int64]*entity.DocumentParentBlock, error) {
+// func (d *LifecycleLogicImpl) listParentBlockMap(ctx context.Context, parentBlockIds []int64) (map[int64]*entity.DocumentParentBlock, error) {
 // 	if len(parentBlockIds) == 0 {
 // 		return map[int64]*entity.DocumentParentBlock{}, nil
 // 	}
@@ -822,7 +809,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return result, nil
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]interface{}) error {
+// func (d *LifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]interface{}) error {
 // 	// TODO: 序列化detail为JSON
 // 	detailJson := ""
 // 	if len(detail) > 0 {
@@ -857,7 +844,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 //
 // // ===== 转换方法 =====
 //
-// func (d *DocumentLifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
+// func (d *LifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
 // 	vo := &vo.DocumentChunkItemVo{
 // 		Id:              chunk.Id,
 // 		ParentBlockId:   chunk.ParentBlockId,
@@ -882,7 +869,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return vo
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *entity.DocumentParentBlock) *vo.DocumentParentBlockItemVo {
+// func (d *LifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *entity.DocumentParentBlock) *vo.DocumentParentBlockItemVo {
 // 	if parentBlock == nil {
 // 		return nil
 // 	}
@@ -923,7 +910,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	}
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
+// func (d *LifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
 // 	// 排序
 // 	sortedSteps := make([]*entity.DocumentStrategyStep, len(stepList))
 // 	copy(sortedSteps, stepList)
@@ -959,7 +946,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return voList
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) toTaskLogVo(logRecord *entity.DocumentTaskLog) *vo.DocumentTaskLogVo {
+// func (d *LifecycleLogicImpl) toTaskLogVo(logRecord *entity.DocumentTaskLog) *vo.DocumentTaskLogVo {
 // 	return &vo.DocumentTaskLogVo{
 // 		Id:           logRecord.Id,
 // 		StageType:    logRecord.StageType,
@@ -976,7 +963,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 //
 // // ===== 工具方法 =====
 //
-// func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
+// func (d *LifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
 // 	if items == nil {
 // 		return []int{}
 // 	}
@@ -1004,7 +991,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return result
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
+// func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
 // 	result := make([]*entity.DocumentStrategyStep, 0)
 // 	for _, step := range stepList {
 // 		pt := step.PipelineType
@@ -1027,34 +1014,34 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return types
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
+// func (d *LifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
 // 	parentVo := d.toPipelineVo(vo.PipelineTypeParent, stepList)
 // 	childVo := d.toPipelineVo(vo.PipelineTypeChild, stepList)
 // 	return "PARENT:" + parentVo.StrategySnapshot + ";CHILD:" + childVo.StrategySnapshot
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) pipelineOrder(pipelineType string) int {
+// func (d *LifecycleLogicImpl) pipelineOrder(pipelineType string) int {
 // 	if strings.EqualFold(pipelineType, "PARENT") {
 // 		return 0
 // 	}
 // 	return 1
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) parsePipelineType(pipelineType string) int {
+// func (d *LifecycleLogicImpl) parsePipelineType(pipelineType string) int {
 // 	if strings.EqualFold(pipelineType, "PARENT") {
 // 		return int(vo.PipelineTypeParent)
 // 	}
 // 	return int(vo.PipelineTypeChild)
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) resolveTriggerSource(operatorId int64) int {
+// func (d *LifecycleLogicImpl) resolveTriggerSource(operatorId int64) int {
 // 	if operatorId > 0 {
 // 		return vo.TriggerSourceUser
 // 	}
 // 	return vo.TriggerSourceSystem
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) parseOptionalLong(rawValue string) int64 {
+// func (d *LifecycleLogicImpl) parseOptionalLong(rawValue string) int64 {
 // 	if strings.TrimSpace(rawValue) == "" {
 // 		return 0
 // 	}
@@ -1065,7 +1052,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return value
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {
+// func (d *LifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {
 // 	if strings.TrimSpace(rawValue) == "" {
 // 		panic(common.NewBizError(BaseCodeParameterError, fieldName+"不能为空。"))
 // 	}
@@ -1077,7 +1064,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // }
 //
 //
-// func (d *DocumentLifecycleLogicImpl) distinctIntList(list []int) []int {
+// func (d *LifecycleLogicImpl) distinctIntList(list []int) []int {
 // 	seen := make(map[int]bool)
 // 	result := make([]int, 0)
 // 	for _, v := range list {
@@ -1089,7 +1076,7 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 // 	return result
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) intListEqual(a, b []int) bool {
+// func (d *LifecycleLogicImpl) intListEqual(a, b []int) bool {
 // 	if len(a) != len(b) {
 // 		return false
 // 	}
