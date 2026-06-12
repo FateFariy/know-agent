@@ -211,7 +211,6 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 	return document, nil
 }
 
-//
 // // DeleteDocument 删除文档
 // func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
 // 	document, err := d.repo.SelectDocumentById(ctx, documentId)
@@ -290,46 +289,37 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 //
 // 	return "", nil
 // }
-//
-// // QueryStrategyPlan 查询策略方案
-// func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error) {
-// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	var planVo *vo.DocumentStrategyPlanVo
-// 	planReady := false
-//
-// 	if document.CurrentPlanId > 0 {
-// 		plan, err := d.repo.SelectPlanById(ctx, document.CurrentPlanId)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		if plan != nil && plan.Status == int(entity.BusinessStatusYes) {
-// 			stepList, err := d.repo.QueryStepListByPlanId(ctx, plan.Id)
-// 			if err != nil {
-// 				return nil, err
-// 			}
-// 			planVo = d.toPlanVo(plan, stepList)
-// 			planReady = true
-// 		}
-// 	}
-//
-// 	return &vo.DocumentStrategyPlanQueryVo{
-// 		DocumentId:        document.Id,
-// 		DocumentName:      document.DocumentName,
-// 		ParseStatus:       document.ParseStatus,
-// 		ParseStatusMsg:    d.enumMsg(vo.ParseStatus(document.ParseStatus)),
-// 		StrategyStatus:    document.StrategyStatus,
-// 		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
-// 		IndexStatus:       document.IndexStatus,
-// 		IndexStatusMsg:    d.enumMsg(vo.IndexStatus(document.IndexStatus)),
-// 		ParseErrorMsg:     document.ParseErrorMsg,
-// 		PlanReady:         planReady,
-// 		Plan:              planVo,
-// 	}, nil
-// }
+
+// QueryStrategyPlan 查询策略方案
+func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error) {
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var plan *entity.DocumentStrategyPlan
+
+	if document.CurrentPlanId > 0 {
+		plan, err = d.repo.SelectPlanById(ctx, document.CurrentPlanId)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		stepList, err := d.repo.SelectStepListByPlanId(ctx, plan.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		plan.ParentPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeParent}
+		plan.ParentPipeline.FillAndProcessSteps(stepList)
+		plan.ChildPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeChild}
+		plan.ChildPipeline.FillAndProcessSteps(stepList)
+		document.PlanReady = true
+		document.FillEnumNames()
+	}
+
+	return document, plan, nil
+}
+
 //
 // // ConfirmStrategy 确认策略
 // func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
@@ -868,44 +858,6 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 //
 // // ===== 转换方法 =====
 //
-// func (d *DocumentLifecycleLogicImpl) toDocumentListItemVo(document *entity.Document, latestTask *entity.DocumentTask) *vo.DocumentListItemVo {
-// 	vo := &vo.DocumentListItemVo{
-// 		DocumentId:         document.Id,
-// 		DocumentName:       document.DocumentName,
-// 		OriginalFileName:   document.OriginalFileName,
-// 		FileType:           document.FileType,
-// 		FileTypeMsg:        d.enumMsg(document.FileType),
-// 		FileSize:           document.FileSize,
-// 		CharCount:          document.CharCount,
-// 		TokenCount:         document.TokenCount,
-// 		ParseStatus:        document.ParseStatus,
-// 		ParseStatusMsg:     d.enumMsg(document.ParseStatus),
-// 		StrategyStatus:     document.StrategyStatus,
-// 		StrategyStatusMsg:  d.enumMsg(document.StrategyStatus),
-// 		IndexStatus:        document.IndexStatus,
-// 		IndexStatusMsg:     d.enumMsg(document.IndexStatus),
-// 		ParseErrorMsg:      document.ParseErrorMsg,
-// 		KnowledgeScopeCode: document.KnowledgeScopeCode,
-// 		KnowledgeScopeName: document.KnowledgeScopeName,
-// 		BusinessCategory:   document.BusinessCategory,
-// 		DocumentTags:       document.DocumentTags,
-// 		CurrentPlanId:      document.CurrentPlanId,
-// 		LastIndexTaskId:    document.LastIndexTaskId,
-// 		CreateTime:         document.CreateTime,
-// 		EditTime:           document.EditTime,
-// 	}
-//
-// 	if latestTask != nil {
-// 		vo.LatestTaskId = latestTask.ID
-// 		vo.LatestTaskType = latestTask.TaskType
-// 		vo.LatestTaskTypeMsg = d.enumMsg(vo.TaskType(latestTask.TaskType))
-// 		vo.LatestTaskStatus = latestTask.TaskStatus
-// 		vo.LatestTaskStatusMsg = d.enumMsg(vo.TaskStatus(latestTask.TaskStatus))
-// 	}
-//
-// 	return vo
-// }
-//
 // func (d *DocumentLifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
 // 	vo := &vo.DocumentChunkItemVo{
 // 		Id:              chunk.Id,
@@ -950,32 +902,7 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, do
 // 	}
 // }
 //
-// func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *entity.DocumentStrategyPlan, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPlanVo {
-// 	return &vo.DocumentStrategyPlanVo{
-// 		PlanId:           plan.Id,
-// 		PlanVersion:      plan.PlanVersion,
-// 		PlanSource:       plan.PlanSource,
-// 		PlanSourceMsg:    d.enumMsg(vo.PlanSource(plan.PlanSource)),
-// 		PlanStatus:       plan.PlanStatus,
-// 		PlanStatusMsg:    d.enumMsg(vo.PlanStatus(plan.PlanStatus)),
-// 		StrategySnapshot: plan.StrategySnapshot,
-// 		RecommendReason:  plan.RecommendReason,
-// 		ParentPipeline:   d.toPipelineVo(vo.PipelineTypeParent, stepList),
-// 		ChildPipeline:    d.toPipelineVo(vo.PipelineTypeChild, stepList),
-// 	}
-// }
-//
-// func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPipelineVo {
-// 	pipelineSteps := make([]*entity.DocumentStrategyStep, 0)
-// 	for _, step := range stepList {
-// 		pt := step.PipelineType
-// 		if pt == "" {
-// 			pt = "CHILD"
-// 		}
-// 		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
-// 			pipelineSteps = append(pipelineSteps, step)
-// 		}
-// 	}
+
 //
 // 	// 按步骤序号排序
 // 	sort.Slice(pipelineSteps, func(i, j int) bool {

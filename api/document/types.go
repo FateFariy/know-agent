@@ -14,16 +14,23 @@ type BuildIndexResp struct {
 }
 
 type ConfirmStrategyReq struct {
-	DocumentId  int64               `json:"documentId"`  // 文档ID
-	BasePlanId  int64               `json:"basePlanId"`  // 基础方案ID
-	OperatorId  string              `json:"operatorId"`  // 操作人ID
-	AdjustNote  string              `json:"adjustNote"`  // 调整备注
-	ParentSteps []*StrategyStepItem `json:"parentSteps"` // 父块步骤
-	ChildSteps  []*StrategyStepItem `json:"childSteps"`  // 子块步骤
+	DocumentId  int64               `json:"documentId"`          // 文档ID
+	BasePlanId  int64               `json:"basePlanId"`          // 基础方案ID
+	OperatorId  string              `json:"operatorId,optional"` // 操作人ID
+	AdjustNote  string              `json:"adjustNote,optional"` // 调整备注
+	ParentSteps []*StrategyStepItem `json:"parentSteps"`         // 父块步骤
+	ChildSteps  []*StrategyStepItem `json:"childSteps"`          // 子块步骤
 }
 
 type ConfirmStrategyResp struct {
-	Success bool `json:"success"` // 是否成功
+	DocumentId        int64                     `json:"documentId"`        // 文档ID
+	PlanId            int64                     `json:"planId"`            // 方案ID
+	PlanVersion       int                       `json:"planVersion"`       // 方案版本
+	StrategyStatus    int                       `json:"strategyStatus"`    // 策略状态
+	StrategyStatusMsg string                    `json:"strategyStatusMsg"` // 策略状态描述
+	Normalized        bool                      `json:"normalized"`        // 是否经过标准化
+	ParentPipeline    *DocumentStrategyPipeline `json:"parentPipeline"`    // 父块流水线
+	ChildPipeline     *DocumentStrategyPipeline `json:"childPipeline"`     // 子块流水线
 }
 
 type DeleteDocumentReq struct {
@@ -72,6 +79,41 @@ type DocumentListItem struct {
 	UpdateTime           string `json:"updateTime"`           // 更新时间
 }
 
+type DocumentStrategyPipeline struct {
+	PipelineType     int                     `json:"pipelineType"`     // 流水线类型
+	PipelineTypeName string                  `json:"pipelineTypeName"` // 流水线类型名称
+	StrategySnapshot string                  `json:"strategySnapshot"` // 策略快照
+	Steps            []*DocumentStrategyStep `json:"steps"`            // 步骤列表
+}
+
+type DocumentStrategyPlan struct {
+	PlanId           int64                     `json:"planId"`           // 方案ID
+	PlanVersion      int                       `json:"planVersion"`      // 方案版本
+	PlanSource       int                       `json:"planSource"`       // 方案来源
+	PlanSourceName   string                    `json:"planSourceName"`   // 方案来源名称
+	PlanStatus       int                       `json:"planStatus"`       // 方案状态
+	PlanStatusName   string                    `json:"planStatusName"`   // 方案状态名称
+	StrategySnapshot string                    `json:"strategySnapshot"` // 策略快照
+	RecommendReason  string                    `json:"recommendReason"`  // 推荐理由
+	ParentPipeline   *DocumentStrategyPipeline `json:"parentPipeline"`   // 父块流水线
+	ChildPipeline    *DocumentStrategyPipeline `json:"childPipeline"`    // 子块流水线
+}
+
+type DocumentStrategyStep struct {
+	StepNo            int    `json:"stepNo"`            // 步骤序号
+	PipelineType      int    `json:"pipelineType"`      // 流水线类型
+	PipelineTypeName  string `json:"pipelineTypeName"`  // 流水线类型名称
+	StrategyType      int    `json:"strategyType"`      // 策略类型
+	StrategyTypeName  string `json:"strategyTypeName"`  // 策略类型名称
+	StrategyRole      int    `json:"strategyRole"`      // 策略角色
+	StrategyRoleName  string `json:"strategyRoleName"`  // 策略角色名称
+	SourceType        int    `json:"sourceType"`        // 来源类型
+	SourceTypeName    string `json:"sourceTypeName"`    // 来源类型名称
+	ExecuteStatus     int    `json:"executeStatus"`     // 执行状态
+	ExecuteStatusName string `json:"executeStatusName"` // 执行状态名称
+	RecommendReason   string `json:"recommendReason"`   // 推荐理由
+}
+
 type QueryDocumentChunkDetailReq struct {
 	DocumentId int64 `json:"documentId"` // 文档ID
 	TaskId     int64 `json:"taskId"`     // 任务ID
@@ -112,8 +154,17 @@ type QueryStrategyPlanReq struct {
 }
 
 type QueryStrategyPlanResp struct {
-	DocumentId   int64       `json:"documentId"`   // 文档ID
-	StrategyList []*Strategy `json:"strategyList"` // 策略列表
+	DocumentId         int64                 `json:"documentId"`         // 文档ID
+	DocumentName       string                `json:"documentName"`       // 文档名称
+	ParseStatus        int                   `json:"parseStatus"`        // 解析状态
+	ParseStatusName    string                `json:"parseStatusName"`    // 解析状态名
+	StrategyStatus     int                   `json:"strategyStatus"`     // 策略状态
+	StrategyStatusName string                `json:"strategyStatusName"` // 策略状态名
+	IndexStatus        int                   `json:"indexStatus"`        // 索引状态
+	IndexStatusName    string                `json:"indexStatusName"`    // 索引状态名
+	ParseErrorMsg      string                `json:"parseErrorMsg"`      // 解析错误信息
+	PlanReady          bool                  `json:"planReady"`          // 方案是否就绪
+	Plan               *DocumentStrategyPlan `json:"plan"`               // 策略方案
 }
 
 type QueryTaskLogsReq struct {
@@ -125,11 +176,6 @@ type QueryTaskLogsReq struct {
 type QueryTaskLogsResp struct {
 	List  []*TaskLog `json:"list"`  // 日志列表
 	Total int64      `json:"total"` // 总记录数
-}
-
-type Strategy struct {
-	StrategyId   int64  `json:"strategyId"`   // 策略ID
-	StrategyName string `json:"strategyName"` // 策略名称
 }
 
 type StrategyStepItem struct {

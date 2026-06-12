@@ -90,6 +90,24 @@ func ToDocumentModel(source *entity.Document) *model.Document {
 	}
 	return pModelDocument
 }
+func ToDocumentStrategyPlan(source *entity.DocumentStrategyPlan) *document.DocumentStrategyPlan {
+	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan
+	if source != nil {
+		var documentDocumentStrategyPlan document.DocumentStrategyPlan
+		documentDocumentStrategyPlan.PlanId = (*source).ID
+		documentDocumentStrategyPlan.PlanVersion = (*source).PlanVersion
+		documentDocumentStrategyPlan.PlanSource = (*source).PlanSource
+		documentDocumentStrategyPlan.PlanSourceName = (*source).PlanSourceName
+		documentDocumentStrategyPlan.PlanStatus = (*source).PlanStatus
+		documentDocumentStrategyPlan.PlanStatusName = (*source).PlanStatusName
+		documentDocumentStrategyPlan.StrategySnapshot = (*source).StrategySnapshot
+		documentDocumentStrategyPlan.RecommendReason = (*source).RecommendReason
+		documentDocumentStrategyPlan.ParentPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ParentPipeline)
+		documentDocumentStrategyPlan.ChildPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ChildPipeline)
+		pDocumentDocumentStrategyPlan = &documentDocumentStrategyPlan
+	}
+	return pDocumentDocumentStrategyPlan
+}
 func ToDocumentTaskLogModel(source *entity.DocumentTaskLog) *model.DocumentTaskLog {
 	var pModelDocumentTaskLog *model.DocumentTaskLog
 	if source != nil {
@@ -126,7 +144,63 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 		modelDocumentTask.CostMillis = (*source).CostMillis
 		modelDocumentTask.ErrorCode = (*source).ErrorCode
 		modelDocumentTask.ErrorMsg = (*source).ErrorMsg
+		modelDocumentTask.ExtJson = (*source).ExtJson
 		pModelDocumentTask = &modelDocumentTask
 	}
 	return pModelDocumentTask
+}
+func ToQueryStrategyPlanResp(source *entity.Document) *document.QueryStrategyPlanResp {
+	var pDocumentQueryStrategyPlanResp *document.QueryStrategyPlanResp
+	if source != nil {
+		var documentQueryStrategyPlanResp document.QueryStrategyPlanResp
+		documentQueryStrategyPlanResp.DocumentId = (*source).ID
+		documentQueryStrategyPlanResp.DocumentName = (*source).DocumentName
+		documentQueryStrategyPlanResp.ParseStatus = (*source).ParseStatus
+		documentQueryStrategyPlanResp.ParseStatusName = (*source).ParseStatusName
+		documentQueryStrategyPlanResp.StrategyStatus = (*source).StrategyStatus
+		documentQueryStrategyPlanResp.StrategyStatusName = (*source).StrategyStatusName
+		documentQueryStrategyPlanResp.IndexStatus = (*source).IndexStatus
+		documentQueryStrategyPlanResp.IndexStatusName = (*source).IndexStatusName
+		documentQueryStrategyPlanResp.ParseErrorMsg = (*source).ParseErrorMsg
+		documentQueryStrategyPlanResp.PlanReady = (*source).PlanReady
+		pDocumentQueryStrategyPlanResp = &documentQueryStrategyPlanResp
+	}
+	return pDocumentQueryStrategyPlanResp
+}
+func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
+	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline
+	if source != nil {
+		var documentDocumentStrategyPipeline document.DocumentStrategyPipeline
+		documentDocumentStrategyPipeline.PipelineType = (*source).PipelineType
+		documentDocumentStrategyPipeline.PipelineTypeName = (*source).PipelineTypeName
+		documentDocumentStrategyPipeline.StrategySnapshot = (*source).StrategySnapshot
+		if (*source).Steps != nil {
+			documentDocumentStrategyPipeline.Steps = make([]*document.DocumentStrategyStep, len((*source).Steps))
+			for i := 0; i < len((*source).Steps); i++ {
+				documentDocumentStrategyPipeline.Steps[i] = pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep((*source).Steps[i])
+			}
+		}
+		pDocumentDocumentStrategyPipeline = &documentDocumentStrategyPipeline
+	}
+	return pDocumentDocumentStrategyPipeline
+}
+func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity.DocumentStrategyStep) *document.DocumentStrategyStep {
+	var pDocumentDocumentStrategyStep *document.DocumentStrategyStep
+	if source != nil {
+		var documentDocumentStrategyStep document.DocumentStrategyStep
+		documentDocumentStrategyStep.StepNo = (*source).StepNo
+		documentDocumentStrategyStep.PipelineType = (*source).PipelineType
+		documentDocumentStrategyStep.PipelineTypeName = (*source).PipelineTypeName
+		documentDocumentStrategyStep.StrategyType = (*source).StrategyType
+		documentDocumentStrategyStep.StrategyTypeName = (*source).StrategyTypeName
+		documentDocumentStrategyStep.StrategyRole = (*source).StrategyRole
+		documentDocumentStrategyStep.StrategyRoleName = (*source).StrategyRoleName
+		documentDocumentStrategyStep.SourceType = (*source).SourceType
+		documentDocumentStrategyStep.SourceTypeName = (*source).SourceTypeName
+		documentDocumentStrategyStep.ExecuteStatus = (*source).ExecuteStatus
+		documentDocumentStrategyStep.ExecuteStatusName = (*source).ExecuteStatusName
+		documentDocumentStrategyStep.RecommendReason = (*source).RecommendReason
+		pDocumentDocumentStrategyStep = &documentDocumentStrategyStep
+	}
+	return pDocumentDocumentStrategyStep
 }

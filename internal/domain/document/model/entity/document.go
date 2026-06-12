@@ -46,6 +46,7 @@ type Document struct {
 	LatestTaskTypeName   string    `gorm:"-"`                            // 最新任务类型名称
 	LatestTaskStatus     int       `gorm:"-"`                            // 最新任务状态
 	LatestTaskStatusName string    `gorm:"-"`                            // 最新任务状态名称
+	PlanReady            bool      `gorm:"-"`                            // 方案是否就绪
 }
 
 func (d *Document) FillEnumNames() {

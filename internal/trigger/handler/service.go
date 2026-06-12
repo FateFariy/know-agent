@@ -52,8 +52,13 @@ func (d *DocumentService) DeleteDocument(ctx context.Context, req *document.Dele
 }
 
 func (d *DocumentService) QueryStrategyPlan(ctx context.Context, req *document.QueryStrategyPlanReq) (*document.QueryStrategyPlanResp, error) {
-	// TODO implement me
-	panic("implement me")
+	doc, plan, err := d.l.QueryStrategyPlan(ctx, req.DocumentId)
+	if err != nil {
+		return nil, err
+	}
+	resp := convert.ToQueryStrategyPlanResp(doc)
+	resp.Plan = convert.ToDocumentStrategyPlan(plan)
+	return resp, nil
 }
 
 func (d *DocumentService) ConfirmStrategy(ctx context.Context, req *document.ConfirmStrategyReq) (*document.ConfirmStrategyResp, error) {

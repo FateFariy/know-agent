@@ -165,8 +165,9 @@ func (d *DocumentRepositoryImpl) DeletePlanByDocumentId(ctx context.Context, doc
 }
 
 func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int64) (*entity.DocumentStrategyPlan, error) {
-	// TODO implement me
-	panic("implement me")
+	var plan = &entity.DocumentStrategyPlan{ID: planId}
+	err := d.db.WithContext(ctx).Model(&entity.DocumentStrategyPlan{}).First(plan).Error
+	return plan, err
 }
 
 func (d *DocumentRepositoryImpl) SelectLatestPlanVersion(ctx context.Context, documentId int64) (int, error) {

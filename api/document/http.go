@@ -24,13 +24,13 @@ type HTTPServer interface {
 	// DeleteDocument 删除文档
 	DeleteDocument(ctx context.Context, req *DeleteDocumentReq) (*DeleteDocumentResp, error)
 
-	// QueryStrategyPlan 查询策略方案
+	// QueryStrategyPlan 查询文档策略方案
 	QueryStrategyPlan(ctx context.Context, req *QueryStrategyPlanReq) (*QueryStrategyPlanResp, error)
 
-	// ConfirmStrategy 确认策略
+	// ConfirmStrategy 确认文档策略方案
 	ConfirmStrategy(ctx context.Context, req *ConfirmStrategyReq) (*ConfirmStrategyResp, error)
 
-	// BuildIndex 构建索引
+	// BuildIndex 构建文档索引
 	BuildIndex(ctx context.Context, req *BuildIndexReq) (*BuildIndexResp, error)
 
 	// QueryDocumentChunks 查询文档chunk列表

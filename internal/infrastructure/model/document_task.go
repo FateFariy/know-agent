@@ -17,6 +17,7 @@ type DocumentTask struct {
 	StartTime        int64  `gorm:"column:start_time"`        // 开始时间
 	FinishTime       int64  `gorm:"column:finish_time"`       // 完成时间
 	CostMillis       int64  `gorm:"column:cost_millis"`       // 耗时(毫秒)
-	ErrorCode        int    `gorm:"column:error_code"`        // 错误码
+	ErrorCode        string `gorm:"column:error_code"`        // 错误码
 	ErrorMsg         string `gorm:"column:error_msg"`         // 错误信息
+	ExtJson          string `gorm:"column:ext_json"`          // 扩展JSON
 }
