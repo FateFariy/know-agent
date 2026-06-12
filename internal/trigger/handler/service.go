@@ -27,6 +27,7 @@ func (d *DocumentService) UploadDocument(ctx context.Context, file multipart.Fil
 	panic("implement me")
 }
 
+// QueryDocumentPage 查询文档分页列表
 func (d *DocumentService) QueryDocumentPage(ctx context.Context, req *document.QueryDocumentPageReq) (*document.QueryDocumentPageResp, error) {
 	keyword := strings.TrimSpace(req.Keyword)
 	documents, total, err := d.l.QueryDocumentPage(ctx, req.PageNo, req.PageSize, keyword)
@@ -34,14 +35,17 @@ func (d *DocumentService) QueryDocumentPage(ctx context.Context, req *document.Q
 		PageNo:   req.PageNo,
 		PageSize: req.PageSize,
 		Total:    total,
-		Records:  convert.ToDocumentListItem(documents),
+		Records:  convert.ToDocumentListItemList(documents),
 	}, err
 }
 
+// QueryDocumentDetail 查询文档详情
 func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document.QueryDocumentDetailReq) (*document.DocumentListItem, error) {
-	document, _, err := d.l.QueryDocumentDetail(ctx, req.DocumentId)
+	detail, err := d.l.QueryDocumentDetail(ctx, req.DocumentId)
+	return convert.ToDocumentListItem(detail), err
 }
 
+// DeleteDocument 删除文档
 func (d *DocumentService) DeleteDocument(ctx context.Context, req *document.DeleteDocumentReq) (*document.DeleteDocumentResp, error) {
 	// TODO implement me
 	panic("implement me")

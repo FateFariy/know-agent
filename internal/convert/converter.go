@@ -17,7 +17,9 @@ import (
 //
 //go:generate goverter gen .
 type DocumentConverter interface {
-	ToDocumentListItem(src []*entity.Document) []*document.DocumentListItem
+	// goverter:map ID DocumentId
+	ToDocumentListItem(src *entity.Document) *document.DocumentListItem
+	ToDocumentListItemList(src []*entity.Document) []*document.DocumentListItem
 
 	ToDocumentModel(src *entity.Document) *model.Document
 	ToDocumentTaskModel(src *entity.DocumentTask) *model.DocumentTask

@@ -37,7 +37,7 @@ type DocumentRepository interface {
 	SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error)
 
 	// SelectLatestTask 查询最新任务
-	SelectLatestTask(ctx context.Context, documentId int64, taskType ...int) (*entity.DocumentTask, error)
+	SelectLatestTask(ctx context.Context, documentId int64) (*entity.DocumentTask, error)
 
 	// CountActiveTask 统计活跃任务数
 	CountActiveTask(ctx context.Context, documentId int64, taskType ...int) (int64, error)

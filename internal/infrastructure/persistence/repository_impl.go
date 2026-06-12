@@ -65,15 +65,16 @@ func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documen
 	panic("implement me")
 }
 
+// SelectDocumentById 获取文档
 func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documentId int64) (*entity.Document, error) {
-	var document = entity.Document{ID: documentId}
-	if err := d.db.WithContext(ctx).Model(&entity.Document{}).First(&document).Error; err != nil {
+	var document = &entity.Document{ID: documentId}
+	if err := d.db.WithContext(ctx).Model(&entity.Document{}).First(document).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrDocumentNotFound
 		}
 		return nil, err
 	}
-	return &document, nil
+	return document, nil
 }
 
 // SelectDocumentPage 获取文档分页列表
@@ -108,9 +109,11 @@ func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int6
 	panic("implement me")
 }
 
-func (d *DocumentRepositoryImpl) SelectLatestTask(ctx context.Context, documentId int64, taskType ...int) (*entity.DocumentTask, error) {
-	// TODO implement me
-	panic("implement me")
+// SelectLatestTask 获取最新任务
+func (d *DocumentRepositoryImpl) SelectLatestTask(ctx context.Context, documentId int64) (*entity.DocumentTask, error) {
+	var task *entity.DocumentTask
+	res := d.db.WithContext(ctx).Model(&entity.DocumentTask{}).Where("document_id = ?", documentId).Order("id DESC").First(task)
+	return task, res.Error
 }
 
 // CountActiveTask 统计活跃任务数量
@@ -124,6 +127,7 @@ func (d *DocumentRepositoryImpl) CountActiveTask(ctx context.Context, documentId
 	return count, err
 }
 
+// SelectTaskListByDocumentIds 获取任务列表
 func (d *DocumentRepositoryImpl) SelectTaskListByDocumentIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentTask, error) {
 	var tasks []*entity.DocumentTask
 	res := d.db.WithContext(ctx).Model(&entity.DocumentTask{}).Where("document_id IN ?", documentIds).Order("id DESC").Find(&tasks)

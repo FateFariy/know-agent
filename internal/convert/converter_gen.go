@@ -9,12 +9,48 @@ import (
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
-func ToDocumentListItem(source []*entity.Document) []*document.DocumentListItem {
+func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
+	var pDocumentDocumentListItem *document.DocumentListItem
+	if source != nil {
+		var documentDocumentListItem document.DocumentListItem
+		documentDocumentListItem.DocumentId = (*source).ID
+		documentDocumentListItem.DocumentName = (*source).DocumentName
+		documentDocumentListItem.OriginalFileName = (*source).OriginalFileName
+		documentDocumentListItem.FileType = (*source).FileType
+		documentDocumentListItem.FileTypeName = (*source).FileTypeName
+		documentDocumentListItem.FileSize = (*source).FileSize
+		documentDocumentListItem.CharCount = (*source).CharCount
+		documentDocumentListItem.TokenCount = (*source).TokenCount
+		documentDocumentListItem.ParseStatus = (*source).ParseStatus
+		documentDocumentListItem.ParseStatusName = (*source).ParseStatusName
+		documentDocumentListItem.StrategyStatus = (*source).StrategyStatus
+		documentDocumentListItem.StrategyStatusName = (*source).StrategyStatusName
+		documentDocumentListItem.IndexStatus = (*source).IndexStatus
+		documentDocumentListItem.IndexStatusName = (*source).IndexStatusName
+		documentDocumentListItem.ParseErrorMsg = (*source).ParseErrorMsg
+		documentDocumentListItem.KnowledgeScopeCode = (*source).KnowledgeScopeCode
+		documentDocumentListItem.KnowledgeScopeName = (*source).KnowledgeScopeName
+		documentDocumentListItem.BusinessCategory = (*source).BusinessCategory
+		documentDocumentListItem.DocumentTags = (*source).DocumentTags
+		documentDocumentListItem.CurrentPlanId = (*source).CurrentPlanId
+		documentDocumentListItem.LastIndexTaskId = (*source).LastIndexTaskId
+		documentDocumentListItem.LatestTaskId = (*source).LatestTaskId
+		documentDocumentListItem.LatestTaskType = (*source).LatestTaskType
+		documentDocumentListItem.LatestTaskTypeName = (*source).LatestTaskTypeName
+		documentDocumentListItem.LatestTaskStatus = (*source).LatestTaskStatus
+		documentDocumentListItem.LatestTaskStatusName = (*source).LatestTaskStatusName
+		documentDocumentListItem.CreateTime = TimeToString((*source).CreateTime)
+		documentDocumentListItem.UpdateTime = TimeToString((*source).UpdateTime)
+		pDocumentDocumentListItem = &documentDocumentListItem
+	}
+	return pDocumentDocumentListItem
+}
+func ToDocumentListItemList(source []*entity.Document) []*document.DocumentListItem {
 	var pDocumentDocumentListItemList []*document.DocumentListItem
 	if source != nil {
 		pDocumentDocumentListItemList = make([]*document.DocumentListItem, len(source))
 		for i := 0; i < len(source); i++ {
-			pDocumentDocumentListItemList[i] = pEntityDocumentToPDocumentDocumentListItem(source[i])
+			pDocumentDocumentListItemList[i] = ToDocumentListItem(source[i])
 		}
 	}
 	return pDocumentDocumentListItemList
@@ -93,30 +129,4 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 		pModelDocumentTask = &modelDocumentTask
 	}
 	return pModelDocumentTask
-}
-func pEntityDocumentToPDocumentDocumentListItem(source *entity.Document) *document.DocumentListItem {
-	var pDocumentDocumentListItem *document.DocumentListItem
-	if source != nil {
-		var documentDocumentListItem document.DocumentListItem
-		documentDocumentListItem.DocumentName = (*source).DocumentName
-		documentDocumentListItem.OriginalFileName = (*source).OriginalFileName
-		documentDocumentListItem.FileType = (*source).FileType
-		documentDocumentListItem.FileSize = (*source).FileSize
-		documentDocumentListItem.CharCount = (*source).CharCount
-		documentDocumentListItem.TokenCount = (*source).TokenCount
-		documentDocumentListItem.ParseStatus = (*source).ParseStatus
-		documentDocumentListItem.StrategyStatus = (*source).StrategyStatus
-		documentDocumentListItem.IndexStatus = (*source).IndexStatus
-		documentDocumentListItem.ParseErrorMsg = (*source).ParseErrorMsg
-		documentDocumentListItem.KnowledgeScopeCode = (*source).KnowledgeScopeCode
-		documentDocumentListItem.KnowledgeScopeName = (*source).KnowledgeScopeName
-		documentDocumentListItem.BusinessCategory = (*source).BusinessCategory
-		documentDocumentListItem.DocumentTags = (*source).DocumentTags
-		documentDocumentListItem.CurrentPlanId = (*source).CurrentPlanId
-		documentDocumentListItem.LastIndexTaskId = (*source).LastIndexTaskId
-		documentDocumentListItem.CreateTime = TimeToString((*source).CreateTime)
-		documentDocumentListItem.UpdateTime = TimeToString((*source).UpdateTime)
-		pDocumentDocumentListItem = &documentDocumentListItem
-	}
-	return pDocumentDocumentListItem
 }

@@ -158,22 +158,26 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 	}, nil
 }
 
-// QueryDocumentPage 分页查询文档列表
+// QueryDocumentPage 分页查询文档列表（含最新任务信息）
 func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
+	// 分页查询文档基础列表
 	documentList, total, err := d.repo.SelectDocumentPage(ctx, pageNo, pageSize, keyword)
 	if err != nil || total == 0 {
 		return nil, 0, err
 	}
 
+	// 提取所有文档ID，用于批量查询关联任务
 	documentIds := slice.Map(documentList, func(index int, document *entity.Document) int64 {
 		return document.ID
 	})
 
+	// 根据文档ID批量查询关联的任务列表
 	taskList, err := d.repo.SelectTaskListByDocumentIds(ctx, documentIds)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	// 构建文档ID到最新任务的映射（利用遍历顺序保证取第一个/最新任务）
 	latestTaskMap := make(map[int64]*entity.DocumentTask)
 	for _, task := range taskList {
 		if _, exists := latestTaskMap[task.DocumentId]; !exists {
@@ -181,37 +185,32 @@ func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, page
 		}
 	}
 
+	// 为每个文档填充枚举名称和最新任务信息
 	for i, document := range documentList {
-		task := latestTaskMap[document.ID]
-		documentList[i].FileTypeName = vo.FileTypeName(document.FileType)
-		documentList[i].ParseStatusName = vo.ParseStatusName(document.ParseStatus)
-		documentList[i].StrategyStatusName = vo.StrategyStatusName(document.StrategyStatus)
-		documentList[i].IndexStatusName = vo.IndexStatusName(document.IndexStatus)
-		documentList[i].LatestTaskId = task.ID
-		documentList[i].LatestTaskType = task.TaskType
-		documentList[i].LatestTaskTypeName = vo.TaskTypeName(task.TaskType)
-		documentList[i].LatestTaskStatus = task.TaskStatus
-		documentList[i].LatestTaskStatusName = vo.TaskStatusName(task.TaskStatus)
+		documentList[i].FillEnumNames()                                // 填充状态等枚举字段的中文名称
+		documentList[i].FillLatestTaskInfo(latestTaskMap[document.ID]) // 填充最新任务信息
 	}
 
 	return documentList, total, nil
 }
 
-//
-// // QueryDocumentDetail 查询文档详情
-// func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error) {
-// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-//
-// 	task, err := d.repo.SelectLatestTask(ctx, documentId)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-//
-// 	return document, task, nil
-// }
+// QueryDocumentDetail 查询文档详情
+func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, error) {
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+
+	task, err := d.repo.SelectLatestTask(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+	document.FillEnumNames()
+	document.FillLatestTaskInfo(task)
+
+	return document, nil
+}
+
 //
 // // DeleteDocument 删除文档
 // func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {

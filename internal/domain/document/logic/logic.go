@@ -16,8 +16,8 @@ type DocumentLifecycleLogic interface {
 	// QueryDocumentPage 分页查询文档列表
 	QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error)
 
-	// // QueryDocumentDetail 查询文档详情
-	// QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error)
+	// QueryDocumentDetail 查询文档详情
+	QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, error)
 	//
 	// // DeleteDocument 删除文档
 	// DeleteDocument(ctx context.Context, documentId int64) (string, error)

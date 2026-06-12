@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+)
 
 type Document struct {
 	ID                   int64     `gorm:"column:id;primaryKey"`         // 主键ID
@@ -42,4 +46,19 @@ type Document struct {
 	LatestTaskTypeName   string    `gorm:"-"`                            // 最新任务类型名称
 	LatestTaskStatus     int       `gorm:"-"`                            // 最新任务状态
 	LatestTaskStatusName string    `gorm:"-"`                            // 最新任务状态名称
+}
+
+func (d *Document) FillEnumNames() {
+	d.FileTypeName = vo.FileTypeName(d.FileType)
+	d.ParseStatusName = vo.ParseStatusName(d.ParseStatus)
+	d.StrategyStatusName = vo.StrategyStatusName(d.StrategyStatus)
+	d.IndexStatusName = vo.IndexStatusName(d.IndexStatus)
+}
+
+func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
+	d.LatestTaskId = task.ID
+	d.LatestTaskType = task.TaskType
+	d.LatestTaskTypeName = vo.TaskTypeName(task.TaskType)
+	d.LatestTaskStatus = task.TaskStatus
+	d.LatestTaskStatusName = vo.TaskStatusName(task.TaskStatus)
 }
