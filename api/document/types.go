@@ -14,12 +14,12 @@ type BuildIndexResp struct {
 }
 
 type ConfirmStrategyReq struct {
-	DocumentId  int64              `json:"documentId"`  // 文档ID
-	BasePlanId  int64              `json:"basePlanId"`  // 基础方案ID
-	OperatorId  string             `json:"operatorId"`  // 操作人ID
-	AdjustNote  string             `json:"adjustNote"`  // 调整备注
-	ParentSteps []StrategyStepItem `json:"parentSteps"` // 父块步骤
-	ChildSteps  []StrategyStepItem `json:"childSteps"`  // 子块步骤
+	DocumentId  int64               `json:"documentId"`  // 文档ID
+	BasePlanId  int64               `json:"basePlanId"`  // 基础方案ID
+	OperatorId  string              `json:"operatorId"`  // 操作人ID
+	AdjustNote  string              `json:"adjustNote"`  // 调整备注
+	ParentSteps []*StrategyStepItem `json:"parentSteps"` // 父块步骤
+	ChildSteps  []*StrategyStepItem `json:"childSteps"`  // 子块步骤
 }
 
 type ConfirmStrategyResp struct {
@@ -86,8 +86,8 @@ type QueryDocumentChunksReq struct {
 }
 
 type QueryDocumentChunksResp struct {
-	List  []DocumentChunk `json:"list"`  // chunk列表
-	Total int             `json:"total"` // 总记录数
+	List  []*DocumentChunk `json:"list"`  // chunk列表
+	Total int64            `json:"total"` // 总记录数
 }
 
 type QueryDocumentDetailReq struct {
@@ -101,8 +101,10 @@ type QueryDocumentPageReq struct {
 }
 
 type QueryDocumentPageResp struct {
-	List  []DocumentListItem `json:"list"`  // 文档列表
-	Total int                `json:"total"` // 总记录数
+	PageNo   int                 `json:"pageNo"`   // 页码
+	PageSize int                 `json:"pageSize"` // 每页大小
+	Total    int64               `json:"total"`    // 总记录数
+	Records  []*DocumentListItem `json:"records"`  // 文档列表
 }
 
 type QueryStrategyPlanReq struct {
@@ -110,8 +112,8 @@ type QueryStrategyPlanReq struct {
 }
 
 type QueryStrategyPlanResp struct {
-	DocumentId   int64      `json:"documentId"`   // 文档ID
-	StrategyList []Strategy `json:"strategyList"` // 策略列表
+	DocumentId   int64       `json:"documentId"`   // 文档ID
+	StrategyList []*Strategy `json:"strategyList"` // 策略列表
 }
 
 type QueryTaskLogsReq struct {
@@ -121,8 +123,8 @@ type QueryTaskLogsReq struct {
 }
 
 type QueryTaskLogsResp struct {
-	List  []TaskLog `json:"list"`  // 日志列表
-	Total int       `json:"total"` // 总记录数
+	List  []*TaskLog `json:"list"`  // 日志列表
+	Total int64      `json:"total"` // 总记录数
 }
 
 type Strategy struct {

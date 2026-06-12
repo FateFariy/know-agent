@@ -3,21 +3,19 @@ package logic
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/duke-git/lancet/v2/slice"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	errorx "github.com/swiftbit/know-agent/internal/error"
@@ -163,652 +161,17 @@ func (d *DocumentLifecycleLogicImpl) Upload(ctx context.Context, file multipart.
 // QueryDocumentPage 分页查询文档列表
 func (d *DocumentLifecycleLogicImpl) QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
 	documentList, total, err := d.repo.SelectDocumentPage(ctx, pageNo, pageSize, keyword)
-	if err != nil {
+	if err != nil || total == 0 {
 		return nil, 0, err
 	}
 
-	latestTaskMap, err := d.getLatestTaskMap(ctx, documentList)
+	documentIds := slice.Map(documentList, func(index int, document *entity.Document) int64 {
+		return document.ID
+	})
+
+	taskList, err := d.repo.SelectTaskListByDocumentIds(ctx, documentIds)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	records := make([]*vo.DocumentListItemVo, 0, len(documentList))
-	for _, document := range documentList {
-		task := latestTaskMap[document.Id]
-		records = append(records, d.toDocumentListItemVo(document, task))
-	}
-
-	return &vo.DocumentPageQueryVo{
-		PageNo:   pageNo,
-		PageSize: pageSize,
-		Total:    total,
-		Records:  records,
-	}, nil
-}
-
-// QueryDocumentDetail 查询文档详情
-func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error) {
-	document, err := d.repo.SelectDocumentById(ctx, documentId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	task, err := d.repo.SelectLatestTask(ctx, documentId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return document, task, nil
-}
-
-// DeleteDocument 删除文档
-func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
-	document, err := d.repo.SelectDocumentById(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	// 检查是否有活跃任务
-	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskStatusNew, vo.TaskStatusRunning)
-	if err != nil {
-		return "", err
-	}
-	if activeTaskCount > 0 {
-		return "", errorx.ErrDocumentStatusInvalid.Format("当前文档存在进行中的任务，请等待任务结束后再删除")
-	}
-
-	// 删除存储对象
-	err = d.port.DeleteObjects(ctx, []string{document.ObjectName, document.ParseTextPath})
-	if err != nil {
-		return "", err
-	}
-
-	// 删除向量索引（TODO: 实现向量网关）
-	// d.vectorGateway.DeleteByDocumentId(documentId)
-
-	// 删除其他索引（TODO: 实现关键词搜索、导航索引、知识路由索引、结构图投影）
-
-	// 删除相关数据
-	err = d.repo.DeleteProfileByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteTopicDocumentRelationByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteParentBlockByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteChunkByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	// TODO: 删除结构化节点
-	// d.structureNodeService.DeleteByDocumentId(documentId)
-
-	err = d.repo.DeleteTaskLogByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteStepByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteTaskByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeletePlanByDocumentId(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	err = d.repo.DeleteDocumentById(ctx, documentId)
-	if err != nil {
-		return "", err
-	}
-
-	return "", nil
-}
-
-// QueryStrategyPlan 查询策略方案
-func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error) {
-	document, err := d.repo.SelectDocumentById(ctx, documentId)
-	if err != nil {
-		return nil, err
-	}
-
-	var planVo *vo.DocumentStrategyPlanVo
-	planReady := false
-
-	if document.CurrentPlanId > 0 {
-		plan, err := d.repo.SelectPlanById(ctx, document.CurrentPlanId)
-		if err != nil {
-			return nil, err
-		}
-		if plan != nil && plan.Status == int(entity.BusinessStatusYes) {
-			stepList, err := d.repo.QueryStepListByPlanId(ctx, plan.Id)
-			if err != nil {
-				return nil, err
-			}
-			planVo = d.toPlanVo(plan, stepList)
-			planReady = true
-		}
-	}
-
-	return &vo.DocumentStrategyPlanQueryVo{
-		DocumentId:        document.Id,
-		DocumentName:      document.DocumentName,
-		ParseStatus:       document.ParseStatus,
-		ParseStatusMsg:    d.enumMsg(vo.ParseStatus(document.ParseStatus)),
-		StrategyStatus:    document.StrategyStatus,
-		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
-		IndexStatus:       document.IndexStatus,
-		IndexStatusMsg:    d.enumMsg(vo.IndexStatus(document.IndexStatus)),
-		ParseErrorMsg:     document.ParseErrorMsg,
-		PlanReady:         planReady,
-		Plan:              planVo,
-	}, nil
-}
-
-// ConfirmStrategy 确认策略
-func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-
-	if document.ParseStatus != int(vo.ParseStatusParseSuccess) {
-		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档还未完成解析，不能确认策略。")
-	}
-
-	if document.CurrentPlanId != req.BasePlanId {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的基础方案不存在或已切换。")
-	}
-
-	basePlan, err := d.repo.GetPlanById(ctx, req.BasePlanId)
-	if err != nil {
-		return nil, err
-	}
-	if basePlan == nil || basePlan.Status != int(entity.BusinessStatusYes) {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
-	}
-
-	baseStepList, err := d.repo.QueryStepListByPlanId(ctx, basePlan.Id)
-	if err != nil {
-		return nil, err
-	}
-
-	requestParentTypeList := d.extractStrategyTypes(req.ParentSteps)
-	requestChildTypeList := d.extractStrategyTypes(req.ChildSteps)
-
-	// TODO: 实现策略标准化
-	// normalizedStepList := d.strategyService.NormalizeSteps(basePlan, baseStepList, requestParentTypeList, requestChildTypeList, req.DocumentId)
-	normalizedStepList := baseStepList
-
-	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeParent)
-	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeChild)
-
-	if len(normalizedParentTypeList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "父块流水线不能为空。")
-	}
-	if len(normalizedChildTypeList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "子块流水线不能为空。")
-	}
-
-	if len(normalizedStepList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "策略步骤不能为空。")
-	}
-
-	baseParentTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeParent)
-	baseChildTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeChild)
-
-	requestDistinctParentTypeList := d.distinctIntList(requestParentTypeList)
-	requestDistinctChildTypeList := d.distinctIntList(requestChildTypeList)
-
-	normalized := !d.intListEqual(requestDistinctParentTypeList, normalizedParentTypeList) ||
-		!d.intListEqual(requestDistinctChildTypeList, normalizedChildTypeList)
-
-	changed := !d.intListEqual(baseParentTypeList, normalizedParentTypeList) ||
-		!d.intListEqual(baseChildTypeList, normalizedChildTypeList)
-
-	var targetPlanId int64
-	var targetPlanVersion int
-	var targetStepList []*entity.DocumentStrategyStep
-
-	if !changed {
-		basePlan.PlanStatus = int(vo.PlanStatusConfirmed)
-		if basePlan.PlanSource == 0 {
-			basePlan.PlanSource = int(vo.PlanSourceSystemRecommend)
-		}
-		basePlan.AdjustNote = req.AdjustNote
-		basePlan.ConfirmUserId = d.parseOptionalLong(req.OperatorId)
-		basePlan.ConfirmTime = time.Now().UnixMilli()
-		err = d.repo.UpdatePlan(ctx, basePlan)
-		if err != nil {
-			return nil, err
-		}
-		targetPlanId = basePlan.Id
-		targetPlanVersion = basePlan.PlanVersion
-		targetStepList = baseStepList
-	} else {
-		basePlan.PlanStatus = int(vo.PlanStatusDiscarded)
-		err = d.repo.UpdatePlan(ctx, basePlan)
-		if err != nil {
-			return nil, err
-		}
-
-		newPlanId := utils.GetSnowflakeNextID()
-		newPlanVersion, err := d.repo.GetLatestPlanVersion(ctx, document.Id)
-		if err != nil {
-			return nil, err
-		}
-		if newPlanVersion == 0 {
-			newPlanVersion = 1
-		}
-
-		newPlan := &entity.DocumentStrategyPlan{
-			Model: common.Model{
-				Id:         newPlanId,
-				CreateTime: time.Now().UnixMilli(),
-				EditTime:   time.Now().UnixMilli(),
-				Status:     int(entity.BusinessStatusYes),
-			},
-			DocumentId:       document.Id,
-			PlanVersion:      newPlanVersion,
-			PlanSource:       int(vo.PlanSourceUserAdjust),
-			PlanStatus:       int(vo.PlanStatusConfirmed),
-			StrategyCount:    len(normalizedStepList),
-			StrategySnapshot: d.buildStrategySnapshot(normalizedStepList),
-			RecommendReason:  basePlan.RecommendReason,
-			AdjustNote:       req.AdjustNote,
-			ConfirmUserId:    d.parseOptionalLong(req.OperatorId),
-			ConfirmTime:      time.Now().UnixMilli(),
-		}
-
-		err = d.repo.InsertPlan(ctx, newPlan)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, step := range normalizedStepList {
-			step.Id = utils.GetSnowflakeNextID()
-			step.PlanId = newPlanId
-			step.Status = int(entity.BusinessStatusYes)
-			err = d.repo.InsertStep(ctx, step)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		targetPlanId = newPlanId
-		targetPlanVersion = newPlanVersion
-		targetStepList = normalizedStepList
-	}
-
-	document.CurrentPlanId = targetPlanId
-	document.StrategyStatus = int(vo.StrategyStatusConfirmed)
-	err = d.repo.UpdateDocument(ctx, document)
-	if err != nil {
-		return nil, err
-	}
-
-	latestParseTask, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeParseRoute))
-	if err != nil {
-		return nil, err
-	}
-	if latestParseTask != nil {
-		latestParseTask.CurrentStage = int(vo.TaskStageStrategyConfirm)
-		err = d.repo.UpdateTask(ctx, latestParseTask)
-		if err != nil {
-			return nil, err
-		}
-
-		if changed {
-			err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
-				int(vo.TaskStageStrategyConfirm),
-				int(vo.TaskEventUserAdjust),
-				int(vo.LogLevelInfo),
-				d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-				d.parseOptionalLong(req.OperatorId),
-				"用户调整了系统推荐策略。",
-				d.detail(
-					"parentStrategyTypes", normalizedParentTypeList,
-					"childStrategyTypes", normalizedChildTypeList,
-					"adjustNote", req.AdjustNote,
-				))
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
-			int(vo.TaskStageStrategyConfirm),
-			int(vo.TaskEventUserConfirm),
-			int(vo.LogLevelInfo),
-			d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-			d.parseOptionalLong(req.OperatorId),
-			"用户已确认最终策略方案。",
-			map[string]interface{}{
-				"planId":              targetPlanId,
-				"parentStrategyTypes": normalizedParentTypeList,
-				"childStrategyTypes":  normalizedChildTypeList,
-			})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &vo.DocumentStrategyConfirmVo{
-		DocumentId:        document.Id,
-		PlanId:            targetPlanId,
-		PlanVersion:       targetPlanVersion,
-		StrategyStatus:    document.StrategyStatus,
-		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
-		Normalized:        normalized,
-		ParentPipeline:    d.toPipelineVo(vo.PipelineTypeParent, targetStepList),
-		ChildPipeline:     d.toPipelineVo(vo.PipelineTypeChild, targetStepList),
-	}, nil
-}
-
-// BuildIndex 构建索引
-func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-
-	if document.ParseStatus != int(vo.ParseStatusParseSuccess) ||
-		document.StrategyStatus != int(vo.StrategyStatusConfirmed) {
-		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档尚未完成\"解析成功 + 策略确认\"，不能构建索引。")
-	}
-
-	if document.CurrentPlanId != req.PlanId {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的生效方案与请求方案不一致。")
-	}
-
-	runningTaskCount, err := d.repo.CountActiveTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
-	if err != nil {
-		return nil, err
-	}
-	if runningTaskCount > 0 {
-		return nil, common.NewBizError(DocumentManageCodeIndexTaskRunning, "索引任务正在运行中")
-	}
-
-	plan, err := d.repo.GetPlanById(ctx, req.PlanId)
-	if err != nil {
-		return nil, err
-	}
-	if plan == nil || plan.Status != int(entity.BusinessStatusYes) {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
-	}
-
-	taskId := utils.GetSnowflakeNextID()
-	task := &entity.DocumentTask{
-		Model: common.Model{
-			Id:         taskId,
-			CreateTime: time.Now().UnixMilli(),
-			EditTime:   time.Now().UnixMilli(),
-			Status:     int(entity.BusinessStatusYes),
-		},
-		DocumentId:       document.Id,
-		PlanId:           req.PlanId,
-		TaskType:         int(vo.TaskTypeBuildIndex),
-		TaskStatus:       int(vo.TaskStatusNew),
-		CurrentStage:     int(vo.TaskStageChunkExecute),
-		TriggerSource:    d.resolveTriggerSource(d.parseOptionalLong(req.OperatorId)),
-		StrategySnapshot: plan.StrategySnapshot,
-		RetryCount:       0,
-	}
-
-	err = d.repo.InsertTask(ctx, task)
-	if err != nil {
-		return nil, err
-	}
-
-	document.IndexStatus = int(vo.IndexStatusBuilding)
-	err = d.repo.UpdateDocument(ctx, document)
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.saveTaskLog(ctx, taskId, document.Id,
-		int(vo.TaskStageChunkExecute),
-		int(vo.TaskEventStart),
-		int(vo.LogLevelInfo),
-		d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-		d.parseOptionalLong(req.OperatorId),
-		"索引构建任务已创建，等待异步执行。",
-		map[string]interface{}{
-			"planId":           req.PlanId,
-			"strategySnapshot": plan.StrategySnapshot,
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	// 发送索引构建消息（TODO: 实现消息发送）
-	// d.kafkaProducer.SendIndexBuild(&DocumentIndexBuildMessage{DocumentId: document.Id, TaskId: taskId, PlanId: req.PlanId})
-
-	return &vo.DocumentIndexBuildVo{
-		DocumentId:     document.Id,
-		TaskId:         taskId,
-		TaskType:       task.TaskType,
-		TaskTypeMsg:    d.enumMsg(vo.TaskType(task.TaskType)),
-		TaskStatus:     task.TaskStatus,
-		TaskStatusMsg:  d.enumMsg(vo.TaskStatus(task.TaskStatus)),
-		IndexStatus:    document.IndexStatus,
-		IndexStatusMsg: d.enumMsg(vo.IndexStatus(document.IndexStatus)),
-	}, nil
-}
-
-// QueryTaskLogs 查询任务日志
-func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
-	task, err := d.repo.GetTaskById(ctx, req.TaskId)
-	if err != nil {
-		return nil, err
-	}
-	if task == nil || task.Status != int(entity.BusinessStatusYes) {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "任务不存在。")
-	}
-
-	pageNo := req.PageNo
-	if pageNo <= 0 {
-		pageNo = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-
-	logList, total, err := d.repo.QueryTaskLogPage(ctx, req.TaskId, pageNo, pageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	logVoList := make([]*vo.DocumentTaskLogVo, 0, len(logList))
-	for _, log := range logList {
-		logVoList = append(logVoList, d.toTaskLogVo(log))
-	}
-
-	return &vo.DocumentTaskLogQueryVo{
-		TaskId:          task.ID,
-		DocumentId:      task.DocumentId,
-		TaskType:        task.TaskType,
-		TaskTypeMsg:     d.enumMsg(vo.TaskType(task.TaskType)),
-		TaskStatus:      task.TaskStatus,
-		TaskStatusMsg:   d.enumMsg(vo.TaskStatus(task.TaskStatus)),
-		CurrentStage:    task.CurrentStage,
-		CurrentStageMsg: d.enumMsg(vo.TaskStage(task.CurrentStage)),
-		StartTime:       task.StartTime,
-		FinishTime:      task.FinishTime,
-		CostMillis:      task.CostMillis,
-		ErrorCode:       task.ErrorCode,
-		ErrorMsg:        task.ErrorMsg,
-		Total:           total,
-		Logs:            logVoList,
-	}, nil
-}
-
-// QueryDocumentChunks 查询文档块
-func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *entity.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-
-	pageNo := req.PageNo
-	if pageNo <= 0 {
-		pageNo = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-
-	effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
-	if effectiveTaskId == 0 {
-		return &vo.DocumentChunkQueryVo{
-			DocumentId: document.Id,
-			TaskId:     0,
-			PlanId:     document.CurrentPlanId,
-			PageNo:     pageNo,
-			PageSize:   pageSize,
-			Total:      0,
-			Records:    []*vo.DocumentChunkItemVo{},
-		}, nil
-	}
-
-	task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
-	if err != nil {
-		return nil, err
-	}
-	if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
-	}
-
-	chunkList, total, err := d.repo.QueryChunkPage(ctx, document.Id, effectiveTaskId, pageNo, pageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	parentBlockIds := make([]int64, 0, len(chunkList))
-	for _, chunk := range chunkList {
-		if chunk.ParentBlockId > 0 {
-			parentBlockIds = append(parentBlockIds, chunk.ParentBlockId)
-		}
-	}
-
-	parentBlockMap, err := d.listParentBlockMap(ctx, parentBlockIds)
-	if err != nil {
-		return nil, err
-	}
-
-	records := make([]*vo.DocumentChunkItemVo, 0, len(chunkList))
-	for _, chunk := range chunkList {
-		parentBlock := parentBlockMap[chunk.ParentBlockId]
-		records = append(records, d.toDocumentChunkItemVo(chunk, parentBlock))
-	}
-
-	return &vo.DocumentChunkQueryVo{
-		DocumentId: document.Id,
-		TaskId:     effectiveTaskId,
-		PlanId:     task.PlanId,
-		PageNo:     pageNo,
-		PageSize:   pageSize,
-		Total:      total,
-		Records:    records,
-	}, nil
-}
-
-// QueryDocumentChunkDetail 查询文档块详情
-func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-
-	effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
-	if effectiveTaskId == 0 {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "当前文档还没有可查看的 chunk 详情。")
-	}
-
-	task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
-	if err != nil {
-		return nil, err
-	}
-	if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
-	}
-
-	chunk, err := d.repo.GetChunkById(ctx, req.ChunkId, document.Id, effectiveTaskId)
-	if err != nil {
-		return nil, err
-	}
-	if chunk == nil {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "chunk 详情不存在。")
-	}
-
-	var parentBlock *entity.DocumentParentBlock
-	if chunk.ParentBlockId > 0 {
-		parentBlock, err = d.repo.GetParentBlockById(ctx, chunk.ParentBlockId, document.Id, effectiveTaskId)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var siblingChunkList []*entity.DocumentChunk
-	if chunk.ParentBlockId > 0 {
-		siblingChunkList, err = d.repo.QueryChunkListByParentBlockId(ctx, document.Id, effectiveTaskId, chunk.ParentBlockId)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		siblingChunkList = []*entity.DocumentChunk{chunk}
-	}
-
-	siblingVoList := make([]*vo.DocumentChunkItemVo, 0, len(siblingChunkList))
-	for _, sibling := range siblingChunkList {
-		siblingVoList = append(siblingVoList, d.toDocumentChunkItemVo(sibling, parentBlock))
-	}
-
-	return &vo.DocumentChunkDetailVo{
-		DocumentId:    document.Id,
-		TaskId:        effectiveTaskId,
-		PlanId:        task.PlanId,
-		Chunk:         d.toDocumentChunkItemVo(chunk, parentBlock),
-		ParentBlock:   d.toDocumentParentBlockItemVo(parentBlock),
-		SiblingChunks: siblingVoList,
-	}, nil
-}
-
-func (d *DocumentLifecycleLogicImpl) getLatestTaskMap(ctx context.Context, documentList []*entity.Document) (map[int64]*entity.DocumentTask, error) {
-	if len(documentList) == 0 {
-		return map[int64]*entity.DocumentTask{}, nil
-	}
-
-	documentIds := make([]int64, 0, len(documentList))
-	for _, document := range documentList {
-		if document.Id > 0 {
-			documentIds = append(documentIds, document.Id)
-		}
-	}
-	if len(documentIds) == 0 {
-		return map[int64]*entity.DocumentTask{}, nil
-	}
-
-	taskList, err := d.repo.QueryTaskListByDocumentIds(ctx, documentIds)
-	if err != nil {
-		return nil, err
 	}
 
 	latestTaskMap := make(map[int64]*entity.DocumentTask)
@@ -817,680 +180,1293 @@ func (d *DocumentLifecycleLogicImpl) getLatestTaskMap(ctx context.Context, docum
 			latestTaskMap[task.DocumentId] = task
 		}
 	}
-	return latestTaskMap, nil
+
+	records := make([]*vo.DocumentListItemVo, 0, len(documentList))
+	for _, document := range documentList {
+		task := latestTaskMap[document.ID]
+		records = append(records, d.toDocumentListItemVo(document, task))
+	}
+
+	return
 }
 
-func (d *DocumentLifecycleLogicImpl) resolveChunkTaskId(document *entity.Document, requestedTaskId int64) int64 {
-	if requestedTaskId > 0 {
-		return requestedTaskId
-	}
-	if document.LastIndexTaskId > 0 {
-		return document.LastIndexTaskId
-	}
-	task, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
-	if err != nil || task == nil {
-		return 0
-	}
-	return task.ID
-}
-
-func (d *DocumentLifecycleLogicImpl) listParentBlockMap(ctx context.Context, parentBlockIds []int64) (map[int64]*entity.DocumentParentBlock, error) {
-	if len(parentBlockIds) == 0 {
-		return map[int64]*entity.DocumentParentBlock{}, nil
-	}
-
-	parentBlockList, err := d.repo.QueryParentBlockListByIds(ctx, parentBlockIds)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[int64]*entity.DocumentParentBlock)
-	for _, pb := range parentBlockList {
-		result[pb.Id] = pb
-	}
-	return result, nil
-}
-
-func (d *DocumentLifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]interface{}) error {
-	// TODO: 序列化detail为JSON
-	detailJson := ""
-	if len(detail) > 0 {
-		// 简化实现，实际应使用json.Marshal
-		var parts []string
-		for k, v := range detail {
-			parts = append(parts, fmt.Sprintf("%s:%v", k, v))
-		}
-		detailJson = "{" + strings.Join(parts, ", ") + "}"
-	}
-
-	logRecord := &entity.DocumentTaskLog{
-		Model: common.Model{
-			Id:         utils.GetSnowflakeNextID(),
-			CreateTime: time.Now().UnixMilli(),
-			EditTime:   time.Now().UnixMilli(),
-			Status:     int(entity.BusinessStatusYes),
-		},
-		TaskId:       taskId,
-		DocumentId:   documentId,
-		StageType:    stageType,
-		EventType:    eventType,
-		LogLevel:     logLevel,
-		OperatorType: operatorType,
-		OperatorId:   operatorId,
-		Content:      content,
-		DetailJson:   detailJson,
-	}
-
-	return d.repo.InsertTaskLog(ctx, logRecord)
-}
-
-// ===== 转换方法 =====
-
-func (d *DocumentLifecycleLogicImpl) toDocumentListItemVo(document *entity.Document, latestTask *entity.DocumentTask) *vo.DocumentListItemVo {
-	vo := &vo.DocumentListItemVo{
-		DocumentId:         document.Id,
-		DocumentName:       document.DocumentName,
-		OriginalFileName:   document.OriginalFileName,
-		FileType:           document.FileType,
-		FileTypeMsg:        d.enumMsg(document.FileType),
-		FileSize:           document.FileSize,
-		CharCount:          document.CharCount,
-		TokenCount:         document.TokenCount,
-		ParseStatus:        document.ParseStatus,
-		ParseStatusMsg:     d.enumMsg(document.ParseStatus),
-		StrategyStatus:     document.StrategyStatus,
-		StrategyStatusMsg:  d.enumMsg(document.StrategyStatus),
-		IndexStatus:        document.IndexStatus,
-		IndexStatusMsg:     d.enumMsg(document.IndexStatus),
-		ParseErrorMsg:      document.ParseErrorMsg,
-		KnowledgeScopeCode: document.KnowledgeScopeCode,
-		KnowledgeScopeName: document.KnowledgeScopeName,
-		BusinessCategory:   document.BusinessCategory,
-		DocumentTags:       document.DocumentTags,
-		CurrentPlanId:      document.CurrentPlanId,
-		LastIndexTaskId:    document.LastIndexTaskId,
-		CreateTime:         document.CreateTime,
-		EditTime:           document.EditTime,
-	}
-
-	if latestTask != nil {
-		vo.LatestTaskId = latestTask.ID
-		vo.LatestTaskType = latestTask.TaskType
-		vo.LatestTaskTypeMsg = d.enumMsg(vo.TaskType(latestTask.TaskType))
-		vo.LatestTaskStatus = latestTask.TaskStatus
-		vo.LatestTaskStatusMsg = d.enumMsg(vo.TaskStatus(latestTask.TaskStatus))
-	}
-
-	return vo
-}
-
-func (d *DocumentLifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
-	vo := &vo.DocumentChunkItemVo{
-		Id:              chunk.Id,
-		ParentBlockId:   chunk.ParentBlockId,
-		ChunkNo:         chunk.ChunkNo,
-		SectionPath:     chunk.SectionPath,
-		SourceType:      chunk.SourceType,
-		SourceTypeMsg:   d.enumMsg(vo.ChunkSourceType(chunk.SourceType)),
-		CharCount:       chunk.CharCount,
-		TokenCount:      chunk.TokenCount,
-		VectorStatus:    chunk.VectorStatus,
-		VectorStatusMsg: d.enumMsg(vo.VectorStatus(chunk.VectorStatus)),
-		ChunkText:       chunk.ChunkText,
-	}
-
-	if parentBlock != nil {
-		vo.ParentNo = parentBlock.ParentNo
-		vo.ChildCount = parentBlock.ChildCount
-		vo.StartChunkNo = parentBlock.StartChunkNo
-		vo.EndChunkNo = parentBlock.EndChunkNo
-	}
-
-	return vo
-}
-
-func (d *DocumentLifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *entity.DocumentParentBlock) *vo.DocumentParentBlockItemVo {
-	if parentBlock == nil {
-		return nil
-	}
-	return &vo.DocumentParentBlockItemVo{
-		Id:            parentBlock.Id,
-		ParentNo:      parentBlock.ParentNo,
-		SectionPath:   parentBlock.SectionPath,
-		SourceType:    parentBlock.SourceType,
-		SourceTypeMsg: d.enumMsg(vo.ChunkSourceType(parentBlock.SourceType)),
-		CharCount:     parentBlock.CharCount,
-		TokenCount:    parentBlock.TokenCount,
-		ChildCount:    parentBlock.ChildCount,
-		StartChunkNo:  parentBlock.StartChunkNo,
-		EndChunkNo:    parentBlock.EndChunkNo,
-		ParentText:    parentBlock.ParentText,
-	}
-}
-
-func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *entity.DocumentStrategyPlan, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPlanVo {
-	return &vo.DocumentStrategyPlanVo{
-		PlanId:           plan.Id,
-		PlanVersion:      plan.PlanVersion,
-		PlanSource:       plan.PlanSource,
-		PlanSourceMsg:    d.enumMsg(vo.PlanSource(plan.PlanSource)),
-		PlanStatus:       plan.PlanStatus,
-		PlanStatusMsg:    d.enumMsg(vo.PlanStatus(plan.PlanStatus)),
-		StrategySnapshot: plan.StrategySnapshot,
-		RecommendReason:  plan.RecommendReason,
-		ParentPipeline:   d.toPipelineVo(vo.PipelineTypeParent, stepList),
-		ChildPipeline:    d.toPipelineVo(vo.PipelineTypeChild, stepList),
-	}
-}
-
-func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPipelineVo {
-	pipelineSteps := make([]*entity.DocumentStrategyStep, 0)
-	for _, step := range stepList {
-		pt := step.PipelineType
-		if pt == "" {
-			pt = "CHILD"
-		}
-		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
-			pipelineSteps = append(pipelineSteps, step)
-		}
-	}
-
-	// 按步骤序号排序
-	sort.Slice(pipelineSteps, func(i, j int) bool {
-		return pipelineSteps[i].StepNo < pipelineSteps[j].StepNo
-	})
-
-	// 构建策略快照
-	var snapshotParts []string
-	for _, step := range pipelineSteps {
-		snapshotParts = append(snapshotParts, strconv.Itoa(step.StrategyType))
-	}
-	snapshot := strings.Join(snapshotParts, ",")
-
-	return &vo.DocumentStrategyPipelineVo{
-		PipelineType:     int(pipelineType),
-		PipelineTypeMsg:  d.enumMsg(pipelineType),
-		StrategySnapshot: snapshot,
-		Steps:            d.toStepVoList(pipelineSteps),
-	}
-}
-
-func (d *DocumentLifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
-	// 排序
-	sortedSteps := make([]*entity.DocumentStrategyStep, len(stepList))
-	copy(sortedSteps, stepList)
-	sort.Slice(sortedSteps, func(i, j int) bool {
-		orderI := d.pipelineOrder(sortedSteps[i].PipelineType)
-		orderJ := d.pipelineOrder(sortedSteps[j].PipelineType)
-		if orderI != orderJ {
-			return orderI < orderJ
-		}
-		if sortedSteps[i].StepNo != sortedSteps[j].StepNo {
-			return sortedSteps[i].StepNo < sortedSteps[j].StepNo
-		}
-		return sortedSteps[i].Id < sortedSteps[j].Id
-	})
-
-	voList := make([]*vo.DocumentStrategyStepVo, 0, len(sortedSteps))
-	for _, step := range sortedSteps {
-		voList = append(voList, &vo.DocumentStrategyStepVo{
-			StepNo:           step.StepNo,
-			PipelineType:     d.parsePipelineType(step.PipelineType),
-			PipelineTypeMsg:  d.enumMsg(vo.PipelineType(d.parsePipelineType(step.PipelineType))),
-			StrategyType:     step.StrategyType,
-			StrategyTypeMsg:  d.enumMsg(vo.StrategyType(step.StrategyType)),
-			StrategyRole:     step.StrategyRole,
-			StrategyRoleMsg:  d.enumMsg(vo.StrategyRole(step.StrategyRole)),
-			SourceType:       step.SourceType,
-			SourceTypeMsg:    d.enumMsg(vo.StrategySourceType(step.SourceType)),
-			ExecuteStatus:    step.ExecuteStatus,
-			ExecuteStatusMsg: d.enumMsg(vo.ExecuteStatus(step.ExecuteStatus)),
-			RecommendReason:  step.RecommendReason,
-		})
-	}
-	return voList
-}
-
-func (d *DocumentLifecycleLogicImpl) toTaskLogVo(logRecord *entity.DocumentTaskLog) *vo.DocumentTaskLogVo {
-	return &vo.DocumentTaskLogVo{
-		Id:           logRecord.Id,
-		StageType:    logRecord.StageType,
-		StageTypeMsg: d.enumMsg(vo.TaskStage(logRecord.StageType)),
-		EventType:    logRecord.EventType,
-		EventTypeMsg: d.enumMsg(vo.TaskEventType(logRecord.EventType)),
-		LogLevel:     logRecord.LogLevel,
-		LogLevelMsg:  d.enumMsg(vo.LogLevel(logRecord.LogLevel)),
-		Content:      logRecord.Content,
-		DetailJson:   logRecord.DetailJson,
-		CreateTime:   logRecord.CreateTime,
-	}
-}
-
-// ===== 工具方法 =====
-
-func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
-	if items == nil {
-		return []int{}
-	}
-	// 按步骤序号排序
-	sortedItems := make([]*entity.DocumentStrategyStepItemDto, len(items))
-	copy(sortedItems, items)
-	sort.Slice(sortedItems, func(i, j int) bool {
-		noI := sortedItems[i].StepNo
-		noJ := sortedItems[j].StepNo
-		if noI == 0 {
-			noI = int(^uint(0) >> 1) // max int
-		}
-		if noJ == 0 {
-			noJ = int(^uint(0) >> 1)
-		}
-		return noI < noJ
-	})
-
-	result := make([]int, 0, len(sortedItems))
-	for _, item := range sortedItems {
-		if item.StrategyType > 0 {
-			result = append(result, item.StrategyType)
-		}
-	}
-	return result
-}
-
-func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
-	result := make([]*entity.DocumentStrategyStep, 0)
-	for _, step := range stepList {
-		pt := step.PipelineType
-		if pt == "" {
-			pt = "CHILD"
-		}
-		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
-			result = append(result, step)
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].StepNo < result[j].StepNo
-	})
-
-	types := make([]int, 0, len(result))
-	for _, step := range result {
-		types = append(types, step.StrategyType)
-	}
-	return types
-}
-
-func (d *DocumentLifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
-	parentVo := d.toPipelineVo(vo.PipelineTypeParent, stepList)
-	childVo := d.toPipelineVo(vo.PipelineTypeChild, stepList)
-	return "PARENT:" + parentVo.StrategySnapshot + ";CHILD:" + childVo.StrategySnapshot
-}
-
-func (d *DocumentLifecycleLogicImpl) pipelineOrder(pipelineType string) int {
-	if strings.EqualFold(pipelineType, "PARENT") {
-		return 0
-	}
-	return 1
-}
-
-func (d *DocumentLifecycleLogicImpl) parsePipelineType(pipelineType string) int {
-	if strings.EqualFold(pipelineType, "PARENT") {
-		return int(vo.PipelineTypeParent)
-	}
-	return int(vo.PipelineTypeChild)
-}
-
-func (d *DocumentLifecycleLogicImpl) resolveTriggerSource(operatorId int64) int {
-	if operatorId > 0 {
-		return vo.TriggerSourceUser
-	}
-	return vo.TriggerSourceSystem
-}
-
-func (d *DocumentLifecycleLogicImpl) parseOptionalLong(rawValue string) int64 {
-	if strings.TrimSpace(rawValue) == "" {
-		return 0
-	}
-	value, err := strconv.ParseInt(rawValue, 10, 64)
-	if err != nil || value <= 0 {
-		return 0
-	}
-	return value
-}
-
-func (d *DocumentLifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {
-	if strings.TrimSpace(rawValue) == "" {
-		panic(common.NewBizError(BaseCodeParameterError, fieldName+"不能为空。"))
-	}
-	value, err := strconv.ParseInt(rawValue, 10, 64)
-	if err != nil || value <= 0 {
-		panic(common.NewBizError(BaseCodeParameterError, fieldName+"格式不正确。"))
-	}
-	return value
-}
-
-func (d *DocumentLifecycleLogicImpl) enumMsg(enumValue interface{}) string {
-	switch v := enumValue.(type) {
-	case vo.ParseStatus:
-		return parseStatusMsg(v)
-	case vo.FileType:
-		return fileTypeMsg(v)
-	case vo.StrategyStatus:
-		return strategyStatusMsg(v)
-	case vo.IndexStatus:
-		return indexStatusMsg(v)
-	case vo.PlanSource:
-		return planSourceMsg(v)
-	case vo.PlanStatus:
-		return planStatusMsg(v)
-	case vo.StrategyType:
-		return strategyTypeMsg(v)
-	case vo.StrategyRole:
-		return strategyRoleMsg(v)
-	case vo.StrategySourceType:
-		return strategySourceTypeMsg(v)
-	case vo.ExecuteStatus:
-		return strategyExecuteStatusMsg(v)
-	case vo.TaskType:
-		return taskTypeMsg(v)
-	case vo.TaskStatus:
-		return taskStatusMsg(v)
-	case vo.TaskStage:
-		return taskStageMsg(v)
-	case vo.TaskEventType:
-		return taskEventTypeMsg(v)
-	case vo.LogLevel:
-		return logLevelMsg(v)
-	case vo.ChunkSourceType:
-		return chunkSourceTypeMsg(v)
-	case vo.VectorStatus:
-		return vectorStatusMsg(v)
-	case vo.PipelineType:
-		return pipelineTypeMsg(v)
-	default:
-		return ""
-	}
-}
-
-func (d *DocumentLifecycleLogicImpl) distinctIntList(list []int) []int {
-	seen := make(map[int]bool)
-	result := make([]int, 0)
-	for _, v := range list {
-		if !seen[v] {
-			seen[v] = true
-			result = append(result, v)
-		}
-	}
-	return result
-}
-
-func (d *DocumentLifecycleLogicImpl) intListEqual(a, b []int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// ===== 枚举消息映射函数 =====
-
-func parseStatusMsg(status vo.ParseStatus) string {
-	switch status {
-	case vo.ParseStatusParsing:
-		return "解析中"
-	case vo.ParseStatusParseSuccess:
-		return "解析成功"
-	case vo.ParseStatusParseFailed:
-		return "解析失败"
-	default:
-		return "未知"
-	}
-}
-
-func fileTypeMsg(ft vo.FileType) string {
-	switch ft {
-	case vo.FileTypePDF:
-		return "PDF"
-	case vo.FileTypeDOCX:
-		return "DOCX"
-	case vo.FileTypeXLSX:
-		return "XLSX"
-	case vo.FileTypePPTX:
-		return "PPTX"
-	case vo.FileTypeTXT:
-		return "TXT"
-	case vo.FileTypeMD:
-		return "MD"
-	case entity.DocumentFileTypeHTML:
-		return "HTML"
-	case vo.FileTypeJSON:
-		return "JSON"
-	default:
-		return "未知"
-	}
-}
-
-func strategyStatusMsg(status vo.StrategyStatus) string {
-	switch status {
-	case vo.StrategyStatusWaitRecommend:
-		return "等待推荐"
-	case vo.StrategyStatusRecommended:
-		return "已推荐"
-	case vo.StrategyStatusConfirmed:
-		return "已确认"
-	case vo.StrategyStatusRejected:
-		return "已拒绝"
-	default:
-		return "未知"
-	}
-}
-
-func indexStatusMsg(status vo.IndexStatus) string {
-	switch status {
-	case vo.IndexStatusWaitBuild:
-		return "等待构建"
-	case vo.IndexStatusBuilding:
-		return "构建中"
-	case vo.IndexStatusBuildSuccess:
-		return "构建成功"
-	case vo.IndexStatusBuildFailed:
-		return "构建失败"
-	default:
-		return "未知"
-	}
-}
-
-func planSourceMsg(source vo.PlanSource) string {
-	switch source {
-	case vo.PlanSourceSystemRecommend:
-		return "系统推荐"
-	case vo.PlanSourceUserAdjust:
-		return "用户调整"
-	default:
-		return "未知"
-	}
-}
-
-func planStatusMsg(status vo.PlanStatus) string {
-	switch status {
-	case vo.PlanStatusRecommended:
-		return "已推荐"
-	case vo.PlanStatusConfirmed:
-		return "已确认"
-	case vo.PlanStatusDiscarded:
-		return "已废弃"
-	default:
-		return "未知"
-	}
-}
-
-func strategyTypeMsg(st vo.StrategyType) string {
-	switch st {
-	case vo.StrategyTypeSemanticChunk:
-		return "语义切块"
-	case vo.StrategyTypeMarkdownChunk:
-		return "Markdown切块"
-	case vo.StrategyTypeRecursiveChunk:
-		return "递归切块"
-	default:
-		return "未知"
-	}
-}
-
-func strategyRoleMsg(sr vo.StrategyRole) string {
-	switch sr {
-	case vo.StrategyRoleSplitter:
-		return "切块器"
-	case vo.StrategyRoleParser:
-		return "解析器"
-	case vo.StrategyRoleIndexer:
-		return "索引器"
-	default:
-		return "未知"
-	}
-}
-
-func strategySourceTypeMsg(st vo.StrategySourceType) string {
-	switch st {
-	case vo.StrategySourceTypeOriginal:
-		return "原始"
-	case vo.StrategySourceTypeParsed:
-		return "已解析"
-	default:
-		return "未知"
-	}
-}
-
-func strategyExecuteStatusMsg(status vo.ExecuteStatus) string {
-	switch status {
-	case vo.ExecuteStatusPending:
-		return "待执行"
-	case vo.ExecuteStatusRunning:
-		return "执行中"
-	case vo.ExecuteStatusCompleted:
-		return "已完成"
-	case vo.ExecuteStatusFailed:
-		return "失败"
-	default:
-		return "未知"
-	}
-}
-
-func taskTypeMsg(tt vo.TaskType) string {
-	switch tt {
-	case vo.TaskTypeParseRoute:
-		return "解析路由"
-	case vo.TaskTypeBuildIndex:
-		return "构建索引"
-	default:
-		return "未知"
-	}
-}
-
-func taskStatusMsg(ts vo.TaskStatus) string {
-	switch ts {
-	case vo.TaskStatusNew:
-		return "新建"
-	case vo.TaskStatusRunning:
-		return "运行中"
-	case vo.TaskStatusCompleted:
-		return "已完成"
-	case entity.usFailed:
-		return "失败"
-	default:
-		return "未知"
-	}
-}
-
-func taskStageMsg(ts vo.TaskStage) string {
-	switch ts {
-	case vo.TaskStageFileUpload:
-		return "文件上传"
-	case vo.TaskStageParse:
-		return "解析"
-	case entity.eStrategyRecommend:
-		return "策略推荐"
-	case vo.TaskStageStrategyConfirm:
-		return "策略确认"
-	case vo.TaskStageChunkExecute:
-		return "切块执行"
-	case vo.TaskStageVectorBuild:
-		return "向量构建"
-	case vo.TaskStageComplete:
-		return "完成"
-	default:
-		return "未知"
-	}
-}
-
-func taskEventTypeMsg(et vo.TaskEventType) string {
-	switch et {
-	case vo.TaskEventStart:
-		return "开始"
-	case vo.TaskEventComplete:
-		return "完成"
-	case vo.TaskEventFailed:
-		return "失败"
-	case vo.TaskEventUserConfirm:
-		return "用户确认"
-	case vo.TaskEventUserAdjust:
-		return "用户调整"
-	default:
-		return "未知"
-	}
-}
-
-func logLevelMsg(ll vo.LogLevel) string {
-	switch ll {
-	case vo.LogLevelInfo:
-		return "INFO"
-	case vo.LogLevelWarn:
-		return "WARN"
-	case vo.LogLevelError:
-		return "ERROR"
-	default:
-		return "未知"
-	}
-}
-
-func chunkSourceTypeMsg(cst vo.ChunkSourceType) string {
-	switch cst {
-	case entity.DocumentChunkSourceTypeText:
-		return "文本"
-	case vo.ChunkSourceTypeTable:
-		return "表格"
-	case vo.ChunkSourceTypeImage:
-		return "图片"
-	default:
-		return "未知"
-	}
-}
-
-func vectorStatusMsg(vs vo.VectorStatus) string {
-	switch vs {
-	case vo.VectorStatusPending:
-		return "待构建"
-	case vo.VectorStatusBuilding:
-		return "构建中"
-	case vo.VectorStatusBuilt:
-		return "已构建"
-	case vo.VectorStatusFailed:
-		return "构建失败"
-	default:
-		return "未知"
-	}
-}
-
-func pipelineTypeMsg(pt vo.PipelineType) string {
-	switch pt {
-	case vo.PipelineTypeParent:
-		return "父块"
-	case vo.PipelineTypeChild:
-		return "子块"
-	default:
-		return "未知"
-	}
-}
+//
+// // QueryDocumentDetail 查询文档详情
+// func (d *DocumentLifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error) {
+// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	task, err := d.repo.SelectLatestTask(ctx, documentId)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	return document, task, nil
+// }
+//
+// // DeleteDocument 删除文档
+// func (d *DocumentLifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
+// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	// 检查是否有活跃任务
+// 	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskStatusNew, vo.TaskStatusRunning)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	if activeTaskCount > 0 {
+// 		return "", errorx.ErrDocumentStatusInvalid.Format("当前文档存在进行中的任务，请等待任务结束后再删除")
+// 	}
+//
+// 	// 删除存储对象
+// 	err = d.port.DeleteObjects(ctx, []string{document.ObjectName, document.ParseTextPath})
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	// 删除向量索引（TODO: 实现向量网关）
+// 	// d.vectorGateway.DeleteByDocumentId(documentId)
+//
+// 	// 删除其他索引（TODO: 实现关键词搜索、导航索引、知识路由索引、结构图投影）
+//
+// 	// 删除相关数据
+// 	err = d.repo.DeleteProfileByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteTopicDocumentRelationByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteParentBlockByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteChunkByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	// TODO: 删除结构化节点
+// 	// d.structureNodeService.DeleteByDocumentId(documentId)
+//
+// 	err = d.repo.DeleteTaskLogByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteStepByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteTaskByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeletePlanByDocumentId(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	err = d.repo.DeleteDocumentById(ctx, documentId)
+// 	if err != nil {
+// 		return "", err
+// 	}
+//
+// 	return "", nil
+// }
+//
+// // QueryStrategyPlan 查询策略方案
+// func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error) {
+// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	var planVo *vo.DocumentStrategyPlanVo
+// 	planReady := false
+//
+// 	if document.CurrentPlanId > 0 {
+// 		plan, err := d.repo.SelectPlanById(ctx, document.CurrentPlanId)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if plan != nil && plan.Status == int(entity.BusinessStatusYes) {
+// 			stepList, err := d.repo.QueryStepListByPlanId(ctx, plan.Id)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 			planVo = d.toPlanVo(plan, stepList)
+// 			planReady = true
+// 		}
+// 	}
+//
+// 	return &vo.DocumentStrategyPlanQueryVo{
+// 		DocumentId:        document.Id,
+// 		DocumentName:      document.DocumentName,
+// 		ParseStatus:       document.ParseStatus,
+// 		ParseStatusMsg:    d.enumMsg(vo.ParseStatus(document.ParseStatus)),
+// 		StrategyStatus:    document.StrategyStatus,
+// 		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
+// 		IndexStatus:       document.IndexStatus,
+// 		IndexStatusMsg:    d.enumMsg(vo.IndexStatus(document.IndexStatus)),
+// 		ParseErrorMsg:     document.ParseErrorMsg,
+// 		PlanReady:         planReady,
+// 		Plan:              planVo,
+// 	}, nil
+// }
+//
+// // ConfirmStrategy 确认策略
+// func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
+// 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	if document.ParseStatus != int(vo.ParseStatusParseSuccess) {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档还未完成解析，不能确认策略。")
+// 	}
+//
+// 	if document.CurrentPlanId != req.BasePlanId {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的基础方案不存在或已切换。")
+// 	}
+//
+// 	basePlan, err := d.repo.GetPlanById(ctx, req.BasePlanId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if basePlan == nil || basePlan.Status != int(entity.BusinessStatusYes) {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
+// 	}
+//
+// 	baseStepList, err := d.repo.QueryStepListByPlanId(ctx, basePlan.Id)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	requestParentTypeList := d.extractStrategyTypes(req.ParentSteps)
+// 	requestChildTypeList := d.extractStrategyTypes(req.ChildSteps)
+//
+// 	// TODO: 实现策略标准化
+// 	// normalizedStepList := d.strategyService.NormalizeSteps(basePlan, baseStepList, requestParentTypeList, requestChildTypeList, req.DocumentId)
+// 	normalizedStepList := baseStepList
+//
+// 	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeParent)
+// 	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeChild)
+//
+// 	if len(normalizedParentTypeList) == 0 {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "父块流水线不能为空。")
+// 	}
+// 	if len(normalizedChildTypeList) == 0 {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "子块流水线不能为空。")
+// 	}
+//
+// 	if len(normalizedStepList) == 0 {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "策略步骤不能为空。")
+// 	}
+//
+// 	baseParentTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeParent)
+// 	baseChildTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeChild)
+//
+// 	requestDistinctParentTypeList := d.distinctIntList(requestParentTypeList)
+// 	requestDistinctChildTypeList := d.distinctIntList(requestChildTypeList)
+//
+// 	normalized := !d.intListEqual(requestDistinctParentTypeList, normalizedParentTypeList) ||
+// 		!d.intListEqual(requestDistinctChildTypeList, normalizedChildTypeList)
+//
+// 	changed := !d.intListEqual(baseParentTypeList, normalizedParentTypeList) ||
+// 		!d.intListEqual(baseChildTypeList, normalizedChildTypeList)
+//
+// 	var targetPlanId int64
+// 	var targetPlanVersion int
+// 	var targetStepList []*entity.DocumentStrategyStep
+//
+// 	if !changed {
+// 		basePlan.PlanStatus = int(vo.PlanStatusConfirmed)
+// 		if basePlan.PlanSource == 0 {
+// 			basePlan.PlanSource = int(vo.PlanSourceSystemRecommend)
+// 		}
+// 		basePlan.AdjustNote = req.AdjustNote
+// 		basePlan.ConfirmUserId = d.parseOptionalLong(req.OperatorId)
+// 		basePlan.ConfirmTime = time.Now().UnixMilli()
+// 		err = d.repo.UpdatePlan(ctx, basePlan)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		targetPlanId = basePlan.Id
+// 		targetPlanVersion = basePlan.PlanVersion
+// 		targetStepList = baseStepList
+// 	} else {
+// 		basePlan.PlanStatus = int(vo.PlanStatusDiscarded)
+// 		err = d.repo.UpdatePlan(ctx, basePlan)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+//
+// 		newPlanId := utils.GetSnowflakeNextID()
+// 		newPlanVersion, err := d.repo.GetLatestPlanVersion(ctx, document.Id)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if newPlanVersion == 0 {
+// 			newPlanVersion = 1
+// 		}
+//
+// 		newPlan := &entity.DocumentStrategyPlan{
+// 			Model: common.Model{
+// 				Id:         newPlanId,
+// 				CreateTime: time.Now().UnixMilli(),
+// 				EditTime:   time.Now().UnixMilli(),
+// 				Status:     int(entity.BusinessStatusYes),
+// 			},
+// 			DocumentId:       document.Id,
+// 			PlanVersion:      newPlanVersion,
+// 			PlanSource:       int(vo.PlanSourceUserAdjust),
+// 			PlanStatus:       int(vo.PlanStatusConfirmed),
+// 			StrategyCount:    len(normalizedStepList),
+// 			StrategySnapshot: d.buildStrategySnapshot(normalizedStepList),
+// 			RecommendReason:  basePlan.RecommendReason,
+// 			AdjustNote:       req.AdjustNote,
+// 			ConfirmUserId:    d.parseOptionalLong(req.OperatorId),
+// 			ConfirmTime:      time.Now().UnixMilli(),
+// 		}
+//
+// 		err = d.repo.InsertPlan(ctx, newPlan)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+//
+// 		for _, step := range normalizedStepList {
+// 			step.Id = utils.GetSnowflakeNextID()
+// 			step.PlanId = newPlanId
+// 			step.Status = int(entity.BusinessStatusYes)
+// 			err = d.repo.InsertStep(ctx, step)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 		}
+//
+// 		targetPlanId = newPlanId
+// 		targetPlanVersion = newPlanVersion
+// 		targetStepList = normalizedStepList
+// 	}
+//
+// 	document.CurrentPlanId = targetPlanId
+// 	document.StrategyStatus = int(vo.StrategyStatusConfirmed)
+// 	err = d.repo.UpdateDocument(ctx, document)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	latestParseTask, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeParseRoute))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if latestParseTask != nil {
+// 		latestParseTask.CurrentStage = int(vo.TaskStageStrategyConfirm)
+// 		err = d.repo.UpdateTask(ctx, latestParseTask)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+//
+// 		if changed {
+// 			err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
+// 				int(vo.TaskStageStrategyConfirm),
+// 				int(vo.TaskEventUserAdjust),
+// 				int(vo.LogLevelInfo),
+// 				d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
+// 				d.parseOptionalLong(req.OperatorId),
+// 				"用户调整了系统推荐策略。",
+// 				d.detail(
+// 					"parentStrategyTypes", normalizedParentTypeList,
+// 					"childStrategyTypes", normalizedChildTypeList,
+// 					"adjustNote", req.AdjustNote,
+// 				))
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 		}
+//
+// 		err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
+// 			int(vo.TaskStageStrategyConfirm),
+// 			int(vo.TaskEventUserConfirm),
+// 			int(vo.LogLevelInfo),
+// 			d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
+// 			d.parseOptionalLong(req.OperatorId),
+// 			"用户已确认最终策略方案。",
+// 			map[string]interface{}{
+// 				"planId":              targetPlanId,
+// 				"parentStrategyTypes": normalizedParentTypeList,
+// 				"childStrategyTypes":  normalizedChildTypeList,
+// 			})
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	}
+//
+// 	return &vo.DocumentStrategyConfirmVo{
+// 		DocumentId:        document.Id,
+// 		PlanId:            targetPlanId,
+// 		PlanVersion:       targetPlanVersion,
+// 		StrategyStatus:    document.StrategyStatus,
+// 		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
+// 		Normalized:        normalized,
+// 		ParentPipeline:    d.toPipelineVo(vo.PipelineTypeParent, targetStepList),
+// 		ChildPipeline:     d.toPipelineVo(vo.PipelineTypeChild, targetStepList),
+// 	}, nil
+// }
+//
+// // BuildIndex 构建索引
+// func (d *DocumentLifecycleLogicImpl) BuildIndex(ctx context.Context, req *entity.DocumentIndexBuildDto) (*vo.DocumentIndexBuildVo, error) {
+// 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	if document.ParseStatus != int(vo.ParseStatusParseSuccess) ||
+// 		document.StrategyStatus != int(vo.StrategyStatusConfirmed) {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档尚未完成\"解析成功 + 策略确认\"，不能构建索引。")
+// 	}
+//
+// 	if document.CurrentPlanId != req.PlanId {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的生效方案与请求方案不一致。")
+// 	}
+//
+// 	runningTaskCount, err := d.repo.CountActiveTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if runningTaskCount > 0 {
+// 		return nil, common.NewBizError(DocumentManageCodeIndexTaskRunning, "索引任务正在运行中")
+// 	}
+//
+// 	plan, err := d.repo.GetPlanById(ctx, req.PlanId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if plan == nil || plan.Status != int(entity.BusinessStatusYes) {
+// 		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
+// 	}
+//
+// 	taskId := utils.GetSnowflakeNextID()
+// 	task := &entity.DocumentTask{
+// 		Model: common.Model{
+// 			Id:         taskId,
+// 			CreateTime: time.Now().UnixMilli(),
+// 			EditTime:   time.Now().UnixMilli(),
+// 			Status:     int(entity.BusinessStatusYes),
+// 		},
+// 		DocumentId:       document.Id,
+// 		PlanId:           req.PlanId,
+// 		TaskType:         int(vo.TaskTypeBuildIndex),
+// 		TaskStatus:       int(vo.TaskStatusNew),
+// 		CurrentStage:     int(vo.TaskStageChunkExecute),
+// 		TriggerSource:    d.resolveTriggerSource(d.parseOptionalLong(req.OperatorId)),
+// 		StrategySnapshot: plan.StrategySnapshot,
+// 		RetryCount:       0,
+// 	}
+//
+// 	err = d.repo.InsertTask(ctx, task)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	document.IndexStatus = int(vo.IndexStatusBuilding)
+// 	err = d.repo.UpdateDocument(ctx, document)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	err = d.saveTaskLog(ctx, taskId, document.Id,
+// 		int(vo.TaskStageChunkExecute),
+// 		int(vo.TaskEventStart),
+// 		int(vo.LogLevelInfo),
+// 		d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
+// 		d.parseOptionalLong(req.OperatorId),
+// 		"索引构建任务已创建，等待异步执行。",
+// 		map[string]interface{}{
+// 			"planId":           req.PlanId,
+// 			"strategySnapshot": plan.StrategySnapshot,
+// 		})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	// 发送索引构建消息（TODO: 实现消息发送）
+// 	// d.kafkaProducer.SendIndexBuild(&DocumentIndexBuildMessage{DocumentId: document.Id, TaskId: taskId, PlanId: req.PlanId})
+//
+// 	return &vo.DocumentIndexBuildVo{
+// 		DocumentId:     document.Id,
+// 		TaskId:         taskId,
+// 		TaskType:       task.TaskType,
+// 		TaskTypeMsg:    d.enumMsg(vo.TaskType(task.TaskType)),
+// 		TaskStatus:     task.TaskStatus,
+// 		TaskStatusMsg:  d.enumMsg(vo.TaskStatus(task.TaskStatus)),
+// 		IndexStatus:    document.IndexStatus,
+// 		IndexStatusMsg: d.enumMsg(vo.IndexStatus(document.IndexStatus)),
+// 	}, nil
+// }
+//
+// // QueryTaskLogs 查询任务日志
+// func (d *DocumentLifecycleLogicImpl) QueryTaskLogs(ctx context.Context, req *entity.DocumentTaskLogQueryDto) (*vo.DocumentTaskLogQueryVo, error) {
+// 	task, err := d.repo.GetTaskById(ctx, req.TaskId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if task == nil || task.Status != int(entity.BusinessStatusYes) {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "任务不存在。")
+// 	}
+//
+// 	pageNo := req.PageNo
+// 	if pageNo <= 0 {
+// 		pageNo = 1
+// 	}
+// 	pageSize := req.PageSize
+// 	if pageSize <= 0 {
+// 		pageSize = 20
+// 	}
+//
+// 	logList, total, err := d.repo.QueryTaskLogPage(ctx, req.TaskId, pageNo, pageSize)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	logVoList := make([]*vo.DocumentTaskLogVo, 0, len(logList))
+// 	for _, log := range logList {
+// 		logVoList = append(logVoList, d.toTaskLogVo(log))
+// 	}
+//
+// 	return &vo.DocumentTaskLogQueryVo{
+// 		TaskId:          task.ID,
+// 		DocumentId:      task.DocumentId,
+// 		TaskType:        task.TaskType,
+// 		TaskTypeMsg:     d.enumMsg(vo.TaskType(task.TaskType)),
+// 		TaskStatus:      task.TaskStatus,
+// 		TaskStatusMsg:   d.enumMsg(vo.TaskStatus(task.TaskStatus)),
+// 		CurrentStage:    task.CurrentStage,
+// 		CurrentStageMsg: d.enumMsg(vo.TaskStage(task.CurrentStage)),
+// 		StartTime:       task.StartTime,
+// 		FinishTime:      task.FinishTime,
+// 		CostMillis:      task.CostMillis,
+// 		ErrorCode:       task.ErrorCode,
+// 		ErrorMsg:        task.ErrorMsg,
+// 		Total:           total,
+// 		Logs:            logVoList,
+// 	}, nil
+// }
+//
+// // QueryDocumentChunks 查询文档块
+// func (d *DocumentLifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, req *entity.DocumentChunkQueryDto) (*vo.DocumentChunkQueryVo, error) {
+// 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	pageNo := req.PageNo
+// 	if pageNo <= 0 {
+// 		pageNo = 1
+// 	}
+// 	pageSize := req.PageSize
+// 	if pageSize <= 0 {
+// 		pageSize = 20
+// 	}
+//
+// 	effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
+// 	if effectiveTaskId == 0 {
+// 		return &vo.DocumentChunkQueryVo{
+// 			DocumentId: document.Id,
+// 			TaskId:     0,
+// 			PlanId:     document.CurrentPlanId,
+// 			PageNo:     pageNo,
+// 			PageSize:   pageSize,
+// 			Total:      0,
+// 			Records:    []*vo.DocumentChunkItemVo{},
+// 		}, nil
+// 	}
+//
+// 	task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
+// 	}
+//
+// 	chunkList, total, err := d.repo.QueryChunkPage(ctx, document.Id, effectiveTaskId, pageNo, pageSize)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	parentBlockIds := make([]int64, 0, len(chunkList))
+// 	for _, chunk := range chunkList {
+// 		if chunk.ParentBlockId > 0 {
+// 			parentBlockIds = append(parentBlockIds, chunk.ParentBlockId)
+// 		}
+// 	}
+//
+// 	parentBlockMap, err := d.listParentBlockMap(ctx, parentBlockIds)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	records := make([]*vo.DocumentChunkItemVo, 0, len(chunkList))
+// 	for _, chunk := range chunkList {
+// 		parentBlock := parentBlockMap[chunk.ParentBlockId]
+// 		records = append(records, d.toDocumentChunkItemVo(chunk, parentBlock))
+// 	}
+//
+// 	return &vo.DocumentChunkQueryVo{
+// 		DocumentId: document.Id,
+// 		TaskId:     effectiveTaskId,
+// 		PlanId:     task.PlanId,
+// 		PageNo:     pageNo,
+// 		PageSize:   pageSize,
+// 		Total:      total,
+// 		Records:    records,
+// 	}, nil
+// }
+//
+// // QueryDocumentChunkDetail 查询文档块详情
+// func (d *DocumentLifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
+// 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
+// 	if effectiveTaskId == 0 {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "当前文档还没有可查看的 chunk 详情。")
+// 	}
+//
+// 	task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
+// 	}
+//
+// 	chunk, err := d.repo.GetChunkById(ctx, req.ChunkId, document.Id, effectiveTaskId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if chunk == nil {
+// 		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "chunk 详情不存在。")
+// 	}
+//
+// 	var parentBlock *entity.DocumentParentBlock
+// 	if chunk.ParentBlockId > 0 {
+// 		parentBlock, err = d.repo.GetParentBlockById(ctx, chunk.ParentBlockId, document.Id, effectiveTaskId)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	}
+//
+// 	var siblingChunkList []*entity.DocumentChunk
+// 	if chunk.ParentBlockId > 0 {
+// 		siblingChunkList, err = d.repo.QueryChunkListByParentBlockId(ctx, document.Id, effectiveTaskId, chunk.ParentBlockId)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	} else {
+// 		siblingChunkList = []*entity.DocumentChunk{chunk}
+// 	}
+//
+// 	siblingVoList := make([]*vo.DocumentChunkItemVo, 0, len(siblingChunkList))
+// 	for _, sibling := range siblingChunkList {
+// 		siblingVoList = append(siblingVoList, d.toDocumentChunkItemVo(sibling, parentBlock))
+// 	}
+//
+// 	return &vo.DocumentChunkDetailVo{
+// 		DocumentId:    document.Id,
+// 		TaskId:        effectiveTaskId,
+// 		PlanId:        task.PlanId,
+// 		Chunk:         d.toDocumentChunkItemVo(chunk, parentBlock),
+// 		ParentBlock:   d.toDocumentParentBlockItemVo(parentBlock),
+// 		SiblingChunks: siblingVoList,
+// 	}, nil
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) resolveChunkTaskId(document *entity.Document, requestedTaskId int64) int64 {
+// 	if requestedTaskId > 0 {
+// 		return requestedTaskId
+// 	}
+// 	if document.LastIndexTaskId > 0 {
+// 		return document.LastIndexTaskId
+// 	}
+// 	task, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
+// 	if err != nil || task == nil {
+// 		return 0
+// 	}
+// 	return task.ID
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) listParentBlockMap(ctx context.Context, parentBlockIds []int64) (map[int64]*entity.DocumentParentBlock, error) {
+// 	if len(parentBlockIds) == 0 {
+// 		return map[int64]*entity.DocumentParentBlock{}, nil
+// 	}
+//
+// 	parentBlockList, err := d.repo.QueryParentBlockListByIds(ctx, parentBlockIds)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	result := make(map[int64]*entity.DocumentParentBlock)
+// 	for _, pb := range parentBlockList {
+// 		result[pb.Id] = pb
+// 	}
+// 	return result, nil
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]interface{}) error {
+// 	// TODO: 序列化detail为JSON
+// 	detailJson := ""
+// 	if len(detail) > 0 {
+// 		// 简化实现，实际应使用json.Marshal
+// 		var parts []string
+// 		for k, v := range detail {
+// 			parts = append(parts, fmt.Sprintf("%s:%v", k, v))
+// 		}
+// 		detailJson = "{" + strings.Join(parts, ", ") + "}"
+// 	}
+//
+// 	logRecord := &entity.DocumentTaskLog{
+// 		Model: common.Model{
+// 			Id:         utils.GetSnowflakeNextID(),
+// 			CreateTime: time.Now().UnixMilli(),
+// 			EditTime:   time.Now().UnixMilli(),
+// 			Status:     int(entity.BusinessStatusYes),
+// 		},
+// 		TaskId:       taskId,
+// 		DocumentId:   documentId,
+// 		StageType:    stageType,
+// 		EventType:    eventType,
+// 		LogLevel:     logLevel,
+// 		OperatorType: operatorType,
+// 		OperatorId:   operatorId,
+// 		Content:      content,
+// 		DetailJson:   detailJson,
+// 	}
+//
+// 	return d.repo.InsertTaskLog(ctx, logRecord)
+// }
+//
+// // ===== 转换方法 =====
+//
+// func (d *DocumentLifecycleLogicImpl) toDocumentListItemVo(document *entity.Document, latestTask *entity.DocumentTask) *vo.DocumentListItemVo {
+// 	vo := &vo.DocumentListItemVo{
+// 		DocumentId:         document.Id,
+// 		DocumentName:       document.DocumentName,
+// 		OriginalFileName:   document.OriginalFileName,
+// 		FileType:           document.FileType,
+// 		FileTypeMsg:        d.enumMsg(document.FileType),
+// 		FileSize:           document.FileSize,
+// 		CharCount:          document.CharCount,
+// 		TokenCount:         document.TokenCount,
+// 		ParseStatus:        document.ParseStatus,
+// 		ParseStatusMsg:     d.enumMsg(document.ParseStatus),
+// 		StrategyStatus:     document.StrategyStatus,
+// 		StrategyStatusMsg:  d.enumMsg(document.StrategyStatus),
+// 		IndexStatus:        document.IndexStatus,
+// 		IndexStatusMsg:     d.enumMsg(document.IndexStatus),
+// 		ParseErrorMsg:      document.ParseErrorMsg,
+// 		KnowledgeScopeCode: document.KnowledgeScopeCode,
+// 		KnowledgeScopeName: document.KnowledgeScopeName,
+// 		BusinessCategory:   document.BusinessCategory,
+// 		DocumentTags:       document.DocumentTags,
+// 		CurrentPlanId:      document.CurrentPlanId,
+// 		LastIndexTaskId:    document.LastIndexTaskId,
+// 		CreateTime:         document.CreateTime,
+// 		EditTime:           document.EditTime,
+// 	}
+//
+// 	if latestTask != nil {
+// 		vo.LatestTaskId = latestTask.ID
+// 		vo.LatestTaskType = latestTask.TaskType
+// 		vo.LatestTaskTypeMsg = d.enumMsg(vo.TaskType(latestTask.TaskType))
+// 		vo.LatestTaskStatus = latestTask.TaskStatus
+// 		vo.LatestTaskStatusMsg = d.enumMsg(vo.TaskStatus(latestTask.TaskStatus))
+// 	}
+//
+// 	return vo
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
+// 	vo := &vo.DocumentChunkItemVo{
+// 		Id:              chunk.Id,
+// 		ParentBlockId:   chunk.ParentBlockId,
+// 		ChunkNo:         chunk.ChunkNo,
+// 		SectionPath:     chunk.SectionPath,
+// 		SourceType:      chunk.SourceType,
+// 		SourceTypeMsg:   d.enumMsg(vo.ChunkSourceType(chunk.SourceType)),
+// 		CharCount:       chunk.CharCount,
+// 		TokenCount:      chunk.TokenCount,
+// 		VectorStatus:    chunk.VectorStatus,
+// 		VectorStatusMsg: d.enumMsg(vo.VectorStatus(chunk.VectorStatus)),
+// 		ChunkText:       chunk.ChunkText,
+// 	}
+//
+// 	if parentBlock != nil {
+// 		vo.ParentNo = parentBlock.ParentNo
+// 		vo.ChildCount = parentBlock.ChildCount
+// 		vo.StartChunkNo = parentBlock.StartChunkNo
+// 		vo.EndChunkNo = parentBlock.EndChunkNo
+// 	}
+//
+// 	return vo
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *entity.DocumentParentBlock) *vo.DocumentParentBlockItemVo {
+// 	if parentBlock == nil {
+// 		return nil
+// 	}
+// 	return &vo.DocumentParentBlockItemVo{
+// 		Id:            parentBlock.Id,
+// 		ParentNo:      parentBlock.ParentNo,
+// 		SectionPath:   parentBlock.SectionPath,
+// 		SourceType:    parentBlock.SourceType,
+// 		SourceTypeMsg: d.enumMsg(vo.ChunkSourceType(parentBlock.SourceType)),
+// 		CharCount:     parentBlock.CharCount,
+// 		TokenCount:    parentBlock.TokenCount,
+// 		ChildCount:    parentBlock.ChildCount,
+// 		StartChunkNo:  parentBlock.StartChunkNo,
+// 		EndChunkNo:    parentBlock.EndChunkNo,
+// 		ParentText:    parentBlock.ParentText,
+// 	}
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toPlanVo(plan *entity.DocumentStrategyPlan, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPlanVo {
+// 	return &vo.DocumentStrategyPlanVo{
+// 		PlanId:           plan.Id,
+// 		PlanVersion:      plan.PlanVersion,
+// 		PlanSource:       plan.PlanSource,
+// 		PlanSourceMsg:    d.enumMsg(vo.PlanSource(plan.PlanSource)),
+// 		PlanStatus:       plan.PlanStatus,
+// 		PlanStatusMsg:    d.enumMsg(vo.PlanStatus(plan.PlanStatus)),
+// 		StrategySnapshot: plan.StrategySnapshot,
+// 		RecommendReason:  plan.RecommendReason,
+// 		ParentPipeline:   d.toPipelineVo(vo.PipelineTypeParent, stepList),
+// 		ChildPipeline:    d.toPipelineVo(vo.PipelineTypeChild, stepList),
+// 	}
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toPipelineVo(pipelineType vo.PipelineType, stepList []*entity.DocumentStrategyStep) *vo.DocumentStrategyPipelineVo {
+// 	pipelineSteps := make([]*entity.DocumentStrategyStep, 0)
+// 	for _, step := range stepList {
+// 		pt := step.PipelineType
+// 		if pt == "" {
+// 			pt = "CHILD"
+// 		}
+// 		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
+// 			pipelineSteps = append(pipelineSteps, step)
+// 		}
+// 	}
+//
+// 	// 按步骤序号排序
+// 	sort.Slice(pipelineSteps, func(i, j int) bool {
+// 		return pipelineSteps[i].StepNo < pipelineSteps[j].StepNo
+// 	})
+//
+// 	// 构建策略快照
+// 	var snapshotParts []string
+// 	for _, step := range pipelineSteps {
+// 		snapshotParts = append(snapshotParts, strconv.Itoa(step.StrategyType))
+// 	}
+// 	snapshot := strings.Join(snapshotParts, ",")
+//
+// 	return &vo.DocumentStrategyPipelineVo{
+// 		PipelineType:     int(pipelineType),
+// 		PipelineTypeMsg:  d.enumMsg(pipelineType),
+// 		StrategySnapshot: snapshot,
+// 		Steps:            d.toStepVoList(pipelineSteps),
+// 	}
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
+// 	// 排序
+// 	sortedSteps := make([]*entity.DocumentStrategyStep, len(stepList))
+// 	copy(sortedSteps, stepList)
+// 	sort.Slice(sortedSteps, func(i, j int) bool {
+// 		orderI := d.pipelineOrder(sortedSteps[i].PipelineType)
+// 		orderJ := d.pipelineOrder(sortedSteps[j].PipelineType)
+// 		if orderI != orderJ {
+// 			return orderI < orderJ
+// 		}
+// 		if sortedSteps[i].StepNo != sortedSteps[j].StepNo {
+// 			return sortedSteps[i].StepNo < sortedSteps[j].StepNo
+// 		}
+// 		return sortedSteps[i].Id < sortedSteps[j].Id
+// 	})
+//
+// 	voList := make([]*vo.DocumentStrategyStepVo, 0, len(sortedSteps))
+// 	for _, step := range sortedSteps {
+// 		voList = append(voList, &vo.DocumentStrategyStepVo{
+// 			StepNo:           step.StepNo,
+// 			PipelineType:     d.parsePipelineType(step.PipelineType),
+// 			PipelineTypeMsg:  d.enumMsg(vo.PipelineType(d.parsePipelineType(step.PipelineType))),
+// 			StrategyType:     step.StrategyType,
+// 			StrategyTypeMsg:  d.enumMsg(vo.StrategyType(step.StrategyType)),
+// 			StrategyRole:     step.StrategyRole,
+// 			StrategyRoleMsg:  d.enumMsg(vo.StrategyRole(step.StrategyRole)),
+// 			SourceType:       step.SourceType,
+// 			SourceTypeMsg:    d.enumMsg(vo.StrategySourceType(step.SourceType)),
+// 			ExecuteStatus:    step.ExecuteStatus,
+// 			ExecuteStatusMsg: d.enumMsg(vo.ExecuteStatus(step.ExecuteStatus)),
+// 			RecommendReason:  step.RecommendReason,
+// 		})
+// 	}
+// 	return voList
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) toTaskLogVo(logRecord *entity.DocumentTaskLog) *vo.DocumentTaskLogVo {
+// 	return &vo.DocumentTaskLogVo{
+// 		Id:           logRecord.Id,
+// 		StageType:    logRecord.StageType,
+// 		StageTypeMsg: d.enumMsg(vo.TaskStage(logRecord.StageType)),
+// 		EventType:    logRecord.EventType,
+// 		EventTypeMsg: d.enumMsg(vo.TaskEventType(logRecord.EventType)),
+// 		LogLevel:     logRecord.LogLevel,
+// 		LogLevelMsg:  d.enumMsg(vo.LogLevel(logRecord.LogLevel)),
+// 		Content:      logRecord.Content,
+// 		DetailJson:   logRecord.DetailJson,
+// 		CreateTime:   logRecord.CreateTime,
+// 	}
+// }
+//
+// // ===== 工具方法 =====
+//
+// func (d *DocumentLifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
+// 	if items == nil {
+// 		return []int{}
+// 	}
+// 	// 按步骤序号排序
+// 	sortedItems := make([]*entity.DocumentStrategyStepItemDto, len(items))
+// 	copy(sortedItems, items)
+// 	sort.Slice(sortedItems, func(i, j int) bool {
+// 		noI := sortedItems[i].StepNo
+// 		noJ := sortedItems[j].StepNo
+// 		if noI == 0 {
+// 			noI = int(^uint(0) >> 1) // max int
+// 		}
+// 		if noJ == 0 {
+// 			noJ = int(^uint(0) >> 1)
+// 		}
+// 		return noI < noJ
+// 	})
+//
+// 	result := make([]int, 0, len(sortedItems))
+// 	for _, item := range sortedItems {
+// 		if item.StrategyType > 0 {
+// 			result = append(result, item.StrategyType)
+// 		}
+// 	}
+// 	return result
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
+// 	result := make([]*entity.DocumentStrategyStep, 0)
+// 	for _, step := range stepList {
+// 		pt := step.PipelineType
+// 		if pt == "" {
+// 			pt = "CHILD"
+// 		}
+// 		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
+// 			result = append(result, step)
+// 		}
+// 	}
+//
+// 	sort.Slice(result, func(i, j int) bool {
+// 		return result[i].StepNo < result[j].StepNo
+// 	})
+//
+// 	types := make([]int, 0, len(result))
+// 	for _, step := range result {
+// 		types = append(types, step.StrategyType)
+// 	}
+// 	return types
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
+// 	parentVo := d.toPipelineVo(vo.PipelineTypeParent, stepList)
+// 	childVo := d.toPipelineVo(vo.PipelineTypeChild, stepList)
+// 	return "PARENT:" + parentVo.StrategySnapshot + ";CHILD:" + childVo.StrategySnapshot
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) pipelineOrder(pipelineType string) int {
+// 	if strings.EqualFold(pipelineType, "PARENT") {
+// 		return 0
+// 	}
+// 	return 1
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) parsePipelineType(pipelineType string) int {
+// 	if strings.EqualFold(pipelineType, "PARENT") {
+// 		return int(vo.PipelineTypeParent)
+// 	}
+// 	return int(vo.PipelineTypeChild)
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) resolveTriggerSource(operatorId int64) int {
+// 	if operatorId > 0 {
+// 		return vo.TriggerSourceUser
+// 	}
+// 	return vo.TriggerSourceSystem
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) parseOptionalLong(rawValue string) int64 {
+// 	if strings.TrimSpace(rawValue) == "" {
+// 		return 0
+// 	}
+// 	value, err := strconv.ParseInt(rawValue, 10, 64)
+// 	if err != nil || value <= 0 {
+// 		return 0
+// 	}
+// 	return value
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {
+// 	if strings.TrimSpace(rawValue) == "" {
+// 		panic(common.NewBizError(BaseCodeParameterError, fieldName+"不能为空。"))
+// 	}
+// 	value, err := strconv.ParseInt(rawValue, 10, 64)
+// 	if err != nil || value <= 0 {
+// 		panic(common.NewBizError(BaseCodeParameterError, fieldName+"格式不正确。"))
+// 	}
+// 	return value
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) enumMsg(enumValue interface{}) string {
+// 	switch v := enumValue.(type) {
+// 	case vo.ParseStatus:
+// 		return parseStatusMsg(v)
+// 	case vo.FileType:
+// 		return fileTypeMsg(v)
+// 	case vo.StrategyStatus:
+// 		return strategyStatusMsg(v)
+// 	case vo.IndexStatus:
+// 		return indexStatusMsg(v)
+// 	case vo.PlanSource:
+// 		return planSourceMsg(v)
+// 	case vo.PlanStatus:
+// 		return planStatusMsg(v)
+// 	case vo.StrategyType:
+// 		return strategyTypeMsg(v)
+// 	case vo.StrategyRole:
+// 		return strategyRoleMsg(v)
+// 	case vo.StrategySourceType:
+// 		return strategySourceTypeMsg(v)
+// 	case vo.ExecuteStatus:
+// 		return strategyExecuteStatusMsg(v)
+// 	case vo.TaskType:
+// 		return taskTypeMsg(v)
+// 	case vo.TaskStatus:
+// 		return taskStatusMsg(v)
+// 	case vo.TaskStage:
+// 		return taskStageMsg(v)
+// 	case vo.TaskEventType:
+// 		return taskEventTypeMsg(v)
+// 	case vo.LogLevel:
+// 		return logLevelMsg(v)
+// 	case vo.ChunkSourceType:
+// 		return chunkSourceTypeMsg(v)
+// 	case vo.VectorStatus:
+// 		return vectorStatusMsg(v)
+// 	case vo.PipelineType:
+// 		return pipelineTypeMsg(v)
+// 	default:
+// 		return ""
+// 	}
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) distinctIntList(list []int) []int {
+// 	seen := make(map[int]bool)
+// 	result := make([]int, 0)
+// 	for _, v := range list {
+// 		if !seen[v] {
+// 			seen[v] = true
+// 			result = append(result, v)
+// 		}
+// 	}
+// 	return result
+// }
+//
+// func (d *DocumentLifecycleLogicImpl) intListEqual(a, b []int) bool {
+// 	if len(a) != len(b) {
+// 		return false
+// 	}
+// 	for i := range a {
+// 		if a[i] != b[i] {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
+//
+// // ===== 枚举消息映射函数 =====
+//
+// func parseStatusMsg(status vo.ParseStatus) string {
+// 	switch status {
+// 	case vo.ParseStatusParsing:
+// 		return "解析中"
+// 	case vo.ParseStatusParseSuccess:
+// 		return "解析成功"
+// 	case vo.ParseStatusParseFailed:
+// 		return "解析失败"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func fileTypeMsg(ft vo.FileType) string {
+// 	switch ft {
+// 	case vo.FileTypePDF:
+// 		return "PDF"
+// 	case vo.FileTypeDOCX:
+// 		return "DOCX"
+// 	case vo.FileTypeXLSX:
+// 		return "XLSX"
+// 	case vo.FileTypePPTX:
+// 		return "PPTX"
+// 	case vo.FileTypeTXT:
+// 		return "TXT"
+// 	case vo.FileTypeMD:
+// 		return "MD"
+// 	case entity.DocumentFileTypeHTML:
+// 		return "HTML"
+// 	case vo.FileTypeJSON:
+// 		return "JSON"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func strategyStatusMsg(status vo.StrategyStatus) string {
+// 	switch status {
+// 	case vo.StrategyStatusWaitRecommend:
+// 		return "等待推荐"
+// 	case vo.StrategyStatusRecommended:
+// 		return "已推荐"
+// 	case vo.StrategyStatusConfirmed:
+// 		return "已确认"
+// 	case vo.StrategyStatusRejected:
+// 		return "已拒绝"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func indexStatusMsg(status vo.IndexStatus) string {
+// 	switch status {
+// 	case vo.IndexStatusWaitBuild:
+// 		return "等待构建"
+// 	case vo.IndexStatusBuilding:
+// 		return "构建中"
+// 	case vo.IndexStatusBuildSuccess:
+// 		return "构建成功"
+// 	case vo.IndexStatusBuildFailed:
+// 		return "构建失败"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func planSourceMsg(source vo.PlanSource) string {
+// 	switch source {
+// 	case vo.PlanSourceSystemRecommend:
+// 		return "系统推荐"
+// 	case vo.PlanSourceUserAdjust:
+// 		return "用户调整"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func planStatusMsg(status vo.PlanStatus) string {
+// 	switch status {
+// 	case vo.PlanStatusRecommended:
+// 		return "已推荐"
+// 	case vo.PlanStatusConfirmed:
+// 		return "已确认"
+// 	case vo.PlanStatusDiscarded:
+// 		return "已废弃"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func strategyTypeMsg(st vo.StrategyType) string {
+// 	switch st {
+// 	case vo.StrategyTypeSemanticChunk:
+// 		return "语义切块"
+// 	case vo.StrategyTypeMarkdownChunk:
+// 		return "Markdown切块"
+// 	case vo.StrategyTypeRecursiveChunk:
+// 		return "递归切块"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func strategyRoleMsg(sr vo.StrategyRole) string {
+// 	switch sr {
+// 	case vo.StrategyRoleSplitter:
+// 		return "切块器"
+// 	case vo.StrategyRoleParser:
+// 		return "解析器"
+// 	case vo.StrategyRoleIndexer:
+// 		return "索引器"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func strategySourceTypeMsg(st vo.StrategySourceType) string {
+// 	switch st {
+// 	case vo.StrategySourceTypeOriginal:
+// 		return "原始"
+// 	case vo.StrategySourceTypeParsed:
+// 		return "已解析"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func strategyExecuteStatusMsg(status vo.ExecuteStatus) string {
+// 	switch status {
+// 	case vo.ExecuteStatusPending:
+// 		return "待执行"
+// 	case vo.ExecuteStatusRunning:
+// 		return "执行中"
+// 	case vo.ExecuteStatusCompleted:
+// 		return "已完成"
+// 	case vo.ExecuteStatusFailed:
+// 		return "失败"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func taskTypeMsg(tt vo.TaskType) string {
+// 	switch tt {
+// 	case vo.TaskTypeParseRoute:
+// 		return "解析路由"
+// 	case vo.TaskTypeBuildIndex:
+// 		return "构建索引"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func taskStatusMsg(ts vo.TaskStatus) string {
+// 	switch ts {
+// 	case vo.TaskStatusNew:
+// 		return "新建"
+// 	case vo.TaskStatusRunning:
+// 		return "运行中"
+// 	case vo.TaskStatusCompleted:
+// 		return "已完成"
+// 	case entity.usFailed:
+// 		return "失败"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func taskStageMsg(ts vo.TaskStage) string {
+// 	switch ts {
+// 	case vo.TaskStageFileUpload:
+// 		return "文件上传"
+// 	case vo.TaskStageParse:
+// 		return "解析"
+// 	case entity.eStrategyRecommend:
+// 		return "策略推荐"
+// 	case vo.TaskStageStrategyConfirm:
+// 		return "策略确认"
+// 	case vo.TaskStageChunkExecute:
+// 		return "切块执行"
+// 	case vo.TaskStageVectorBuild:
+// 		return "向量构建"
+// 	case vo.TaskStageComplete:
+// 		return "完成"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func taskEventTypeMsg(et vo.TaskEventType) string {
+// 	switch et {
+// 	case vo.TaskEventStart:
+// 		return "开始"
+// 	case vo.TaskEventComplete:
+// 		return "完成"
+// 	case vo.TaskEventFailed:
+// 		return "失败"
+// 	case vo.TaskEventUserConfirm:
+// 		return "用户确认"
+// 	case vo.TaskEventUserAdjust:
+// 		return "用户调整"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func logLevelMsg(ll vo.LogLevel) string {
+// 	switch ll {
+// 	case vo.LogLevelInfo:
+// 		return "INFO"
+// 	case vo.LogLevelWarn:
+// 		return "WARN"
+// 	case vo.LogLevelError:
+// 		return "ERROR"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func chunkSourceTypeMsg(cst vo.ChunkSourceType) string {
+// 	switch cst {
+// 	case entity.DocumentChunkSourceTypeText:
+// 		return "文本"
+// 	case vo.ChunkSourceTypeTable:
+// 		return "表格"
+// 	case vo.ChunkSourceTypeImage:
+// 		return "图片"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func vectorStatusMsg(vs vo.VectorStatus) string {
+// 	switch vs {
+// 	case vo.VectorStatusPending:
+// 		return "待构建"
+// 	case vo.VectorStatusBuilding:
+// 		return "构建中"
+// 	case vo.VectorStatusBuilt:
+// 		return "已构建"
+// 	case vo.VectorStatusFailed:
+// 		return "构建失败"
+// 	default:
+// 		return "未知"
+// 	}
+// }
+//
+// func pipelineTypeMsg(pt vo.PipelineType) string {
+// 	switch pt {
+// 	case vo.PipelineTypeParent:
+// 		return "父块"
+// 	case vo.PipelineTypeChild:
+// 		return "子块"
+// 	default:
+// 		return "未知"
+// 	}
+// }

@@ -83,7 +83,7 @@ func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo,
 	if keyword != "" {
 		query = query.Where("document_name LIKE %?% or original_file_name LIKE %?%", keyword, keyword)
 	}
-	res := query.Find(&documents)
+	res := query.Order("update_time DESC").Find(&documents)
 	return documents, res.RowsAffected, res.Error
 }
 
@@ -125,8 +125,9 @@ func (d *DocumentRepositoryImpl) CountActiveTask(ctx context.Context, documentId
 }
 
 func (d *DocumentRepositoryImpl) SelectTaskListByDocumentIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentTask, error) {
-	// TODO implement me
-	panic("implement me")
+	var tasks []*entity.DocumentTask
+	res := d.db.WithContext(ctx).Model(&entity.DocumentTask{}).Where("document_id IN ?", documentIds).Order("id DESC").Find(&tasks)
+	return tasks, res.Error
 }
 
 func (d *DocumentRepositoryImpl) InsertTaskLog(ctx context.Context, log *entity.DocumentTaskLog) error {

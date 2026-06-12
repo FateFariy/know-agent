@@ -16,27 +16,27 @@ type DocumentLifecycleLogic interface {
 	// QueryDocumentPage 分页查询文档列表
 	QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error)
 
-	// QueryDocumentDetail 查询文档详情
-	QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error)
-
-	// DeleteDocument 删除文档
-	DeleteDocument(ctx context.Context, documentId int64) (string, error)
-
-	// QueryStrategyPlan 查询策略方案
-	QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error)
-
-	// ConfirmStrategy 确认策略
-	ConfirmStrategy(ctx context.Context, req *vo.DocumentStrategyConfirm) (*vo.DocumentStrategyConfirmVo, error)
-
-	// BuildIndex 构建索引
-	BuildIndex(ctx context.Context, req *vo.DocumentIndexBuild) (*vo.DocumentIndexBuildVo, error)
-
-	// QueryTaskLogs 查询任务日志
-	QueryTaskLogs(ctx context.Context, req *vo.DocumentTaskLogQuery) (*vo.DocumentTaskLogQueryVo, error)
-
-	// QueryDocumentChunks 查询文档块
-	QueryDocumentChunks(ctx context.Context, req *vo.DocumentChunkQuery) (*vo.DocumentChunkQueryVo, error)
-
-	// QueryDocumentChunkDetail 查询文档块详情
-	QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVo, error)
+	// // QueryDocumentDetail 查询文档详情
+	// QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentTask, error)
+	//
+	// // DeleteDocument 删除文档
+	// DeleteDocument(ctx context.Context, documentId int64) (string, error)
+	//
+	// // QueryStrategyPlan 查询策略方案
+	// QueryStrategyPlan(ctx context.Context, documentId int64) (*vo.DocumentStrategyPlanQueryVo, error)
+	//
+	// // ConfirmStrategy 确认策略
+	// ConfirmStrategy(ctx context.Context, req *vo.DocumentStrategyConfirm) (*vo.DocumentStrategyConfirmVo, error)
+	//
+	// // BuildIndex 构建索引
+	// BuildIndex(ctx context.Context, req *vo.DocumentIndexBuild) (*vo.DocumentIndexBuildVo, error)
+	//
+	// // QueryTaskLogs 查询任务日志
+	// QueryTaskLogs(ctx context.Context, req *vo.DocumentTaskLogQuery) (*vo.DocumentTaskLogQueryVo, error)
+	//
+	// // QueryDocumentChunks 查询文档块
+	// QueryDocumentChunks(ctx context.Context, req *vo.DocumentChunkQuery) (*vo.DocumentChunkQueryVo, error)
+	//
+	// // QueryDocumentChunkDetail 查询文档块详情
+	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVo, error)
 }
