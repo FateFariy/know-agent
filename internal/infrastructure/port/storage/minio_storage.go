@@ -24,7 +24,7 @@ type MinioStorage struct {
 	Config      config.MinioConf
 }
 
-var _ document.Storage = (*MinioStorage)(nil)
+var _ adapter.Storage = (*MinioStorage)(nil)
 
 func NewMinioStorage(svcCtx *svc.ServiceContext) *MinioStorage {
 	return &MinioStorage{

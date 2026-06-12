@@ -1,0 +1,21 @@
+Http:
+  Name: user
+  Host: 0.0.0.0
+  Port: 8081
+  Mode: dev
+
+Auth:
+  AccessSecret: your-access-secret-key
+  AccessExpire: 2h
+
+Mysql:
+  Host: 10.104.0.165
+  Port: 13306
+  Username: root
+  Password: "123456"
+  DbName: damai_user_0
+
+Redis:
+  - Host: 10.104.0.165:6379
+    Type: node
+    Weight: 100

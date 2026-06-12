@@ -43,7 +43,7 @@ type DocumentLifecycleLogicImpl struct {
 
 var _ DocumentLifecycleLogic = (*DocumentLifecycleLogicImpl)(nil)
 
-func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) DocumentLifecycleLogic {
+func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *DocumentLifecycleLogicImpl {
 	return &DocumentLifecycleLogicImpl{
 		conf: svcCtx.Config,
 		port: port,
@@ -320,7 +320,6 @@ func (d *DocumentLifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, docu
 	return document, plan, nil
 }
 
-//
 // // ConfirmStrategy 确认策略
 // func (d *DocumentLifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
 // 	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)

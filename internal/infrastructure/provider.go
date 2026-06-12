@@ -5,6 +5,7 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/mq"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/storage"
 )
 
@@ -13,4 +14,6 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(adapter.DocumentRepository), new(*persistence.DocumentRepositoryImpl)),
 	storage.NewMinioStorage,
 	wire.Bind(new(adapter.Storage), new(*storage.MinioStorage)),
+	mq.NewMockMessageProducer,
+	wire.Bind(new(adapter.MessageProducer), new(*mq.MockMessageProducer)),
 )
