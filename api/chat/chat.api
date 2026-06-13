@@ -1,0 +1,159 @@
+syntax = "v1"
+
+info (
+	title:   "聊天服务接口"
+	desc:    "聊天服务接口, 包含会话管理、消息流、检索观察等功能"
+	author:  "susu"
+	version: "v1.0.0"
+)
+
+// ==================== 请求类型定义 ====================
+type (
+	// 聊天请求
+	ChatReq {
+		Question           string `json:"question"` // 问题内容
+		ConversationId     int64  `json:"conversationId,optional"` // 会话ID
+		ChatMode           string `json:"chatMode"` // 聊天模式
+		SelectedDocumentId int64  `json:"selectedDocumentId,optional"` // 选中的文档ID
+	}
+	// 会话标识请求
+	ConversationIdentityReq {
+		ConversationId string `json:"conversationId"` // 会话ID
+	}
+	// 对话详情查询请求
+	ConversationExchangeDetailQueryReq {
+		ConversationId string `json:"conversationId"` // 会话ID
+		ExchangeId     string `json:"exchangeId"` // 对话ID
+	}
+	// 会话列表查询请求
+	ConversationSessionListReq {
+		PageNo   int    `json:"pageNo,optional,default=1"` // 页码
+		PageSize int    `json:"pageSize,optional,default=10"` // 每页大小
+		Keyword  string `json:"keyword,optional"` // 关键词
+	}
+	// 检索观察查询请求
+	RetrievalObserveReq {
+		ConversationId string `json:"conversationId"` // 会话ID
+		ExchangeId     string `json:"exchangeId"` // 对话ID
+	}
+)
+
+// ==================== 响应类型定义 ====================
+type (
+	// 知识文档选项
+	KnowledgeDocumentOptionResp {
+		DocumentId   int64  `json:"documentId"` // 文档ID
+		DocumentName string `json:"documentName"` // 文档名称
+	}
+	// 会话视图
+	ConversationSessionResp {
+		ConversationId string `json:"conversationId"` // 会话ID
+		Title          string `json:"title"` // 会话标题
+		LatestMessage  string `json:"latestMessage"` // 最新消息
+		CreateTime     string `json:"createTime"` // 创建时间
+		UpdateTime     string `json:"updateTime"` // 更新时间
+	}
+	// 对话详情视图
+	ConversationExchangeDetailResp {
+		ExchangeId     string `json:"exchangeId"` // 对话ID
+		ConversationId string `json:"conversationId"` // 会话ID
+		UserMessage    string `json:"userMessage"` // 用户消息
+		AgentMessage   string `json:"agentMessage"` // 代理消息
+		CreateTime     string `json:"createTime"` // 创建时间
+	}
+	// 会话列表响应
+	ConversationSessionListResp {
+		PageNo   int                        `json:"pageNo"` // 页码
+		PageSize int                        `json:"pageSize"` // 每页大小
+		Total    int64                      `json:"total"` // 总记录数
+		Records  []*ConversationSessionResp `json:"records"` // 会话列表
+	}
+	// 会话重置响应
+	ConversationResetResp {
+		Success bool `json:"success"` // 是否成功
+	}
+	// 会话停止响应
+	ConversationStopResp {
+		Success bool `json:"success"` // 是否成功
+	}
+	// 会话记忆摘要视图
+	ConversationMemorySummaryResp {
+		ConversationId string `json:"conversationId"` // 会话ID
+		Summary        string `json:"summary"` // 摘要内容
+	}
+	// 检索结果视图
+	RetrievalResultResp {
+		RetrievalId  int64  `json:"retrievalId"` // 检索ID
+		DocumentId   int64  `json:"documentId"` // 文档ID
+		DocumentName string `json:"documentName"` // 文档名称
+		Content      string `json:"content"` // 检索内容
+		Score        string `json:"score"` // 相似度分数
+	}
+	// 渠道执行视图
+	ChannelExecutionResp {
+		ExecutionId  string `json:"executionId"` // 执行ID
+		ChannelId    string `json:"channelId"` // 渠道ID
+		ChannelName  string `json:"channelName"` // 渠道名称
+		Status       int    `json:"status"` // 执行状态
+		ErrorMessage string `json:"errorMessage"` // 错误信息
+		CreateTime   string `json:"createTime"` // 创建时间
+	}
+	// 阶段基准视图
+	StageBenchmarkResp {
+		StageName string `json:"stageName"` // 阶段名称
+		Benchmark string `json:"benchmark"` // 基准值
+	}
+)
+
+// ==================== 聊天服务 ====================
+@server (
+	group:  chat
+	desc:   "聊天服务"
+	prefix: /api/chat
+)
+service chat {
+	@doc "流式聊天"
+	@handler StreamChat
+	post /stream (ChatReq)
+
+	@doc "获取知识文档选项"
+	@handler GetDocumentOptions
+	post /document/options returns ([]KnowledgeDocumentOptionResp)
+
+	@doc "停止会话"
+	@handler StopConversation
+	post /session/stop (ConversationIdentityReq) returns (ConversationStopResp)
+
+	@doc "获取会话详情"
+	@handler GetSessionDetail
+	post /session/detail (ConversationIdentityReq) returns (ConversationSessionResp)
+
+	@doc "获取对话详情"
+	@handler GetExchangeDetail
+	post /exchange/detail (ConversationExchangeDetailQueryReq) returns (ConversationExchangeDetailResp)
+
+	@doc "获取会话列表"
+	@handler ListSessions
+	post /session/list (ConversationSessionListReq) returns (ConversationSessionListResp)
+
+	@doc "重置会话"
+	@handler ResetConversation
+	post /session/reset (ConversationIdentityReq) returns (ConversationResetResp)
+
+	@doc "重建会话摘要"
+	@handler RebuildSummary
+	post /session/summary/rebuild (ConversationIdentityReq) returns (ConversationMemorySummaryResp)
+
+	@doc "获取检索结果"
+	@handler GetRetrievalResults
+	post /exchange/retrieval/results (RetrievalObserveReq) returns ([]RetrievalResultResp)
+
+	@doc "获取渠道执行结果"
+	@handler GetChannelExecutions
+	post /exchange/channel/executions (RetrievalObserveReq) returns ([]ChannelExecutionResp)
+
+	@doc "获取阶段基准"
+	@handler GetStageBenchmarks
+	post /stage/benchmarks returns ([]StageBenchmarkResp)
+}
+
