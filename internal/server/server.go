@@ -4,6 +4,7 @@ import (
 	"github.com/google/wire"
 	"github.com/zeromicro/go-zero/rest"
 
+	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -19,8 +20,9 @@ func NewServer(HTTP *rest.Server) *Server {
 	return &Server{HTTP: HTTP}
 }
 
-func NewHTTPServer(c config.Config, svcCtx *svc.ServiceContext, srv document.HTTPServer) *rest.Server {
+func NewHTTPServer(c config.Config, svcCtx *svc.ServiceContext, docSrv document.HTTPServer, chatSrv chat.HTTPServer) *rest.Server {
 	server := rest.MustNewServer(c.Http)
-	document.RegisterHandlers(server, svcCtx, srv)
+	document.RegisterHandlers(server, svcCtx, docSrv)
+	chat.RegisterHandlers(server, svcCtx, chatSrv)
 	return server
 }

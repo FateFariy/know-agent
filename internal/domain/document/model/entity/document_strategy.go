@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -79,13 +78,5 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 		}
 	}
 	d.StrategySnapshot = strings.Join(strategyTypes, ",")
-	slices.SortFunc(steps, func(a, b *DocumentStrategyStep) int {
-		if a.PipelineType != b.PipelineType {
-			return a.PipelineType - b.PipelineType
-		} else if a.StepNo != b.StepNo {
-			return a.StepNo - b.StepNo
-		}
-		return int(a.ID - b.ID)
-	})
 	d.Steps = steps
 }

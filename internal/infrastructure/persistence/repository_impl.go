@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/stores/cache"
@@ -106,7 +107,7 @@ func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documen
 	var document = &entity.Document{ID: documentId}
 	if err := d.db.WithContext(ctx).Model(&model.Document{}).First(document).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errorx.ErrDocumentNotFound
+			return nil, errorx.ErrDocumentNotFound.Format(documentId)
 		}
 		return nil, err
 	}
@@ -142,8 +143,14 @@ func (d *DocumentRepositoryImpl) DeleteTaskByDocumentId(ctx context.Context, doc
 }
 
 func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error) {
-	// TODO implement me
-	panic("implement me")
+	var task = &entity.DocumentTask{ID: taskId}
+	if err := d.db.WithContext(ctx).Model(&model.DocumentTask{}).First(task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorx.ErrTaskNotFound.Format(taskId)
+		}
+		return nil, err
+	}
+	return task, nil
 }
 
 // SelectLatestTask 获取最新任务
@@ -242,8 +249,17 @@ func (d *DocumentRepositoryImpl) DeleteStepByDocumentId(ctx context.Context, doc
 }
 
 func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error) {
-	// TODO implement me
-	panic("implement me")
+	var steps []*entity.DocumentStrategyStep
+	res := d.db.WithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps)
+	slices.SortFunc(steps, func(a, b *entity.DocumentStrategyStep) int {
+		if a.PipelineType != b.PipelineType {
+			return a.PipelineType - b.PipelineType
+		} else if a.StepNo != b.StepNo {
+			return a.StepNo - b.StepNo
+		}
+		return int(a.ID - b.ID)
+	})
+	return steps, res.Error
 }
 
 func (d *DocumentRepositoryImpl) UpdateStepExecuteStatus(ctx context.Context, planId int64, status int) error {

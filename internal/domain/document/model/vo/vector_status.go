@@ -9,6 +9,7 @@ const (
 	VectorStatusBuilding
 	VectorStatusBuilt
 	VectorStatusFailed
+	VectorStatusBuildSuccess // 构建成功
 )
 
 func VectorStatusName(vs VectorStatus) string {
@@ -21,6 +22,8 @@ func VectorStatusName(vs VectorStatus) string {
 		return "已构建"
 	case VectorStatusFailed:
 		return "构建失败"
+	case VectorStatusBuildSuccess:
+		return "构建成功"
 	default:
 		return "未知"
 	}

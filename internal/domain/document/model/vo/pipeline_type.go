@@ -1,5 +1,7 @@
 package vo
 
+import "strings"
+
 // PipelineType 流水线类型
 type PipelineType = int
 
@@ -16,5 +18,17 @@ func PipelineTypeName(pt PipelineType) string {
 		return "子块"
 	default:
 		return ""
+	}
+}
+
+// PipelineTypeNameStr 根据字符串类型获取流水线类型名称
+func PipelineTypeNameStr(pt string) string {
+	switch strings.ToUpper(pt) {
+	case "PARENT":
+		return "父块"
+	case "CHILD":
+		return "子块"
+	default:
+		return "子块"
 	}
 }

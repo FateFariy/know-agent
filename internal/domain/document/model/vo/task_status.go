@@ -8,6 +8,7 @@ const (
 	TaskStatusRunning
 	TaskStatusCompleted
 	TaskStatusFailed
+	TaskStatusSuccess // 成功
 )
 
 func TaskStatusName(ts TaskStatus) string {
@@ -20,6 +21,8 @@ func TaskStatusName(ts TaskStatus) string {
 		return "已完成"
 	case TaskStatusFailed:
 		return "失败"
+	case TaskStatusSuccess:
+		return "成功"
 	default:
 		return ""
 	}

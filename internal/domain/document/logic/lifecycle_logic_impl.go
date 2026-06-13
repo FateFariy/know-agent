@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
 
@@ -300,6 +301,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 		plan.ChildPipeline.FillAndProcessSteps(stepList)
 		document.PlanReady = true
 		document.FillEnumNames()
+		time.After(time.Second * 1)
 	}
 
 	return document, plan, nil
@@ -505,7 +507,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 // 	}, nil
 // }
 
-// BuildIndex 构建文档索引 - 异步任务模式，创建任务后发送MQ消息触发实际索引构建
+// BuildIndex 构建文档索引
 func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error) {
 	// 基础校验：查询文档详情
 	document, err := d.repo.SelectDocumentById(ctx, documentId)

@@ -9,6 +9,7 @@ const (
 	TaskEventFailed
 	TaskEventUserConfirm
 	TaskEventUserAdjust
+	TaskEventRecommendStrategy
 )
 
 func TaskEventTypeName(et TaskEventType) string {
@@ -23,6 +24,8 @@ func TaskEventTypeName(et TaskEventType) string {
 		return "用户确认"
 	case TaskEventUserAdjust:
 		return "用户调整"
+	case TaskEventRecommendStrategy:
+		return "推荐策略"
 	default:
 		return ""
 	}

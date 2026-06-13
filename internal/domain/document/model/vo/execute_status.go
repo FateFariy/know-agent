@@ -8,6 +8,9 @@ const (
 	ExecuteStatusRunning
 	ExecuteStatusCompleted
 	ExecuteStatusFailed
+	ExecuteStatusWaitExecute    // 待执行
+	ExecuteStatusExecuting      // 执行中
+	ExecuteStatusExecuteSuccess // 执行成功
 )
 
 func ExecuteStatusName(status ExecuteStatus) string {
@@ -20,6 +23,12 @@ func ExecuteStatusName(status ExecuteStatus) string {
 		return "已完成"
 	case ExecuteStatusFailed:
 		return "失败"
+	case ExecuteStatusWaitExecute:
+		return "待执行"
+	case ExecuteStatusExecuting:
+		return "执行中"
+	case ExecuteStatusExecuteSuccess:
+		return "执行成功"
 	default:
 		return ""
 	}
