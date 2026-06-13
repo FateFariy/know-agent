@@ -102,8 +102,6 @@ func (c *ChatLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.Chat
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("======request内容：%s", string(cmdJSON))
 
-	conversationId := normalizeConversationId(cmd.ConversationId)
-
 	stream := make(chan string)
 
 	go func() {
