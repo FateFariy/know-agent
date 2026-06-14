@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/duke-git/lancet/v2/slice"
 	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -73,22 +74,6 @@ func (r *ChatRepositoryImpl) CompleteExchange(ctx context.Context, exchange *ent
 			Where("conversation_id = ?", exchange.ConversationId).
 			Update("session_status", vo.ChatSessionStatusIdle).Error
 	})
-}
-
-// SelectExchange 获取单个对话交换记录
-func (r *ChatRepositoryImpl) SelectExchange(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, error) {
-	var chatExchange *entity.ChatExchange
-	err := r.db.WithContext(ctx).
-		Model(&model.ChatExchange{}).
-		Where("id = ? AND conversation_id = ?", exchangeId, conversationId).
-		First(&chatExchange).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return chatExchange, nil
 }
 
 // ListExchanges 列出对话的所有交换记录
@@ -178,9 +163,9 @@ func (r *ChatRepositoryImpl) RefreshSessionScope(ctx context.Context, dialogue *
 	return r.upsertDialogue(ctx, dialogue)
 }
 
-// SelectDialogue 获取会话
-func (r *ChatRepositoryImpl) SelectDialogue(ctx context.Context, conversationId string) (*entity.ChatDialogue, error) {
-	var dialogue *entity.ChatDialogue
+// SelectSessionRecord 获取会话
+func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
+	dialogue := &entity.ChatDialogue{}
 	err := r.db.WithContext(ctx).
 		Where("conversation_id = ?", conversationId).
 		Order("id DESC").
@@ -191,46 +176,41 @@ func (r *ChatRepositoryImpl) SelectDialogue(ctx context.Context, conversationId 
 		}
 		return nil, err
 	}
-	return dialogue, nil
-}
 
-// ListDialogues 列出所有会话
-func (r *ChatRepositoryImpl) ListDialogues(ctx context.Context) ([]*entity.ChatDialogue, error) {
-	var dialogues []*entity.ChatDialogue
-	err := r.db.WithContext(ctx).
-		Order("update_time DESC, id DESC").
-		Find(&dialogues).Error
-	if err != nil {
+	var chatExchanges []*entity.ChatExchange
+	if err = r.db.WithContext(ctx).Model(&model.ChatExchange{}).
+		Where("conversation_id = ?", conversationId).
+		Order("creat_time ASC, id ASC").Find(&chatExchanges).Error; err != nil {
 		return nil, err
 	}
-	return dialogues, nil
+
+	return r.toChatArchiveRecord(dialogue, chatExchanges), nil
 }
 
-// ListDialoguePage 分页查询会话
-func (r *ChatRepositoryImpl) ListDialoguePage(ctx context.Context, pageNo, pageSize int, keyword string, chatMode, latestTurnStatus int) ([]*entity.ChatDialogue, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.ChatDialogue{}).Scopes(utils.Paginate(pageNo, pageSize))
-
-	if chatMode > 0 {
-		query = query.Where("chat_mode = ?", chatMode)
-	}
-
-	if keyword != "" {
-		keyword = strings.TrimSpace(keyword)
-		query = query.Where("(conversation_id LIKE ? OR selected_document_name LIKE ?)",
-			"%"+keyword+"%", "%"+keyword+"%")
-	}
+// ListSessionRecordPage 列出会话记录分页
+func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, keyword string, pageNo, pageSize, chatMode, latestTurnStatus int) ([]*vo.ConversationArchiveRecord, int64, error) {
+	query := r.buildListDialoguePageQuery(ctx, keyword, chatMode, latestTurnStatus)
 
 	var total int64
-	err := query.Count(&total).Error
-	if err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var dialogues []*entity.ChatDialogue
-	if err = query.Order("update_time DESC, id DESC").Find(&dialogues).Error; err != nil {
+	if err := query.Scopes(utils.Paginate(pageNo, pageSize)).Find(&dialogues).Error; err != nil {
 		return nil, 0, err
 	}
-	return dialogues, total, nil
+	conversationIds := slice.Map(dialogues, func(index int, item *entity.ChatDialogue) string {
+		return item.ConversationId
+	})
+	chatExchangesMap, err := r.selectLatestExchangesByConversationIds(ctx, conversationIds)
+	if err != nil {
+		return nil, 0, err
+	}
+	records := slice.Map(dialogues, func(index int, item *entity.ChatDialogue) *vo.ConversationArchiveRecord {
+		return r.toChatArchiveRecord(item, []*entity.ChatExchange{chatExchangesMap[item.ConversationId]})
+	})
+	return records, total, nil
 }
 
 // DeleteSession 删除会话及所有交换记录
@@ -249,4 +229,72 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 	})
 
 	return dialogueCount, exchangeCount, err
+}
+
+// buildListDialoguePageQuery 构建分页查询会话的查询条件
+func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, keyword string, chatMode, latestTurnStatus int) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&model.ChatDialogue{})
+
+	if chatMode > 0 {
+		query = query.Where("chat_mode = ?", chatMode)
+	}
+
+	keyword = strings.TrimSpace(keyword)
+	if keyword != "" {
+		likeKeyword := "%" + keyword + "%"
+		subQuery := r.db.Session(&gorm.Session{NewDB: true}).
+			Table("chat_exchange AS e").
+			Select("1").
+			Where("dialogue_code = e.dialogue_code").
+			Where("e.user_prompt LIKE ? OR e.reply_content LIKE ? OR e.finish_note LIKE ?", likeKeyword, likeKeyword, likeKeyword)
+		query = query.Where("(conversation_id LIKE ? OR selected_document_name LIKE ? OR EXISTS (?))", likeKeyword, likeKeyword, subQuery)
+	}
+
+	if latestTurnStatus > 1 {
+		query.Where("session_status = ?", vo.ChatSessionStatusIdle)
+		latestIdSubQuery := r.db.Session(&gorm.Session{NewDB: true}).
+			Table("chat_exchange AS latest").
+			Select("latest.id").
+			Where("latest.dialogue_code = dialogue_code").
+			Order("latest.create_time DESC, latest.id DESC").
+			Limit(1)
+		existsQuery := r.db.Session(&gorm.Session{NewDB: true}).
+			Table("chat_exchange AS e").
+			Select("1").
+			Where("dialogue_code = e.dialogue_code").
+			Where("e.id = (?)", latestIdSubQuery).
+			Where("e.exchange_state = ?", latestTurnStatus)
+		query.Where("EXISTS (?)", existsQuery)
+	} else if latestTurnStatus > 0 {
+		query.Where("session_status = ?", vo.ChatSessionStatusRunning)
+	}
+
+	return query.Order("update_time DESC, id DESC")
+}
+
+// selectLatestExchangesByConversationIds 根据会话ID列表获取最新的对话交换记录
+func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.Context, conversationIds []string) (map[string]*entity.ChatExchange, error) {
+	var chatExchanges []*entity.ChatExchange
+	if err := r.db.WithContext(ctx).Model(&model.ChatExchange{}).
+		Where("conversation_id IN ?", conversationIds).
+		Order("creat_time DESC, id DESC").Find(&chatExchanges).Error; err != nil {
+		return nil, err
+	}
+	return utils.SliceToMapBy(chatExchanges, func(item *entity.ChatExchange) (string, *entity.ChatExchange) {
+		return item.ConversationId, item
+	}), nil
+}
+
+// toChatArchiveRecord 转换为会话记录
+func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
+	return &vo.ConversationArchiveRecord{
+		ConversationId:       dialogue.ConversationId,
+		ChatMode:             dialogue.ChatMode,
+		Running:              dialogue.SessionStatus == vo.ChatSessionStatusRunning,
+		SelectedDocumentId:   dialogue.SelectedDocumentId,
+		SelectedDocumentName: dialogue.SelectedDocumentName,
+		CreatedAt:            dialogue.CreateTime,
+		UpdatedAt:            dialogue.UpdateTime,
+		Exchanges:            chatExchanges,
+	}
 }

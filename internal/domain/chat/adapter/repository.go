@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChatRepository 聊天仓储接口
@@ -13,9 +14,6 @@ type ChatRepository interface {
 
 	// CompleteExchange 完成对话交换记录
 	CompleteExchange(ctx context.Context, exchange *entity.ChatExchange) error
-
-	// SelectExchange 获取单个对话交换记录
-	SelectExchange(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, error)
 
 	// ListExchanges 列出对话的所有交换记录
 	ListExchanges(ctx context.Context, conversationId string) ([]*entity.ChatExchange, error)
@@ -29,14 +27,11 @@ type ChatRepository interface {
 	// RefreshSessionScope 刷新会话范围（更新会话状态、模式、文档选择）
 	RefreshSessionScope(ctx context.Context, dialogue *entity.ChatDialogue) error
 
-	// SelectDialogue 获取会话
-	SelectDialogue(ctx context.Context, conversationId string) (*entity.ChatDialogue, error)
+	// SelectSessionRecord 获取会话记录
+	SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)
 
-	// ListDialogues 列出所有会话
-	ListDialogues(ctx context.Context) ([]*entity.ChatDialogue, error)
-
-	// ListDialoguePage 分页查询会话
-	ListDialoguePage(ctx context.Context, pageNo, pageSize int, keyword string, chatMode, latestTurnStatus int) ([]*entity.ChatDialogue, int64, error)
+	// ListSessionRecordPage 列出会话记录分页
+	ListSessionRecordPage(ctx context.Context, keyword string, pageNo, pageSize, chatMode, latestTurnStatus int) ([]*vo.ConversationArchiveRecord, int64, error)
 
 	// DeleteSession 删除会话及所有交换记录
 	DeleteSession(ctx context.Context, conversationId string) (int64, int64, error)

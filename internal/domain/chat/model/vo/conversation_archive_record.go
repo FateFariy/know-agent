@@ -1,6 +1,10 @@
 package vo
 
-import "time"
+import (
+	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+)
 
 type ConversationArchiveRecord struct {
 	ConversationId       string
@@ -10,5 +14,5 @@ type ConversationArchiveRecord struct {
 	SelectedDocumentName string
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
-	Exchanges            []*ConversationExchangeView
+	Exchanges            []*entity.ChatExchange
 }
