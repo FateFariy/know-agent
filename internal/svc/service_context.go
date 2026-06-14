@@ -2,9 +2,12 @@ package svc
 
 import (
 	"github.com/go-playground/validator/v10"
+	"github.com/go-redsync/redsync/v4"
+	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/google/wire"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/swiftbit/know-agent/internal/config"
 )
@@ -39,4 +42,10 @@ func (s *ServiceContext) NewMinioClient() *minio.Client {
 		return nil
 	}
 	return minioClient
+}
+
+// NewRedSync 创建 Redis 同步客户端
+func (s *ServiceContext) NewRedSync(client *redis.Client) *redsync.Redsync {
+	pool := goredis.NewPool(client)
+	return redsync.New(pool)
 }

@@ -4,13 +4,27 @@
 package convert
 
 import (
+	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
+	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	entity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	vo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"time"
 )
 
+func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
+	var pVoChatCommand *vo.ChatCommand
+	if source != nil {
+		var voChatCommand vo.ChatCommand
+		voChatCommand.Question = (*source).Question
+		voChatCommand.ConversationId = (*source).ConversationId
+		voChatCommand.ChatMode = ToChatQueryMode((*source).ChatMode)
+		voChatCommand.SelectedDocumentId = (*source).SelectedDocumentId
+		pVoChatCommand = &voChatCommand
+	}
+	return pVoChatCommand
+}
 func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document {
 	var pEntityDocument *entity.Document
 	if source != nil {
@@ -25,15 +39,18 @@ func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document 
 	}
 	return pEntityDocument
 }
-func ToBuildIndexResp(source *vo.DocumentIndexBuild) *document.BuildIndexResp {
+func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 	var pDocumentBuildIndexResp *document.BuildIndexResp
 	if source != nil {
 		var documentBuildIndexResp document.BuildIndexResp
 		documentBuildIndexResp.TaskId = (*source).TaskId
 		documentBuildIndexResp.DocumentId = (*source).DocumentId
 		documentBuildIndexResp.TaskType = (*source).TaskType
+		documentBuildIndexResp.TaskTypeName = (*source).TaskTypeName
 		documentBuildIndexResp.TaskStatus = (*source).TaskStatus
+		documentBuildIndexResp.TaskStatusName = (*source).TaskStatusName
 		documentBuildIndexResp.IndexStatus = (*source).IndexStatus
+		documentBuildIndexResp.IndexStatusName = (*source).IndexStatusName
 		pDocumentBuildIndexResp = &documentBuildIndexResp
 	}
 	return pDocumentBuildIndexResp
@@ -196,7 +213,7 @@ func ToQueryStrategyPlanResp(source *entity.Document) *document.QueryStrategyPla
 	}
 	return pDocumentQueryStrategyPlanResp
 }
-func ToUploadDocumentResp(source *vo.DocumentUpload) *document.UploadDocumentResp {
+func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentResp {
 	var pDocumentUploadDocumentResp *document.UploadDocumentResp
 	if source != nil {
 		var documentUploadDocumentResp document.UploadDocumentResp

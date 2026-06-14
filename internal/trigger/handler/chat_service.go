@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/swiftbit/know-agent/api/chat"
+	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 )
 
@@ -24,7 +25,7 @@ func NewChatService(l logic.ChatLogic) *ChatService {
 
 // StreamChat 流式聊天
 func (c *ChatService) StreamChat(ctx context.Context, req *chat.ChatReq) (<-chan string, error) {
-	return c.l.OpenConversationStream(ctx, req)
+	return c.l.OpenConversationStream(ctx, convert.FromChatReq(req))
 }
 
 // GetDocumentOptions 获取知识文档选项

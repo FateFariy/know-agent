@@ -7,8 +7,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
-// DocumentKnowledgeService 文档知识服务接口
-type DocumentKnowledgeService interface {
+// DocumentKnowledgeLogic 文档知识服务
+type DocumentKnowledgeLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
 	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocumentDescriptor, error)
 

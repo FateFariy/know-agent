@@ -13,10 +13,10 @@ type ChannelExecutionResp struct {
 }
 
 type ChatReq struct {
-	Question           string `json:"question"`                    // 问题内容
-	ConversationId     int64  `json:"conversationId,optional"`     // 会话ID
-	ChatMode           string `json:"chatMode"`                    // 聊天模式
-	SelectedDocumentId int64  `json:"selectedDocumentId,optional"` // 选中的文档ID
+	Question           string `json:"question"`                                          // 问题内容
+	ConversationId     string `json:"conversationId,optional"`                           // 会话ID
+	ChatMode           string `json:"chatMode,options=document|open_chat|auto_document"` // 聊天模式
+	SelectedDocumentId int64  `json:"selectedDocumentId,optional"`                       // 选中的文档ID
 }
 
 type ConversationExchangeDetailQueryReq struct {
