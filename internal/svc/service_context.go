@@ -8,7 +8,9 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/config"
 )
 
@@ -17,26 +19,34 @@ var ProviderSet = wire.NewSet(
 )
 
 type ServiceContext struct {
-	Config      config.Config
-	Validate    *validator.Validate
-	MinioClient *minio.Client
+	Config   config.Config
+	Validate *validator.Validate
+	Minio    *minio.Client
+	Db       *gorm.DB
+	Rdb      *redis.Client
+	RedSync  *redsync.Redsync
 }
 
-func NewServiceContext(c config.Config, validate *validator.Validate) *ServiceContext {
+func NewServiceContext(c config.Config) *ServiceContext {
+	redisClient := common.NewRedisClient(c)
 	return &ServiceContext{
 		Config:   c,
-		Validate: validate,
+		Validate: common.NewValidator(),
+		Rdb:      redisClient,
+		Db:       common.NewDb(c),
+		Minio:    NewMinioClient(c),
+		RedSync:  NewRedSync(redisClient),
 	}
 }
 
 // NewMinioClient 创建 Minio 客户端
-func (s *ServiceContext) NewMinioClient() *minio.Client {
-	endpoint := s.Config.Minio.Endpoint
-	accessKeyID := s.Config.Minio.AccessKeyID
-	accessKey := s.Config.Minio.SecretAccessKey
+func NewMinioClient(c config.Config) *minio.Client {
+	endpoint := c.Minio.Endpoint
+	accessKeyID := c.Minio.AccessKeyID
+	accessKey := c.Minio.SecretAccessKey
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, accessKey, ""),
-		Secure: s.Config.Minio.UseSSL,
+		Secure: c.Minio.UseSSL,
 	})
 	if err != nil {
 		return nil
@@ -45,7 +55,7 @@ func (s *ServiceContext) NewMinioClient() *minio.Client {
 }
 
 // NewRedSync 创建 Redis 同步客户端
-func (s *ServiceContext) NewRedSync(client *redis.Client) *redsync.Redsync {
+func NewRedSync(client *redis.Client) *redsync.Redsync {
 	pool := goredis.NewPool(client)
 	return redsync.New(pool)
 }

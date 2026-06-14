@@ -1,4 +1,4 @@
-package support
+package vo
 
 // SearchReference 检索引用来源
 type SearchReference struct {

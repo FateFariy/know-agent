@@ -16,7 +16,6 @@ import (
 func WireApp(c config.Config) *server.Server {
 	panic(wire.Build(
 		provideCommonConfig,
-		common.ProviderSet,
 		internal.ProviderSet,
 	))
 }

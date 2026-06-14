@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/stores/cache"
 	"github.com/zeromicro/go-zero/core/syncx"
@@ -39,8 +38,6 @@ type MysqlConf struct {
 	Password string `json:",omitempty"`
 	DbName   string `json:",omitempty"`
 }
-
-var ProviderSet = wire.NewSet(NewDb, NewRedisCache, NewRedisClient, NewValidator)
 
 func NewDb(c Config) *gorm.DB {
 	m := c.GetBaseConfig().Mysql

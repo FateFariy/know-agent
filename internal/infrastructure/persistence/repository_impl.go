@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/zeromicro/go-zero/core/stores/cache"
 	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -16,6 +15,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const (
@@ -26,18 +26,16 @@ const (
 )
 
 type DocumentRepositoryImpl struct {
-	db    *gorm.DB
-	rdb   *redis.Client
-	cache cache.Cache
+	db  *gorm.DB
+	rdb *redis.Client
 }
 
 var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
-func NewDocumentRepository(db *gorm.DB, rdb *redis.Client, cache cache.Cache) *DocumentRepositoryImpl {
+func NewDocumentRepository(svcCtx *svc.ServiceContext) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
-		db:    db,
-		rdb:   rdb,
-		cache: cache,
+		db:  svcCtx.Db,
+		rdb: svcCtx.Rdb,
 	}
 }
 
