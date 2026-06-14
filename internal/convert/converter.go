@@ -5,10 +5,11 @@ import (
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
+	cen "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	dmo "github.com/swiftbit/know-agent/internal/infrastructure/model"
+	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
 // goverter:converter
@@ -33,9 +34,16 @@ type DocumentConverter interface {
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
 
-	ToDocumentModel(src *den.Document) *dmo.Document
-	ToDocumentTaskModel(src *den.DocumentTask) *dmo.DocumentTask
-	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *dmo.DocumentTaskLog
+	// goverter:map . Model
+	ToDocumentModel(src *den.Document) *model.Document
+	// goverter:map . Model
+	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
+	// goverter:map . Model
+	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
+	// goverter:map . Model
+	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
+	// goverter:map . Model
+	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
 }
 
 // goverter:converter

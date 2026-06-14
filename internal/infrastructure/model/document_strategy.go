@@ -8,8 +8,7 @@ import (
 
 // DocumentStrategyPlan 策略方案实体
 type DocumentStrategyPlan struct {
-	common.AuditModel
-	ID               int64     `gorm:"column:id;primaryKey"`     // 主键ID
+	common.Model
 	DocumentId       int64     `gorm:"column:document_id"`       // 文档ID
 	PlanVersion      int       `gorm:"column:plan_version"`      // 方案版本
 	PlanSource       int       `gorm:"column:plan_source"`       // 方案来源

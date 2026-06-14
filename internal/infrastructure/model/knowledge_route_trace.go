@@ -6,8 +6,7 @@ import (
 
 // KnowledgeRouteTrace 知识路由追踪实体
 type KnowledgeRouteTrace struct {
-	common.AuditModel
-	ID                  int64   `gorm:"column:id;primaryKey"`         // 主键ID
+	common.Model
 	CreateTime          int64   `gorm:"column:create_time"`           // 创建时间
 	UpdateTime          int64   `gorm:"column:edit_time"`             // 更新时间
 	Deleted             int     `gorm:"column:deleted"`               // 逻辑删除标记

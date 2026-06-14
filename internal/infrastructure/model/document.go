@@ -5,8 +5,7 @@ import (
 )
 
 type Document struct {
-	common.AuditModel
-	ID                  int64  `gorm:"column:id;primaryKey"`         // 主键ID
+	common.Model
 	DocumentName        string `gorm:"column:document_name"`         // 文档名称
 	OriginalFileName    string `gorm:"column:original_file_name"`    // 原始文件名
 	FileType            int    `gorm:"column:file_type"`             // 文件类型

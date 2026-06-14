@@ -24,7 +24,7 @@ func NewChatService(l logic.ChatLogic) *ChatService {
 }
 
 // StreamChat 流式聊天
-func (c *ChatService) StreamChat(ctx context.Context, req *chat.ChatReq) (<-chan string, error) {
+func (c *ChatService) StreamChat(ctx context.Context, req *chat.ChatReq) <-chan string {
 	return c.l.OpenConversationStream(ctx, convert.FromChatReq(req))
 }
 

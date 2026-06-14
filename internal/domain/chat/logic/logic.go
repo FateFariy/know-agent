@@ -10,7 +10,7 @@ import (
 // ChatLogic 聊天业务逻辑接口
 type ChatLogic interface {
 	// OpenConversationStream 打开会话流
-	OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) (<-chan string, error)
+	OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string
 
 	// ListKnowledgeDocumentOptions 获取知识文档选项列表
 	ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error)

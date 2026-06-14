@@ -3,6 +3,8 @@ package support
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // StreamEventBuilder 流式事件构建器, 用于构建 SSE 流式响应中的各类事件 JSON 字符串
@@ -20,7 +22,7 @@ func (b *StreamEventBuilder) Text(content string) string {
 }
 
 // TextWithMetadata 生成带元数据的文本类型事件
-func (b *StreamEventBuilder) TextWithMetadata(content string, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) TextWithMetadata(content string, metadata *vo.StreamEventMetadata) string {
 	return b.build(b.event("text", content, metadata))
 }
 
@@ -30,7 +32,7 @@ func (b *StreamEventBuilder) Thinking(content string) string {
 }
 
 // ThinkingWithMetadata 生成带元数据的思考类型事件
-func (b *StreamEventBuilder) ThinkingWithMetadata(content string, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) ThinkingWithMetadata(content string, metadata *vo.StreamEventMetadata) string {
 	return b.build(b.event("thinking", content, metadata))
 }
 
@@ -40,7 +42,7 @@ func (b *StreamEventBuilder) Status(content string) string {
 }
 
 // StatusWithMetadata 生成带元数据的状态类型事件
-func (b *StreamEventBuilder) StatusWithMetadata(content string, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) StatusWithMetadata(content string, metadata *vo.StreamEventMetadata) string {
 	return b.build(b.event("status", content, metadata))
 }
 
@@ -50,17 +52,17 @@ func (b *StreamEventBuilder) Error(content string) string {
 }
 
 // ErrorWithMetadata 生成带元数据的错误类型事件
-func (b *StreamEventBuilder) ErrorWithMetadata(content string, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) ErrorWithMetadata(content string, metadata *vo.StreamEventMetadata) string {
 	return b.build(b.event("error", content, metadata))
 }
 
 // References 生成引用类型事件
-func (b *StreamEventBuilder) References(references []*SearchReference) string {
+func (b *StreamEventBuilder) References(references []*vo.SearchReference) string {
 	return b.ReferencesWithMetadata(references, nil)
 }
 
 // ReferencesWithMetadata 生成带元数据的引用类型事件
-func (b *StreamEventBuilder) ReferencesWithMetadata(references []*SearchReference, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) ReferencesWithMetadata(references []*vo.SearchReference, metadata *vo.StreamEventMetadata) string {
 	count := 0
 	if references != nil {
 		count = len(references)
@@ -76,7 +78,7 @@ func (b *StreamEventBuilder) Recommendations(recommendations []string) string {
 }
 
 // RecommendationsWithMetadata 生成带元数据的推荐类型事件
-func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []string, metadata *StreamEventMetadata) string {
+func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []string, metadata *vo.StreamEventMetadata) string {
 	count := 0
 	if recommendations != nil {
 		count = len(recommendations)
@@ -87,7 +89,7 @@ func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []strin
 }
 
 // event 构建事件载荷
-func (b *StreamEventBuilder) event(eventType string, content any, metadata *StreamEventMetadata) map[string]any {
+func (b *StreamEventBuilder) event(eventType string, content any, metadata *vo.StreamEventMetadata) map[string]any {
 	payload := map[string]any{
 		"type":      eventType,
 		"content":   content,
@@ -106,9 +108,6 @@ func (b *StreamEventBuilder) event(eventType string, content any, metadata *Stre
 
 // build 将载荷序列化为 JSON 字符串
 func (b *StreamEventBuilder) build(payload map[string]any) string {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		panic("流式事件序列化失败: " + err.Error())
-	}
+	data, _ := json.Marshal(payload)
 	return string(data)
 }

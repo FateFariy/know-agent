@@ -4,8 +4,7 @@ import "github.com/swiftbit/know-agent/common"
 
 // DocumentTaskLog 任务日志实体
 type DocumentTaskLog struct {
-	common.AuditModel
-	ID           int64  `gorm:"column:id;primaryKey"` // 主键ID
+	common.Model
 	TaskId       int64  `gorm:"column:task_id"`       // 任务ID
 	DocumentId   int64  `gorm:"column:document_id"`   // 文档ID
 	StageType    int    `gorm:"column:stage_type"`    // 阶段类型

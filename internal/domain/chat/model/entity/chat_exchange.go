@@ -1,10 +1,14 @@
-package model
+package entity
 
-import "github.com/swiftbit/know-agent/common"
+import (
+	"time"
+
+	"github.com/swiftbit/know-agent/common"
+)
 
 // ChatExchange 对话记录表
 type ChatExchange struct {
-	common.Model
+	ID                  int64            `gorm:"column:id;primaryKey"`          // 对话ID
 	ConversationId      string           `gorm:"column:conversation_id"`        // 会话ID
 	Question            string           `gorm:"column:question"`               // 用户问题
 	Answer              string           `gorm:"column:answer"`                 // 回答内容
@@ -17,4 +21,6 @@ type ChatExchange struct {
 	ErrorMessage        string           `gorm:"column:error_message"`          // 错误信息
 	FirstResponseTimeMs int64            `gorm:"column:first_response_time_ms"` // 首个响应时间毫秒
 	TotalResponseTimeMs int64            `gorm:"column:total_response_time_ms"` // 总响应时间毫秒
+	CreateTime          time.Time        `gorm:"column:create_time"`            // 创建时间
+	UpdateTime          time.Time        `gorm:"column:update_time"`            // 更新时间
 }

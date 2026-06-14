@@ -1,4 +1,4 @@
-package support
+package vo
 
 // StreamEventMetadata 流式事件元数据
 type StreamEventMetadata struct {

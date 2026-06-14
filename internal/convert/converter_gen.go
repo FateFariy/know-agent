@@ -6,6 +6,8 @@ package convert
 import (
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
+	common "github.com/swiftbit/know-agent/common"
+	entity1 "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	entity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -54,6 +56,41 @@ func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 		pDocumentBuildIndexResp = &documentBuildIndexResp
 	}
 	return pDocumentBuildIndexResp
+}
+func ToChatDialogueModel(source *entity1.ChatDialogue) *model.ChatDialogue {
+	var pModelChatDialogue *model.ChatDialogue
+	if source != nil {
+		var modelChatDialogue model.ChatDialogue
+		modelChatDialogue.Model = entityChatDialogueToCommonModel((*source))
+		modelChatDialogue.ConversationId = (*source).ConversationId
+		modelChatDialogue.SessionStatus = (*source).SessionStatus
+		modelChatDialogue.ChatMode = (*source).ChatMode
+		modelChatDialogue.SelectedDocumentId = (*source).SelectedDocumentId
+		modelChatDialogue.SelectedDocumentName = (*source).SelectedDocumentName
+		pModelChatDialogue = &modelChatDialogue
+	}
+	return pModelChatDialogue
+}
+func ToChatExchangeModel(source *entity1.ChatExchange) *model.ChatExchange {
+	var pModelChatExchange *model.ChatExchange
+	if source != nil {
+		var modelChatExchange model.ChatExchange
+		modelChatExchange.Model = entityChatExchangeToCommonModel((*source))
+		modelChatExchange.ConversationId = (*source).ConversationId
+		modelChatExchange.Question = (*source).Question
+		modelChatExchange.Answer = (*source).Answer
+		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
+		modelChatExchange.ReferenceList = commonJSONArrayToCommonJSONArray((*source).ReferenceList)
+		modelChatExchange.RecommendationList = commonJSONArrayToCommonJSONArray((*source).RecommendationList)
+		modelChatExchange.UsedToolList = commonJSONArrayToCommonJSONArray((*source).UsedToolList)
+		modelChatExchange.DebugTraceJson = (*source).DebugTraceJson
+		modelChatExchange.TurnStatus = (*source).TurnStatus
+		modelChatExchange.ErrorMessage = (*source).ErrorMessage
+		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
+		modelChatExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		pModelChatExchange = &modelChatExchange
+	}
+	return pModelChatExchange
 }
 func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
@@ -105,7 +142,7 @@ func ToDocumentModel(source *entity.Document) *model.Document {
 	var pModelDocument *model.Document
 	if source != nil {
 		var modelDocument model.Document
-		modelDocument.ID = (*source).ID
+		modelDocument.Model = entityDocumentToCommonModel((*source))
 		modelDocument.DocumentName = (*source).DocumentName
 		modelDocument.OriginalFileName = (*source).OriginalFileName
 		modelDocument.FileType = (*source).FileType
@@ -158,7 +195,7 @@ func ToDocumentTaskLogModel(source *entity.DocumentTaskLog) *model.DocumentTaskL
 	var pModelDocumentTaskLog *model.DocumentTaskLog
 	if source != nil {
 		var modelDocumentTaskLog model.DocumentTaskLog
-		modelDocumentTaskLog.ID = (*source).ID
+		modelDocumentTaskLog.Model = entityDocumentTaskLogToCommonModel((*source))
 		modelDocumentTaskLog.TaskId = (*source).TaskId
 		modelDocumentTaskLog.DocumentId = (*source).DocumentId
 		modelDocumentTaskLog.StageType = (*source).StageType
@@ -176,7 +213,7 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 	var pModelDocumentTask *model.DocumentTask
 	if source != nil {
 		var modelDocumentTask model.DocumentTask
-		modelDocumentTask.ID = (*source).ID
+		modelDocumentTask.Model = entityDocumentTaskToCommonModel((*source))
 		modelDocumentTask.DocumentId = (*source).DocumentId
 		modelDocumentTask.PlanId = (*source).PlanId
 		modelDocumentTask.TaskType = (*source).TaskType
@@ -226,6 +263,34 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 		pDocumentUploadDocumentResp = &documentUploadDocumentResp
 	}
 	return pDocumentUploadDocumentResp
+}
+func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
+	return source
+}
+func entityChatDialogueToCommonModel(source entity1.ChatDialogue) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityChatExchangeToCommonModel(source entity1.ChatExchange) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentTaskLogToCommonModel(source entity.DocumentTaskLog) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentTaskToCommonModel(source entity.DocumentTask) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentToCommonModel(source entity.Document) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
 }
 func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline

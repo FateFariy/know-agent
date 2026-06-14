@@ -14,7 +14,7 @@ import (
 // HTTPServer 聊天服务HTTP接口
 type HTTPServer interface {
 	// StreamChat 流式聊天
-	StreamChat(ctx context.Context, req *ChatReq) (<-chan string, error)
+	StreamChat(ctx context.Context, req *ChatReq) <-chan string
 
 	// GetDocumentOptions 获取知识文档选项
 	GetDocumentOptions(ctx context.Context) ([]*KnowledgeDocumentOptionResp, error)
@@ -56,19 +56,23 @@ func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 			return
 		}
 
-		stream, err := srv.StreamChat(r.Context(), &req)
-		if err != nil {
-			common.Response(w, nil, "", err)
-			return
-		}
+		stream := srv.StreamChat(r.Context(), &req)
 
 		w.Header().Set("Content-Type", "text/event-stream;charset=UTF-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
-		for msg := range stream {
-			w.Write([]byte(msg))
-			w.(http.Flusher).Flush()
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case msg, ok := <-stream:
+				if !ok {
+					return
+				}
+				w.Write([]byte(msg))
+				w.(http.Flusher).Flush()
+			}
 		}
 	}
 }
