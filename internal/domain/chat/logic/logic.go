@@ -42,3 +42,21 @@ type ChatLogic interface {
 	// GetStageBenchmarks 获取阶段基准
 	GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error)
 }
+
+// SessionMemoryLogic 会话记忆逻辑接口
+type SessionMemoryLogic interface {
+	// LoadMemoryContext 加载会话记忆上下文
+	LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error)
+
+	// RefreshConversationSummaryAsync 异步刷新会话摘要
+	RefreshConversationSummaryAsync(ctx context.Context, conversationId string)
+
+	// GetConversationSummary 获取会话摘要
+	GetConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error)
+
+	// RebuildConversationSummary 重建会话摘要
+	RebuildConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error)
+
+	// DeleteConversationSummary 删除会话摘要
+	DeleteConversationSummary(ctx context.Context, conversationId string) error
+}

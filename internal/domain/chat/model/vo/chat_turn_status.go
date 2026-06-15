@@ -1,10 +1,10 @@
 package vo
 
-type ChatExchangeStatus = int
+type ChatTurnStatus = int
 
 const (
-	ChatExchangeStatusRunning   ChatExchangeStatus = 1 + iota // 进行中
-	ChatExchangeStatusCompleted                               // 已完成
-	ChatExchangeStatusFailed                                  // 失败
-	ChatExchangeStatusStopped                                 // 已停止
+	ChatTurnStatusRunning   ChatTurnStatus = 1 + iota // 进行中
+	ChatTurnStatusCompleted                           // 已完成
+	ChatTurnStatusFailed                              // 失败
+	ChatTurnStatusStopped                             // 已停止
 )

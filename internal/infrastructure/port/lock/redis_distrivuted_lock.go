@@ -2,6 +2,7 @@ package lock
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -37,7 +38,7 @@ func (r *RedisMutexLock) Unlock(ctx context.Context, name string) error {
 		_, err := mutex.UnlockContext(ctx)
 		return err
 	}
-	return nil
+	return fmt.Errorf("分布式锁[%s]不存在", name)
 }
 
 func (r *RedisMutexLock) Extend(ctx context.Context, name string) error {
@@ -45,7 +46,7 @@ func (r *RedisMutexLock) Extend(ctx context.Context, name string) error {
 		_, err := mutex.ExtendContext(ctx)
 		return err
 	}
-	return nil
+	return fmt.Errorf("分布式锁[%s]不存在", name)
 }
 
 func (r *RedisMutexLock) getMutex(name string) (*redsync.Mutex, bool) {

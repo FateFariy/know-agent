@@ -37,7 +37,7 @@ func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity
 		ID:             utils.GetSnowflakeNextID(),
 		ConversationId: dialogue.ConversationId,
 		Question:       dialogue.Question,
-		TurnStatus:     vo.ChatExchangeStatusRunning,
+		TurnStatus:     vo.ChatTurnStatusRunning,
 		CreateTime:     time.Now(),
 		UpdateTime:     time.Now(),
 	}
@@ -230,6 +230,65 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 	})
 
 	return dialogueCount, exchangeCount, err
+}
+
+// ========== 会话记忆摘要相关 ==========
+
+// FindMemorySummary 查询会话记忆摘要
+func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
+	var summary entity.ChatMemorySummary
+	err := r.db.WithContext(ctx).Model(&model.ChatMemorySummary{}).
+		Where("conversation_id = ? AND status = 1", conversationId).
+		Order("id DESC").
+		First(&summary).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &summary, nil
+}
+
+// InsertMemorySummary 插入会话记忆摘要
+func (r *ChatRepositoryImpl) InsertMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error {
+	modelSummary := &model.ChatMemorySummary{
+		ID:                   summary.ID,
+		ConversationId:       summary.ConversationId,
+		CoveredExchangeId:    summary.CoveredExchangeId,
+		CoveredExchangeCount: summary.CoveredExchangeCount,
+		CompressionCount:     summary.CompressionCount,
+		SummaryVersion:       summary.SummaryVersion,
+		SummaryText:          summary.SummaryText,
+		SummaryJson:          summary.SummaryJson,
+		LastSourceEditTime:   summary.LastSourceEditTime,
+		Status:               summary.Status,
+		CreateTime:           time.Now(),
+		UpdateTime:           time.Now(),
+	}
+	return r.db.WithContext(ctx).Create(modelSummary).Error
+}
+
+// UpdateMemorySummary 更新会话记忆摘要
+func (r *ChatRepositoryImpl) UpdateMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error {
+	updates := map[string]interface{}{
+		"covered_exchange_id":    summary.CoveredExchangeId,
+		"covered_exchange_count": summary.CoveredExchangeCount,
+		"compression_count":      summary.CompressionCount,
+		"summary_version":        summary.SummaryVersion,
+		"summary_text":           summary.SummaryText,
+		"summary_json":           summary.SummaryJson,
+		"last_source_edit_time":  summary.LastSourceEditTime,
+		"update_time":            time.Now(),
+	}
+	return r.db.WithContext(ctx).Model(&model.ChatMemorySummary{}).
+		Where("id = ?", summary.ID).
+		Updates(updates).Error
+}
+
+// DeleteMemorySummary 删除会话记忆摘要
+func (r *ChatRepositoryImpl) DeleteMemorySummary(ctx context.Context, conversationId string) error {
+	return r.db.WithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model.ChatMemorySummary{}).Error
 }
 
 // buildListDialoguePageQuery 构建分页查询会话的查询条件

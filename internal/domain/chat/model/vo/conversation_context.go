@@ -1,6 +1,7 @@
 package vo
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 )
@@ -26,5 +27,9 @@ type ConversationContext struct {
 	FirstResponseTimeMs atomic.Int64                              // 首次响应耗时（毫秒）
 	Finalized           atomic.Bool                               // 是否已完成
 	// disposable             Disposable                                // 资源释放器（对应Disposable）
-	// leaseRenewalDisposable Disposable                                // 租约续期资源释放器
+	CancelLeaseRenewal context.CancelFunc // 租约锁取消函数
+}
+
+func (c *ConversationContext) IsFinalized() bool {
+	return c.Finalized.Load()
 }

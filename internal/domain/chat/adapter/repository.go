@@ -35,4 +35,18 @@ type ChatRepository interface {
 
 	// DeleteSession 删除会话及所有交换记录
 	DeleteSession(ctx context.Context, conversationId string) (int64, int64, error)
+
+	// ========== 会话记忆摘要相关 ==========
+
+	// SelectMemorySummary 查询会话记忆摘要
+	SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)
+
+	// InsertMemorySummary 插入会话记忆摘要
+	InsertMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error
+
+	// UpdateMemorySummary 更新会话记忆摘要
+	UpdateMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error
+
+	// DeleteMemorySummary 删除会话记忆摘要
+	DeleteMemorySummary(ctx context.Context, conversationId string) error
 }
