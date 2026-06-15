@@ -34,6 +34,7 @@ func NewChatRepository(svcCtx *svc.ServiceContext) *ChatRepositoryImpl {
 // StartExchange 创建对话交换记录
 func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error) {
 	chatExchange := &entity.ChatExchange{
+		ID:             utils.GetSnowflakeNextID(),
 		ConversationId: dialogue.ConversationId,
 		Question:       dialogue.Question,
 		TurnStatus:     vo.ChatExchangeStatusRunning,
@@ -180,7 +181,7 @@ func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversati
 	var chatExchanges []*entity.ChatExchange
 	if err = r.db.WithContext(ctx).Model(&model.ChatExchange{}).
 		Where("conversation_id = ?", conversationId).
-		Order("creat_time ASC, id ASC").Find(&chatExchanges).Error; err != nil {
+		Order("create_time ASC, id ASC").Find(&chatExchanges).Error; err != nil {
 		return nil, err
 	}
 
@@ -245,8 +246,8 @@ func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, key
 		subQuery := r.db.Session(&gorm.Session{NewDB: true}).
 			Table("chat_exchange AS e").
 			Select("1").
-			Where("dialogue_code = e.dialogue_code").
-			Where("e.user_prompt LIKE ? OR e.reply_content LIKE ? OR e.finish_note LIKE ?", likeKeyword, likeKeyword, likeKeyword)
+			Where("conversation_id = e.conversation_id").
+			Where("e.question LIKE ? OR e.answer LIKE ? OR e.error_message LIKE ?", likeKeyword, likeKeyword, likeKeyword)
 		query = query.Where("(conversation_id LIKE ? OR selected_document_name LIKE ? OR EXISTS (?))", likeKeyword, likeKeyword, subQuery)
 	}
 
@@ -255,15 +256,15 @@ func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, key
 		latestIdSubQuery := r.db.Session(&gorm.Session{NewDB: true}).
 			Table("chat_exchange AS latest").
 			Select("latest.id").
-			Where("latest.dialogue_code = dialogue_code").
+			Where("latest.conversation_id = conversation_id").
 			Order("latest.create_time DESC, latest.id DESC").
 			Limit(1)
 		existsQuery := r.db.Session(&gorm.Session{NewDB: true}).
 			Table("chat_exchange AS e").
 			Select("1").
-			Where("dialogue_code = e.dialogue_code").
+			Where("conversation_id = e.conversation_id").
 			Where("e.id = (?)", latestIdSubQuery).
-			Where("e.exchange_state = ?", latestTurnStatus)
+			Where("e.turn_status = ?", latestTurnStatus)
 		query.Where("EXISTS (?)", existsQuery)
 	} else if latestTurnStatus > 0 {
 		query.Where("session_status = ?", vo.ChatSessionStatusRunning)

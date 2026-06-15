@@ -3,8 +3,6 @@ package vo
 import (
 	"sync/atomic"
 	"time"
-
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 )
 
 type ConversationContext struct {
@@ -18,7 +16,7 @@ type ConversationContext struct {
 	RunnableConfig      RunnableConfig                            // 运行配置
 	TraceRecorder       ConversationTraceRecorder                 // 追踪记录器
 	Stream              chan string                               // 响应流
-	Mutex               *adapter.DistributedLock                  // 分布式锁
+	LeaseKey            string                                    // 租约锁键
 	EventMetadata       StreamEventMetadata                       // 流式事件元数据
 	AnswerBuffer        []string                                  // 响应内容缓冲区（原StringBuffer，改为切片）
 	ThinkingSteps       []string                                  // 思考步骤列表
