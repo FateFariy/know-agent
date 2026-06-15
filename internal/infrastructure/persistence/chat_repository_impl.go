@@ -31,7 +31,7 @@ func NewChatRepository(svcCtx *svc.ServiceContext) *ChatRepositoryImpl {
 	}
 }
 
-// StartExchange 创建对话交换记录
+// StartExchange 创建对话记录
 func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error) {
 	chatExchange := &entity.ChatExchange{
 		ID:             utils.GetSnowflakeNextID(),
@@ -50,7 +50,7 @@ func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity
 	})
 }
 
-// CompleteExchange 完成对话交换记录
+// CompleteExchange 完成对话记录
 func (r *ChatRepositoryImpl) CompleteExchange(ctx context.Context, exchange *entity.ChatExchange) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		updates := map[string]any{
@@ -91,11 +91,11 @@ func (r *ChatRepositoryImpl) ListExchanges(ctx context.Context, conversationId s
 	return exchanges, nil
 }
 
-// ListExchangesAfter 列出某个交换之后的记录
+// ListExchangesAfter 列出某个记录之后的记录
 func (r *ChatRepositoryImpl) ListExchangesAfter(ctx context.Context, conversationId string, afterExchangeId int64) ([]*entity.ChatExchange, error) {
 	var exchanges []*entity.ChatExchange
 	query := r.db.WithContext(ctx).Model(&model.ChatExchange{}).Where("conversation_id = ?", conversationId)
-	if afterExchangeId > 0 {
+	if afterExchangeId > -1 {
 		query = query.Where("id > ?", afterExchangeId)
 	}
 	if err := query.Order("create_time ASC, id ASC").Find(&exchanges).Error; err != nil {
@@ -104,7 +104,7 @@ func (r *ChatRepositoryImpl) ListExchangesAfter(ctx context.Context, conversatio
 	return exchanges, nil
 }
 
-// ListRecentExchanges 列出最近的交换记录
+// ListRecentExchanges 列出最近的记录
 func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversationId string, limit int) ([]*entity.ChatExchange, error) {
 	if limit <= 0 {
 		return []*entity.ChatExchange{}, nil
@@ -214,7 +214,7 @@ func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, keyword 
 	return records, total, nil
 }
 
-// DeleteSession 删除会话及所有交换记录
+// DeleteSession 删除会话及所有记录
 func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId string) (int64, int64, error) {
 	var exchangeCount, dialogueCount int64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -234,7 +234,7 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 
 // ========== 会话记忆摘要相关 ==========
 
-// FindMemorySummary 查询会话记忆摘要
+// SelectMemorySummary 查询会话记忆摘要
 func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
 	var summary entity.ChatMemorySummary
 	err := r.db.WithContext(ctx).Model(&model.ChatMemorySummary{}).

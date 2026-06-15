@@ -6,9 +6,10 @@ import (
 
 type Config struct {
 	common.BaseConfig
-	Minio MinioConf
-	Neo4j Neo4jConf
-	MQ    MQConf
+	Minio  MinioConf
+	Neo4j  Neo4jConf
+	MQ     MQConf
+	Memory MemoryConf
 }
 type MinioConf struct {
 	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
@@ -33,6 +34,23 @@ type MQConf struct {
 	ParseTopic string `json:",omitempty,default=know-agent-document"`
 	IndexTopic string `json:",omitempty,default=know-agent-index"`
 	Enabled    bool   `json:",omitempty,default=false"`
+}
+
+// HistorySummaryConf 历史摘要配置
+type HistorySummaryConf struct {
+	Enabled                  bool `json:",optional,default=true"` // 是否启用摘要压缩
+	KeepRecentTurns          int  `json:",optional,default=3"`    // 保留最近轮次
+	CompressionBatchTurns    int  `json:",optional,default=3"`    // 压缩批次轮次
+	SummaryMaxChars          int  `json:",optional,default=1024"` // 摘要最大字符数
+	RecentTranscriptMaxChars int  `json:",optional,default=1024"` // 最近对话记录最大字符数
+}
+
+// MemoryConf 记忆配置
+type MemoryConf struct {
+	StrategyType            string             `json:",optional,default=summary_compression"` // 记忆策略类型: sliding_window 或 summary_compression
+	HistorySummary          HistorySummaryConf `json:",optional"`                             // 历史摘要配置
+	RewriteHistoryTurns     int                `json:",optional,default=4"`                   // 重写历史轮次
+	QuestionHistoryMaxChars int                `json:",optional,default=512"`                 // 问题历史最大字符数
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {

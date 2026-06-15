@@ -37,18 +37,22 @@ var (
 
 // SessionMemoryLogicImpl 会话记忆逻辑实现
 type SessionMemoryLogicImpl struct {
-	historySummary config.HistorySummaryConf
-	repo           adapter.ChatRepository
-	refreshingMu   sync.Mutex
-	refreshing     map[string]struct{}
+	historySummary          config.HistorySummaryConf
+	repo                    adapter.ChatRepository
+	refreshingMu            sync.Mutex
+	refreshing              map[string]struct{}
+	rewriteHistoryTurns     int
+	questionHistoryMaxChars int
 }
 
 // NewSessionMemoryLogic 创建会话记忆逻辑实例
 func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatRepository) *SessionMemoryLogicImpl {
 	return &SessionMemoryLogicImpl{
-		repo:           repo,
-		refreshing:     make(map[string]struct{}),
-		historySummary: svcCtx.Config.HistorySummary,
+		repo:                    repo,
+		refreshing:              make(map[string]struct{}),
+		historySummary:          svcCtx.Config.Memory.HistorySummary,
+		rewriteHistoryTurns:     svcCtx.Config.Memory.RewriteHistoryTurns,
+		questionHistoryMaxChars: svcCtx.Config.Memory.QuestionHistoryMaxChars,
 	}
 }
 
@@ -59,7 +63,7 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 	}
 
 	// 获取最近对话
-	recentExchanges, err := s.repo.ListRecentExchanges(ctx, conversationId, 9)
+	recentExchanges, err := s.repo.ListRecentExchanges(ctx, conversationId, s.rewriteHistoryTurns*3)
 	if err != nil {
 		return nil, err
 	}
@@ -77,23 +81,23 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 
 	summaryPayload := s.readSummaryPayload(summaryState)
 
-	recentTranscript := s.renderRecentTranscript(recentExchanges, 3, 1024)
-	answerRecentTranscript := s.renderAnswerRecentTranscript(recentExchanges, 3, 512)
+	recentTranscript := s.renderRecentTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
+	answerRecentTranscript := s.renderRecentQuestionTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
 	longTermSummary := ""
 	if summaryState != nil {
 		longTermSummary = strings.TrimSpace(summaryState.SummaryText)
 	}
 
 	return &vo.MemoryContext{
-		AssembledHistory:       s.assembleHistory(longTermSummary, recentTranscript),
-		LongTermSummary:        longTermSummary,
-		RecentTranscript:       recentTranscript,
-		AnswerRecentTranscript: answerRecentTranscript,
-		Summary:                summaryPayload,
-		IsCompressed:           longTermSummary != "",
-		CoveredExchangeId:      s.defaultLong(summaryState),
-		CoveredExchangeCount:   s.safeIntValue(summaryState),
-		CompressionCount:       s.safeCompressionCount(summaryState),
+		AssembledHistory:         s.assembleHistory(longTermSummary, recentTranscript),
+		LongTermSummary:          longTermSummary,
+		RecentTranscript:         recentTranscript,
+		QuestionRecentTranscript: answerRecentTranscript,
+		Summary:                  summaryPayload,
+		IsCompressed:             longTermSummary != "",
+		CoveredExchangeId:        s.defaultLong(summaryState),
+		CoveredExchangeCount:     s.safeIntValue(summaryState),
+		CompressionCount:         s.safeCompressionCount(summaryState),
 	}, nil
 }
 
@@ -182,32 +186,27 @@ func (s *SessionMemoryLogicImpl) DeleteConversationSummary(ctx context.Context, 
 
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
 func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, conversationId string, currentState *entity.ChatMemorySummary) *entity.ChatMemorySummary {
-	coveredExchangeId := int64(0)
-	if currentState != nil {
-		coveredExchangeId = currentState.CoveredExchangeId
-	}
-
+	coveredExchangeId := utils.Ternary(currentState == nil, 0, currentState.CoveredExchangeId)
 	incrementalExchanges, err := s.repo.ListExchangesAfter(ctx, conversationId, coveredExchangeId)
 	if err != nil {
 		logx.Errorf("查询增量对话失败, conversationId=%s, err=%v", conversationId, err)
 		return currentState
 	}
 
-	// 过滤稳定的对话
+	// 过滤已完成的对话
 	stableExchanges := slice.Filter(incrementalExchanges, func(i int, item *entity.ChatExchange) bool {
-		return s.isStableSummaryExchange(item)
+		return item.TurnStatus == vo.ChatTurnStatusCompleted && strings.TrimSpace(item.Question) != ""
 	})
 
 	// 检查是否需要压缩
-	keepRecentTurns := 3
-	overflowCount := len(stableExchanges) - keepRecentTurns
+	overflowCount := len(stableExchanges) - s.historySummary.KeepRecentTurns
 	if overflowCount <= 0 {
 		return currentState
 	}
 
 	overflowExchanges := stableExchanges[:overflowCount]
 	workingState := currentState
-	compressionBatchTurns := 3
+	compressionBatchTurns := s.historySummary.CompressionBatchTurns
 
 	for start := 0; start < len(overflowExchanges); start += compressionBatchTurns {
 		end := start + compressionBatchTurns
@@ -429,22 +428,19 @@ func (s *SessionMemoryLogicImpl) renderFallbackBatchHighlight(batch []*entity.Ch
 
 // renderRecentTranscript 渲染最近对话记录
 func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
+	// 判断是否应保留在最近窗口中
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		return s.shouldKeepInRecentWindow(item)
+		question, answer := strings.TrimSpace(item.Question), strings.TrimSpace(item.Answer)
+		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && (question != "" || answer != "")
 	})
 
 	if len(renderable) == 0 {
 		return ""
 	}
 
-	fromIndex := 0
-	if len(renderable) > keepRecentTurns {
-		fromIndex = len(renderable) - keepRecentTurns
-	}
-
 	var builder strings.Builder
 	builder.WriteString("【最近对话原文】\n")
-	for i := fromIndex; i < len(renderable); i++ {
+	for i := 0; i < len(renderable) && i < keepRecentTurns; i++ {
 		exchange := renderable[i]
 		if exchange.Question != "" {
 			builder.WriteString("用户：")
@@ -458,40 +454,29 @@ func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.Chat
 		}
 	}
 
-	return s.clipRecentTranscript(strings.TrimSpace(builder.String()), maxChars)
+	return s.clipRecentTranscript(builder.String(), maxChars)
 }
 
-// renderAnswerRecentTranscript 渲染回答最近对话记录
-func (s *SessionMemoryLogicImpl) renderAnswerRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
-	if len(exchanges) == 0 {
-		return ""
-	}
-
+// renderQuestionRecentTranscript 渲染最近问题记录
+func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && item.Question != ""
+		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && strings.TrimSpace(item.Question) != ""
 	})
 
 	if len(renderable) == 0 {
 		return ""
 	}
 
-	fromIndex := 0
-	if len(renderable) > keepRecentTurns {
-		fromIndex = len(renderable) - keepRecentTurns
-	}
-
 	var builder strings.Builder
 	builder.WriteString("【最近相关对话】\n")
-	for i := fromIndex; i < len(renderable); i++ {
+	for i := 0; i < len(renderable) && i < keepRecentTurns; i++ {
 		exchange := renderable[i]
-		if exchange.Question != "" {
-			builder.WriteString("用户：")
-			builder.WriteString(s.clipText(exchange.Question, maxQuestionLength))
-			builder.WriteString("\n")
-		}
+		builder.WriteString("用户：")
+		builder.WriteString(s.clipText(exchange.Question, maxQuestionLength))
+		builder.WriteString("\n")
 	}
 
-	return s.clipRecentTranscript(strings.TrimSpace(builder.String()), maxChars)
+	return s.clipRecentTranscript(builder.String(), maxChars)
 }
 
 // buildLongTermSummaryText 构建长期摘要文本
@@ -597,21 +582,6 @@ func (s *SessionMemoryLogicImpl) extractJsonObject(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-// isStableSummaryExchange 判断是否为稳定的摘要对话
-func (s *SessionMemoryLogicImpl) isStableSummaryExchange(exchange *entity.ChatExchange) bool {
-	if exchange == nil || exchange.TurnStatus == 0 {
-		return false
-	}
-	return exchange.TurnStatus == vo.ChatTurnStatusCompleted && exchange.Question != ""
-}
-
-// shouldKeepInRecentWindow 判断是否应保留在最近窗口中
-func (s *SessionMemoryLogicImpl) shouldKeepInRecentWindow(exchange *entity.ChatExchange) bool {
-	return exchange != nil &&
-		exchange.TurnStatus != vo.ChatTurnStatusRunning &&
-		(exchange.Question != "" || exchange.Answer != "")
-}
-
 // appendSection 添加段落
 func (s *SessionMemoryLogicImpl) appendSection(builder *strings.Builder, title, content string) {
 	if strings.TrimSpace(content) == "" {
@@ -663,11 +633,7 @@ func (s *SessionMemoryLogicImpl) clipRecentTranscript(text string, maxChars int)
 	if len(normalized) <= maxChars {
 		return normalized
 	}
-	startIndex := len(normalized) - (maxChars - 1)
-	if startIndex < 0 {
-		startIndex = 0
-	}
-	return "…" + normalized[startIndex:]
+	return "…" + normalized[len(normalized)-maxChars+1:]
 }
 
 // extractRetrievalHints 提取检索提示
@@ -723,7 +689,7 @@ func (s *SessionMemoryLogicImpl) toSummaryView(conversationId string, summary *e
 	}
 
 	updateTime := summary.UpdateTime
-	lastSourceEditTime := summary.LastSourceEditTime
+	lastSourceUpdateTime := summary.LastSourceUpdateTime
 
 	return &vo.ConversationMemorySummaryView{
 		ConversationId:       conversationId,
@@ -734,7 +700,7 @@ func (s *SessionMemoryLogicImpl) toSummaryView(conversationId string, summary *e
 		SummaryVersion:       summary.SummaryVersion,
 		SummaryText:          summary.SummaryText,
 		Summary:              s.readSummaryPayload(summary),
-		LastSourceEditTime:   &lastSourceEditTime,
+		LastSourceUpdateTime: &lastSourceUpdateTime,
 		UpdateTime:           &updateTime,
 	}
 }
