@@ -2,7 +2,6 @@ package persistence
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -363,10 +362,8 @@ func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, 
 // ========== 会话阶段追踪相关 ==========
 
 // InsertStage 创建阶段记录
-func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) (int64, error) {
-	stageId := utils.GetSnowflakeNextID()
-
-	return stageId, r.db.WithContext(ctx).Create(stage).Error
+func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
+	return r.db.WithContext(ctx).Create(convert.ToChatExchangeTraceStageModel(stage)).Error
 }
 
 // UpdateStageById 更新阶段记录
@@ -394,29 +391,4 @@ func (r *ChatRepositoryImpl) DeleteStage(ctx context.Context, conversationId str
 	return r.db.WithContext(ctx).
 		Where("conversation_id = ?", conversationId).
 		Delete(&model.ChatExchangeTraceStage{}).Error
-}
-
-func (r *ChatRepositoryImpl) writeNullableJson(value any) string {
-	if value == nil {
-		return ""
-	}
-	data, err := json.Marshal(value)
-	if err != nil {
-		panic("序列化阶段轨迹快照失败: " + err.Error())
-	}
-	return string(data)
-}
-
-func (r *ChatRepositoryImpl) readSnapshot(value string) map[string]any {
-	if value == "" {
-		return map[string]any{}
-	}
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
-		panic("解析阶段轨迹快照失败: " + err.Error())
-	}
-	if parsed == nil {
-		return map[string]any{}
-	}
-	return parsed
 }

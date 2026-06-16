@@ -44,6 +44,8 @@ type DocumentConverter interface {
 	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
 	// goverter:map . Model
 	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
+	// goverter:map . Model
+	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
 }
 
 // goverter:converter

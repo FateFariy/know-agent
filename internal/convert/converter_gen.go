@@ -92,6 +92,31 @@ func ToChatExchangeModel(source *entity1.ChatExchange) *model.ChatExchange {
 	}
 	return pModelChatExchange
 }
+func ToChatExchangeTraceStageModel(source *entity1.ChatExchangeTraceStage) *model.ChatExchangeTraceStage {
+	var pModelChatExchangeTraceStage *model.ChatExchangeTraceStage
+	if source != nil {
+		var modelChatExchangeTraceStage model.ChatExchangeTraceStage
+		modelChatExchangeTraceStage.Model = entityChatExchangeTraceStageToCommonModel((*source))
+		modelChatExchangeTraceStage.ConversationId = (*source).ConversationId
+		modelChatExchangeTraceStage.ExchangeId = (*source).ExchangeId
+		modelChatExchangeTraceStage.TraceId = (*source).TraceId
+		modelChatExchangeTraceStage.StageCode = (*source).StageCode
+		modelChatExchangeTraceStage.StageName = (*source).StageName
+		modelChatExchangeTraceStage.StageOrder = (*source).StageOrder
+		modelChatExchangeTraceStage.StageLevel = (*source).StageLevel
+		modelChatExchangeTraceStage.ParentStageId = (*source).ParentStageId
+		modelChatExchangeTraceStage.ExecutionMode = (*source).ExecutionMode
+		modelChatExchangeTraceStage.StageState = (*source).StageState
+		modelChatExchangeTraceStage.StartTime = timeTimeToTimeTime((*source).StartTime)
+		modelChatExchangeTraceStage.EndTime = timeTimeToTimeTime((*source).EndTime)
+		modelChatExchangeTraceStage.DurationMs = (*source).DurationMs
+		modelChatExchangeTraceStage.SummaryText = (*source).SummaryText
+		modelChatExchangeTraceStage.ErrorMessage = (*source).ErrorMessage
+		modelChatExchangeTraceStage.SnapshotJson = (*source).SnapshotJson
+		pModelChatExchangeTraceStage = &modelChatExchangeTraceStage
+	}
+	return pModelChatExchangeTraceStage
+}
 func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
@@ -273,6 +298,11 @@ func entityChatDialogueToCommonModel(source entity1.ChatDialogue) common.Model {
 	return commonModel
 }
 func entityChatExchangeToCommonModel(source entity1.ChatExchange) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityChatExchangeTraceStageToCommonModel(source entity1.ChatExchangeTraceStage) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

@@ -53,7 +53,7 @@ type ChatRepository interface {
 	// ========== 会话阶段追踪相关 ==========
 
 	// InsertStage 创建阶段记录
-	InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) (int64, error)
+	InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) error
 
 	// UpdateStageById 更新阶段记录
 	UpdateStageById(ctx context.Context, id int64, updates map[string]any) error
