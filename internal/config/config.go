@@ -6,10 +6,11 @@ import (
 
 type Config struct {
 	common.BaseConfig
-	Minio  MinioConf
-	Neo4j  Neo4jConf
-	MQ     MQConf
-	Memory MemoryConf
+	Minio     MinioConf
+	Neo4j     Neo4jConf
+	MQ        MQConf
+	Memory    MemoryConf
+	ChatModel []LLMConf
 }
 type MinioConf struct {
 	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
@@ -34,6 +35,12 @@ type MQConf struct {
 	ParseTopic string `json:",omitempty,default=know-agent-document"`
 	IndexTopic string `json:",omitempty,default=know-agent-index"`
 	Enabled    bool   `json:",omitempty,default=false"`
+}
+
+type LLMConf struct {
+	Model   string
+	ApiKey  string
+	BaseURL string
 }
 
 // HistorySummaryConf 历史摘要配置

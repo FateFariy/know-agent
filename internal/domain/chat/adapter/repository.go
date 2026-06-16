@@ -49,4 +49,18 @@ type ChatRepository interface {
 
 	// DeleteMemorySummary 删除会话记忆摘要
 	DeleteMemorySummary(ctx context.Context, conversationId string) error
+
+	// ========== 会话阶段追踪相关 ==========
+
+	// InsertStage 创建阶段记录
+	InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) (int64, error)
+
+	// UpdateStageById 更新阶段记录
+	UpdateStageById(ctx context.Context, id int64, updates map[string]any) error
+
+	// SelectStages 查询阶段记录
+	SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error)
+
+	// DeleteStage 删除阶段记录
+	DeleteStage(ctx context.Context, conversationId string) error
 }

@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -236,18 +237,18 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 
 // SelectMemorySummary 查询会话记忆摘要
 func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
-	var summary entity.ChatMemorySummary
+	var summary *entity.ChatMemorySummary
 	err := r.db.WithContext(ctx).Model(&model.ChatMemorySummary{}).
-		Where("conversation_id = ? AND status = 1", conversationId).
+		Where("conversation_id = ?", conversationId).
 		Order("id DESC").
-		First(&summary).Error
+		First(summary).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &summary, nil
+	return summary, nil
 }
 
 // InsertMemorySummary 插入会话记忆摘要
@@ -357,4 +358,65 @@ func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, 
 		UpdatedAt:            dialogue.UpdateTime,
 		Exchanges:            chatExchanges,
 	}
+}
+
+// ========== 会话阶段追踪相关 ==========
+
+// InsertStage 创建阶段记录
+func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) (int64, error) {
+	stageId := utils.GetSnowflakeNextID()
+
+	return stageId, r.db.WithContext(ctx).Create(stage).Error
+}
+
+// UpdateStageById 更新阶段记录
+func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, id int64, updates map[string]any) error {
+	return r.db.WithContext(ctx).Model(&model.ChatExchangeTraceStage{}).
+		Where("id = ?", id).
+		Updates(updates).Error
+}
+
+// SelectStages 查询阶段记录
+func (r *ChatRepositoryImpl) SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error) {
+	var stages []*entity.ChatExchangeTraceStage
+	if err := r.db.WithContext(ctx).
+		Model(&model.ChatExchangeTraceStage{}).
+		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
+		Order("stage_order ASC, start_time ASC, id ASC").
+		Find(&stages).Error; err != nil {
+		return nil, err
+	}
+	return stages, nil
+}
+
+// DeleteStage 删除阶段记录
+func (r *ChatRepositoryImpl) DeleteStage(ctx context.Context, conversationId string) error {
+	return r.db.WithContext(ctx).
+		Where("conversation_id = ?", conversationId).
+		Delete(&model.ChatExchangeTraceStage{}).Error
+}
+
+func (r *ChatRepositoryImpl) writeNullableJson(value any) string {
+	if value == nil {
+		return ""
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		panic("序列化阶段轨迹快照失败: " + err.Error())
+	}
+	return string(data)
+}
+
+func (r *ChatRepositoryImpl) readSnapshot(value string) map[string]any {
+	if value == "" {
+		return map[string]any{}
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+		panic("解析阶段轨迹快照失败: " + err.Error())
+	}
+	if parsed == nil {
+		return map[string]any{}
+	}
+	return parsed
 }
