@@ -10,7 +10,7 @@ type Config struct {
 	Neo4j     Neo4jConf
 	MQ        MQConf
 	Memory    MemoryConf
-	ChatModel []LLMConf
+	ChatModel map[string]*LLMConf
 }
 type MinioConf struct {
 	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
@@ -38,9 +38,14 @@ type MQConf struct {
 }
 
 type LLMConf struct {
-	Model   string
-	ApiKey  string
-	BaseURL string
+	Model             string
+	ApiKey            string
+	BaseURL           string
+	Temperature       float32 `json:",optional"`
+	MaxTokens         int     `json:",optional"`
+	TopP              float32 `json:",optional"`
+	InputTokenCost1k  float64 `json:",optional"`
+	OutputTokenCost1k float64 `json:",optional"`
 }
 
 // HistorySummaryConf 历史摘要配置
