@@ -254,7 +254,7 @@ func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSumma
 	}
 
 	content, err := s.chatModel.Generate(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
-	newSummary := s.parseSummaryPayload(content)
+	newSummary := s.diserizeSummary(content)
 	if newSummary == nil {
 		return nil, err
 	}
@@ -371,6 +371,65 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 	return latestState
 }
 
+// readSummaryPayload 读取摘要负载
+func (s *SessionMemoryLogicImpl) readSummaryPayload(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
+	if summaryState == nil {
+		return &entity.ConversationSummary{}
+	}
+
+	if summaryState.SummaryJson != "" {
+		payload := s.deserializeSummary(summaryState.SummaryJson)
+		if payload != nil {
+			return s.normalizeSummary(payload)
+		}
+	}
+
+	return s.normalizeSummary(&entity.ConversationSummary{Summary: summaryState.SummaryText})
+}
+
+// deserializeSummary 反序列化摘要
+func (s *SessionMemoryLogicImpl) deserializeSummary(raw string) *entity.ConversationSummary {
+	raw = extractJsonObject(raw)
+	summary := &entity.ConversationSummary{}
+	if err := json.Unmarshal([]byte(raw), summary); err != nil {
+		logx.Debugf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
+		return nil
+	}
+
+	return summary
+}
+
+// normalizeSummary 规范化摘要
+func (s *SessionMemoryLogicImpl) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
+	summary := s.clipText(strings.TrimSpace(payload.Summary), s.historySummary.SummaryMaxChars)
+	summaryEntity := &entity.ConversationSummary{
+		ConversationGoal: s.clipText(strings.TrimSpace(payload.ConversationGoal), maxGoalLength),
+		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
+		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
+		ResolvedPoints:   s.deduplicateAndLimit(payload.ResolvedPoints),
+		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
+		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
+	}
+	summaryEntity.Summary = utils.Ternary(summary != "", summary, s.synthesizeSummaryFromSections(summaryEntity))
+	return summaryEntity
+}
+
+// buildLongTermSummaryText 构建长期摘要文本
+func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload *entity.ConversationSummary) string {
+	normalized := s.normalizeSummary(payload)
+	var builder strings.Builder
+
+	s.appendSection(&builder, "长期会话摘要", normalized.Summary)
+	s.appendSection(&builder, "会话目标", normalized.ConversationGoal)
+	s.appendBulletSection(&builder, "已确认事实", normalized.StableFacts)
+	s.appendBulletSection(&builder, "用户偏好与约束", normalized.UserPreferences)
+	s.appendBulletSection(&builder, "已解决问题", normalized.ResolvedPoints)
+	s.appendBulletSection(&builder, "待跟进问题", normalized.PendingQuestions)
+	s.appendBulletSection(&builder, "检索提示", normalized.RetrievalHints)
+
+	return s.clipText(strings.TrimSpace(builder.String()), 1024)
+}
+
 // renderCompressionTranscript 渲染压缩对话记录
 func (s *SessionMemoryLogicImpl) renderCompressionTranscript(batch []*entity.ChatExchange) string {
 	var builder strings.Builder
@@ -443,7 +502,7 @@ func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.Chat
 }
 
 // renderQuestionRecentTranscript 渲染最近问题记录
-func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
+func (s *SessionMemoryLogicImpl) renderQuestionRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
 		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && strings.TrimSpace(item.Question) != ""
 	})
@@ -464,63 +523,15 @@ func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*ent
 	return s.clipRecentTranscript(builder.String(), maxChars)
 }
 
-// buildLongTermSummaryText 构建长期摘要文本
-func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload *entity.ConversationSummary) string {
-	normalized := s.normalizeSummary(payload)
-	var builder strings.Builder
-
-	s.appendSection(&builder, "长期会话摘要", normalized.Summary)
-	s.appendSection(&builder, "会话目标", normalized.ConversationGoal)
-	s.appendBulletSection(&builder, "已确认事实", normalized.StableFacts)
-	s.appendBulletSection(&builder, "用户偏好与约束", normalized.UserPreferences)
-	s.appendBulletSection(&builder, "已解决问题", normalized.ResolvedPoints)
-	s.appendBulletSection(&builder, "待跟进问题", normalized.PendingQuestions)
-	s.appendBulletSection(&builder, "检索提示", normalized.RetrievalHints)
-
-	return s.clipText(strings.TrimSpace(builder.String()), 1024)
-}
-
-// readSummaryPayload 读取摘要负载
-func (s *SessionMemoryLogicImpl) readSummaryPayload(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
-	if summaryState == nil {
-		return &entity.ConversationSummary{}
+// serializeSummary 序列化摘要
+func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) string {
+	normalized := s.normalizeSummary(summary)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
+		return "{}"
 	}
-
-	if summaryState.SummaryJson != "" {
-		payload := s.parseSummaryPayload(summaryState.SummaryJson)
-		if payload != nil {
-			return s.normalizeSummary(payload)
-		}
-	}
-
-	return s.normalizeSummary(&entity.ConversationSummary{Summary: summaryState.SummaryText})
-}
-
-// parseSummaryPayload 解析摘要负载
-func (s *SessionMemoryLogicImpl) parseSummaryPayload(raw string) *entity.ConversationSummary {
-	raw = extractJsonObject(raw)
-	summary := &entity.ConversationSummary{}
-	if err := json.Unmarshal([]byte(raw), summary); err != nil {
-		logx.Debugf("解析会话长期摘要 JSON 失败: %s, err=%v", raw, err)
-		return nil
-	}
-
-	return summary
-}
-
-// normalizeSummary 规范化摘要
-func (s *SessionMemoryLogicImpl) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
-	summary := s.clipText(strings.TrimSpace(payload.Summary), s.historySummary.SummaryMaxChars)
-	summaryEntity := &entity.ConversationSummary{
-		ConversationGoal: s.clipText(strings.TrimSpace(payload.ConversationGoal), maxGoalLength),
-		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
-		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
-		ResolvedPoints:   s.deduplicateAndLimit(payload.ResolvedPoints),
-		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
-		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
-	}
-	summaryEntity.Summary = utils.Ternary(summary != "", summary, s.synthesizeSummaryFromSections(summaryEntity))
-	return summaryEntity
+	return string(data)
 }
 
 // synthesizeSummaryFromSections 从各部分合成摘要
@@ -536,6 +547,43 @@ func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload *entity.C
 		parts = append(parts, "待跟进："+strings.Join(payload.PendingQuestions, "；"))
 	}
 	return s.clipText(strings.Join(parts, "；"), s.historySummary.SummaryMaxChars)
+}
+
+// extractRetrievalHints 提取检索提示
+func (s *SessionMemoryLogicImpl) extractRetrievalHints(question string) []string {
+	if strings.TrimSpace(question) == "" {
+		return []string{}
+	}
+
+	matches := retrievalHintPattern.FindAllString(question, -1)
+	hints := make([]string, 0, len(matches))
+	for _, match := range matches {
+		hint := strings.TrimSpace(match)
+		if len(hint) >= 2 && !isNoiseHint(hint) {
+			hints = append(hints, s.clipText(hint, maxItemLength))
+		}
+		if len(hints) >= maxSectionItems {
+			break
+		}
+	}
+	s.deduplicateAndLimit(hints)
+
+	return hints
+}
+
+// extractJsonObject 提取JSON对象
+func extractJsonObject(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return trimmed
+	}
+
+	start := strings.Index(trimmed, "{")
+	end := strings.LastIndex(trimmed, "}")
+	if start == -1 || end == -1 || end < start {
+		return trimmed
+	}
+	return trimmed[start : end+1]
 }
 
 // deduplicateAndLimit 去重并限制数量
@@ -554,17 +602,6 @@ func (s *SessionMemoryLogicImpl) deduplicateAndLimit(values []string) []string {
 		}
 	}
 	return result
-}
-
-// serializeSummary 序列化摘要
-func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) string {
-	normalized := s.normalizeSummary(summary)
-	data, err := json.Marshal(normalized)
-	if err != nil {
-		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
-		return "{}"
-	}
-	return string(data)
 }
 
 // appendSection 添加段落
@@ -621,26 +658,22 @@ func (s *SessionMemoryLogicImpl) clipRecentTranscript(text string, maxChars int)
 	return "…" + normalized[len(normalized)-maxChars+1:]
 }
 
-// extractRetrievalHints 提取检索提示
-func (s *SessionMemoryLogicImpl) extractRetrievalHints(question string) []string {
-	if strings.TrimSpace(question) == "" {
-		return []string{}
-	}
+// assembleHistory 组装历史记录
+func (s *SessionMemoryLogicImpl) assembleHistory(longTermSummary, recentTranscript string) string {
+	return s.joinNonBlank(longTermSummary, recentTranscript, "\n\n")
+}
 
-	matches := retrievalHintPattern.FindAllString(question, -1)
-	hints := make([]string, 0, len(matches))
-	for _, match := range matches {
-		hint := strings.TrimSpace(match)
-		if len(hint) >= 2 && !isNoiseHint(hint) {
-			hints = append(hints, s.clipText(hint, maxItemLength))
-		}
-		if len(hints) >= maxSectionItems {
-			break
-		}
+// joinNonBlank 连接非空字符串
+func (s *SessionMemoryLogicImpl) joinNonBlank(left, right, delimiter string) string {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" {
+		return right
 	}
-	s.deduplicateAndLimit(hints)
-
-	return hints
+	if right == "" {
+		return left
+	}
+	return left + delimiter + right
 }
 
 // isNoiseHint 判断是否为噪音提示
@@ -688,24 +721,6 @@ func safeCompressionCount(summary *entity.ChatMemorySummary) int {
 	return summary.CompressionCount
 }
 
-// assembleHistory 组装历史记录
-func (s *SessionMemoryLogicImpl) assembleHistory(longTermSummary, recentTranscript string) string {
-	return s.joinNonBlank(longTermSummary, recentTranscript, "\n\n")
-}
-
-// joinNonBlank 连接非空字符串
-func (s *SessionMemoryLogicImpl) joinNonBlank(left, right, delimiter string) string {
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
-	if left == "" {
-		return right
-	}
-	if right == "" {
-		return left
-	}
-	return left + delimiter + right
-}
-
 // copySummary 复制摘要
 func copySummary(summary *entity.ConversationSummary) *entity.ConversationSummary {
 	return &entity.ConversationSummary{
@@ -717,19 +732,4 @@ func copySummary(summary *entity.ConversationSummary) *entity.ConversationSummar
 		PendingQuestions: append([]string{}, summary.PendingQuestions...),
 		RetrievalHints:   append([]string{}, summary.RetrievalHints...),
 	}
-}
-
-// extractJsonObject 提取JSON对象
-func extractJsonObject(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return trimmed
-	}
-
-	start := strings.Index(trimmed, "{")
-	end := strings.LastIndex(trimmed, "}")
-	if start == -1 || end == -1 || end < start {
-		return trimmed
-	}
-	return trimmed[start : end+1]
 }
