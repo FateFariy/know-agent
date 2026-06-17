@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -62,8 +63,8 @@ func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatReposito
 }
 
 // LoadMemoryContext 加载会话记忆上下文
-func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
-	if strings.TrimSpace(conversationId) == "" {
+func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error) {
+	if strutil.IsBlank(conversationId) {
 		return &vo.MemoryContext{}, nil
 	}
 
@@ -81,16 +82,16 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 
 	// 如果有摘要，刷新（如果需要）
 	if summaryState != nil {
-		summaryState = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState)
+		summaryState = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, tracer)
 	}
 
-	summaryPayload := s.readSummaryPayload(summaryState)
+	summaryPayload := s.readSummary(summaryState)
 
 	recentTranscript := s.renderRecentTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
 	answerRecentTranscript := s.renderRecentQuestionTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
 	longTermSummary := ""
 	if summaryState != nil {
-		longTermSummary = strings.TrimSpace(summaryState.SummaryText)
+		longTermSummary = strutil.Trim(summaryState.SummaryText)
 	}
 
 	return &vo.MemoryContext{
@@ -99,7 +100,7 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 		RecentTranscript:         recentTranscript,
 		QuestionRecentTranscript: answerRecentTranscript,
 		Summary:                  summaryPayload,
-		IsCompressed:             longTermSummary != "",
+		IsCompressed:             strutil.IsNotBlank(longTermSummary),
 		CoveredExchangeId:        s.defaultLong(summaryState),
 		CoveredExchangeCount:     s.safeIntValue(summaryState),
 		CompressionCount:         s.safeCompressionCount(summaryState),
@@ -108,7 +109,7 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 
 // RefreshConversationSummaryAsync 异步刷新会话摘要
 func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(ctx context.Context, conversationId string) {
-	if strings.TrimSpace(conversationId) == "" {
+	if strutil.IsBlank(conversationId) {
 		return
 	}
 
@@ -133,13 +134,13 @@ func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(ctx context.Con
 			}
 		}()
 
-		s.refreshSummaryIfNecessary(ctx, conversationId, nil)
+		s.refreshSummaryIfNecessary(ctx, conversationId, nil, tracer)
 	}()
 }
 
 // GetConversationSummary 获取会话摘要
 func (s *SessionMemoryLogicImpl) GetConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
-	if strings.TrimSpace(conversationId) == "" {
+	if strutil.IsBlank(conversationId) {
 		return nil, nil
 	}
 
@@ -147,14 +148,14 @@ func (s *SessionMemoryLogicImpl) GetConversationSummary(ctx context.Context, con
 	if err != nil {
 		return nil, err
 	}
-	summary.IsCompressed = strings.TrimSpace(summary.SummaryText) != ""
+	summary.IsCompressed = strutil.IsNotBlank(summary.SummaryText)
 
 	return summary, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
 func (s *SessionMemoryLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
-	if strings.TrimSpace(conversationId) == "" {
+	if strutil.IsBlank(conversationId) {
 		return &entity.ChatMemorySummary{}, nil
 	}
 
@@ -178,13 +179,16 @@ func (s *SessionMemoryLogicImpl) RebuildConversationSummary(ctx context.Context,
 	}
 
 	// 重新生成
-	rebuiltState := s.refreshSummaryIfNecessary(ctx, conversationId, nil)
+	rebuiltState, err := s.refreshSummaryIfNecessary(ctx, conversationId, nil, tracer)
+	if err != nil {
+		return nil, err
+	}
 	return s.toSummaryView(conversationId, rebuiltState), nil
 }
 
 // DeleteConversationSummary 删除会话摘要
 func (s *SessionMemoryLogicImpl) DeleteConversationSummary(ctx context.Context, conversationId string) error {
-	if strings.TrimSpace(conversationId) == "" {
+	if strutil.IsBlank(conversationId) {
 		return nil
 	}
 	return s.repo.DeleteMemorySummary(ctx, conversationId)
@@ -192,24 +196,24 @@ func (s *SessionMemoryLogicImpl) DeleteConversationSummary(ctx context.Context, 
 
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
 func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
-	currentState *entity.ChatMemorySummary, tracer *vo.ConversationTrace) *entity.ChatMemorySummary {
+	currentState *entity.ChatMemorySummary, tracer *vo.ConversationTrace) (*entity.ChatMemorySummary, error) {
 	// 只拉取"摘要尚未覆盖"的新增轮次，避免重复压缩旧内容
 	coveredExchangeId := utils.Ternary(currentState == nil, 0, currentState.CoveredExchangeId)
 	incrementalExchanges, err := s.repo.ListExchangesAfter(ctx, conversationId, coveredExchangeId)
 	if err != nil {
 		logx.Errorf("查询增量对话失败, conversationId=%s, err=%v", conversationId, err)
-		return currentState
+		return currentState, err
 	}
 
 	// 过滤已完成的对话，参与提取摘要
 	stableExchanges := slice.Filter(incrementalExchanges, func(i int, item *entity.ChatExchange) bool {
-		return item.TurnStatus == vo.ChatTurnStatusCompleted && strings.TrimSpace(item.Question) != ""
+		return item.TurnStatus == vo.ChatTurnStatusCompleted && strutil.IsNotBlank(item.Question)
 	})
 
 	// 检查是否需要压缩
 	overflowCount := len(stableExchanges) - s.historySummary.KeepRecentTurns
 	if overflowCount <= 0 {
-		return currentState
+		return currentState, nil
 	}
 
 	overflowExchanges := stableExchanges[:overflowCount]
@@ -221,7 +225,7 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 		batch := overflowExchanges[start:end]
 
 		// 使用回退合并策略
-		oldSummary := s.readSummaryPayload(workingState)
+		oldSummary := s.readSummary(workingState)
 		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch, tracer)
 		if err != nil {
 			logx.Errorf("LLM合并会话长期摘要失败，回退到规则压缩, conversationId=%s, err=%v", conversationId, err)
@@ -235,17 +239,18 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 			s.resolveSourceTime(lastExchange))
 	}
 
-	return workingState
+	return workingState, nil
 }
 
 // mergeSummary 由大模型合并摘要
-func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange, tracer *vo.ConversationTrace) (*entity.ConversationSummary, error) {
+func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary,
+	batch []*entity.ChatExchange, tracer *vo.ConversationTrace) (*entity.ConversationSummary, error) {
 	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
 	if err != nil {
 		return nil, err
 	}
 	variables := map[string]any{
-		"existingSummaryJson":  s.serializeSummary(oldSummary),
+		"existingSummaryJson":  s.serializeSummary(s.normalizeSummary(copySummary(oldSummary))),
 		"newConversationBatch": s.renderCompressionTranscript(batch),
 	}
 	userPrompt, err := s.promptTemplate.Render(prompt.ConversationSummaryMerge, variables)
@@ -254,11 +259,11 @@ func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSumma
 	}
 
 	content, err := s.chatModel.Generate(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
-	newSummary := s.diserizeSummary(content)
+	newSummary := s.deserializeSummary(content)
 	if newSummary == nil {
 		return nil, err
 	}
-	return newSummary, nil
+	return s.normalizeSummary(newSummary), nil
 }
 
 // fallbackMerge 回退合并策略
@@ -267,9 +272,9 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要
-	if oldSummary.Summary == "" {
+	if strutil.IsBlank(oldSummary.Summary) {
 		newSummary.Summary = batchHighlight
-	} else if batchHighlight == "" {
+	} else if strutil.IsBlank(batchHighlight) {
 		newSummary.Summary = oldSummary.Summary
 	} else {
 		newSummary.Summary = oldSummary.Summary + "；" + batchHighlight
@@ -278,7 +283,7 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 
 	// 设置会话目标
 	lastQuestion := batch[len(batch)-1].Question
-	if newSummary.ConversationGoal == "" && lastQuestion != "" {
+	if strutil.IsBlank(newSummary.ConversationGoal) && strutil.IsNotBlank(lastQuestion) {
 		newSummary.ConversationGoal = s.clipText(lastQuestion, maxGoalLength)
 	}
 
@@ -286,7 +291,7 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 	pendingQuestions := make([]string, 0, len(batch)+len(newSummary.PendingQuestions))
 	pendingQuestions = append(pendingQuestions, oldSummary.PendingQuestions...)
 	for _, exchange := range batch {
-		if exchange.Question != "" {
+		if strutil.IsNotBlank(exchange.Question) {
 			pendingQuestions = append(pendingQuestions, s.clipText(exchange.Question, maxItemLength))
 		}
 	}
@@ -295,7 +300,7 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 	// 添加检索提示
 	retrievalHints := make([]string, 0, len(oldSummary.RetrievalHints))
 	retrievalHints = append(retrievalHints, oldSummary.RetrievalHints...)
-	if len(batch) > 0 && lastQuestion != "" {
+	if len(batch) > 0 && strutil.IsNotBlank(lastQuestion) {
 		retrievalHints = append(retrievalHints, s.extractRetrievalHints(lastQuestion)...)
 	}
 	newSummary.RetrievalHints = s.deduplicateAndLimit(retrievalHints)
@@ -324,7 +329,7 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 		return latestState
 	}
 
-	if latestState != nil && latestCoveredExchangeId == coveredExchangeId && latestState.SummaryText != "" {
+	if latestState != nil && latestCoveredExchangeId == coveredExchangeId && strutil.IsNotBlank(latestState.SummaryText) {
 		return latestState
 	}
 
@@ -371,13 +376,13 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 	return latestState
 }
 
-// readSummaryPayload 读取摘要负载
-func (s *SessionMemoryLogicImpl) readSummaryPayload(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
+// readSummary 读取摘要
+func (s *SessionMemoryLogicImpl) readSummary(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
 	if summaryState == nil {
 		return &entity.ConversationSummary{}
 	}
 
-	if summaryState.SummaryJson != "" {
+	if strutil.IsNotBlank(summaryState.SummaryJson) {
 		payload := s.deserializeSummary(summaryState.SummaryJson)
 		if payload != nil {
 			return s.normalizeSummary(payload)
@@ -401,16 +406,16 @@ func (s *SessionMemoryLogicImpl) deserializeSummary(raw string) *entity.Conversa
 
 // normalizeSummary 规范化摘要
 func (s *SessionMemoryLogicImpl) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
-	summary := s.clipText(strings.TrimSpace(payload.Summary), s.historySummary.SummaryMaxChars)
+	summary := s.clipText(strutil.Trim(payload.Summary), s.historySummary.SummaryMaxChars)
 	summaryEntity := &entity.ConversationSummary{
-		ConversationGoal: s.clipText(strings.TrimSpace(payload.ConversationGoal), maxGoalLength),
+		ConversationGoal: s.clipText(strutil.Trim(payload.ConversationGoal), maxGoalLength),
 		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
 		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
 		ResolvedPoints:   s.deduplicateAndLimit(payload.ResolvedPoints),
 		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
 		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
 	}
-	summaryEntity.Summary = utils.Ternary(summary != "", summary, s.synthesizeSummaryFromSections(summaryEntity))
+	summaryEntity.Summary = utils.Ternary(strutil.IsNotBlank(summary), summary, s.synthesizeSummaryFromSections(summaryEntity))
 	return summaryEntity
 }
 
@@ -427,40 +432,40 @@ func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload *entity.Conver
 	s.appendBulletSection(&builder, "待跟进问题", normalized.PendingQuestions)
 	s.appendBulletSection(&builder, "检索提示", normalized.RetrievalHints)
 
-	return s.clipText(strings.TrimSpace(builder.String()), 1024)
+	return s.clipText(strutil.Trim(builder.String()), 1024)
 }
 
 // renderCompressionTranscript 渲染压缩对话记录
 func (s *SessionMemoryLogicImpl) renderCompressionTranscript(batch []*entity.ChatExchange) string {
 	var builder strings.Builder
 	for _, exchange := range batch {
-		if exchange.Question != "" {
+		if strutil.IsNotBlank(exchange.Question) {
 			builder.WriteString("用户：")
 			builder.WriteString(s.clipText(exchange.Question, maxQuestionLength))
 			builder.WriteString("\n")
 		}
-		if exchange.Answer != "" {
+		if strutil.IsNotBlank(exchange.Answer) {
 			builder.WriteString("助手：")
 			builder.WriteString(s.clipText(exchange.Answer, maxAnswerLength))
 			builder.WriteString("\n")
 		}
-		if exchange.TurnStatus == vo.ChatTurnStatusStopped && exchange.ErrorMessage != "" {
+		if exchange.TurnStatus == vo.ChatTurnStatusStopped && strutil.IsNotBlank(exchange.ErrorMessage) {
 			builder.WriteString("补充说明：本轮被停止，说明=")
 			builder.WriteString(s.clipText(exchange.ErrorMessage, maxItemLength))
 			builder.WriteString("\n")
 		}
 	}
-	return strings.TrimSpace(builder.String())
+	return strutil.Trim(builder.String())
 }
 
 // renderFallbackBatchHighlight 渲染回退批次高亮
 func (s *SessionMemoryLogicImpl) renderFallbackBatchHighlight(batch []*entity.ChatExchange) string {
 	var highlights []string
 	for _, exchange := range batch {
-		if exchange.Question != "" {
+		if strutil.IsNotBlank(exchange.Question) {
 			highlights = append(highlights, "用户关注："+s.clipText(exchange.Question, maxItemLength))
 		}
-		if exchange.Answer != "" {
+		if strutil.IsNotBlank(exchange.Answer) {
 			highlights = append(highlights, "已有结论："+s.clipText(exchange.Answer, maxItemLength))
 		}
 		if len(highlights) >= 4 {
@@ -474,8 +479,7 @@ func (s *SessionMemoryLogicImpl) renderFallbackBatchHighlight(batch []*entity.Ch
 func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	// 判断是否应保留在最近窗口中
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		question, answer := strings.TrimSpace(item.Question), strings.TrimSpace(item.Answer)
-		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && (question != "" || answer != "")
+		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && (strutil.IsNotBlank(item.Question) || strutil.IsNotBlank(item.Answer))
 	})
 
 	if len(renderable) == 0 {
@@ -486,12 +490,12 @@ func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.Chat
 	builder.WriteString("【最近对话原文】\n")
 	for i := 0; i < len(renderable) && i < keepRecentTurns; i++ {
 		exchange := renderable[i]
-		if exchange.Question != "" {
+		if strutil.IsNotBlank(exchange.Question) {
 			builder.WriteString("用户：")
 			builder.WriteString(s.clipText(exchange.Question, maxQuestionLength))
 			builder.WriteString("\n")
 		}
-		if exchange.TurnStatus == vo.ChatTurnStatusCompleted && exchange.Answer != "" {
+		if exchange.TurnStatus == vo.ChatTurnStatusCompleted && strutil.IsNotBlank(exchange.Answer) {
 			builder.WriteString("助手：")
 			builder.WriteString(s.clipText(exchange.Answer, maxAnswerLength))
 			builder.WriteString("\n")
@@ -501,10 +505,10 @@ func (s *SessionMemoryLogicImpl) renderRecentTranscript(exchanges []*entity.Chat
 	return s.clipRecentTranscript(builder.String(), maxChars)
 }
 
-// renderQuestionRecentTranscript 渲染最近问题记录
-func (s *SessionMemoryLogicImpl) renderQuestionRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
+// renderRecentQuestionTranscript 渲染最近问题记录
+func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && strings.TrimSpace(item.Question) != ""
+		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && strutil.IsNotBlank(item.Question)
 	})
 
 	if len(renderable) == 0 {
@@ -525,8 +529,7 @@ func (s *SessionMemoryLogicImpl) renderQuestionRecentTranscript(exchanges []*ent
 
 // serializeSummary 序列化摘要
 func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) string {
-	normalized := s.normalizeSummary(summary)
-	data, err := json.Marshal(normalized)
+	data, err := json.Marshal(summary)
 	if err != nil {
 		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
 		return "{}"
@@ -537,7 +540,7 @@ func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSu
 // synthesizeSummaryFromSections 从各部分合成摘要
 func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload *entity.ConversationSummary) string {
 	var parts []string
-	if payload.ConversationGoal != "" {
+	if strutil.IsNotBlank(payload.ConversationGoal) {
 		parts = append(parts, "目标："+s.clipText(payload.ConversationGoal, maxItemLength))
 	}
 	if len(payload.StableFacts) > 0 {
@@ -551,14 +554,14 @@ func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload *entity.C
 
 // extractRetrievalHints 提取检索提示
 func (s *SessionMemoryLogicImpl) extractRetrievalHints(question string) []string {
-	if strings.TrimSpace(question) == "" {
+	if strutil.IsBlank(question) {
 		return []string{}
 	}
 
 	matches := retrievalHintPattern.FindAllString(question, -1)
 	hints := make([]string, 0, len(matches))
 	for _, match := range matches {
-		hint := strings.TrimSpace(match)
+		hint := strutil.Trim(match)
 		if len(hint) >= 2 && !isNoiseHint(hint) {
 			hints = append(hints, s.clipText(hint, maxItemLength))
 		}
@@ -573,8 +576,8 @@ func (s *SessionMemoryLogicImpl) extractRetrievalHints(question string) []string
 
 // extractJsonObject 提取JSON对象
 func extractJsonObject(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
+	trimmed := strutil.Trim(raw)
+	if strutil.IsBlank(trimmed) {
 		return trimmed
 	}
 
@@ -591,8 +594,8 @@ func (s *SessionMemoryLogicImpl) deduplicateAndLimit(values []string) []string {
 	seen := make(map[string]bool)
 	var result []string
 	for _, v := range values {
-		text := s.clipText(strings.TrimSpace(v), maxItemLength)
-		if seen[text] || text == "" {
+		text := s.clipText(strutil.Trim(v), maxItemLength)
+		if seen[text] || strutil.IsBlank(text) {
 			continue
 		}
 		seen[text] = true
@@ -606,7 +609,7 @@ func (s *SessionMemoryLogicImpl) deduplicateAndLimit(values []string) []string {
 
 // appendSection 添加段落
 func (s *SessionMemoryLogicImpl) appendSection(builder *strings.Builder, title, content string) {
-	if strings.TrimSpace(content) == "" {
+	if strutil.IsBlank(content) {
 		return
 	}
 	if builder.Len() > 0 {
@@ -615,7 +618,7 @@ func (s *SessionMemoryLogicImpl) appendSection(builder *strings.Builder, title, 
 	builder.WriteString("【")
 	builder.WriteString(title)
 	builder.WriteString("】\n")
-	builder.WriteString(strings.TrimSpace(content))
+	builder.WriteString(strutil.Trim(content))
 	builder.WriteString("\n")
 }
 
@@ -639,7 +642,7 @@ func (s *SessionMemoryLogicImpl) appendBulletSection(builder *strings.Builder, t
 
 // clipText 裁剪文本
 func (s *SessionMemoryLogicImpl) clipText(text string, maxChars int) string {
-	normalized := strings.TrimSpace(text)
+	normalized := strutil.Trim(text)
 	if len(normalized) <= maxChars {
 		return normalized
 	}
@@ -651,7 +654,7 @@ func (s *SessionMemoryLogicImpl) clipText(text string, maxChars int) string {
 
 // clipRecentTranscript 裁剪最近对话记录
 func (s *SessionMemoryLogicImpl) clipRecentTranscript(text string, maxChars int) string {
-	normalized := strings.TrimSpace(text)
+	normalized := strutil.Trim(text)
 	if len(normalized) <= maxChars {
 		return normalized
 	}
@@ -665,12 +668,12 @@ func (s *SessionMemoryLogicImpl) assembleHistory(longTermSummary, recentTranscri
 
 // joinNonBlank 连接非空字符串
 func (s *SessionMemoryLogicImpl) joinNonBlank(left, right, delimiter string) string {
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
-	if left == "" {
+	left = strutil.Trim(left)
+	right = strutil.Trim(right)
+	if strutil.IsBlank(left) {
 		return right
 	}
-	if right == "" {
+	if strutil.IsBlank(right) {
 		return left
 	}
 	return left + delimiter + right
