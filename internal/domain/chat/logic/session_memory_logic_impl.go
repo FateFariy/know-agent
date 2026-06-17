@@ -8,12 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -31,7 +33,6 @@ const (
 )
 
 var (
-	jsonObjectPattern    = regexp.MustCompile(`\{.*\}`)
 	retrievalHintPattern = regexp.MustCompile(`[a-zA-Z0-9._-]{2,}|[\p{Han}]{2,12}`)
 )
 
@@ -39,6 +40,8 @@ var (
 type SessionMemoryLogicImpl struct {
 	historySummary          config.HistorySummaryConf
 	repo                    adapter.ChatRepository
+	chatModel               *ObservedChatModelImpl[*schema.AgenticMessage]
+	promptTemplate          PromptTemplateLogic
 	refreshingMu            sync.Mutex
 	refreshing              map[string]struct{}
 	rewriteHistoryTurns     int
@@ -46,13 +49,15 @@ type SessionMemoryLogicImpl struct {
 }
 
 // NewSessionMemoryLogic 创建会话记忆逻辑实例
-func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatRepository) *SessionMemoryLogicImpl {
+func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *ObservedChatModelImpl[*schema.AgenticMessage], promptTemplate PromptTemplateLogic) *SessionMemoryLogicImpl {
 	return &SessionMemoryLogicImpl{
 		repo:                    repo,
 		refreshing:              make(map[string]struct{}),
 		historySummary:          svcCtx.Config.Memory.HistorySummary,
 		rewriteHistoryTurns:     svcCtx.Config.Memory.RewriteHistoryTurns,
 		questionHistoryMaxChars: svcCtx.Config.Memory.QuestionHistoryMaxChars,
+		chatModel:               chanMode,
+		promptTemplate:          promptTemplate,
 	}
 }
 
@@ -133,23 +138,24 @@ func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(ctx context.Con
 }
 
 // GetConversationSummary 获取会话摘要
-func (s *SessionMemoryLogicImpl) GetConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error) {
+func (s *SessionMemoryLogicImpl) GetConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
 	if strings.TrimSpace(conversationId) == "" {
-		return s.emptySummaryView(""), nil
+		return nil, nil
 	}
 
 	summary, err := s.repo.SelectMemorySummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
+	summary.IsCompressed = strings.TrimSpace(summary.SummaryText) != ""
 
-	return s.toSummaryView(conversationId, summary), nil
+	return summary, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
-func (s *SessionMemoryLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error) {
+func (s *SessionMemoryLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
 	if strings.TrimSpace(conversationId) == "" {
-		return s.emptySummaryView(""), nil
+		return &entity.ChatMemorySummary{}, nil
 	}
 
 	s.refreshingMu.Lock()
@@ -185,7 +191,9 @@ func (s *SessionMemoryLogicImpl) DeleteConversationSummary(ctx context.Context, 
 }
 
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
-func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, conversationId string, currentState *entity.ChatMemorySummary) *entity.ChatMemorySummary {
+func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
+	currentState *entity.ChatMemorySummary, tracer *vo.ConversationTrace) *entity.ChatMemorySummary {
+	// 只拉取"摘要尚未覆盖"的新增轮次，避免重复压缩旧内容
 	coveredExchangeId := utils.Ternary(currentState == nil, 0, currentState.CoveredExchangeId)
 	incrementalExchanges, err := s.repo.ListExchangesAfter(ctx, conversationId, coveredExchangeId)
 	if err != nil {
@@ -193,7 +201,7 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 		return currentState
 	}
 
-	// 过滤已完成的对话
+	// 过滤已完成的对话，参与提取摘要
 	stableExchanges := slice.Filter(incrementalExchanges, func(i int, item *entity.ChatExchange) bool {
 		return item.TurnStatus == vo.ChatTurnStatusCompleted && strings.TrimSpace(item.Question) != ""
 	})
@@ -209,18 +217,19 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 	compressionBatchTurns := s.historySummary.CompressionBatchTurns
 
 	for start := 0; start < len(overflowExchanges); start += compressionBatchTurns {
-		end := start + compressionBatchTurns
-		if end > len(overflowExchanges) {
-			end = len(overflowExchanges)
-		}
+		end := min(start+compressionBatchTurns, len(overflowExchanges))
 		batch := overflowExchanges[start:end]
 
 		// 使用回退合并策略
-		existingPayload := s.readSummaryPayload(workingState)
-		mergedPayload := s.fallbackMerge(existingPayload, batch)
+		oldSummary := s.readSummaryPayload(workingState)
+		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch, tracer)
+		if err != nil {
+			logx.Errorf("LLM合并会话长期摘要失败，回退到规则压缩, conversationId=%s, err=%v", conversationId, err)
+			newSummary = s.fallbackMerge(oldSummary, batch)
+		}
 
 		lastExchange := batch[len(batch)-1]
-		workingState = s.saveSummarySnapshot(ctx, conversationId, workingState, mergedPayload,
+		workingState = s.saveSummarySnapshot(ctx, conversationId, workingState, newSummary,
 			lastExchange.ID,
 			s.safeInt(workingState)+len(batch),
 			s.resolveSourceTime(lastExchange))
@@ -229,51 +238,74 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 	return workingState
 }
 
+// mergeSummary 由大模型合并摘要
+func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange, tracer *vo.ConversationTrace) (*entity.ConversationSummary, error) {
+	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
+	if err != nil {
+		return nil, err
+	}
+	variables := map[string]any{
+		"existingSummaryJson":  s.serializeSummary(oldSummary),
+		"newConversationBatch": s.renderCompressionTranscript(batch),
+	}
+	userPrompt, err := s.promptTemplate.Render(prompt.ConversationSummaryMerge, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := s.chatModel.Generate(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
+	newSummary := s.parseSummaryPayload(content)
+	if newSummary == nil {
+		return nil, err
+	}
+	return newSummary, nil
+}
+
 // fallbackMerge 回退合并策略
-func (s *SessionMemoryLogicImpl) fallbackMerge(existingPayload vo.ConversationSummary, batch []*entity.ChatExchange) vo.ConversationSummary {
-	mergedPayload := s.copyPayload(existingPayload)
+func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange) *entity.ConversationSummary {
+	newSummary := copySummary(oldSummary)
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要
-	var mergedSummary string
-	if existingPayload.Summary != "" && batchHighlight != "" {
-		mergedSummary = existingPayload.Summary + "；" + batchHighlight
-	} else if existingPayload.Summary != "" {
-		mergedSummary = existingPayload.Summary
+	if oldSummary.Summary == "" {
+		newSummary.Summary = batchHighlight
+	} else if batchHighlight == "" {
+		newSummary.Summary = oldSummary.Summary
 	} else {
-		mergedSummary = batchHighlight
+		newSummary.Summary = oldSummary.Summary + "；" + batchHighlight
 	}
-	mergedPayload.Summary = s.clipText(mergedSummary, 1024)
+	newSummary.Summary = s.clipText(newSummary.Summary, s.historySummary.SummaryMaxChars)
 
 	// 设置会话目标
-	if mergedPayload.ConversationGoal == "" && len(batch) > 0 && batch[len(batch)-1].Question != "" {
-		mergedPayload.ConversationGoal = s.clipText(batch[len(batch)-1].Question, maxGoalLength)
+	lastQuestion := batch[len(batch)-1].Question
+	if newSummary.ConversationGoal == "" && lastQuestion != "" {
+		newSummary.ConversationGoal = s.clipText(lastQuestion, maxGoalLength)
 	}
 
 	// 添加待处理问题
-	pendingQuestions := make([]string, 0)
-	pendingQuestions = append(pendingQuestions, existingPayload.PendingQuestions...)
+	pendingQuestions := make([]string, 0, len(batch)+len(newSummary.PendingQuestions))
+	pendingQuestions = append(pendingQuestions, oldSummary.PendingQuestions...)
 	for _, exchange := range batch {
 		if exchange.Question != "" {
 			pendingQuestions = append(pendingQuestions, s.clipText(exchange.Question, maxItemLength))
 		}
 	}
-	mergedPayload.PendingQuestions = s.deduplicateAndLimit(pendingQuestions)
+	newSummary.PendingQuestions = s.deduplicateAndLimit(pendingQuestions)
 
 	// 添加检索提示
-	retrievalHints := make([]string, 0)
-	retrievalHints = append(retrievalHints, existingPayload.RetrievalHints...)
-	if len(batch) > 0 && batch[len(batch)-1].Question != "" {
-		retrievalHints = append(retrievalHints, s.extractRetrievalHints(batch[len(batch)-1].Question)...)
+	retrievalHints := make([]string, 0, len(oldSummary.RetrievalHints))
+	retrievalHints = append(retrievalHints, oldSummary.RetrievalHints...)
+	if len(batch) > 0 && lastQuestion != "" {
+		retrievalHints = append(retrievalHints, s.extractRetrievalHints(lastQuestion)...)
 	}
-	mergedPayload.RetrievalHints = s.deduplicateAndLimit(retrievalHints)
+	newSummary.RetrievalHints = s.deduplicateAndLimit(retrievalHints)
 
-	return s.normalizePayload(mergedPayload)
+	return s.normalizeSummary(newSummary)
 }
 
 // saveSummarySnapshot 保存摘要快照
 func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conversationId string,
-	currentState *entity.ChatMemorySummary, payload vo.ConversationSummary,
+	currentState *entity.ChatMemorySummary, payload entity.ConversationSummary,
 	coveredExchangeId int64, coveredExchangeCount int, lastSourceEditTime time.Time) *entity.ChatMemorySummary {
 
 	latestState, err := s.repo.SelectMemorySummary(ctx, conversationId)
@@ -297,7 +329,7 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 	}
 
 	summaryText := s.buildLongTermSummaryText(payload)
-	summaryJson := s.writePayloadJson(payload)
+	summaryJson := s.serializeSummary(payload)
 
 	if latestState == nil {
 		// 插入新记录
@@ -311,9 +343,6 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 			SummaryText:          summaryText,
 			SummaryJson:          summaryJson,
 			LastSourceEditTime:   lastSourceEditTime,
-			Status:               businessStatusYes,
-			CreateTime:           time.Now(),
-			UpdateTime:           time.Now(),
 		}
 		if err := s.repo.InsertMemorySummary(ctx, newState); err != nil {
 			logx.Errorf("插入摘要失败, conversationId=%s, err=%v", conversationId, err)
@@ -340,50 +369,6 @@ func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conver
 	}
 
 	return latestState
-}
-
-// readSummaryPayload 读取摘要负载
-func (s *SessionMemoryLogicImpl) readSummaryPayload(summaryState *entity.ChatMemorySummary) vo.ConversationSummary {
-	if summaryState == nil {
-		return vo.ConversationSummary{}
-	}
-
-	if summaryState.SummaryJson != "" {
-		payload := s.parseSummaryPayload(summaryState.SummaryJson)
-		if payload.Summary != "" || len(payload.PendingQuestions) > 0 {
-			return s.normalizePayload(payload)
-		}
-	}
-
-	return s.normalizePayload(vo.ConversationSummary{
-		Summary: summaryState.SummaryText,
-	})
-}
-
-// parseSummaryPayload 解析摘要负载
-func (s *SessionMemoryLogicImpl) parseSummaryPayload(raw string) vo.ConversationSummary {
-	if strings.TrimSpace(raw) == "" {
-		return vo.ConversationSummary{}
-	}
-
-	jsonStr := s.extractJsonObject(raw)
-	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-		logx.Debugf("解析会话长期摘要JSON失败: %s, err=%v", raw, err)
-		return vo.ConversationSummary{}
-	}
-
-	payload := vo.ConversationSummary{
-		Summary:          s.getString(data, "summary"),
-		ConversationGoal: s.getString(data, "conversation_goal"),
-		StableFacts:      s.getStringSlice(data, "stable_facts"),
-		UserPreferences:  s.getStringSlice(data, "user_preferences"),
-		ResolvedPoints:   s.getStringSlice(data, "resolved_points"),
-		PendingQuestions: s.getStringSlice(data, "pending_questions"),
-		RetrievalHints:   s.getStringSlice(data, "retrieval_hints"),
-	}
-
-	return s.normalizePayload(payload)
 }
 
 // renderCompressionTranscript 渲染压缩对话记录
@@ -480,8 +465,8 @@ func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*ent
 }
 
 // buildLongTermSummaryText 构建长期摘要文本
-func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload vo.ConversationSummary) string {
-	normalized := s.normalizePayload(payload)
+func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload *entity.ConversationSummary) string {
+	normalized := s.normalizeSummary(payload)
 	var builder strings.Builder
 
 	s.appendSection(&builder, "长期会话摘要", normalized.Summary)
@@ -495,15 +480,38 @@ func (s *SessionMemoryLogicImpl) buildLongTermSummaryText(payload vo.Conversatio
 	return s.clipText(strings.TrimSpace(builder.String()), 1024)
 }
 
-// normalizePayload 规范化负载
-func (s *SessionMemoryLogicImpl) normalizePayload(payload vo.ConversationSummary) vo.ConversationSummary {
-	normalizedSummary := s.clipText(strings.TrimSpace(payload.Summary), 1024)
-	if normalizedSummary == "" {
-		normalizedSummary = s.synthesizeSummaryFromSections(payload)
+// readSummaryPayload 读取摘要负载
+func (s *SessionMemoryLogicImpl) readSummaryPayload(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
+	if summaryState == nil {
+		return &entity.ConversationSummary{}
 	}
 
-	return vo.ConversationSummary{
-		Summary:          normalizedSummary,
+	if summaryState.SummaryJson != "" {
+		payload := s.parseSummaryPayload(summaryState.SummaryJson)
+		if payload != nil {
+			return s.normalizeSummary(payload)
+		}
+	}
+
+	return s.normalizeSummary(&entity.ConversationSummary{Summary: summaryState.SummaryText})
+}
+
+// parseSummaryPayload 解析摘要负载
+func (s *SessionMemoryLogicImpl) parseSummaryPayload(raw string) *entity.ConversationSummary {
+	raw = extractJsonObject(raw)
+	summary := &entity.ConversationSummary{}
+	if err := json.Unmarshal([]byte(raw), summary); err != nil {
+		logx.Debugf("解析会话长期摘要 JSON 失败: %s, err=%v", raw, err)
+		return nil
+	}
+
+	return summary
+}
+
+// normalizeSummary 规范化摘要
+func (s *SessionMemoryLogicImpl) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
+	summary := s.clipText(strings.TrimSpace(payload.Summary), s.historySummary.SummaryMaxChars)
+	summaryEntity := &entity.ConversationSummary{
 		ConversationGoal: s.clipText(strings.TrimSpace(payload.ConversationGoal), maxGoalLength),
 		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
 		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
@@ -511,10 +519,12 @@ func (s *SessionMemoryLogicImpl) normalizePayload(payload vo.ConversationSummary
 		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
 		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
 	}
+	summaryEntity.Summary = utils.Ternary(summary != "", summary, s.synthesizeSummaryFromSections(summaryEntity))
+	return summaryEntity
 }
 
 // synthesizeSummaryFromSections 从各部分合成摘要
-func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload vo.ConversationSummary) string {
+func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload *entity.ConversationSummary) string {
 	var parts []string
 	if payload.ConversationGoal != "" {
 		parts = append(parts, "目标："+s.clipText(payload.ConversationGoal, maxItemLength))
@@ -525,22 +535,19 @@ func (s *SessionMemoryLogicImpl) synthesizeSummaryFromSections(payload vo.Conver
 	if len(payload.PendingQuestions) > 0 {
 		parts = append(parts, "待跟进："+strings.Join(payload.PendingQuestions, "；"))
 	}
-	return s.clipText(strings.Join(parts, "；"), 1024)
+	return s.clipText(strings.Join(parts, "；"), s.historySummary.SummaryMaxChars)
 }
 
 // deduplicateAndLimit 去重并限制数量
 func (s *SessionMemoryLogicImpl) deduplicateAndLimit(values []string) []string {
-	seen := make(map[string]struct{})
+	seen := make(map[string]bool)
 	var result []string
 	for _, v := range values {
 		text := s.clipText(strings.TrimSpace(v), maxItemLength)
-		if text == "" {
+		if seen[text] || text == "" {
 			continue
 		}
-		if _, exists := seen[text]; exists {
-			continue
-		}
-		seen[text] = struct{}{}
+		seen[text] = true
 		result = append(result, text)
 		if len(result) >= maxSectionItems {
 			break
@@ -549,37 +556,15 @@ func (s *SessionMemoryLogicImpl) deduplicateAndLimit(values []string) []string {
 	return result
 }
 
-// copyPayload 复制负载
-func (s *SessionMemoryLogicImpl) copyPayload(payload vo.ConversationSummary) vo.ConversationSummary {
-	return vo.ConversationSummary{
-		Summary:          payload.Summary,
-		ConversationGoal: payload.ConversationGoal,
-		StableFacts:      append([]string(nil), payload.StableFacts...),
-		UserPreferences:  append([]string(nil), payload.UserPreferences...),
-		ResolvedPoints:   append([]string(nil), payload.ResolvedPoints...),
-		PendingQuestions: append([]string(nil), payload.PendingQuestions...),
-		RetrievalHints:   append([]string(nil), payload.RetrievalHints...),
-	}
-}
-
-// writePayloadJson 写入负载JSON
-func (s *SessionMemoryLogicImpl) writePayloadJson(payload vo.ConversationSummary) string {
-	normalized := s.normalizePayload(payload)
+// serializeSummary 序列化摘要
+func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) string {
+	normalized := s.normalizeSummary(summary)
 	data, err := json.Marshal(normalized)
 	if err != nil {
 		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
 		return "{}"
 	}
 	return string(data)
-}
-
-// extractJsonObject 提取JSON对象
-func (s *SessionMemoryLogicImpl) extractJsonObject(raw string) string {
-	match := jsonObjectPattern.FindString(strings.TrimSpace(raw))
-	if match != "" {
-		return match
-	}
-	return strings.TrimSpace(raw)
 }
 
 // appendSection 添加段落
@@ -642,27 +627,24 @@ func (s *SessionMemoryLogicImpl) extractRetrievalHints(question string) []string
 		return []string{}
 	}
 
-	hints := make(map[string]struct{})
 	matches := retrievalHintPattern.FindAllString(question, -1)
+	hints := make([]string, 0, len(matches))
 	for _, match := range matches {
 		hint := strings.TrimSpace(match)
-		if len(hint) >= 2 && !s.isNoiseHint(hint) {
-			hints[s.clipText(hint, maxItemLength)] = struct{}{}
+		if len(hint) >= 2 && !isNoiseHint(hint) {
+			hints = append(hints, s.clipText(hint, maxItemLength))
 		}
 		if len(hints) >= maxSectionItems {
 			break
 		}
 	}
+	s.deduplicateAndLimit(hints)
 
-	result := make([]string, 0, len(hints))
-	for hint := range hints {
-		result = append(result, hint)
-	}
-	return result
+	return hints
 }
 
 // isNoiseHint 判断是否为噪音提示
-func (s *SessionMemoryLogicImpl) isNoiseHint(value string) bool {
+func isNoiseHint(value string) bool {
 	noiseHints := map[string]bool{
 		"请问": true, "帮我": true, "一下": true, "如何": true, "怎么": true,
 		"什么": true, "哪个": true, "这个": true, "那个": true, "可以": true, "需要": true,
@@ -671,7 +653,7 @@ func (s *SessionMemoryLogicImpl) isNoiseHint(value string) bool {
 }
 
 // resolveSourceTime 解析源时间
-func (s *SessionMemoryLogicImpl) resolveSourceTime(exchange *entity.ChatExchange) time.Time {
+func resolveSourceTime(exchange *entity.ChatExchange) time.Time {
 	if exchange == nil {
 		return time.Now()
 	}
@@ -682,63 +664,16 @@ func (s *SessionMemoryLogicImpl) resolveSourceTime(exchange *entity.ChatExchange
 	return exchange.CreateTime
 }
 
-// toSummaryView 转换为摘要视图
-func (s *SessionMemoryLogicImpl) toSummaryView(conversationId string, summary *entity.ChatMemorySummary) *vo.ConversationMemorySummaryView {
-	if summary == nil {
-		return s.emptySummaryView(conversationId)
-	}
-
-	updateTime := summary.UpdateTime
-	lastSourceUpdateTime := summary.LastSourceUpdateTime
-
-	return &vo.ConversationMemorySummaryView{
-		ConversationId:       conversationId,
-		HasSummary:           summary.SummaryText != "",
-		CoveredExchangeId:    summary.CoveredExchangeId,
-		CoveredExchangeCount: summary.CoveredExchangeCount,
-		CompressionCount:     summary.CompressionCount,
-		SummaryVersion:       summary.SummaryVersion,
-		SummaryText:          summary.SummaryText,
-		Summary:              s.readSummaryPayload(summary),
-		LastSourceUpdateTime: &lastSourceUpdateTime,
-		UpdateTime:           &updateTime,
-	}
-}
-
-// emptySummaryView 创建空摘要视图
-func (s *SessionMemoryLogicImpl) emptySummaryView(conversationId string) *vo.ConversationMemorySummaryView {
-	return &vo.ConversationMemorySummaryView{
-		ConversationId:       conversationId,
-		HasSummary:           false,
-		CoveredExchangeId:    0,
-		CoveredExchangeCount: 0,
-		CompressionCount:     0,
-		SummaryVersion:       0,
-		SummaryText:          "",
-		Summary:              vo.ConversationSummary{},
-		LastSourceEditTime:   nil,
-		UpdateTime:           nil,
-	}
-}
-
 // safeInt 安全获取int值
-func (s *SessionMemoryLogicImpl) safeInt(summary *entity.ChatMemorySummary) int {
+func safeInt(summary *entity.ChatMemorySummary) int {
 	if summary == nil {
 		return 0
 	}
 	return summary.CoveredExchangeCount
 }
 
-// defaultLong 安全获取CoveredExchangeId
-func (s *SessionMemoryLogicImpl) defaultLong(summary *entity.ChatMemorySummary) int64 {
-	if summary == nil {
-		return 0
-	}
-	return summary.CoveredExchangeId
-}
-
 // safeIntValue 安全获取CoveredExchangeCount
-func (s *SessionMemoryLogicImpl) safeIntValue(summary *entity.ChatMemorySummary) int {
+func safeIntValue(summary *entity.ChatMemorySummary) int {
 	if summary == nil {
 		return 0
 	}
@@ -746,7 +681,7 @@ func (s *SessionMemoryLogicImpl) safeIntValue(summary *entity.ChatMemorySummary)
 }
 
 // safeCompressionCount 安全获取CompressionCount
-func (s *SessionMemoryLogicImpl) safeCompressionCount(summary *entity.ChatMemorySummary) int {
+func safeCompressionCount(summary *entity.ChatMemorySummary) int {
 	if summary == nil {
 		return 0
 	}
@@ -771,24 +706,30 @@ func (s *SessionMemoryLogicImpl) joinNonBlank(left, right, delimiter string) str
 	return left + delimiter + right
 }
 
-// getString 从map获取字符串
-func (s *SessionMemoryLogicImpl) getString(data map[string]interface{}, key string) string {
-	if v, ok := data[key].(string); ok {
-		return v
+// copySummary 复制摘要
+func copySummary(summary *entity.ConversationSummary) *entity.ConversationSummary {
+	return &entity.ConversationSummary{
+		Summary:          summary.Summary,
+		ConversationGoal: summary.ConversationGoal,
+		StableFacts:      append([]string{}, summary.StableFacts...),
+		UserPreferences:  append([]string{}, summary.UserPreferences...),
+		ResolvedPoints:   append([]string{}, summary.ResolvedPoints...),
+		PendingQuestions: append([]string{}, summary.PendingQuestions...),
+		RetrievalHints:   append([]string{}, summary.RetrievalHints...),
 	}
-	return ""
 }
 
-// getStringSlice 从map获取字符串切片
-func (s *SessionMemoryLogicImpl) getStringSlice(data map[string]interface{}, key string) []string {
-	if v, ok := data[key].([]interface{}); ok {
-		var result []string
-		for _, item := range v {
-			if str, ok := item.(string); ok && str != "" {
-				result = append(result, str)
-			}
-		}
-		return result
+// extractJsonObject 提取JSON对象
+func extractJsonObject(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return trimmed
 	}
-	return []string{}
+
+	start := strings.Index(trimmed, "{")
+	end := strings.LastIndex(trimmed, "}")
+	if start == -1 || end == -1 || end < start {
+		return trimmed
+	}
+	return trimmed[start : end+1]
 }
