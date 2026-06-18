@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
@@ -50,9 +51,9 @@ type SummaryCompressionStrategy struct {
 func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *logic.ObservedChatModelImpl[*schema.AgenticMessage], promptTemplate logic.PromptTemplateLogic) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
-		historySummary:           svcCtx.Config.Memory.HistorySummary,
-		questionHistoryMaxChars:  svcCtx.Config.Memory.QuestionHistoryMaxChars,
-		recentTranscriptMaxChars: svcCtx.Config.Memory.RecentTranscriptMaxChars,
+		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,
+		questionHistoryMaxChars:  svcCtx.Config.Chat.Memory.QuestionHistoryMaxChars,
+		recentTranscriptMaxChars: svcCtx.Config.Chat.Memory.RecentTranscriptMaxChars,
 		chatModel:                chanMode,
 		promptTemplate:           promptTemplate,
 	}
@@ -301,6 +302,8 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 // fallbackMerge 回退合并策略（当LLM合并失败时使用规则合并）
 func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange) *entity.ConversationSummary {
 	newSummary := copySummary(oldSummary)
+
+	// 批次高亮
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要文本（用分号连接旧摘要和批次高亮）
@@ -551,20 +554,10 @@ func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *enti
 
 // deduplicateAndLimit 去重并限制数量
 func (s *SummaryCompressionStrategy) deduplicateAndLimit(values []string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, v := range values {
-		text := s.clipText(strutil.Trim(v), maxItemLength)
-		if seen[text] || strutil.IsBlank(text) {
-			continue
-		}
-		seen[text] = true
-		result = append(result, text)
-		if len(result) >= maxSectionItems {
-			break
-		}
-	}
-	return result
+	return stream.FromSlice(values).
+		Map(func(item string) string { return s.clipText(strutil.Trim(item), maxItemLength) }).
+		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).
+		Distinct().Limit(maxSectionItems).ToSlice()
 }
 
 // joinNonBlank 连接非空字符串

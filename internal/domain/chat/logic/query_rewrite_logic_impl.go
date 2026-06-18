@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -16,6 +17,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 var (
@@ -28,15 +30,20 @@ type QueryRewriteLogicImpl struct {
 	chatModel       *ObservedChatModelImpl[*schema.AgenticMessage]
 	promptTemplate  PromptTemplateLogic
 	maxSubQuestions int
+	options         []model.Option
 }
 
 // NewQueryRewriteLogicImpl 创建问题改写逻辑实例
-func NewQueryRewriteLogicImpl(chatModel *ObservedChatModelImpl[*schema.AgenticMessage],
-	promptTemplate PromptTemplateLogic, maxSubQuestions int) *QueryRewriteLogicImpl {
+func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *ObservedChatModelImpl[*schema.AgenticMessage],
+	promptTemplate PromptTemplateLogic) *QueryRewriteLogicImpl {
 	return &QueryRewriteLogicImpl{
 		chatModel:       chatModel,
 		promptTemplate:  promptTemplate,
-		maxSubQuestions: maxSubQuestions,
+		maxSubQuestions: svcCtx.Config.Chat.Rewrite.MaxSubQuestions,
+		options: []model.Option{
+			model.WithTemperature(svcCtx.Config.Chat.Rewrite.Temperature),
+			model.WithTopP(svcCtx.Config.Chat.Rewrite.TopP),
+		},
 	}
 }
 
@@ -74,7 +81,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	}
 
 	// 调用LLM生成改写结果
-	raw, err := q.chatModel.Generate(ctx, vo.ChatStageRewrite, "", promptText, tracer)
+	raw, err := q.chatModel.Generate(ctx, vo.ChatStageRewrite, "", promptText, tracer, q.options...)
 	if err != nil {
 		logx.Alert(warn)
 		return fallback, nil

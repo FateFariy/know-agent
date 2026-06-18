@@ -86,7 +86,7 @@ func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemProm
 	usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
 
 	// 调用底层模型建立流式连接
-	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt))
+	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
 	if err != nil {
 		// 连接建立失败，记录使用量并返回错误
 		appendUsage(tracer, usageTrace)
