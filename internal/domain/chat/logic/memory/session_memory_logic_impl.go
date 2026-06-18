@@ -1,4 +1,4 @@
-package logic
+package memory
 
 import (
 	"context"
@@ -16,21 +16,19 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// 常量定义
 const (
-	maxSectionItems              = 6
-	maxItemLength                = 80
-	maxGoalLength                = 120
-	maxQuestionLength            = 160
-	maxAnswerLength              = 320
-	maxAnswerContextAnswerLength = 220
-	businessStatusYes            = 1
+	maxSectionItems   = 6
+	maxItemLength     = 80
+	maxGoalLength     = 120
+	maxQuestionLength = 160
+	maxAnswerLength   = 320
 )
 
 var (
@@ -39,152 +37,163 @@ var (
 
 // SessionMemoryLogicImpl 会话记忆逻辑实现
 type SessionMemoryLogicImpl struct {
-	historySummary          config.HistorySummaryConf
-	repo                    adapter.ChatRepository
-	chatModel               *ObservedChatModelImpl[*schema.AgenticMessage]
-	promptTemplate          PromptTemplateLogic
-	refreshingMu            sync.Mutex
-	refreshing              map[string]struct{}
-	rewriteHistoryTurns     int
-	questionHistoryMaxChars int
+	historySummary            config.HistorySummaryConf
+	repo                      adapter.ChatRepository
+	chatModel                 *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	promptTemplate            logic.PromptTemplateLogic
+	rewriteHistoryTurns       int
+	questionHistoryMaxChars   int
+	recentTranscriptMaxChars  int
+	refreshingConversationIds sync.Map
 }
 
 // NewSessionMemoryLogic 创建会话记忆逻辑实例
-func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *ObservedChatModelImpl[*schema.AgenticMessage], promptTemplate PromptTemplateLogic) *SessionMemoryLogicImpl {
+func NewSessionMemoryLogic(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *logic.ObservedChatModelImpl[*schema.AgenticMessage], promptTemplate logic.PromptTemplateLogic) *SessionMemoryLogicImpl {
 	return &SessionMemoryLogicImpl{
-		repo:                    repo,
-		refreshing:              make(map[string]struct{}),
-		historySummary:          svcCtx.Config.Memory.HistorySummary,
-		rewriteHistoryTurns:     svcCtx.Config.Memory.RewriteHistoryTurns,
-		questionHistoryMaxChars: svcCtx.Config.Memory.QuestionHistoryMaxChars,
-		chatModel:               chanMode,
-		promptTemplate:          promptTemplate,
+		repo:                     repo,
+		historySummary:           svcCtx.Config.Memory.HistorySummary,
+		rewriteHistoryTurns:      svcCtx.Config.Memory.RewriteHistoryTurns,
+		questionHistoryMaxChars:  svcCtx.Config.Memory.QuestionHistoryMaxChars,
+		recentTranscriptMaxChars: svcCtx.Config.Memory.RecentTranscriptMaxChars,
+		chatModel:                chanMode,
+		promptTemplate:           promptTemplate,
 	}
 }
 
 // LoadMemoryContext 加载会话记忆上下文
 func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error) {
+	memoryCtx := &vo.MemoryContext{}
+
+	// 空会话ID直接返回空上下文
 	if strutil.IsBlank(conversationId) {
-		return &vo.MemoryContext{}, nil
+		return memoryCtx, nil
 	}
 
-	// 获取最近对话
-	recentExchanges, err := s.repo.ListRecentExchanges(ctx, conversationId, s.rewriteHistoryTurns*3)
-	if err != nil {
-		return nil, err
+	// 摘要功能未启用：仅返回最近对话
+	if !s.historySummary.Enabled {
+		recentExchanges, err := s.repo.ListRecentExchanges(ctx, conversationId, s.rewriteHistoryTurns*3)
+		if err != nil {
+			return nil, err
+		}
+
+		// 渲染最近对话记录
+		memoryCtx.RecentTranscript = s.renderRecentTranscript(recentExchanges, s.rewriteHistoryTurns, s.recentTranscriptMaxChars)
+		memoryCtx.QuestionRecentTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.rewriteHistoryTurns, s.questionHistoryMaxChars)
+		memoryCtx.AssembledHistory = memoryCtx.RecentTranscript
+
+		return memoryCtx, nil
 	}
 
-	// 查询现有摘要
+	// 摘要功能启用：查询现有摘要并按需刷新
 	summaryState, err := s.repo.SelectMemorySummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
 
-	// 刷新摘要（如果需要）
+	// 刷新摘要（增量压缩超出保留窗口的对话）
 	summaryState, err = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, tracer)
 	if err != nil {
 		return nil, err
 	}
 
-	summaryPayload := s.readSummary(summaryState)
-
-	recentTranscript := s.renderRecentTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
-	answerRecentTranscript := s.renderRecentQuestionTranscript(recentExchanges, s.rewriteHistoryTurns, s.historySummary.RecentTranscriptMaxChars)
-	longTermSummary := ""
-	if summaryState != nil {
-		longTermSummary = strutil.Trim(summaryState.SummaryText)
+	// 获取最近对话（用于组装上下文）
+	recentExchanges, err := s.repo.ListRecentExchanges(ctx, conversationId, max(s.historySummary.KeepRecentTurns*3, s.historySummary.KeepRecentTurns+4))
+	if err != nil {
+		return nil, err
 	}
 
-	return &vo.MemoryContext{
-		AssembledHistory:         s.assembleHistory(longTermSummary, recentTranscript),
-		LongTermSummary:          longTermSummary,
-		RecentTranscript:         recentTranscript,
-		QuestionRecentTranscript: answerRecentTranscript,
-		Summary:                  summaryPayload,
-		IsCompressed:             strutil.IsNotBlank(longTermSummary),
-		CoveredExchangeId:        s.defaultLong(summaryState),
-		CoveredExchangeCount:     s.safeIntValue(summaryState),
-		CompressionCount:         s.safeCompressionCount(summaryState),
-	}, nil
+	// 渲染最近对话记录
+	memoryCtx.RecentTranscript = s.renderRecentTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.recentTranscriptMaxChars)
+	memoryCtx.QuestionRecentTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.questionHistoryMaxChars)
+
+	// 反序列化摘要JSON
+	memoryCtx.Summary = s.readSummary(summaryState)
+
+	// 组装长期摘要和上下文元数据
+	if summaryState != nil {
+		memoryCtx.LongTermSummary = strutil.Trim(summaryState.SummaryText)
+		memoryCtx.AssembledHistory = s.joinNonBlank(memoryCtx.LongTermSummary, memoryCtx.RecentTranscript, "\n\n")
+		memoryCtx.IsCompressed = memoryCtx.LongTermSummary != ""
+		memoryCtx.CoveredExchangeId = summaryState.CoveredExchangeId
+		memoryCtx.CoveredExchangeCount = summaryState.CoveredExchangeCount
+		memoryCtx.CompressionCount = summaryState.CompressionCount
+	}
+
+	return memoryCtx, nil
 }
 
 // RefreshConversationSummaryAsync 异步刷新会话摘要
 func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(ctx context.Context, conversationId string) {
-	if strutil.IsBlank(conversationId) {
+	if strutil.IsBlank(conversationId) || !s.historySummary.Enabled {
+		return
+	}
+	// todo 仅支持摘要有效
+	if _, exists := s.refreshingConversationIds.LoadOrStore(conversationId, struct{}{}); exists {
 		return
 	}
 
-	s.refreshingMu.Lock()
-	if _, exists := s.refreshing[conversationId]; exists {
-		s.refreshingMu.Unlock()
-		return
-	}
-	s.refreshing[conversationId] = struct{}{}
-	s.refreshingMu.Unlock()
-
+	// todo 待完善（使用协程池）
 	go func() {
-		defer func() {
-			s.refreshingMu.Lock()
-			delete(s.refreshing, conversationId)
-			s.refreshingMu.Unlock()
-		}()
+		defer s.refreshingConversationIds.Delete(conversationId)
+		summaryState, _ := s.repo.SelectMemorySummary(ctx, conversationId)
 
-		defer func() {
-			if r := recover(); r != nil {
-				logx.Errorf("异步刷新会话摘要失败, conversationId=%s, err=%v", conversationId, r)
-			}
-		}()
-
-		s.refreshSummaryIfNecessary(ctx, conversationId, nil, tracer)
+		_, err := s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, nil)
+		if err != nil {
+			logx.Errorf("异步刷新会话摘要失败, conversationId=%s, err=%v", conversationId, err)
+			return
+		}
 	}()
 }
 
 // GetConversationSummary 获取会话摘要
 func (s *SessionMemoryLogicImpl) GetConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
+	defaultValue := &entity.ChatMemorySummary{ConversationId: conversationId}
+
+	// 空会话ID返回默认值
 	if strutil.IsBlank(conversationId) {
-		return nil, nil
+		return defaultValue, nil
 	}
 
+	// 查询数据库中的摘要记录
 	summary, err := s.repo.SelectMemorySummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
+	if summary == nil {
+		return defaultValue, nil
+	}
+
+	// 反序列化摘要JSON并设置压缩状态
+	summary.Summary = s.readSummary(summary)
 	summary.IsCompressed = strutil.IsNotBlank(summary.SummaryText)
 
 	return summary, nil
 }
 
-// RebuildConversationSummary 重建会话摘要
+// RebuildConversationSummary 重建会话摘要（删除现有摘要后重新生成）
 func (s *SessionMemoryLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
+	// 空会话ID返回空对象
 	if strutil.IsBlank(conversationId) {
 		return &entity.ChatMemorySummary{}, nil
 	}
 
-	s.refreshingMu.Lock()
-	if _, exists := s.refreshing[conversationId]; exists {
-		s.refreshingMu.Unlock()
+	// 并发控制：防止重复重建
+	if _, exists := s.refreshingConversationIds.LoadOrStore(conversationId, struct{}{}); exists {
 		return s.GetConversationSummary(ctx, conversationId)
 	}
-	s.refreshing[conversationId] = struct{}{}
-	s.refreshingMu.Unlock()
+	defer s.refreshingConversationIds.Delete(conversationId)
 
-	defer func() {
-		s.refreshingMu.Lock()
-		delete(s.refreshing, conversationId)
-		s.refreshingMu.Unlock()
-	}()
-
-	// 删除现有摘要
+	// 步骤1: 删除现有摘要记录
 	if err := s.repo.DeleteMemorySummary(ctx, conversationId); err != nil {
 		return nil, err
 	}
 
-	// 重新生成
-	rebuiltState, err := s.refreshSummaryIfNecessary(ctx, conversationId, nil, tracer)
+	// 步骤2: 重新生成摘要（从第一条对话开始压缩）
+	rebuiltState, err := s.refreshSummaryIfNecessary(ctx, conversationId, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.toSummaryView(conversationId, rebuiltState), nil
+	return rebuiltState, nil
 }
 
 // DeleteConversationSummary 删除会话摘要
@@ -663,11 +672,6 @@ func (s *SessionMemoryLogicImpl) clipRecentTranscript(text string, maxChars int)
 	return "…" + normalized[len(normalized)-maxChars+1:]
 }
 
-// assembleHistory 组装历史记录
-func (s *SessionMemoryLogicImpl) assembleHistory(longTermSummary, recentTranscript string) string {
-	return s.joinNonBlank(longTermSummary, recentTranscript, "\n\n")
-}
-
 // joinNonBlank 连接非空字符串
 func (s *SessionMemoryLogicImpl) joinNonBlank(left, right, delimiter string) string {
 	left = strutil.Trim(left)
@@ -688,42 +692,6 @@ func isNoiseHint(value string) bool {
 		"什么": true, "哪个": true, "这个": true, "那个": true, "可以": true, "需要": true,
 	}
 	return noiseHints[value]
-}
-
-// resolveSourceTime 解析源时间
-func resolveSourceTime(exchange *entity.ChatExchange) time.Time {
-	if exchange == nil {
-		return time.Now()
-	}
-	// 使用UpdateTime作为编辑时间，如果没有则使用CreateTime
-	if !exchange.UpdateTime.IsZero() {
-		return exchange.UpdateTime
-	}
-	return exchange.CreateTime
-}
-
-// safeInt 安全获取int值
-func safeInt(summary *entity.ChatMemorySummary) int {
-	if summary == nil {
-		return 0
-	}
-	return summary.CoveredExchangeCount
-}
-
-// safeIntValue 安全获取CoveredExchangeCount
-func safeIntValue(summary *entity.ChatMemorySummary) int {
-	if summary == nil {
-		return 0
-	}
-	return summary.CoveredExchangeCount
-}
-
-// safeCompressionCount 安全获取CompressionCount
-func safeCompressionCount(summary *entity.ChatMemorySummary) int {
-	if summary == nil {
-		return 0
-	}
-	return summary.CompressionCount
 }
 
 // copySummary 复制摘要

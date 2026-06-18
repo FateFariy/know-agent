@@ -44,8 +44,8 @@ type ChatRepository interface {
 	// InsertMemorySummary 插入会话记忆摘要
 	InsertMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error
 
-	// UpdateMemorySummary 更新会话记忆摘要
-	UpdateMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error
+	// UpdateMemorySummaryById 更新会话记忆摘要
+	UpdateMemorySummaryById(ctx context.Context, summary *entity.ChatMemorySummary) error
 
 	// DeleteMemorySummary 删除会话记忆摘要
 	DeleteMemorySummary(ctx context.Context, conversationId string) error
