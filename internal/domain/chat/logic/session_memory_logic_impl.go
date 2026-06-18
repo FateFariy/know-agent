@@ -80,9 +80,10 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 		return nil, err
 	}
 
-	// 如果有摘要，刷新（如果需要）
-	if summaryState != nil {
-		summaryState = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, tracer)
+	// 刷新摘要（如果需要）
+	summaryState, err = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, tracer)
+	if err != nil {
+		return nil, err
 	}
 
 	summaryPayload := s.readSummary(summaryState)
@@ -197,7 +198,7 @@ func (s *SessionMemoryLogicImpl) DeleteConversationSummary(ctx context.Context, 
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
 func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
 	currentState *entity.ChatMemorySummary, tracer *vo.ConversationTrace) (*entity.ChatMemorySummary, error) {
-	// 只拉取"摘要尚未覆盖"的新增轮次，避免重复压缩旧内容
+	// 获取增量对话（只拉取摘要尚未覆盖的新增轮次，避免重复压缩）
 	coveredExchangeId := utils.Ternary(currentState == nil, 0, currentState.CoveredExchangeId)
 	incrementalExchanges, err := s.repo.ListExchangesAfter(ctx, conversationId, coveredExchangeId)
 	if err != nil {
@@ -205,17 +206,18 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 		return currentState, err
 	}
 
-	// 过滤已完成的对话，参与提取摘要
+	// 过滤已完成的对话（只有已完成的对话才参与摘要提取）
 	stableExchanges := slice.Filter(incrementalExchanges, func(i int, item *entity.ChatExchange) bool {
 		return item.TurnStatus == vo.ChatTurnStatusCompleted && strutil.IsNotBlank(item.Question)
 	})
 
-	// 检查是否需要压缩
+	// 检查是否需要压缩（超出保留窗口的对话需要压缩）
 	overflowCount := len(stableExchanges) - s.historySummary.KeepRecentTurns
 	if overflowCount <= 0 {
 		return currentState, nil
 	}
 
+	// 分批压缩溢出对话（按批次大小分批处理，避免单次压缩内容过多）
 	overflowExchanges := stableExchanges[:overflowCount]
 	workingState := currentState
 	compressionBatchTurns := s.historySummary.CompressionBatchTurns
@@ -224,7 +226,7 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 		end := min(start+compressionBatchTurns, len(overflowExchanges))
 		batch := overflowExchanges[start:end]
 
-		// 使用回退合并策略
+		// 优先使用LLM合并摘要，失败时回退到规则合并
 		oldSummary := s.readSummary(workingState)
 		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch, tracer)
 		if err != nil {
@@ -232,25 +234,37 @@ func (s *SessionMemoryLogicImpl) refreshSummaryIfNecessary(ctx context.Context, 
 			newSummary = s.fallbackMerge(oldSummary, batch)
 		}
 
+		// 保存摘要快照（记录已覆盖的对话ID和数量）
 		lastExchange := batch[len(batch)-1]
-		workingState = s.saveSummarySnapshot(ctx, conversationId, workingState, newSummary,
-			lastExchange.ID,
-			s.safeInt(workingState)+len(batch),
-			s.resolveSourceTime(lastExchange))
+		coveredExchangeCount := utils.Ternary(workingState == nil, 0, workingState.CoveredExchangeCount+len(batch))
+		workingState, err = s.saveSummarySnapshot(ctx, lastExchange, newSummary, coveredExchangeCount)
+		if err != nil {
+			logx.Errorf("保存会话摘要快照失败, conversationId=%s, err=%v", conversationId, err)
+			return currentState, err
+		}
 	}
 
 	return workingState, nil
 }
 
-// mergeSummary 由大模型合并摘要
+// mergeSummaryByLLM 由大模型合并摘要
 func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary,
 	batch []*entity.ChatExchange, tracer *vo.ConversationTrace) (*entity.ConversationSummary, error) {
+	// 渲染系统提示词
 	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	// 序列化现有摘要（规范化后转为JSON）
+	serializeSummary, err := s.serializeSummary(s.normalizeSummary(copySummary(oldSummary)))
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建用户提示词变量（包含现有摘要和新对话批次）
 	variables := map[string]any{
-		"existingSummaryJson":  s.serializeSummary(s.normalizeSummary(copySummary(oldSummary))),
+		"existingSummaryJson":  serializeSummary,
 		"newConversationBatch": s.renderCompressionTranscript(batch),
 	}
 	userPrompt, err := s.promptTemplate.Render(prompt.ConversationSummaryMerge, variables)
@@ -258,36 +272,33 @@ func (s *SessionMemoryLogicImpl) mergeSummaryByLLM(ctx context.Context, oldSumma
 		return nil, err
 	}
 
+	// 调用LLM生成合并后的摘要
 	content, err := s.chatModel.Generate(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
 	newSummary := s.deserializeSummary(content)
 	if newSummary == nil {
 		return nil, err
 	}
+
+	// 规范化摘要（限制字段长度、去重）
 	return s.normalizeSummary(newSummary), nil
 }
 
-// fallbackMerge 回退合并策略
+// fallbackMerge 回退合并策略（当LLM合并失败时使用规则合并）
 func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange) *entity.ConversationSummary {
 	newSummary := copySummary(oldSummary)
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
-	// 合并摘要
-	if strutil.IsBlank(oldSummary.Summary) {
-		newSummary.Summary = batchHighlight
-	} else if strutil.IsBlank(batchHighlight) {
-		newSummary.Summary = oldSummary.Summary
-	} else {
-		newSummary.Summary = oldSummary.Summary + "；" + batchHighlight
-	}
+	// 合并摘要文本（用分号连接旧摘要和批次高亮）
+	newSummary.Summary = s.joinNonBlank(newSummary.Summary, batchHighlight, ";")
 	newSummary.Summary = s.clipText(newSummary.Summary, s.historySummary.SummaryMaxChars)
 
-	// 设置会话目标
+	// 设置会话目标（若尚未设置，则取最后一条问题作为目标）
 	lastQuestion := batch[len(batch)-1].Question
 	if strutil.IsBlank(newSummary.ConversationGoal) && strutil.IsNotBlank(lastQuestion) {
 		newSummary.ConversationGoal = s.clipText(lastQuestion, maxGoalLength)
 	}
 
-	// 添加待处理问题
+	// 累积待处理问题（保留旧问题，追加批次中的新问题）
 	pendingQuestions := make([]string, 0, len(batch)+len(newSummary.PendingQuestions))
 	pendingQuestions = append(pendingQuestions, oldSummary.PendingQuestions...)
 	for _, exchange := range batch {
@@ -297,7 +308,7 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 	}
 	newSummary.PendingQuestions = s.deduplicateAndLimit(pendingQuestions)
 
-	// 添加检索提示
+	// 累积检索提示（从最后一条问题中提取关键词）
 	retrievalHints := make([]string, 0, len(oldSummary.RetrievalHints))
 	retrievalHints = append(retrievalHints, oldSummary.RetrievalHints...)
 	if len(batch) > 0 && strutil.IsNotBlank(lastQuestion) {
@@ -309,71 +320,62 @@ func (s *SessionMemoryLogicImpl) fallbackMerge(oldSummary *entity.ConversationSu
 }
 
 // saveSummarySnapshot 保存摘要快照
-func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, conversationId string,
-	currentState *entity.ChatMemorySummary, payload entity.ConversationSummary,
-	coveredExchangeId int64, coveredExchangeCount int, lastSourceEditTime time.Time) *entity.ChatMemorySummary {
-
-	latestState, err := s.repo.SelectMemorySummary(ctx, conversationId)
+func (s *SessionMemoryLogicImpl) saveSummarySnapshot(ctx context.Context, lastExchange *entity.ChatExchange,
+	summary *entity.ConversationSummary, coveredExchangeCount int) (*entity.ChatMemorySummary, error) {
+	// 获取当前摘要
+	latestState, err := s.repo.SelectMemorySummary(ctx, lastExchange.ConversationId)
 	if err != nil {
-		logx.Errorf("查询最新摘要失败, conversationId=%s, err=%v", conversationId, err)
-		return currentState
-	}
-
-	latestCoveredExchangeId := int64(0)
-	if latestState != nil {
-		latestCoveredExchangeId = latestState.CoveredExchangeId
+		return nil, err
 	}
 
 	// 检查是否需要更新
-	if latestCoveredExchangeId > coveredExchangeId {
-		return latestState
+	if latestState != nil {
+		exchangeId := latestState.CoveredExchangeId
+		if (exchangeId == lastExchange.ID && strutil.IsNotBlank(latestState.SummaryText)) || exchangeId > lastExchange.ID {
+			return latestState, nil
+		}
 	}
 
-	if latestState != nil && latestCoveredExchangeId == coveredExchangeId && strutil.IsNotBlank(latestState.SummaryText) {
-		return latestState
+	summaryText := s.buildLongTermSummaryText(summary)
+	summaryJson, err := s.serializeSummary(summary)
+	if err != nil {
+		return nil, err
 	}
-
-	summaryText := s.buildLongTermSummaryText(payload)
-	summaryJson := s.serializeSummary(payload)
 
 	if latestState == nil {
 		// 插入新记录
 		newState := &entity.ChatMemorySummary{
 			ID:                   utils.GetSnowflakeNextID(),
-			ConversationId:       conversationId,
-			CoveredExchangeId:    coveredExchangeId,
+			ConversationId:       lastExchange.ConversationId,
+			CoveredExchangeId:    lastExchange.ID,
 			CoveredExchangeCount: coveredExchangeCount,
 			CompressionCount:     1,
 			SummaryVersion:       1,
 			SummaryText:          summaryText,
 			SummaryJson:          summaryJson,
-			LastSourceEditTime:   lastSourceEditTime,
+			LastSourceUpdateTime: lastExchange.UpdateTime,
+			UpdateTime:           time.Now(),
 		}
-		if err := s.repo.InsertMemorySummary(ctx, newState); err != nil {
-			logx.Errorf("插入摘要失败, conversationId=%s, err=%v", conversationId, err)
-			return currentState
+		if err = s.repo.InsertMemorySummary(ctx, newState); err != nil {
+			return nil, err
 		}
-		return newState
+		return newState, nil
 	}
 
 	// 更新现有记录
-	latestState.CoveredExchangeId = coveredExchangeId
-	if coveredExchangeCount > latestState.CoveredExchangeCount {
-		latestState.CoveredExchangeCount = coveredExchangeCount
-	}
+	latestState.CoveredExchangeId = lastExchange.ID
+	latestState.CoveredExchangeCount = max(latestState.CoveredExchangeCount, coveredExchangeCount)
 	latestState.CompressionCount++
 	latestState.SummaryVersion++
 	latestState.SummaryText = summaryText
 	latestState.SummaryJson = summaryJson
-	latestState.LastSourceEditTime = lastSourceEditTime
+	latestState.LastSourceUpdateTime = lastExchange.UpdateTime
 	latestState.UpdateTime = time.Now()
-
-	if err := s.repo.UpdateMemorySummary(ctx, latestState); err != nil {
-		logx.Errorf("更新摘要失败, conversationId=%s, err=%v", conversationId, err)
-		return currentState
+	if err = s.repo.UpdateMemorySummaryById(ctx, latestState); err != nil {
+		return nil, err
 	}
 
-	return latestState
+	return latestState, nil
 }
 
 // readSummary 读取摘要
@@ -383,9 +385,9 @@ func (s *SessionMemoryLogicImpl) readSummary(summaryState *entity.ChatMemorySumm
 	}
 
 	if strutil.IsNotBlank(summaryState.SummaryJson) {
-		payload := s.deserializeSummary(summaryState.SummaryJson)
-		if payload != nil {
-			return s.normalizeSummary(payload)
+		summary := s.deserializeSummary(summaryState.SummaryJson)
+		if summary != nil {
+			return s.normalizeSummary(summary)
 		}
 	}
 
@@ -528,13 +530,13 @@ func (s *SessionMemoryLogicImpl) renderRecentQuestionTranscript(exchanges []*ent
 }
 
 // serializeSummary 序列化摘要
-func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) string {
+func (s *SessionMemoryLogicImpl) serializeSummary(summary *entity.ConversationSummary) (string, error) {
 	data, err := json.Marshal(summary)
 	if err != nil {
 		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
-		return "{}"
+		return "{}", err
 	}
-	return string(data)
+	return string(data), nil
 }
 
 // synthesizeSummaryFromSections 从各部分合成摘要
@@ -726,6 +728,9 @@ func safeCompressionCount(summary *entity.ChatMemorySummary) int {
 
 // copySummary 复制摘要
 func copySummary(summary *entity.ConversationSummary) *entity.ConversationSummary {
+	if summary == nil {
+		return &entity.ConversationSummary{}
+	}
 	return &entity.ConversationSummary{
 		Summary:          summary.Summary,
 		ConversationGoal: summary.ConversationGoal,

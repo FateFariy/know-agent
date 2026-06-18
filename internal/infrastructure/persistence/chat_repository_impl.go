@@ -252,38 +252,14 @@ func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversati
 
 // InsertMemorySummary 插入会话记忆摘要
 func (r *ChatRepositoryImpl) InsertMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error {
-	modelSummary := &model.ChatMemorySummary{
-		ID:                   summary.ID,
-		ConversationId:       summary.ConversationId,
-		CoveredExchangeId:    summary.CoveredExchangeId,
-		CoveredExchangeCount: summary.CoveredExchangeCount,
-		CompressionCount:     summary.CompressionCount,
-		SummaryVersion:       summary.SummaryVersion,
-		SummaryText:          summary.SummaryText,
-		SummaryJson:          summary.SummaryJson,
-		LastSourceEditTime:   summary.LastSourceEditTime,
-		Status:               summary.Status,
-		CreateTime:           time.Now(),
-		UpdateTime:           time.Now(),
-	}
-	return r.db.WithContext(ctx).Create(modelSummary).Error
+	return r.db.WithContext(ctx).Create(convert.ToChatMemorySummaryModel(summary)).Error
 }
 
-// UpdateMemorySummary 更新会话记忆摘要
-func (r *ChatRepositoryImpl) UpdateMemorySummary(ctx context.Context, summary *entity.ChatMemorySummary) error {
-	updates := map[string]interface{}{
-		"covered_exchange_id":    summary.CoveredExchangeId,
-		"covered_exchange_count": summary.CoveredExchangeCount,
-		"compression_count":      summary.CompressionCount,
-		"summary_version":        summary.SummaryVersion,
-		"summary_text":           summary.SummaryText,
-		"summary_json":           summary.SummaryJson,
-		"last_source_edit_time":  summary.LastSourceEditTime,
-		"update_time":            time.Now(),
-	}
-	return r.db.WithContext(ctx).Model(&model.ChatMemorySummary{}).
-		Where("id = ?", summary.ID).
-		Updates(updates).Error
+// UpdateMemorySummaryById 更新会话记忆摘要
+func (r *ChatRepositoryImpl) UpdateMemorySummaryById(ctx context.Context, summary *entity.ChatMemorySummary) error {
+	fields := "covered_exchange_id,covered_exchange_count,compression_count,summary_version,summary_text,summary_json,last_source_update_time,update_time"
+	return r.db.WithContext(ctx).Select(fields).Where("id = ?", summary.ID).
+		Updates(convert.ToChatMemorySummaryModel(summary)).Error
 }
 
 // DeleteMemorySummary 删除会话记忆摘要
