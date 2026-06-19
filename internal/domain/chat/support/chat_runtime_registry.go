@@ -11,10 +11,6 @@ type ChatRuntimeRegistry struct {
 	conversations sync.Map
 }
 
-func NewChatRuntimeRegistry() *ChatRuntimeRegistry {
-	return &ChatRuntimeRegistry{}
-}
-
 func (r *ChatRuntimeRegistry) Register(conversationCtx *vo.ConversationContext) bool {
 	_, loaded := r.conversations.LoadOrStore(conversationCtx.ConversationId, conversationCtx)
 	return !loaded

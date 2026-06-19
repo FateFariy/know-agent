@@ -1,7 +1,8 @@
 package chat
 
 import (
-	"strings"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -13,10 +14,16 @@ const (
 	Document = "document"
 )
 
-func (r *ChatReq) Validate() error {
-	r.ConversationId = strings.TrimSpace(r.ConversationId)
+func (r *ChatReq) Validate() (err error) {
+	r.ConversationId = strutil.Trim(r.ConversationId)
 	r.ConversationId = utils.Ternary(r.ConversationId != "", r.ConversationId, utils.GenerateUUIDWithoutHyphen())
-	if strings.TrimSpace(r.Question) == "" {
+	r.Question = strutil.Trim(r.Question)
+	defer func() {
+		if err != nil {
+			logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%s", r.ConversationId, r.Question, err.Error())
+		}
+	}()
+	if strutil.IsBlank(r.Question) {
 		return common.ErrParm.Format("question 不能为空")
 	}
 	if r.ChatMode == OpenChat && r.SelectedDocumentId != 0 {

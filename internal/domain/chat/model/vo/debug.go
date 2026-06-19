@@ -111,16 +111,19 @@ type RetrievalQuestionPlan struct {
 	ExpandToChildren bool     `json:"expandToChildren"` // 是否扩展到子级
 }
 
-// NewChatDebugTrace 创建新的调试轨迹实例
-func NewChatDebugTrace() *ChatDebugTrace {
-	return &ChatDebugTrace{
-		RewriteSubQuestions:   []string{},
-		RetrievalSubQuestions: []string{},
-		RetrievalNotes:        []string{},
-		UsedChannels:          []string{},
-		ToolTraces:            []*ChatToolTrace{},
-		ModelUsageTraces:      []*ChatModelUsageTrace{},
+// NewChatDebugTrace 创建新的调试轨迹实例 todo 待完善
+func NewChatDebugTrace(plan *ConversationExecutionPlan) *ChatDebugTrace {
+	if plan == nil {
+		return &ChatDebugTrace{
+			RewriteSubQuestions:   []string{},
+			RetrievalSubQuestions: []string{},
+			RetrievalNotes:        []string{},
+			UsedChannels:          []string{},
+			ToolTraces:            []*ChatToolTrace{},
+			ModelUsageTraces:      []*ChatModelUsageTrace{},
+		}
 	}
+	return nil
 }
 
 // NewDocumentNavigationDecision 创建新的文档导航决策实例

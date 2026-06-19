@@ -9,7 +9,7 @@ type Config struct {
 	Minio     MinioConf
 	Neo4j     Neo4jConf
 	MQ        MQConf
-	Memory    MemoryConf
+	Chat      ChatConf
 	ChatModel map[string]*LLMConf
 }
 type MinioConf struct {
@@ -48,21 +48,38 @@ type LLMConf struct {
 	OutputTokenCost1k float64 `json:",optional"`
 }
 
-// HistorySummaryConf 历史摘要配置
-type HistorySummaryConf struct {
-	Enabled                  bool `json:",optional,default=true"` // 是否启用摘要压缩
-	KeepRecentTurns          int  `json:",optional,default=3"`    // 保留最近轮次
-	CompressionBatchTurns    int  `json:",optional,default=3"`    // 压缩批次轮次
-	SummaryMaxChars          int  `json:",optional,default=1024"` // 摘要最大字符数
-	RecentTranscriptMaxChars int  `json:",optional,default=1024"` // 最近对话记录最大字符数
+type ChatConf struct {
+	IsRewriteEnabled bool `json:",optional,default=true"` // 是否启用问题改写
+	Memory           MemoryConf
+	Rewrite          RewriteConf
 }
 
 // MemoryConf 记忆配置
 type MemoryConf struct {
-	StrategyType            string             `json:",optional,default=summary_compression"` // 记忆策略类型: sliding_window 或 summary_compression
-	HistorySummary          HistorySummaryConf `json:",optional"`                             // 历史摘要配置
-	RewriteHistoryTurns     int                `json:",optional,default=4"`                   // 重写历史轮次
-	QuestionHistoryMaxChars int                `json:",optional,default=512"`                 // 问题历史最大字符数
+	StrategyType             string             `json:",optional,default=summary_compression"` // 记忆策略类型: sliding_window 或 summary_compression
+	HistorySummary           HistorySummaryConf `json:",optional"`                             // 历史摘要配置
+	RewriteHistoryTurns      int                `json:",optional,default=4"`                   // 重写历史轮次
+	RecentTranscriptMaxChars int                `json:",optional,default=1024"`                // 最近对话记录最大字符数
+	QuestionHistoryMaxChars  int                `json:",optional,default=512"`                 // 问题历史最大字符数
+	RewriteEnabled           bool               `json:",optional,default=true"`                // 是否启用问题改写
+	MaxSubQuestions          int                `json:",optional,default=5"`                   // 最大子问题数量
+}
+
+// HistorySummaryConf 历史摘要配置
+type HistorySummaryConf struct {
+	Enabled               bool `json:",optional,default=true"` // 是否启用摘要压缩
+	KeepRecentTurns       int  `json:",optional,default=3"`    // 保留最近轮次
+	CompressionBatchTurns int  `json:",optional,default=3"`    // 压缩批次轮次
+	SummaryMaxChars       int  `json:",optional,default=1024"` // 摘要最大字符数
+}
+
+// RewriteConf 问题改写配置
+type RewriteConf struct {
+	Enabled         bool    `json:",optional,default=true"`  // 是否启用问题改写
+	MaxSubQuestions int     `json:",optional,default=5"`     // 最大子问题数量
+	Temperature     float32 `json:",optional,default=0.1"`   // 温度参数
+	TopP            float32 `json:",optional,default=0.3"`   // TopP参数
+	Thinking        bool    `json:",optional,default=false"` // 是否启用思考过程
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {

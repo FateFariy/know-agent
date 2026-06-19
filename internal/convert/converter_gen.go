@@ -7,9 +7,9 @@ import (
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	common "github.com/swiftbit/know-agent/common"
-	entity1 "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	entity "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	entity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"time"
@@ -27,10 +27,94 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 	}
 	return pVoChatCommand
 }
-func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity.Document {
-	var pEntityDocument *entity.Document
+func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
+	var pModelChatDialogue *model.ChatDialogue
 	if source != nil {
-		var entityDocument entity.Document
+		var modelChatDialogue model.ChatDialogue
+		modelChatDialogue.ID = (*source).ID
+		modelChatDialogue.ConversationId = (*source).ConversationId
+		modelChatDialogue.SessionStatus = (*source).SessionStatus
+		modelChatDialogue.ChatMode = (*source).ChatMode
+		modelChatDialogue.SelectedDocumentId = (*source).SelectedDocumentId
+		modelChatDialogue.SelectedDocumentName = (*source).SelectedDocumentName
+		pModelChatDialogue = &modelChatDialogue
+	}
+	return pModelChatDialogue
+}
+func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
+	var pModelChatExchange *model.ChatExchange
+	if source != nil {
+		var modelChatExchange model.ChatExchange
+		modelChatExchange.ID = (*source).ID
+		modelChatExchange.ConversationId = (*source).ConversationId
+		modelChatExchange.Question = (*source).Question
+		modelChatExchange.Answer = (*source).Answer
+		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
+		modelChatExchange.ReferenceList = commonJSONArrayToCommonJSONArray((*source).ReferenceList)
+		modelChatExchange.RecommendationList = commonJSONArrayToCommonJSONArray((*source).RecommendationList)
+		modelChatExchange.UsedToolList = commonJSONArrayToCommonJSONArray((*source).UsedToolList)
+		modelChatExchange.DebugTraceJson = (*source).DebugTraceJson
+		modelChatExchange.TurnStatus = (*source).TurnStatus
+		modelChatExchange.ErrorMessage = (*source).ErrorMessage
+		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
+		modelChatExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		pModelChatExchange = &modelChatExchange
+	}
+	return pModelChatExchange
+}
+func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model.ChatExchangeTraceStage {
+	var pModelChatExchangeTraceStage *model.ChatExchangeTraceStage
+	if source != nil {
+		var modelChatExchangeTraceStage model.ChatExchangeTraceStage
+		modelChatExchangeTraceStage.ID = (*source).ID
+		modelChatExchangeTraceStage.ConversationId = (*source).ConversationId
+		modelChatExchangeTraceStage.ExchangeId = (*source).ExchangeId
+		modelChatExchangeTraceStage.TraceId = (*source).TraceId
+		modelChatExchangeTraceStage.StageCode = (*source).StageCode
+		modelChatExchangeTraceStage.StageName = (*source).StageName
+		modelChatExchangeTraceStage.StageOrder = (*source).StageOrder
+		modelChatExchangeTraceStage.StageLevel = (*source).StageLevel
+		modelChatExchangeTraceStage.ParentStageId = (*source).ParentStageId
+		modelChatExchangeTraceStage.ExecutionMode = (*source).ExecutionMode
+		modelChatExchangeTraceStage.StageState = (*source).StageState
+		modelChatExchangeTraceStage.StartTime = timeTimeToTimeTime((*source).StartTime)
+		modelChatExchangeTraceStage.EndTime = timeTimeToTimeTime((*source).EndTime)
+		modelChatExchangeTraceStage.DurationMs = (*source).DurationMs
+		modelChatExchangeTraceStage.SummaryText = (*source).SummaryText
+		modelChatExchangeTraceStage.ErrorMessage = (*source).ErrorMessage
+		modelChatExchangeTraceStage.SnapshotJson = (*source).SnapshotJson
+		pModelChatExchangeTraceStage = &modelChatExchangeTraceStage
+	}
+	return pModelChatExchangeTraceStage
+}
+func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemorySummary {
+	var pModelChatMemorySummary *model.ChatMemorySummary
+	if source != nil {
+		var modelChatMemorySummary model.ChatMemorySummary
+		modelChatMemorySummary.ID = (*source).ID
+		modelChatMemorySummary.ConversationId = (*source).ConversationId
+		modelChatMemorySummary.CoveredExchangeId = (*source).CoveredExchangeId
+		modelChatMemorySummary.CoveredExchangeCount = (*source).CoveredExchangeCount
+		modelChatMemorySummary.CompressionCount = (*source).CompressionCount
+		modelChatMemorySummary.SummaryVersion = (*source).SummaryVersion
+		modelChatMemorySummary.SummaryText = (*source).SummaryText
+		modelChatMemorySummary.SummaryJson = (*source).SummaryJson
+		modelChatMemorySummary.LastSourceUpdateTime = timeTimeToTimeTime((*source).LastSourceUpdateTime)
+		pModelChatMemorySummary = &modelChatMemorySummary
+	}
+	return pModelChatMemorySummary
+}
+func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
+	return source
+}
+
+func timeTimeToTimeTime(source time.Time) time.Time {
+	return source
+}
+func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity1.Document {
+	var pEntityDocument *entity1.Document
+	if source != nil {
+		var entityDocument entity1.Document
 		entityDocument.DocumentName = (*source).DocumentName
 		entityDocument.KnowledgeScopeCode = (*source).KnowledgeScopeCode
 		entityDocument.KnowledgeScopeName = (*source).KnowledgeScopeName
@@ -57,67 +141,7 @@ func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 	}
 	return pDocumentBuildIndexResp
 }
-func ToChatDialogueModel(source *entity1.ChatDialogue) *model.ChatDialogue {
-	var pModelChatDialogue *model.ChatDialogue
-	if source != nil {
-		var modelChatDialogue model.ChatDialogue
-		modelChatDialogue.Model = entityChatDialogueToCommonModel((*source))
-		modelChatDialogue.ConversationId = (*source).ConversationId
-		modelChatDialogue.SessionStatus = (*source).SessionStatus
-		modelChatDialogue.ChatMode = (*source).ChatMode
-		modelChatDialogue.SelectedDocumentId = (*source).SelectedDocumentId
-		modelChatDialogue.SelectedDocumentName = (*source).SelectedDocumentName
-		pModelChatDialogue = &modelChatDialogue
-	}
-	return pModelChatDialogue
-}
-func ToChatExchangeModel(source *entity1.ChatExchange) *model.ChatExchange {
-	var pModelChatExchange *model.ChatExchange
-	if source != nil {
-		var modelChatExchange model.ChatExchange
-		modelChatExchange.Model = entityChatExchangeToCommonModel((*source))
-		modelChatExchange.ConversationId = (*source).ConversationId
-		modelChatExchange.Question = (*source).Question
-		modelChatExchange.Answer = (*source).Answer
-		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
-		modelChatExchange.ReferenceList = commonJSONArrayToCommonJSONArray((*source).ReferenceList)
-		modelChatExchange.RecommendationList = commonJSONArrayToCommonJSONArray((*source).RecommendationList)
-		modelChatExchange.UsedToolList = commonJSONArrayToCommonJSONArray((*source).UsedToolList)
-		modelChatExchange.DebugTraceJson = (*source).DebugTraceJson
-		modelChatExchange.TurnStatus = (*source).TurnStatus
-		modelChatExchange.ErrorMessage = (*source).ErrorMessage
-		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
-		modelChatExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
-		pModelChatExchange = &modelChatExchange
-	}
-	return pModelChatExchange
-}
-func ToChatExchangeTraceStageModel(source *entity1.ChatExchangeTraceStage) *model.ChatExchangeTraceStage {
-	var pModelChatExchangeTraceStage *model.ChatExchangeTraceStage
-	if source != nil {
-		var modelChatExchangeTraceStage model.ChatExchangeTraceStage
-		modelChatExchangeTraceStage.Model = entityChatExchangeTraceStageToCommonModel((*source))
-		modelChatExchangeTraceStage.ConversationId = (*source).ConversationId
-		modelChatExchangeTraceStage.ExchangeId = (*source).ExchangeId
-		modelChatExchangeTraceStage.TraceId = (*source).TraceId
-		modelChatExchangeTraceStage.StageCode = (*source).StageCode
-		modelChatExchangeTraceStage.StageName = (*source).StageName
-		modelChatExchangeTraceStage.StageOrder = (*source).StageOrder
-		modelChatExchangeTraceStage.StageLevel = (*source).StageLevel
-		modelChatExchangeTraceStage.ParentStageId = (*source).ParentStageId
-		modelChatExchangeTraceStage.ExecutionMode = (*source).ExecutionMode
-		modelChatExchangeTraceStage.StageState = (*source).StageState
-		modelChatExchangeTraceStage.StartTime = timeTimeToTimeTime((*source).StartTime)
-		modelChatExchangeTraceStage.EndTime = timeTimeToTimeTime((*source).EndTime)
-		modelChatExchangeTraceStage.DurationMs = (*source).DurationMs
-		modelChatExchangeTraceStage.SummaryText = (*source).SummaryText
-		modelChatExchangeTraceStage.ErrorMessage = (*source).ErrorMessage
-		modelChatExchangeTraceStage.SnapshotJson = (*source).SnapshotJson
-		pModelChatExchangeTraceStage = &modelChatExchangeTraceStage
-	}
-	return pModelChatExchangeTraceStage
-}
-func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
+func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
 		var documentDocumentListItem document.DocumentListItem
@@ -153,7 +177,7 @@ func ToDocumentListItem(source *entity.Document) *document.DocumentListItem {
 	}
 	return pDocumentDocumentListItem
 }
-func ToDocumentListItemList(source []*entity.Document) []*document.DocumentListItem {
+func ToDocumentListItemList(source []*entity1.Document) []*document.DocumentListItem {
 	var pDocumentDocumentListItemList []*document.DocumentListItem
 	if source != nil {
 		pDocumentDocumentListItemList = make([]*document.DocumentListItem, len(source))
@@ -163,11 +187,11 @@ func ToDocumentListItemList(source []*entity.Document) []*document.DocumentListI
 	}
 	return pDocumentDocumentListItemList
 }
-func ToDocumentModel(source *entity.Document) *model.Document {
+func ToDocumentModel(source *entity1.Document) *model.Document {
 	var pModelDocument *model.Document
 	if source != nil {
 		var modelDocument model.Document
-		modelDocument.Model = entityDocumentToCommonModel((*source))
+		modelDocument.ID = (*source).ID
 		modelDocument.DocumentName = (*source).DocumentName
 		modelDocument.OriginalFileName = (*source).OriginalFileName
 		modelDocument.FileType = (*source).FileType
@@ -198,7 +222,7 @@ func ToDocumentModel(source *entity.Document) *model.Document {
 	}
 	return pModelDocument
 }
-func ToDocumentStrategyPlan(source *entity.DocumentStrategyPlan) *document.DocumentStrategyPlan {
+func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.DocumentStrategyPlan {
 	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan
 	if source != nil {
 		var documentDocumentStrategyPlan document.DocumentStrategyPlan
@@ -216,11 +240,11 @@ func ToDocumentStrategyPlan(source *entity.DocumentStrategyPlan) *document.Docum
 	}
 	return pDocumentDocumentStrategyPlan
 }
-func ToDocumentTaskLogModel(source *entity.DocumentTaskLog) *model.DocumentTaskLog {
+func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTaskLog {
 	var pModelDocumentTaskLog *model.DocumentTaskLog
 	if source != nil {
 		var modelDocumentTaskLog model.DocumentTaskLog
-		modelDocumentTaskLog.Model = entityDocumentTaskLogToCommonModel((*source))
+		modelDocumentTaskLog.ID = (*source).ID
 		modelDocumentTaskLog.TaskId = (*source).TaskId
 		modelDocumentTaskLog.DocumentId = (*source).DocumentId
 		modelDocumentTaskLog.StageType = (*source).StageType
@@ -234,11 +258,11 @@ func ToDocumentTaskLogModel(source *entity.DocumentTaskLog) *model.DocumentTaskL
 	}
 	return pModelDocumentTaskLog
 }
-func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
+func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 	var pModelDocumentTask *model.DocumentTask
 	if source != nil {
 		var modelDocumentTask model.DocumentTask
-		modelDocumentTask.Model = entityDocumentTaskToCommonModel((*source))
+		modelDocumentTask.ID = (*source).ID
 		modelDocumentTask.DocumentId = (*source).DocumentId
 		modelDocumentTask.PlanId = (*source).PlanId
 		modelDocumentTask.TaskType = (*source).TaskType
@@ -247,8 +271,8 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 		modelDocumentTask.TriggerSource = (*source).TriggerSource
 		modelDocumentTask.StrategySnapshot = (*source).StrategySnapshot
 		modelDocumentTask.RetryCount = (*source).RetryCount
-		modelDocumentTask.StartTime = timeTimeToTimeTime((*source).StartTime)
-		modelDocumentTask.FinishTime = timeTimeToTimeTime((*source).FinishTime)
+		modelDocumentTask.StartTime = timeTimeToTimeTime2((*source).StartTime)
+		modelDocumentTask.FinishTime = timeTimeToTimeTime2((*source).FinishTime)
 		modelDocumentTask.CostMillis = (*source).CostMillis
 		modelDocumentTask.ErrorCode = (*source).ErrorCode
 		modelDocumentTask.ErrorMsg = (*source).ErrorMsg
@@ -257,7 +281,7 @@ func ToDocumentTaskModel(source *entity.DocumentTask) *model.DocumentTask {
 	}
 	return pModelDocumentTask
 }
-func ToQueryStrategyPlanResp(source *entity.Document) *document.QueryStrategyPlanResp {
+func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPlanResp {
 	var pDocumentQueryStrategyPlanResp *document.QueryStrategyPlanResp
 	if source != nil {
 		var documentQueryStrategyPlanResp document.QueryStrategyPlanResp
@@ -289,40 +313,8 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 	}
 	return pDocumentUploadDocumentResp
 }
-func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
-	return source
-}
-func entityChatDialogueToCommonModel(source entity1.ChatDialogue) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityChatExchangeToCommonModel(source entity1.ChatExchange) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityChatExchangeTraceStageToCommonModel(source entity1.ChatExchangeTraceStage) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentTaskLogToCommonModel(source entity.DocumentTaskLog) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentTaskToCommonModel(source entity.DocumentTask) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentToCommonModel(source entity.Document) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
+
+func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity1.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline
 	if source != nil {
 		var documentDocumentStrategyPipeline document.DocumentStrategyPipeline
@@ -339,7 +331,7 @@ func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *
 	}
 	return pDocumentDocumentStrategyPipeline
 }
-func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity.DocumentStrategyStep) *document.DocumentStrategyStep {
+func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity1.DocumentStrategyStep) *document.DocumentStrategyStep {
 	var pDocumentDocumentStrategyStep *document.DocumentStrategyStep
 	if source != nil {
 		var documentDocumentStrategyStep document.DocumentStrategyStep
@@ -359,6 +351,6 @@ func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity.D
 	}
 	return pDocumentDocumentStrategyStep
 }
-func timeTimeToTimeTime(source time.Time) time.Time {
+func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source
 }

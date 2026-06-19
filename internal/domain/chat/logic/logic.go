@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/api/chat"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -46,17 +47,25 @@ type ChatLogic interface {
 // SessionMemoryLogic 会话记忆逻辑接口
 type SessionMemoryLogic interface {
 	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error)
+	LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error)
 
 	// RefreshConversationSummaryAsync 异步刷新会话摘要
 	RefreshConversationSummaryAsync(ctx context.Context, conversationId string)
 
 	// GetConversationSummary 获取会话摘要
-	GetConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error)
+	GetConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)
 
 	// RebuildConversationSummary 重建会话摘要
-	RebuildConversationSummary(ctx context.Context, conversationId string) (*vo.ConversationMemorySummaryView, error)
+	RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)
 
 	// DeleteConversationSummary 删除会话摘要
 	DeleteConversationSummary(ctx context.Context, conversationId string) error
+}
+
+type PromptTemplateLogic interface {
+	Render(templateName string, variables map[string]any) (string, error)
+}
+
+type QueryRewriteLogic interface {
+	Rewrite(ctx context.Context, question, historySummary string, tracer *vo.ConversationTrace) (*vo.RagRewriteResult, error)
 }

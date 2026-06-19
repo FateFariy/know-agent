@@ -34,18 +34,9 @@ type DocumentConverter interface {
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
 
-	// goverter:map . Model
 	ToDocumentModel(src *den.Document) *model.Document
-	// goverter:map . Model
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
-	// goverter:map . Model
 	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
-	// goverter:map . Model
-	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
-	// goverter:map . Model
-	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
-	// goverter:map . Model
-	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
 }
 
 // goverter:converter
@@ -57,6 +48,11 @@ type DocumentConverter interface {
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
+
+	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
+	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
+	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
+	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
 }
 
 func TimeToString(t time.Time) string {

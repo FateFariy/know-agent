@@ -11,6 +11,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/api/chat"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -25,6 +26,7 @@ const (
 	chatRunningLeasePrefix        = "chat:running:"
 	chatRunningLeaseTTL           = 30 * time.Second
 	chatRunningLeaseRenewInterval = 10 * time.Second
+	channelBufferSize             = 100
 )
 
 // ChatLogicImpl 聊天业务逻辑实现
@@ -41,8 +43,8 @@ type ChatLogicImpl struct {
 func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic logic.DocumentKnowledgeLogic, distributedLock adapter.DistributedLock) *ChatLogicImpl {
 	return &ChatLogicImpl{
 		repo:               repo,
-		streamEventBuilder: support.NewStreamEventBuilder(),
-		runtimeRegistry:    support.NewChatRuntimeRegistry(),
+		streamEventBuilder: &support.StreamEventBuilder{},
+		runtimeRegistry:    &support.ChatRuntimeRegistry{},
 		knowledgeLogic:     knowledgeLogic,
 		distributedLock:    distributedLock,
 	}
@@ -53,39 +55,25 @@ func (c *ChatLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.Chat
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("======request内容：%s", string(cmdJSON))
 
-	stream := make(chan string, 100)
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				err := r.(error)
-				logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%s", cmd.ConversationId, cmd.Question, err.Error())
-				stream <- c.streamEventBuilder.ErrorWithMetadata(err.Error(), cmd.ConversationId, 0)
-			}
-		}()
-
-		defer close(stream)
-
-		leaseKey := chatRunningLeasePrefix + cmd.ConversationId
-		if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
-			stream <- c.streamEventBuilder.ErrorWithMetadata("当前会话正在执行中，请稍后再试", cmd.ConversationId, 0)
-			return
-		}
-		defer func() {
-			if err := c.distributedLock.Unlock(ctx, leaseKey); err != nil {
-				logx.Alert(fmt.Sprintf("锁释放失败: %s", err.Error()))
-			}
-		}()
-
-		launchPlan, err := c.buildLaunchPlan(ctx, cmd)
-		if err != nil {
-			panic(err)
-		}
-		if err = c.bootstrapConversation(ctx, launchPlan); err != nil {
-			stream <- c.streamEventBuilder.ErrorWithMetadata(err.Error(), cmd.ConversationId, 0)
-			return
+	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
+	if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
+		return c.rejectStream("当前会话正在执行中，请稍后再试", cmd.ConversationId, 0)
+	}
+	defer func() {
+		if err := c.distributedLock.Unlock(ctx, leaseKey); err != nil {
+			logx.Alert(fmt.Sprintf("锁 %s 释放失败: %s", leaseKey, err.Error()))
 		}
 	}()
+
+	launchPlan, err := c.buildLaunchPlan(ctx, cmd)
+	if err != nil {
+		logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%s", cmd.ConversationId, cmd.Question, err.Error())
+		return c.rejectStream(err.Error(), cmd.ConversationId, 0)
+	}
+	stream, err := c.bootstrapConversation(ctx, launchPlan)
+	if err != nil {
+		return c.rejectStream(err.Error(), cmd.ConversationId, 0)
+	}
 
 	return stream
 }
@@ -218,7 +206,7 @@ func (c *ChatLogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand
 	return launchPlan, nil
 }
 
-func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) error {
+func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) (<-chan string, error) {
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       launchPlan.ConversationId,
 		ChatMode:             launchPlan.ChatMode,
@@ -228,10 +216,10 @@ func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *v
 	}
 	exchange, err := c.repo.StartExchange(ctx, dialogue)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// 创建任务信息
+	// 创建对话上下文信息
 	convCtx := c.buildConversationCtx(launchPlan, exchange)
 
 	// 注册到运行时注册表
@@ -243,14 +231,12 @@ func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *v
 			ErrorMessage:   "当前会话正在执行中，请稍后再试",
 		}
 		if err = c.repo.CompleteExchange(ctx, failChatExchange); err != nil {
-			return err
+			return nil, err
 		}
-		return fmt.Errorf("当前会话正在执行中，请稍后再试")
+		return nil, fmt.Errorf("当前会话正在执行中，请稍后再试")
 	}
 
-	// 绑定客户端通道
-	outbound := c.bindClientChannel(ctx, convCtx)
-	return nil
+	return convCtx.Channel, nil
 }
 
 func (c *ChatLogicImpl) executeConversation(convCtx *vo.ConversationContext, stream chan<- string) {
@@ -464,7 +450,7 @@ func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationCo
 	if convCtx.TraceRecorder != nil {
 		// TODO: 调用 traceRecorder.StartStage，需要定义相应接口
 		// finalizeStage = convCtx.TraceRecorder.StartStage(...)
-		// 参数：ConversationTraceStageCode.FINALIZE, modeName, description, metadata
+		// 参数：ConversationTraceStage.FINALIZE, modeName, description, metadata
 	}
 
 	// 辅助函数：安全发送状态事件
@@ -570,49 +556,49 @@ func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationCo
 	}
 }
 
+// rejectStream 拒绝流式请求
+func (c *ChatLogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
+	stream := make(chan string, 1)
+	defer close(stream)
+	stream <- c.streamEventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
+	return stream
+}
+
 func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
-	sink := make(chan string, 100) // 缓冲通道，类似 Sinks.Many
-	runnableConfig := s.buildSessionConfig(plan.ConversationId)
+	// todo runnableConfig := s.buildSessionConfig(plan.ConversationId)
+	// thinkingSteps := &syncSlice{data: make([]string, 0)}
+	// references := &syncSliceRef{data: make([]chat.SearchReference, 0)}
+	// usedTools := &syncSet{data: make(map[string]struct{})}
 
-	thinkingSteps := &syncSlice{data: make([]string, 0)}
-	references := &syncSliceRef{data: make([]chat.SearchReference, 0)}
-	usedTools := &syncSet{data: make(map[string]struct{})}
+	traceId := utils.GenerateUUIDWithoutHyphen()
+	tracer := vo.NewConversationTrace(plan.ConversationId, exchange.ID, traceId)
+	// eventMetadata := &StreamEventMetadata{
+	// 	ConversationId: plan.ConversationId,
+	// 	ExchangeId:     exchange.ID,
+	// }
 
-	traceId := uuid.New().String()
-	traceRecorder := trace.NewConversationTraceRecorder(
-		s.conversationTraceStageStore,
-		s.retrievalObserveStore,
-		plan.ConversationId,
-		exchangeView.ExchangeId,
-		traceId,
-	)
-	eventMetadata := &StreamEventMetadata{
-		ConversationId: plan.ConversationId,
-		ExchangeId:     exchangeView.ExchangeId,
-	}
+	// todo 设置上下文
+	// runnableConfig.Context["eventSink"] = channel
+	// runnableConfig.Context["eventMetadata"] = eventMetadata
+	// runnableConfig.Context["thinkingSteps"] = thinkingSteps
+	// runnableConfig.Context["references"] = references
+	// runnableConfig.Context["usedTools"] = usedTools
+	// runnableConfig.Context["traceId"] = traceId
+	// runnableConfig.Context["question"] = plan.Question
+	// runnableConfig.Context["chatMode"] = plan.ChatMode.String()
+	// runnableConfig.Context["currentDate"] = plan.CurrentDate.Format(time.RFC3339)
+	// runnableConfig.Context["currentDateText"] = plan.CurrentDateText
+	//
+	// putContextIfNotNull(runnableConfig.Context, "selectedDocumentId", plan.SelectedDocumentId)
+	// putContextIfNotBlank(runnableConfig.Context, "selectedDocumentName", plan.SelectedDocumentName)
+	// putContextIfNotNull(runnableConfig.Context, "selectedTaskId", plan.SelectedTaskId)
 
-	// 设置上下文
-	runnableConfig.Context["eventSink"] = sink
-	runnableConfig.Context["eventMetadata"] = eventMetadata
-	runnableConfig.Context["thinkingSteps"] = thinkingSteps
-	runnableConfig.Context["references"] = references
-	runnableConfig.Context["usedTools"] = usedTools
-	runnableConfig.Context["traceId"] = traceId
-	runnableConfig.Context["question"] = plan.Question
-	runnableConfig.Context["chatMode"] = plan.ChatMode.String()
-	runnableConfig.Context["currentDate"] = plan.CurrentDate.Format(time.RFC3339)
-	runnableConfig.Context["currentDateText"] = plan.CurrentDateText
-
-	putContextIfNotNull(runnableConfig.Context, "selectedDocumentId", plan.SelectedDocumentId)
-	putContextIfNotBlank(runnableConfig.Context, "selectedDocumentName", plan.SelectedDocumentName)
-	putContextIfNotNull(runnableConfig.Context, "selectedTaskId", plan.SelectedTaskId)
-
-	debugTrace := s.initializeDebugTrace(nil)
-	runnableConfig.Context["debugTrace"] = debugTrace
+	// debugTrace := vo.NewChatDebugTrace(nil)
+	// runnableConfig.Context["debugTrace"] = debugTrace
 
 	return &vo.ConversationContext{
 		ConversationId:       plan.ConversationId,
-		ExchangeId:           exchangeView.ExchangeId,
+		ExchangeId:           exchange.ID,
 		Question:             plan.Question,
 		ChatMode:             plan.ChatMode,
 		TraceId:              traceId,
@@ -621,17 +607,16 @@ func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange
 		SelectedTaskId:       plan.SelectedTaskId,
 		CurrentDate:          plan.CurrentDate,
 		CurrentDateText:      plan.CurrentDateText,
-		ExecutionPlan:        nil,
-		DebugTrace:           debugTrace,
-		RunnableConfig:       runnableConfig,
-		TraceRecorder:        traceRecorder,
-		Sink:                 sink,
-		EventMetadata:        eventMetadata,
-		LeaseKey:             plan.LeaseKey,
-		LeaseOwnerToken:      plan.LeaseOwnerToken,
-		ThinkingSteps:        thinkingSteps,
-		References:           references,
-		UsedTools:            usedTools,
-		StartTime:            time.Now(),
+		// ExecutionPlan:        nil,
+		// DebugTrace:           debugTrace,
+		// RunnableConfig:       runnableConfig,
+		Tracer:  tracer,
+		Channel: make(chan string, channelBufferSize),
+		// EventMetadata:   eventMetadata,
+		LeaseKey: chatRunningLeasePrefix + plan.ConversationId,
+		// ThinkingSteps: thinkingSteps,
+		// References:    references,
+		// UsedTools:     usedTools,
+		StartTime: time.Now(),
 	}
 }

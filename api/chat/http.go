@@ -56,13 +56,15 @@ func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 			return
 		}
 
-		stream := srv.StreamChat(r.Context(), &req)
-
 		w.Header().Set("Content-Type", "text/event-stream;charset=UTF-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
+		var stream <-chan string
 		for {
+			if stream == nil {
+				stream = srv.StreamChat(r.Context(), &req)
+			}
 			select {
 			case <-r.Context().Done():
 				return

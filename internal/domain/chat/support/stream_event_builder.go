@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/duke-git/lancet/v2/strutil"
+
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -20,11 +22,6 @@ type StreamEvent struct {
 
 // StreamEventBuilder 流式事件构建器, 用于构建 SSE 流式响应中的各类事件 JSON 字符串
 type StreamEventBuilder struct {
-}
-
-// NewStreamEventBuilder 创建流式事件构建器实例
-func NewStreamEventBuilder() *StreamEventBuilder {
-	return &StreamEventBuilder{}
 }
 
 // Text 生成文本类型事件
@@ -98,7 +95,7 @@ func (b *StreamEventBuilder) event(eventType string, content any, conversationId
 		Content:   content,
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
-	payload.ConversationId = conversationId
+	payload.ConversationId = strutil.Trim(conversationId)
 	payload.ExchangeId = exchangeId
 	return payload
 }
