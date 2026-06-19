@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/swiftbit/know-agent/common"
 )
 
@@ -49,9 +51,18 @@ type LLMConf struct {
 }
 
 type ChatConf struct {
-	IsRewriteEnabled bool `json:",optional,default=true"` // 是否启用问题改写
-	Memory           MemoryConf
-	Rewrite          RewriteConf
+	RewriteEnabled        bool               `json:",optional,default=true"` // 是否启用问题改写
+	RecommendationEnabled bool               `json:",optional,default=true"` // 是否启用推荐追问
+	Memory                MemoryConf         // 记忆配置
+	Rewrite               RewriteConf        // 问题改写配置
+	Recommendation        RecommendationConf // 推荐配置
+}
+
+// RecommendationConf 推荐追问配置
+type RecommendationConf struct {
+	Enabled             bool          `json:",optional,default=true"` // 是否启用推荐追问
+	Timeout             time.Duration `json:",optional,default=5s"`   // 推荐生成超时时间
+	HistoryPreviewTurns int           `json:",optional,default=3"`    // 预览历史轮次
 }
 
 // MemoryConf 记忆配置

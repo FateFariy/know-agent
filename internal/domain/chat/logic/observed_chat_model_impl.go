@@ -82,13 +82,11 @@ func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemProm
 	// 记录当前阶段的调用选项日志
 	o.logStageCallOptions(stage, opts...)
 
-	// 预先构建失败状态的使用量轨迹
-	usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
-
 	// 调用底层模型建立流式连接
 	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
 	if err != nil {
 		// 连接建立失败，记录使用量并返回错误
+		usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
 		appendUsage(tracer, usageTrace)
 		return nil, err
 	}
@@ -111,9 +109,10 @@ func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemProm
 
 			// 处理接收过程中的错误
 			if err != nil {
-				usageTrace = o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
+				usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
+				appendUsage(tracer, usageTrace)
 				logx.Errorf("模型调用失败: %v", err)
-				break
+				return
 			}
 
 			// 从数据块中提取文本
@@ -126,15 +125,16 @@ func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemProm
 					// 成功发送到通道
 				case <-ctx.Done():
 					// 外部主动取消，记录终止日志和使用量
+					usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
+					appendUsage(tracer, usageTrace)
 					logx.Alert("由外部终止调用...")
-					usageTrace = o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-					break
+					return
 				}
 			}
 		}
 
 		// 流式处理结束，构建成功状态的使用量轨迹并记录
-		usageTrace = o.buildUsageTrace(stage, chunk, startTime, "COMPLETED", systemPrompt, userPrompt, outputBuilder.String())
+		usageTrace := o.buildUsageTrace(stage, chunk, startTime, "COMPLETED", systemPrompt, userPrompt, outputBuilder.String())
 		appendUsage(tracer, usageTrace)
 	}()
 

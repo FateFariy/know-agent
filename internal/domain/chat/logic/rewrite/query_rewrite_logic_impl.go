@@ -1,4 +1,4 @@
-package logic
+package rewrite
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -27,15 +28,15 @@ var (
 
 // QueryRewriteLogicImpl 问题改写逻辑实现
 type QueryRewriteLogicImpl struct {
-	chatModel       *ObservedChatModelImpl[*schema.AgenticMessage]
-	promptTemplate  PromptTemplateLogic
+	chatModel       *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	promptTemplate  logic.PromptTemplateLogic
 	maxSubQuestions int
 	options         []model.Option
 }
 
 // NewQueryRewriteLogicImpl 创建问题改写逻辑实例
-func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *ObservedChatModelImpl[*schema.AgenticMessage],
-	promptTemplate PromptTemplateLogic) *QueryRewriteLogicImpl {
+func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.ObservedChatModelImpl[*schema.AgenticMessage],
+	promptTemplate logic.PromptTemplateLogic) *QueryRewriteLogicImpl {
 	return &QueryRewriteLogicImpl{
 		chatModel:       chatModel,
 		promptTemplate:  promptTemplate,
@@ -205,9 +206,13 @@ func (q *QueryRewriteLogicImpl) parse(raw string) *parsedRewritePayload {
 	if strutil.IsBlank(raw) {
 		return nil
 	}
-
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start != -1 && end != -1 && end > start {
+		raw = raw[start : end+1]
+	}
 	var payload parsedRewritePayload
-	if err := json.Unmarshal([]byte(extractJsonObject(raw)), &payload); err != nil {
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 		logx.Alert(fmt.Sprintf("解析问题改写结果失败: raw=%s, err=%v", raw, err))
 		return nil
 	}
@@ -233,21 +238,6 @@ func (q *QueryRewriteLogicImpl) ruleBasedSplit(question string) []string {
 	}
 
 	return result
-}
-
-// extractJsonObject 提取JSON对象
-func extractJsonObject(raw string) string {
-	trimmed := strutil.Trim(raw)
-	if strutil.IsBlank(trimmed) {
-		return trimmed
-	}
-
-	start := strings.Index(trimmed, "{")
-	end := strings.LastIndex(trimmed, "}")
-	if start == -1 || end == -1 || end < start {
-		return trimmed
-	}
-	return trimmed[start : end+1]
 }
 
 type parsedRewritePayload struct {
