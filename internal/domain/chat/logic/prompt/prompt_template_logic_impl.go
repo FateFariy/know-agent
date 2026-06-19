@@ -21,18 +21,18 @@ const (
 	endDelimiter   = ">"
 )
 
-// TemplateLogic Prompt模板渲染服务
-type TemplateLogic struct {
+// TemplateLogicImpl Prompt模板渲染服务实现
+type TemplateLogicImpl struct {
 	cache sync.Map
 }
 
-// NewPromptTemplateService 创建Prompt模板服务实例
-func NewPromptTemplateService() *TemplateLogic {
-	return &TemplateLogic{}
+// NewPromptTemplateLogicImpl 创建Prompt模板服务实例
+func NewPromptTemplateLogicImpl() *TemplateLogicImpl {
+	return &TemplateLogicImpl{}
 }
 
 // Render 渲染模板
-func (s *TemplateLogic) Render(templateName string, variables map[string]any) (string, error) {
+func (s *TemplateLogicImpl) Render(templateName string, variables map[string]any) (string, error) {
 	templatePath := normalizeTemplatePath(templateName)
 
 	// 从缓存中获取或加载模板
@@ -54,7 +54,7 @@ func (s *TemplateLogic) Render(templateName string, variables map[string]any) (s
 }
 
 // loadTemplate 加载模板内容
-func (s *TemplateLogic) loadTemplate(templatePath string) (string, error) {
+func (s *TemplateLogicImpl) loadTemplate(templatePath string) (string, error) {
 	// 尝试从缓存获取
 	if cached, ok := s.cache.Load(templatePath); ok {
 		if content, ok := cached.(string); ok {

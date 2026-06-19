@@ -69,3 +69,9 @@ type PromptTemplateLogic interface {
 type QueryRewriteLogic interface {
 	Rewrite(ctx context.Context, question, historySummary string, tracer *vo.ConversationTrace) (*vo.RagRewriteResult, error)
 }
+
+// RecommendationLogic 推荐追问业务逻辑接口
+type RecommendationLogic interface {
+	// GenerateRecommendations 生成推荐追问
+	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) []string
+}
