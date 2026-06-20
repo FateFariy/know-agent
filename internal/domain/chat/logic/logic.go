@@ -75,3 +75,31 @@ type RecommendationLogic interface {
 	// GenerateRecommendations 生成推荐追问
 	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) []string
 }
+
+// KnowledgeRouteService 知识路由服务接口
+type KnowledgeRouteService interface {
+	// Route 根据问题进行知识路由
+	Route(ctx context.Context, question, rewriteQuestion string) (*vo.KnowledgeRouteDecision, error)
+	// RecordAutoRoute 记录自动路由结果
+	RecordAutoRoute(ctx context.Context, conversationId, exchangeId string, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error
+	// RecordShadowRoute 记录影子路由结果
+	RecordShadowRoute(ctx context.Context, conversationId, exchangeId string, documentId int64, question, rewriteQuestion string) error
+}
+
+// DocumentQuestionRouter 文档问题路由接口
+type DocumentQuestionRouter interface {
+	// Route 根据文档ID和问题进行文档内路由
+	Route(ctx context.Context, documentId *int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
+}
+
+// AnswerHistoryContextAssembler 回答历史上下文组装器接口
+type AnswerHistoryContextAssembler interface {
+	// Assemble 组装回答历史上下文
+	Assemble(question, answerRecentTranscript string) *vo.AnswerHistoryContext
+}
+
+// ChatPreparationOrchestrator 聊天准备编排器接口
+type ChatPreparationOrchestrator interface {
+	// Prepare 准备对话执行计划
+	Prepare(ctx context.Context, taskInfo *vo.TaskInfo) (*vo.ConversationExecutionPlan, error)
+}

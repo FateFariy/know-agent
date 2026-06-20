@@ -27,9 +27,9 @@ type SlidingWindowStrategy struct {
 func NewSlidingWindowStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository) *SlidingWindowStrategy {
 	return &SlidingWindowStrategy{
 		repo:                     repo,
-		keepRecentTurns:          svcCtx.Config.Memory.RewriteHistoryTurns,
-		questionHistoryMaxChars:  svcCtx.Config.Memory.QuestionHistoryMaxChars,
-		recentTranscriptMaxChars: svcCtx.Config.Memory.RecentTranscriptMaxChars,
+		keepRecentTurns:          svcCtx.Config.Chat.Memory.RewriteHistoryTurns,
+		questionHistoryMaxChars:  svcCtx.Config.Chat.Memory.QuestionHistoryMaxChars,
+		recentTranscriptMaxChars: svcCtx.Config.Chat.Memory.RecentTranscriptMaxChars,
 	}
 }
 
@@ -48,7 +48,7 @@ func (s *SlidingWindowStrategy) LoadMemoryContext(ctx context.Context, conversat
 
 	// 渲染最近对话记录
 	memoryCtx.RecentTranscript = s.renderRecentTranscript(recentExchanges, s.keepRecentTurns, s.recentTranscriptMaxChars)
-	memoryCtx.QuestionRecentTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.keepRecentTurns, s.questionHistoryMaxChars)
+	memoryCtx.RecentQuestionTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.keepRecentTurns, s.questionHistoryMaxChars)
 	memoryCtx.AssembledHistory = memoryCtx.RecentTranscript
 
 	return memoryCtx, nil

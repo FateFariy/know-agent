@@ -56,6 +56,7 @@ type ChatConf struct {
 	Memory                MemoryConf         // 记忆配置
 	Rewrite               RewriteConf        // 问题改写配置
 	Recommendation        RecommendationConf // 推荐配置
+	Rag                   RagConf            // RAG配置
 }
 
 // RecommendationConf 推荐追问配置
@@ -91,6 +92,14 @@ type RewriteConf struct {
 	Temperature     float32 `json:",optional,default=0.1"`   // 温度参数
 	TopP            float32 `json:",optional,default=0.3"`   // TopP参数
 	Thinking        bool    `json:",optional,default=false"` // 是否启用思考过程
+}
+
+// RagConf RAG配置
+type RagConf struct {
+	Enabled                 bool   `json:",optional,default=true"` // 是否启用RAG
+	NoEvidenceReply         string `json:",optional"`              // 无证据时的回复
+	PlanningHistoryMaxChars int    `json:",optional,default=2000"` // 规划历史最大字符数
+	
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {

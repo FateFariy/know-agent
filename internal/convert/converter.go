@@ -59,6 +59,6 @@ func TimeToString(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
-func ToChatQueryMode(name string) int {
-	return cvo.ChatQueryModeMap[name]
+func ToChatQueryMode(name string) cvo.ChatQueryMode {
+	return cvo.ToChatQueryMode(name)
 }

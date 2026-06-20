@@ -88,7 +88,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 
 	// 渲染最近对话记录
 	memoryCtx.RecentTranscript = s.renderRecentTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.recentTranscriptMaxChars)
-	memoryCtx.QuestionRecentTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.questionHistoryMaxChars)
+	memoryCtx.RecentQuestionTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.questionHistoryMaxChars)
 
 	// 反序列化摘要JSON
 	memoryCtx.Summary = s.readSummary(summaryState)
@@ -97,7 +97,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	if summaryState != nil {
 		memoryCtx.LongTermSummary = strutil.Trim(summaryState.SummaryText)
 		memoryCtx.AssembledHistory = joinNonBlank(memoryCtx.LongTermSummary, memoryCtx.RecentTranscript, "\n\n")
-		memoryCtx.IsCompressed = memoryCtx.LongTermSummary != ""
+		memoryCtx.CompressionApplied = memoryCtx.LongTermSummary != ""
 		memoryCtx.CoveredExchangeId = summaryState.CoveredExchangeId
 		memoryCtx.CoveredExchangeCount = summaryState.CoveredExchangeCount
 		memoryCtx.CompressionCount = summaryState.CompressionCount

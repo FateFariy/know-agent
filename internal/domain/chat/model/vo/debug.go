@@ -77,7 +77,7 @@ type ChatToolTrace struct {
 // DocumentNavigationDecision 文档问答路由结果
 type DocumentNavigationDecision struct {
 	NavigationAction  string                       `json:"navigationAction"`  // 导航动作
-	ExecutionMode     string                       `json:"executionMode"`     // 执行模式
+	ExecutionMode     ExecutionMode                `json:"executionMode"`     // 执行模式
 	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
 	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划
@@ -102,13 +102,14 @@ type ConversationItemAnchor struct {
 
 // RetrievalQuestionPlan 检索问题计划
 type RetrievalQuestionPlan struct {
-	MainQuestion     string   `json:"mainQuestion"`     // 主问题
-	SubQuestions     []string `json:"subQuestions"`     // 子问题列表
-	RetrievalMode    string   `json:"retrievalMode"`    // 检索模式
-	MaxResults       int      `json:"maxResults"`       // 最大结果数
-	ScoreThreshold   float64  `json:"scoreThreshold"`   // 分数阈值
-	ExpandToParent   bool     `json:"expandToParent"`   // 是否扩展到父级
-	ExpandToChildren bool     `json:"expandToChildren"` // 是否扩展到子级
+	MainQuestion      string   `json:"mainQuestion"`      // 主问题
+	RetrievalQuestion string   `json:"retrievalQuestion"` // 检索问题
+	SubQuestions      []string `json:"subQuestions"`      // 子问题列表
+	RetrievalMode     string   `json:"retrievalMode"`     // 检索模式
+	MaxResults        int      `json:"maxResults"`        // 最大结果数
+	ScoreThreshold    float64  `json:"scoreThreshold"`    // 分数阈值
+	ExpandToParent    bool     `json:"expandToParent"`    // 是否扩展到父级
+	ExpandToChildren  bool     `json:"expandToChildren"`  // 是否扩展到子级
 }
 
 // NewChatDebugTrace 创建新的调试轨迹实例 todo 待完善
