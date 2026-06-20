@@ -30,14 +30,13 @@ var (
 
 // ChatPreparationOrchestratorImpl 聊天准备编排器实现
 type ChatPreparationOrchestratorImpl struct {
-	repo                          adapter.ChatRepository
-	properties                    config.RagConf
-	sessionMemoryLogic            SessionMemoryLogic
-	answerHistoryContextAssembler AnswerHistoryContextAssembler
-	queryRewriteLogic             QueryRewriteLogic
-	documentQuestionRouter        DocumentQuestionRouter
-	knowledgeRouteService         KnowledgeRouteService
-	documentKnowledgeLogic        logic.DocumentKnowledgeLogic
+	repo                   adapter.ChatRepository
+	properties             config.RagConf
+	sessionMemoryLogic     SessionMemoryLogic
+	queryRewriteLogic      QueryRewriteLogic
+	documentQuestionRouter DocumentQuestionRouter
+	knowledgeRouteService  KnowledgeRouteService
+	documentKnowledgeLogic logic.DocumentKnowledgeLogic
 }
 
 // NewChatPreparationOrchestrator 创建聊天准备编排器实例
@@ -45,21 +44,19 @@ func NewChatPreparationOrchestrator(
 	repo adapter.ChatRepository,
 	properties config.RagConf,
 	sessionMemoryLogic SessionMemoryLogic,
-	answerHistoryContextAssembler AnswerHistoryContextAssembler,
 	queryRewriteLogic QueryRewriteLogic,
 	documentQuestionRouter DocumentQuestionRouter,
 	knowledgeRouteService KnowledgeRouteService,
 	documentKnowledgeLogic logic.DocumentKnowledgeLogic,
 ) *ChatPreparationOrchestratorImpl {
 	return &ChatPreparationOrchestratorImpl{
-		repo:                          repo,
-		properties:                    properties,
-		sessionMemoryLogic:            sessionMemoryLogic,
-		answerHistoryContextAssembler: answerHistoryContextAssembler,
-		queryRewriteLogic:             queryRewriteLogic,
-		documentQuestionRouter:        documentQuestionRouter,
-		knowledgeRouteService:         knowledgeRouteService,
-		documentKnowledgeLogic:        documentKnowledgeLogic,
+		repo:                   repo,
+		properties:             properties,
+		sessionMemoryLogic:     sessionMemoryLogic,
+		queryRewriteLogic:      queryRewriteLogic,
+		documentQuestionRouter: documentQuestionRouter,
+		knowledgeRouteService:  knowledgeRouteService,
+		documentKnowledgeLogic: documentKnowledgeLogic,
 	}
 }
 
@@ -271,11 +268,11 @@ func (o *ChatPreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *
 	return plan, nil
 }
 
-func (o *ChatPreparationOrchestratorImpl) buildHistoryContext(memoryContext *vo.MemoryContext, question string) (vo.HistoryPlanningContext, string, *vo.AnswerHistoryContext) {
+func (o *ChatPreparationOrchestratorImpl) buildHistoryContext(memoryContext *vo.MemoryContext, question string) (vo.HistoryPlanningContext, string, *vo.QuestionHistoryContext) {
 	// 构建历史规划上下文
 	historyPlanningContext := vo.NewHistoryPlanningContext(memoryContext.Summary)
 	historySummary := o.buildPlanningHistory(memoryContext, historyPlanningContext)
-	answerHistoryContext := o.buildAnswerHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript))
+	answerHistoryContext := o.buildQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript))
 	return historyPlanningContext, historySummary, answerHistoryContext
 }
 
@@ -330,7 +327,7 @@ func (o *ChatPreparationOrchestratorImpl) questionRewrite(ctx context.Context, c
 
 // basePlan 构建基础执行计划
 func (o *ChatPreparationOrchestratorImpl) basePlan(question string, chatMode vo.ChatQueryMode, memoryContext *vo.MemoryContext,
-	historyPlanningContext vo.HistoryPlanningContext, historySummary string, answerHistoryContext *vo.AnswerHistoryContext,
+	historyPlanningContext vo.HistoryPlanningContext, historySummary string, answerHistoryContext *vo.QuestionHistoryContext,
 	currentDate time.Time, currentDateText string, requiresCurrentDateAnchoring, requiresFreshSearch bool) *vo.ConversationExecutionPlan {
 
 	return &vo.ConversationExecutionPlan{
@@ -402,9 +399,9 @@ func (o *ChatPreparationOrchestratorImpl) buildPlanningHistory(memoryContext *vo
 	return o.joinNonBlank(structuredPart, recentPart)
 }
 
-// buildAnswerHistoryContext 构建回答历史上下文
-func (o *ChatPreparationOrchestratorImpl) buildAnswerHistoryContext(question, answerRecentTranscript string) *vo.AnswerHistoryContext {
-	return o.answerHistoryContextAssembler.Assemble(question, answerRecentTranscript)
+// buildQuestionHistoryContext 构建回答历史上下文
+func (o *ChatPreparationOrchestratorImpl) buildQuestionHistoryContext(question, questionRecentTranscript string) *vo.QuestionHistoryContext {
+	return support.Assemble(question, questionRecentTranscript)
 }
 
 // appendSection 追加章节
@@ -447,30 +444,27 @@ func (o *ChatPreparationOrchestratorImpl) appendBulletSection(sb *strings.Builde
 
 // clipHead 截取头部
 func (o *ChatPreparationOrchestratorImpl) clipHead(text string, maxChars int) string {
-	normalized := strutil.Trim(text)
+	normalized := []rune(strutil.Trim(text))
 	if len(normalized) <= maxChars {
-		return normalized
+		return string(normalized)
 	}
 	if maxChars <= 1 {
 		return ""
 	}
-	return normalized[:maxChars-1] + "…"
+	return string(normalized[:maxChars-1]) + "…"
 }
 
 // clipTail 截取尾部
 func (o *ChatPreparationOrchestratorImpl) clipTail(text string, maxChars int) string {
-	normalized := strutil.Trim(text)
+	normalized := []rune(strutil.Trim(text))
 	if len(normalized) <= maxChars {
-		return normalized
+		return string(normalized)
 	}
 	if maxChars <= 1 {
 		return ""
 	}
-	start := len(normalized) - (maxChars - 1)
-	if start < 0 {
-		start = 0
-	}
-	return "…" + normalized[start:]
+	start := max(0, len(normalized)-maxChars+1)
+	return "…" + string(normalized[start:])
 }
 
 // joinNonBlank 连接非空字符串

@@ -92,12 +92,6 @@ type DocumentQuestionRouter interface {
 	Route(ctx context.Context, documentId *int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
 }
 
-// AnswerHistoryContextAssembler 回答历史上下文组装器接口
-type AnswerHistoryContextAssembler interface {
-	// Assemble 组装回答历史上下文
-	Assemble(question, answerRecentTranscript string) *vo.AnswerHistoryContext
-}
-
 // ChatPreparationOrchestrator 聊天准备编排器接口
 type ChatPreparationOrchestrator interface {
 	// Prepare 准备对话执行计划
