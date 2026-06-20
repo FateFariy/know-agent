@@ -92,21 +92,21 @@ func (b *baseMemoryStrategy) renderRecentQuestionTranscript(exchanges []*entity.
 
 // clipText 裁剪文本（超出长度截断并添加省略号）
 func (b *baseMemoryStrategy) clipText(text string, maxChars int) string {
-	normalized := strutil.Trim(text)
+	normalized := []rune(strutil.Trim(text))
 	if len(normalized) <= maxChars {
-		return normalized
+		return string(normalized)
 	}
 	if maxChars <= 1 {
 		return ""
 	}
-	return normalized[:maxChars-1] + "…"
+	return string(normalized[:maxChars-1]) + "…"
 }
 
 // clipRecentTranscript 裁剪最近对话记录（保留末尾内容）
 func (b *baseMemoryStrategy) clipRecentTranscript(text string, maxChars int) string {
-	normalized := strutil.Trim(text)
+	normalized := []rune(strutil.Trim(text))
 	if len(normalized) <= maxChars {
-		return normalized
+		return string(normalized)
 	}
-	return "…" + normalized[len(normalized)-maxChars+1:]
+	return "…" + string(normalized[len(normalized)-maxChars+1:])
 }

@@ -51,40 +51,39 @@ func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.Obser
 // Rewrite 改写问题（结合历史上下文）
 // 流程：空问题直接返回 -> 判断是否需要改写 -> 不需要则规则改写 -> 需要则LLM改写 -> 规范化结果
 func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, tracer *vo.ConversationTrace) (*vo.RagRewriteResult, error) {
-	// 规范化问题，空问题直接返回空结果
-	normalizedQuestion := strutil.Trim(question)
-	if strutil.IsBlank(normalizedQuestion) {
+	// 空问题直接返回空结果
+	question = strutil.Trim(question)
+	if strutil.IsBlank(question) {
 		return vo.NewRagRewriteResult("", []string{}), nil
 	}
 
 	// 预计算兜底结果，用于快速返回
-	fallback := q.fallback(normalizedQuestion)
+	fallback := q.fallback(question)
 
 	// 判断是否需要LLM改写（短问题或有明确多问题特征时跳过）
-	if !q.needsRewrite(normalizedQuestion, historySummary) {
+	if !q.needsRewrite(question, historySummary) {
 		logx.Infof("RAG 改写跳过: question='%s', rewritten='%s', subQuestions=%v",
-			normalizedQuestion, fallback.RewrittenQuestion, fallback.SubQuestions)
+			question, fallback.RewrittenQuestion, fallback.SubQuestions)
 		return fallback, nil
 	}
 
 	// 构建提示词变量
 	templateVars := map[string]any{
 		"history":  utils.Ternary(strutil.IsNotBlank(historySummary), historySummary, "无历史上下文"),
-		"question": normalizedQuestion,
+		"question": question,
 	}
 
 	// 渲染提示词
 	promptText, err := q.promptTemplate.Render(prompt.ChatQueryRewrite, templateVars)
-	warn := fmt.Sprintf("RAG 改写失败，回退到规则改写: question='%s', err=%v", normalizedQuestion, err)
 	if err != nil {
-		logx.Alert(warn)
+		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil
 	}
 
 	// 调用LLM生成改写结果
 	raw, err := q.chatModel.Generate(ctx, vo.ChatStageRewrite, "", promptText, tracer, q.options...)
 	if err != nil {
-		logx.Alert(warn)
+		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil
 	}
 
@@ -92,16 +91,16 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	parsed := q.parse(raw)
 
 	// 规范化改写结果
-	result := q.normalizeRewriteResult(normalizedQuestion, parsed)
+	result := q.normalizeRewriteResult(question, parsed)
 	if result != nil && strutil.IsNotBlank(result.RewrittenQuestion) {
 		result.RawModelOutput = raw
 		logx.Infof("RAG 改写完成: question='%s', rewritten='%s', subQuestions=%v",
-			normalizedQuestion, result.RewrittenQuestion, result.SubQuestions)
+			question, result.RewrittenQuestion, result.SubQuestions)
 		return result, nil
 	}
 
 	// LLM结果无效，回退到规则改写
-	logx.Errorf("RAG 改写结果不可用，回退到规则改写: question='%s', raw='%s'", normalizedQuestion, strutil.Trim(raw))
+	logx.Errorf("RAG 改写结果不可用，回退到规则改写: question='%s', raw='%s'", question, strutil.Trim(raw))
 
 	return fallback, nil
 }
@@ -117,9 +116,9 @@ func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.RagRewri
 // needsRewrite 是否需要改写
 func (q *QueryRewriteLogicImpl) needsRewrite(question, historySummary string) bool {
 	if strutil.IsBlank(historySummary) {
-		return len(question) < 8 || q.looksLikeExplicitMultiQuestion(question)
+		return len([]rune(question)) < 8 || q.looksLikeExplicitMultiQuestion(question)
 	}
-	return len(question) < 18 || q.looksLikeExplicitMultiQuestion(question)
+	return len([]rune(question)) < 18 || q.looksLikeExplicitMultiQuestion(question)
 }
 
 // looksLikeExplicitMultiQuestion 是否显式多问题
@@ -213,7 +212,7 @@ func (q *QueryRewriteLogicImpl) parse(raw string) *parsedRewritePayload {
 	}
 	var payload parsedRewritePayload
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-		logx.Alert(fmt.Sprintf("解析问题改写结果失败: raw=%s, err=%v", raw, err))
+		Warnf("解析问题改写结果失败: raw=%s, err=%v", raw, err)
 		return nil
 	}
 
@@ -238,6 +237,10 @@ func (q *QueryRewriteLogicImpl) ruleBasedSplit(question string) []string {
 	}
 
 	return result
+}
+
+func Warnf(format string, args ...any) {
+	logx.Alert(fmt.Sprintf(format, args...))
 }
 
 type parsedRewritePayload struct {
