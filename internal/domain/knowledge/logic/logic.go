@@ -3,20 +3,19 @@ package logic
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/req"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 // DocumentKnowledgeLogic 文档知识服务
 type DocumentKnowledgeLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
-	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocumentDescriptor, error)
+	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 
 	// VectorSearch 向量检索
-	VectorSearch(ctx context.Context, request *req.DocumentRetrieveRequest) ([]*vo.SearchDocument, error)
+	VectorSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.SearchDocument, error)
 
 	// KeywordSearch 关键词检索
-	KeywordSearch(ctx context.Context, request *req.DocumentRetrieveRequest) ([]*vo.SearchDocument, error)
+	KeywordSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.SearchDocument, error)
 
 	// ElevateToParentBlocks 将子文档提升到父块级别
 	ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.SearchDocument, maxChars int) ([]*vo.SearchDocument, error)

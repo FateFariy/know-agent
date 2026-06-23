@@ -104,6 +104,26 @@ func NewDocumentRetrieve(subQuestion string, plan *vo.ConversationExecutionPlan,
 	return documentRetrieve
 }
 
+func (d *DocumentRetrieve) ResolvedDocumentIDs() []int64 {
+	if len(d.DocumentIds) > 0 {
+		return d.DocumentIds
+	}
+	if d.DocumentId != 0 {
+		return []int64{d.DocumentId}
+	}
+	return []int64{}
+}
+
+func (d *DocumentRetrieve) ResolvedTaskIDs() []int64 {
+	if len(d.TaskIds) > 0 {
+		return d.TaskIds
+	}
+	if d.TaskId != 0 {
+		return []int64{d.TaskId}
+	}
+	return []int64{}
+}
+
 // buildQueryAugmentation 构建查询增强，将导航决策提示、历史规划上下文提示与原问题合并，生成更完整的检索查询
 func buildQueryAugmentation(normalizedQuestion string, plan *vo.ConversationExecutionPlan) (string, []string) {
 	if normalizedQuestion == "" || plan == nil {

@@ -1,6 +1,6 @@
 package vo
 
-type KnowledgeDocumentDescriptor struct {
+type KnowledgeDocument struct {
 	DocumentId         int64  // 文档ID
 	DocumentName       string // 文档名称
 	LastIndexTaskId    int64  // 最后一次索引任务ID

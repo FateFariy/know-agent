@@ -3,20 +3,20 @@ package adapter
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/data"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
-// KnowledgeRepository 知识存储库接口
 type KnowledgeRepository interface {
-	// ListDocuments 获取文档列表
-	ListDocuments(ctx context.Context) ([]*vo.KnowledgeDocumentDescriptor, error)
+	// ListDocuments 列出所有文档
+	ListDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 
-	// SearchByVector 向量检索
-	SearchByVector(ctx context.Context, query string, topK int, scoreThreshold float64) ([]*vo.SearchDocument, error)
+	// ListDocumentsByIDs 根据文档ID列表列出文档
+	ListDocumentsByIDs(ctx context.Context, documentIDs []int64) ([]*vo.KnowledgeDocument, error)
 
-	// SearchByKeyword 关键词检索
-	SearchByKeyword(ctx context.Context, query string, topK int) ([]*vo.SearchDocument, error)
+	SearchByVector(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error)
 
-	// GetParentBlock 获取父块内容
-	GetParentBlock(ctx context.Context, documentID string, maxChars int) (*vo.SearchDocument, error)
+	SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error)
+
+	GetParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*data.SuperAgentDocumentParentBlock, error)
 }
