@@ -15,7 +15,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/data"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
 )
 
 const (
@@ -43,25 +42,23 @@ func NewDocumentKnowledgeService(repo adapter.KnowledgeRepository) *DocumentKnow
 	}
 }
 
+// ListRetrievableDocuments 列出可检索的文档
 func (s *DocumentKnowledgeLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error) {
-	return s.repo.ListDocuments(ctx)
+	return s.repo.SelectAllDocuments(ctx)
 }
 
-func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.SearchDocument, error) {
-	if !s.isSearchableRequest(retrieve) {
+// VectorSearch 向量检索
+func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.Document, error) {
+	if !s.validSearchable(retrieve) {
 		return nil, nil
 	}
 
 	documentIDs := retrieve.ResolvedDocumentIDs()
 	taskIDs := retrieve.ResolvedTaskIDs()
-	descriptors, err := s.repo.ListDocumentsByIDs(ctx, documentIDs)
+	knowledgeMap, err := s.getDocumentsMap(ctx, documentIDs)
 	if err != nil {
 		return nil, err
 	}
-
-	knowledgeMap := utils.SliceToMapBy(descriptors, func(item *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
-		return item.DocumentId, item
-	})
 
 	chunks, err := s.repo.SearchByVector(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, s.resolveTopK(retrieve.TopK), retrieve.Filters)
 	if err != nil {
@@ -72,17 +69,17 @@ func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve 
 	return s.buildSearchDocuments(chunks, knowledgeMap, "vector"), nil
 }
 
-func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.SearchDocument, error) {
-	if !s.isSearchableRequest(retrieve) {
+// KeywordSearch 关键词检索
+func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.Document, error) {
+	if !s.validSearchable(retrieve) {
 		return nil, nil
 	}
 
 	documentIDs := retrieve.ResolvedDocumentIDs()
 	taskIDs := retrieve.ResolvedTaskIDs()
-	descriptorMap := s.listDescriptorMap(ctx, documentIDs)
-
-	if len(documentIDs) == 0 || len(taskIDs) == 0 {
-		return nil, nil
+	descriptorMap, err := s.getDocumentsMap(ctx, documentIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	chunks, err := s.repo.SearchByKeyword(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, s.resolveTopK(retrieve.TopK), retrieve.Filters)
@@ -94,19 +91,20 @@ func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve
 	return s.buildSearchDocuments(chunks, descriptorMap, "keyword"), nil
 }
 
-func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.SearchDocument, maxChars int) ([]*vo.SearchDocument, error) {
+// ElevateToParentBlocks 提升到父级块
+func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.Document, maxChars int) ([]*vo.Document, error) {
 	if len(childDocuments) == 0 {
-		return []*vo.SearchDocument{}, nil
+		return []*vo.Document{}, nil
 	}
 
-	childGroupsByParent := make(map[int64][]*vo.SearchDocument)
-	fallbackDocuments := make([]*vo.SearchDocument, 0)
+	childGroupsByParent := make(map[int64][]*vo.Document)
+	fallbackDocuments := make([]*vo.Document, 0)
 
 	for _, childDocument := range childDocuments {
 		if childDocument == nil {
 			continue
 		}
-		parentBlockID := s.asInt64(childDocument.Meta[logic.MetaParentBlockID])
+		parentBlockID := s.asInt64(childDocument.Meta[vo.MetaParentBlockID])
 		if parentBlockID == nil || *parentBlockID == 0 {
 			fallbackDocuments = append(fallbackDocuments, childDocument)
 			continue
@@ -134,7 +132,7 @@ func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, 
 		parentBlockMap[pb.ID] = pb
 	}
 
-	elevatedDocuments := make([]*vo.SearchDocument, 0, len(childGroupsByParent)+len(fallbackDocuments))
+	elevatedDocuments := make([]*vo.Document, 0, len(childGroupsByParent)+len(fallbackDocuments))
 	for parentID, children := range childGroupsByParent {
 		parentBlock := parentBlockMap[parentID]
 		if parentBlock == nil {
@@ -152,15 +150,27 @@ func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, 
 	return elevatedDocuments, nil
 }
 
-func (s *DocumentKnowledgeLogicImpl) isSearchableRequest(retrieve *vo.DocumentRetrieve) bool {
+func (s *DocumentKnowledgeLogicImpl) validSearchable(retrieve *vo.DocumentRetrieve) bool {
 	if retrieve == nil || strutil.IsBlank(retrieve.Question) || strutil.IsBlank(retrieve.RetrievalQuery) {
 		return false
 	}
 	return len(retrieve.ResolvedDocumentIDs()) > 0 && len(retrieve.ResolvedTaskIDs()) > 0
 }
 
-func (s *DocumentKnowledgeLogicImpl) buildSearchDocuments(chunks []*data.EmbeddingChunk, descriptorMap map[int64]*vo.KnowledgeDocument, channel string) []*vo.SearchDocument {
-	result := make([]*vo.SearchDocument, 0, len(chunks))
+func (s *DocumentKnowledgeLogicImpl) getDocumentsMap(ctx context.Context, documentIDs []int64) (map[int64]*vo.KnowledgeDocument, error) {
+	documents, err := s.repo.SelectDocumentsByIDs(ctx, documentIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	knowledgeMap := utils.SliceToMapBy(documents, func(item *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
+		return item.DocumentId, item
+	})
+	return knowledgeMap, nil
+}
+
+func (s *DocumentKnowledgeLogicImpl) buildSearchDocuments(chunks []*data.EmbeddingChunk, descriptorMap map[int64]*vo.KnowledgeDocument, channel string) []*vo.Document {
+	result := make([]*vo.Document, 0, len(chunks))
 	for _, chunk := range chunks {
 		descriptor := descriptorMap[chunk.DocumentId]
 		doc := s.buildRetrievedDocument(chunk, descriptor, channel)
@@ -169,40 +179,40 @@ func (s *DocumentKnowledgeLogicImpl) buildSearchDocuments(chunks []*data.Embeddi
 	return result
 }
 
-func (s *DocumentKnowledgeLogicImpl) buildRetrievedDocument(chunk *data.EmbeddingChunk, descriptor *vo.KnowledgeDocument, channel string) *vo.SearchDocument {
+func (s *DocumentKnowledgeLogicImpl) buildRetrievedDocument(chunk *data.EmbeddingChunk, descriptor *vo.KnowledgeDocument, channel string) *vo.Document {
 	meta := make(map[string]interface{})
 
-	meta[logic.MetaSourceType] = "DOCUMENT"
-	meta[logic.MetaChannel] = channel
-	meta[logic.MetaScore] = 0.0
-	meta[logic.MetaChunkID] = chunk.ID
-	meta[logic.MetaDocumentID] = chunk.DocumentId
-	meta[logic.MetaTaskID] = chunk.TaskId
-	meta[logic.MetaParentBlockID] = chunk.ParentBlockId
-	meta[logic.MetaChunkNo] = chunk.ChunkNo
-	meta[logic.MetaSectionPath] = s.safeText(chunk.SectionPath)
+	meta[vo.MetaSourceType] = "DOCUMENT"
+	meta[vo.MetaChannel] = channel
+	meta[vo.MetaScore] = 0.0
+	meta[vo.MetaChunkID] = chunk.ID
+	meta[vo.MetaDocumentID] = chunk.DocumentId
+	meta[vo.MetaTaskID] = chunk.TaskId
+	meta[vo.MetaParentBlockID] = chunk.ParentBlockId
+	meta[vo.MetaChunkNo] = chunk.ChunkNo
+	meta[vo.MetaSectionPath] = chunk.SectionPath
 
 	if chunk.StructureNodeId != 0 {
-		meta[logic.MetaStructureNodeID] = chunk.StructureNodeId
+		meta[vo.MetaStructureNodeID] = chunk.StructureNodeId
 	}
 	if chunk.StructureNodeType != 0 {
-		meta[logic.MetaStructureNodeType] = chunk.StructureNodeType
+		meta[vo.MetaStructureNodeType] = chunk.StructureNodeType
 	}
-	meta[logic.MetaCanonicalPath] = s.safeText(chunk.CanonicalPath)
+	meta[vo.MetaCanonicalPath] = chunk.CanonicalPath
 	if chunk.ItemIndex != 0 {
-		meta[logic.MetaItemIndex] = chunk.ItemIndex
+		meta[vo.MetaItemIndex] = chunk.ItemIndex
 	}
-	meta[logic.MetaOriginalSnippet] = chunk.ChunkText
+	meta[vo.MetaOriginalSnippet] = chunk.ChunkText
 
 	if descriptor != nil {
-		meta[logic.MetaDocumentName] = s.safeText(descriptor.DocumentName)
-		meta[logic.MetaKnowledgeScopeCode] = s.safeText(descriptor.KnowledgeScopeCode)
-		meta[logic.MetaKnowledgeScopeName] = s.safeText(descriptor.KnowledgeScopeName)
-		meta[logic.MetaBusinessCategory] = s.safeText(descriptor.BusinessCategory)
-		meta[logic.MetaDocumentTags] = s.safeText(descriptor.DocumentTags)
+		meta[vo.MetaDocumentName] = descriptor.DocumentName
+		meta[vo.MetaKnowledgeScopeCode] = descriptor.KnowledgeScopeCode
+		meta[vo.MetaKnowledgeScopeName] = descriptor.KnowledgeScopeName
+		meta[vo.MetaBusinessCategory] = descriptor.BusinessCategory
+		meta[vo.MetaDocumentTags] = descriptor.DocumentTags
 	}
 
-	return &vo.SearchDocument{
+	return &vo.Document{
 		ID:      fmt.Sprintf("%d", chunk.ID),
 		Content: chunk.ChunkText,
 		Meta:    meta,
@@ -210,7 +220,7 @@ func (s *DocumentKnowledgeLogicImpl) buildRetrievedDocument(chunk *data.Embeddin
 	}
 }
 
-func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.SearchDocument, maxChars int) *vo.SearchDocument {
+func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.Document, maxChars int) *vo.Document {
 	bestChild := s.findBestChild(childDocuments)
 	parentScore := s.aggregateParentScore(childDocuments)
 
@@ -221,32 +231,32 @@ func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *da
 		}
 	}
 
-	meta[logic.MetaParentBlockID] = parentBlock.ID
-	meta[logic.MetaParentBlockNo] = parentBlock.ParentNo
-	meta[logic.MetaSectionPath] = s.safeText(parentBlock.SectionPath)
+	meta[vo.MetaParentBlockID] = parentBlock.ID
+	meta[vo.MetaParentBlockNo] = parentBlock.ParentNo
+	meta[vo.MetaSectionPath] = parentBlock.SectionPath
 	if parentBlock.StructureNodeId != 0 {
-		meta[logic.MetaStructureNodeID] = parentBlock.StructureNodeId
+		meta[vo.MetaStructureNodeID] = parentBlock.StructureNodeId
 	}
 	if parentBlock.StructureNodeType != 0 {
-		meta[logic.MetaStructureNodeType] = parentBlock.StructureNodeType
+		meta[vo.MetaStructureNodeType] = parentBlock.StructureNodeType
 	}
-	meta[logic.MetaCanonicalPath] = s.safeText(parentBlock.CanonicalPath)
+	meta[vo.MetaCanonicalPath] = parentBlock.CanonicalPath
 	if parentBlock.ItemIndex != 0 {
-		meta[logic.MetaItemIndex] = parentBlock.ItemIndex
+		meta[vo.MetaItemIndex] = parentBlock.ItemIndex
 	}
-	meta[logic.MetaScore] = parentScore
-	meta[logic.MetaOriginalSnippet] = s.safeText(parentBlock.ParentText)
+	meta[vo.MetaScore] = parentScore
+	meta[vo.MetaOriginalSnippet] = parentBlock.ParentText
 
 	channels := s.extractChannels(childDocuments)
 	if len(channels) > 1 {
-		meta[logic.MetaChannel] = "hybrid"
+		meta[vo.MetaChannel] = "hybrid"
 	} else if len(channels) == 1 {
-		meta[logic.MetaChannel] = channels[0]
+		meta[vo.MetaChannel] = channels[0]
 	} else {
-		meta[logic.MetaChannel] = "vector"
+		meta[vo.MetaChannel] = "vector"
 	}
 
-	return &vo.SearchDocument{
+	return &vo.Document{
 		ID:      fmt.Sprintf("parent-%d", parentBlock.ID),
 		Content: s.renderParentEvidenceText(parentBlock, childDocuments, maxChars),
 		Meta:    meta,
@@ -254,7 +264,7 @@ func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *da
 	}
 }
 
-func (s *DocumentKnowledgeLogicImpl) findBestChild(childDocuments []*vo.SearchDocument) *vo.SearchDocument {
+func (s *DocumentKnowledgeLogicImpl) findBestChild(childDocuments []*vo.Document) *vo.Document {
 	if len(childDocuments) == 0 {
 		return nil
 	}
@@ -270,7 +280,7 @@ func (s *DocumentKnowledgeLogicImpl) findBestChild(childDocuments []*vo.SearchDo
 	return best
 }
 
-func (s *DocumentKnowledgeLogicImpl) aggregateParentScore(childDocuments []*vo.SearchDocument) float64 {
+func (s *DocumentKnowledgeLogicImpl) aggregateParentScore(childDocuments []*vo.Document) float64 {
 	bestChildScore := 0.0
 	for _, doc := range childDocuments {
 		score := s.resolveScore(doc)
@@ -291,13 +301,13 @@ func (s *DocumentKnowledgeLogicImpl) aggregateParentScore(childDocuments []*vo.S
 	return bestChildScore * (1.0 + supportWeight + multiChannelWeight)
 }
 
-func (s *DocumentKnowledgeLogicImpl) extractChannels(childDocuments []*vo.SearchDocument) []string {
+func (s *DocumentKnowledgeLogicImpl) extractChannels(childDocuments []*vo.Document) []string {
 	channelSet := make(map[string]bool)
 	for _, doc := range childDocuments {
 		if doc == nil {
 			continue
 		}
-		channel, ok := doc.Meta[logic.MetaChannel].(string)
+		channel, ok := doc.Meta[vo.MetaChannel].(string)
 		if ok && channel != "" {
 			channelSet[channel] = true
 		}
@@ -309,13 +319,13 @@ func (s *DocumentKnowledgeLogicImpl) extractChannels(childDocuments []*vo.Search
 	return result
 }
 
-func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.SearchDocument, maxChars int) string {
-	parentText := s.safeText(parentBlock.ParentText)
+func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.Document, maxChars int) string {
+	parentText := parentBlock.ParentText
 	if parentText == "" {
 		if len(childDocuments) == 0 {
 			return ""
 		}
-		return s.safeText(childDocuments[0].Content)
+		return childDocuments[0].Content
 	}
 
 	var hitSummaryBuilder strings.Builder
@@ -326,11 +336,11 @@ func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.
 		if i > 0 {
 			hitSummaryBuilder.WriteByte('\n')
 		}
-		chunkNo := s.asInt(childDocument.Meta[logic.MetaChunkNo])
+		chunkNo := s.asInt(childDocument.Meta[vo.MetaChunkNo])
 		if chunkNo == nil {
 			*chunkNo = 0
 		}
-		hitSummaryBuilder.WriteString(fmt.Sprintf("- child#%d：%s", *chunkNo, s.trimText(s.safeText(childDocument.Content), 140)))
+		hitSummaryBuilder.WriteString(fmt.Sprintf("- child#%d：%s", *chunkNo, s.trimText((childDocument.Content), 140)))
 	}
 
 	var composed string
@@ -343,21 +353,21 @@ func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.
 	return s.trimText(composed, max(maxChars, 1))
 }
 
-func (s *DocumentKnowledgeLogicImpl) resolveScore(document *vo.SearchDocument) float64 {
+func (s *DocumentKnowledgeLogicImpl) resolveScore(document *vo.Document) float64 {
 	if document == nil {
 		return 0.0
 	}
 	if document.Score > 0 {
 		return document.Score
 	}
-	metaScore, ok := document.Meta[logic.MetaScore].(float64)
+	metaScore, ok := document.Meta[vo.MetaScore].(float64)
 	if ok {
 		return metaScore
 	}
 	return 0.0
 }
 
-func (s *DocumentKnowledgeLogicImpl) compareEvidenceDocument(left, right *vo.SearchDocument) int {
+func (s *DocumentKnowledgeLogicImpl) compareEvidenceDocument(left, right *vo.Document) int {
 	leftScore := s.resolveScore(left)
 	rightScore := s.resolveScore(right)
 	if rightScore > leftScore {
@@ -367,15 +377,15 @@ func (s *DocumentKnowledgeLogicImpl) compareEvidenceDocument(left, right *vo.Sea
 		return 1
 	}
 
-	leftParentNo := s.asInt(left.Meta[logic.MetaParentBlockNo])
-	rightParentNo := s.asInt(right.Meta[logic.MetaParentBlockNo])
+	leftParentNo := s.asInt(left.Meta[vo.MetaParentBlockNo])
+	rightParentNo := s.asInt(right.Meta[vo.MetaParentBlockNo])
 	parentNoCompare := s.compareNullableInt(leftParentNo, rightParentNo)
 	if parentNoCompare != 0 {
 		return parentNoCompare
 	}
 
-	leftChunkNo := s.asInt(left.Meta[logic.MetaChunkNo])
-	rightChunkNo := s.asInt(right.Meta[logic.MetaChunkNo])
+	leftChunkNo := s.asInt(left.Meta[vo.MetaChunkNo])
+	rightChunkNo := s.asInt(right.Meta[vo.MetaChunkNo])
 	return s.compareNullableInt(leftChunkNo, rightChunkNo)
 }
 
@@ -406,13 +416,6 @@ func (s *DocumentKnowledgeLogicImpl) trimText(text string, maxChars int) string 
 		return text[:1] + "…"
 	}
 	return text[:maxChars-1] + "…"
-}
-
-func (s *DocumentKnowledgeLogicImpl) safeText(text string) string {
-	if text == nil {
-		return ""
-	}
-	return text
 }
 
 func (s *DocumentKnowledgeLogicImpl) asInt64(value interface{}) *int64 {
