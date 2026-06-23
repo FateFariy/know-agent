@@ -98,8 +98,9 @@ type RewriteConf struct {
 type RagConf struct {
 	Enabled                 bool   `json:",optional,default=true"` // 是否启用RAG
 	NoEvidenceReply         string `json:",optional"`              // 无证据时的回复
+	VectorTopK              int    `json:",optional,default=5"`    // 向量检索TopK
 	PlanningHistoryMaxChars int    `json:",optional,default=2000"` // 规划历史最大字符数
-	
+	QuestionHistoryMaxChars int    `json:",optional,default=1000"` // 问题历史最大字符数
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {
