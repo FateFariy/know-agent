@@ -7,7 +7,7 @@ import (
 )
 
 type Document struct {
-	ID                   int64     `gorm:"column:id;primaryKey"`         // 主键ID
+	ID                   int64     `gorm:"column:id"`                    // 主键ID
 	DocumentName         string    `gorm:"column:document_name"`         // 文档名称
 	OriginalFileName     string    `gorm:"column:original_file_name"`    // 原始文件名
 	FileType             int       `gorm:"column:file_type"`             // 文件类型

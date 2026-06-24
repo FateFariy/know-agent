@@ -3,15 +3,21 @@ package logic
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/data"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
@@ -94,48 +100,41 @@ func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve
 // ElevateToParentBlocks 提升到父级块
 func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.Document, maxChars int) ([]*vo.Document, error) {
 	if len(childDocuments) == 0 {
-		return []*vo.Document{}, nil
+		return nil, nil
 	}
 
-	childGroupsByParent := make(map[int64][]*vo.Document)
-	fallbackDocuments := make([]*vo.Document, 0)
-
+	childGroupsByParent := make(map[int64][]*vo.Document, len(childDocuments))
+	fallbackDocuments := make([]*vo.Document, 0, len(childDocuments))
+	parentBlockIDs := make([]int64, 0, len(childDocuments))
 	for _, childDocument := range childDocuments {
 		if childDocument == nil {
 			continue
 		}
-		parentBlockID := s.asInt64(childDocument.Meta[vo.MetaParentBlockID])
-		if parentBlockID == nil || *parentBlockID == 0 {
+		parentBlockID, err := convertor.ToInt(childDocument.Meta[vo.MetaParentBlockID])
+		if err != nil {
 			fallbackDocuments = append(fallbackDocuments, childDocument)
 			continue
 		}
-		childGroupsByParent[*parentBlockID] = append(childGroupsByParent[*parentBlockID], childDocument)
+		childGroupsByParent[parentBlockID] = append(childGroupsByParent[parentBlockID], childDocument)
+		parentBlockIDs = append(parentBlockIDs, parentBlockID)
 	}
 
 	if len(childGroupsByParent) == 0 {
 		return fallbackDocuments, nil
 	}
 
-	parentBlockIDs := make([]int64, 0, len(childGroupsByParent))
-	for id := range childGroupsByParent {
-		parentBlockIDs = append(parentBlockIDs, id)
-	}
-
-	parentBlocks, err := s.repo.GetParentBlocks(ctx, parentBlockIDs)
+	parentBlocks, err := s.repo.SelectParentBlocks(ctx, parentBlockIDs)
 	if err != nil {
-		logx.Errorf("Get parent blocks failed: %v", err)
 		return nil, err
 	}
-
-	parentBlockMap := make(map[int64]*data.SuperAgentDocumentParentBlock)
-	for _, pb := range parentBlocks {
-		parentBlockMap[pb.ID] = pb
-	}
+	parentBlockMap := utils.SliceToMapBy(parentBlocks, func(item *entity.DocumentParentBlock) (int64, *entity.DocumentParentBlock) {
+		return item.ID, item
+	})
 
 	elevatedDocuments := make([]*vo.Document, 0, len(childGroupsByParent)+len(fallbackDocuments))
 	for parentID, children := range childGroupsByParent {
-		parentBlock := parentBlockMap[parentID]
-		if parentBlock == nil {
+		parentBlock, ok := parentBlockMap[parentID]
+		if !ok {
 			elevatedDocuments = append(elevatedDocuments, children...)
 			continue
 		}
@@ -220,16 +219,20 @@ func (s *DocumentKnowledgeLogicImpl) buildRetrievedDocument(chunk *data.Embeddin
 	}
 }
 
-func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.Document, maxChars int) *vo.Document {
-	bestChild := s.findBestChild(childDocuments)
-	parentScore := s.aggregateParentScore(childDocuments)
+// buildParentEvidenceDocument 构建父文档证据
+func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.Document, maxChars int) *vo.Document {
+	bestChild := slices.MaxFunc(childDocuments, func(a, b *vo.Document) int {
+		return int(a.Score - b.Score)
+	})
 
-	meta := make(map[string]interface{})
-	if bestChild != nil {
-		for k, v := range bestChild.Meta {
-			meta[k] = v
-		}
-	}
+	supportCount := max(0, len(childDocuments)-1)
+	channels := s.extractChannels(childDocuments)
+	supportWeight := min(0.36, float64(supportCount)*0.12)
+	multiChannelWeight := utils.Ternary(len(channels) > 1, 0.10, 0.0)
+	parentScore := bestChild.Score * (1.0 + supportWeight + multiChannelWeight)
+
+	meta := make(map[string]any)
+	maps.Copy(meta, bestChild.Meta)
 
 	meta[vo.MetaParentBlockID] = parentBlock.ID
 	meta[vo.MetaParentBlockNo] = parentBlock.ParentNo
@@ -247,7 +250,6 @@ func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *da
 	meta[vo.MetaScore] = parentScore
 	meta[vo.MetaOriginalSnippet] = parentBlock.ParentText
 
-	channels := s.extractChannels(childDocuments)
 	if len(channels) > 1 {
 		meta[vo.MetaChannel] = "hybrid"
 	} else if len(channels) == 1 {
@@ -264,83 +266,30 @@ func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *da
 	}
 }
 
-func (s *DocumentKnowledgeLogicImpl) findBestChild(childDocuments []*vo.Document) *vo.Document {
-	if len(childDocuments) == 0 {
-		return nil
-	}
-	best := childDocuments[0]
-	bestScore := s.resolveScore(best)
-	for i := 1; i < len(childDocuments); i++ {
-		score := s.resolveScore(childDocuments[i])
-		if score > bestScore {
-			bestScore = score
-			best = childDocuments[i]
-		}
-	}
-	return best
-}
-
-func (s *DocumentKnowledgeLogicImpl) aggregateParentScore(childDocuments []*vo.Document) float64 {
-	bestChildScore := 0.0
-	for _, doc := range childDocuments {
-		score := s.resolveScore(doc)
-		if score > bestChildScore {
-			bestChildScore = score
-		}
-	}
-
-	supportCount := max(0, len(childDocuments)-1)
-	channels := s.extractChannels(childDocuments)
-
-	supportWeight := min(0.36, float64(supportCount)*0.12)
-	multiChannelWeight := 0.0
-	if len(channels) > 1 {
-		multiChannelWeight = 0.10
-	}
-
-	return bestChildScore * (1.0 + supportWeight + multiChannelWeight)
-}
-
+// extractChannels 提取子文档的渠道
 func (s *DocumentKnowledgeLogicImpl) extractChannels(childDocuments []*vo.Document) []string {
-	channelSet := make(map[string]bool)
-	for _, doc := range childDocuments {
-		if doc == nil {
-			continue
-		}
-		channel, ok := doc.Meta[vo.MetaChannel].(string)
-		if ok && channel != "" {
-			channelSet[channel] = true
-		}
-	}
-	result := make([]string, 0, len(channelSet))
-	for ch := range channelSet {
-		result = append(result, ch)
-	}
-	return result
+	channels := slice.Map(childDocuments, func(index int, item *vo.Document) string {
+		return item.Meta[vo.MetaChannel].(string)
+	})
+	return stream.FromSlice(channels).
+		Filter(func(item string) bool { return item != "" }).
+		Distinct().ToSlice()
 }
 
-func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.SuperAgentDocumentParentBlock, childDocuments []*vo.Document, maxChars int) string {
-	parentText := parentBlock.ParentText
-	if parentText == "" {
-		if len(childDocuments) == 0 {
-			return ""
-		}
-		return childDocuments[0].Content
+// renderParentEvidenceText 渲染父文档的证据文本
+func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.Document, maxChars int) string {
+	parentText := strutil.Trim(parentBlock.ParentText)
+	if strutil.IsBlank(parentText) {
+		return utils.Ternary(len(childDocuments) > 0, childDocuments[0].Content, "")
 	}
 
 	var hitSummaryBuilder strings.Builder
 	for i, childDocument := range childDocuments {
-		if childDocument == nil {
-			continue
-		}
 		if i > 0 {
 			hitSummaryBuilder.WriteByte('\n')
 		}
-		chunkNo := s.asInt(childDocument.Meta[vo.MetaChunkNo])
-		if chunkNo == nil {
-			*chunkNo = 0
-		}
-		hitSummaryBuilder.WriteString(fmt.Sprintf("- child#%d：%s", *chunkNo, s.trimText((childDocument.Content), 140)))
+		chunkNo, _ := convertor.ToInt(childDocument.Meta[vo.MetaChunkNo])
+		hitSummaryBuilder.WriteString(fmt.Sprintf("- child#%d：%s", chunkNo, s.trimText(childDocument.Content, 140)))
 	}
 
 	var composed string
@@ -353,105 +302,33 @@ func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *data.
 	return s.trimText(composed, max(maxChars, 1))
 }
 
-func (s *DocumentKnowledgeLogicImpl) resolveScore(document *vo.Document) float64 {
-	if document == nil {
-		return 0.0
-	}
-	if document.Score > 0 {
-		return document.Score
-	}
-	metaScore, ok := document.Meta[vo.MetaScore].(float64)
-	if ok {
-		return metaScore
-	}
-	return 0.0
-}
-
+// compareEvidenceDocument 比较证据文档
 func (s *DocumentKnowledgeLogicImpl) compareEvidenceDocument(left, right *vo.Document) int {
-	leftScore := s.resolveScore(left)
-	rightScore := s.resolveScore(right)
-	if rightScore > leftScore {
+	if right.Score > left.Score {
 		return -1
 	}
-	if rightScore < leftScore {
+	if right.Score < left.Score {
 		return 1
 	}
 
-	leftParentNo := s.asInt(left.Meta[vo.MetaParentBlockNo])
-	rightParentNo := s.asInt(right.Meta[vo.MetaParentBlockNo])
-	parentNoCompare := s.compareNullableInt(leftParentNo, rightParentNo)
+	leftParentNo, _ := convertor.ToInt(left.Meta[vo.MetaParentBlockNo])
+	rightParentNo, _ := convertor.ToInt(right.Meta[vo.MetaParentBlockNo])
+	parentNoCompare := int(leftParentNo - rightParentNo)
 	if parentNoCompare != 0 {
 		return parentNoCompare
 	}
 
-	leftChunkNo := s.asInt(left.Meta[vo.MetaChunkNo])
-	rightChunkNo := s.asInt(right.Meta[vo.MetaChunkNo])
-	return s.compareNullableInt(leftChunkNo, rightChunkNo)
-}
-
-func (s *DocumentKnowledgeLogicImpl) compareNullableInt(left, right *int) int {
-	if left == nil && right == nil {
-		return 0
-	}
-	if left == nil {
-		return 1
-	}
-	if right == nil {
-		return -1
-	}
-	if *left < *right {
-		return -1
-	}
-	if *left > *right {
-		return 1
-	}
-	return 0
+	leftChunkNo, _ := convertor.ToInt(left.Meta[vo.MetaChunkNo])
+	rightChunkNo, _ := convertor.ToInt(right.Meta[vo.MetaChunkNo])
+	return int(leftChunkNo - rightChunkNo)
 }
 
 func (s *DocumentKnowledgeLogicImpl) trimText(text string, maxChars int) string {
-	if text == "" || len(text) <= maxChars {
+	if len(text) <= maxChars {
 		return text
 	}
-	if maxChars <= 1 {
-		return text[:1] + "…"
-	}
+	maxChars = max(maxChars, 1)
 	return text[:maxChars-1] + "…"
-}
-
-func (s *DocumentKnowledgeLogicImpl) asInt64(value interface{}) *int64 {
-	if value == nil {
-		return nil
-	}
-	switch v := value.(type) {
-	case int64:
-		return &v
-	case int:
-		iv := int64(v)
-		return &iv
-	case float64:
-		iv := int64(v)
-		return &iv
-	default:
-		return nil
-	}
-}
-
-func (s *DocumentKnowledgeLogicImpl) asInt(value interface{}) *int {
-	if value == nil {
-		return nil
-	}
-	switch v := value.(type) {
-	case int:
-		return &v
-	case int64:
-		iv := int(v)
-		return &iv
-	case float64:
-		iv := int(v)
-		return &iv
-	default:
-		return nil
-	}
 }
 
 func (s *DocumentKnowledgeLogicImpl) resolveTopK(topK int) int {

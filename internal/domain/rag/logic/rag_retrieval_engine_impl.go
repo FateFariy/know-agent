@@ -57,116 +57,92 @@ func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *vo.Conversation
 		subQuestions = []string{plan.RetrievalQuestion}
 	}
 
-	type result struct {
-		evidence *rvo.SubQuestionEvidence
-		index    int
-	}
-
-	subCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
-	defer cancel()
-
-	results := make([]*result, len(subQuestions))
-	var wg sync.WaitGroup
-
-	// todo 线程池改造
-	for i, sq := range subQuestions {
-		wg.Add(1)
-		go func(idx int, subQuestion string) {
-			defer wg.Done()
-
-			evidence := e.retrieveSingleSubQuestion(subCtx, ragCtx, idx+1, subQuestion, plan, tracer)
-			results[idx] = &result{evidence: evidence, index: idx}
-		}(i, sq)
-	}
-
-	wg.Wait()
-
-	evidenceList := make([]*rvo.SubQuestionEvidence, 0, len(subQuestions))
-	acceptedCount := 0
-	for _, r := range results {
-		if r != nil && r.evidence != nil {
-			evidenceList = append(evidenceList, r.evidence)
-			if len(r.evidence.Documents) > 0 {
-				acceptedCount++
-			}
-		}
-
-	}
+	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan, tracer)
+	acceptedCount := stream.FromSlice(evidenceList).
+		Filter(func(item *rvo.SubQuestionEvidence) bool { return item != nil && len(item.Documents) > 0 }).
+		Count()
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
 		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.RetrievalNotes)
 
 	e.assignReferenceIds(evidenceList)
 	ragCtx.SubQuestionEvidenceList = evidenceList
+
 	return ragCtx, nil
 }
 
-func (e *RagRetrievalEngine) retrieveSingleSubQuestion(ctx context.Context, ragCtx *rvo.RagRetrievalContext, subQuestionIndex int,
-	subQuestion string, plan *vo.ConversationExecutionPlan, tracer *vo.ConversationTrace) *rvo.SubQuestionEvidence {
-	channelResults := e.retrieveChannelParallel(ctx, ragCtx, subQuestionIndex, subQuestion, plan)
+func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *rvo.RagRetrievalContext, subQuestions []string,
+	plan *vo.ConversationExecutionPlan, tracer *vo.ConversationTrace) []*rvo.SubQuestionEvidence {
+	timeoutCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
+	defer cancel()
 
-	if len(channelResults) == 0 {
-		ragCtx.AddRetrievalNotef("子问题%d没有可用的检索通道。", subQuestionIndex)
-		return &rvo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
+	// todo 线程池改造
+	resultChan := make(chan *rvo.SubQuestionEvidence, len(subQuestions))
+	for i, sq := range subQuestions {
+		go func(subQuestionIndex int, subQuestion string) {
+			channelResults := e.retrieveChannelParallel(timeoutCtx, ragCtx, subQuestionIndex, subQuestion, plan)
+
+			if len(channelResults) == 0 {
+				ragCtx.AddRetrievalNotef("子问题%d没有可用的检索通道。", subQuestionIndex)
+				resultChan <- &rvo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
+				return
+			}
+
+			rawChannelResults := slice.Filter(channelResults, func(index int, result *RetrievalChannelResult) bool {
+				return len(result.Documents) > 0
+			})
+			filteredResults := slice.Map(rawChannelResults, func(index int, result *RetrievalChannelResult) *RetrievalChannelResult {
+				return e.applyEvidenceGate(result)
+			})
+
+			channelTraces := e.buildChannelTraces(rawChannelResults, filteredResults)
+
+			for _, r := range filteredResults {
+				if len(r.Documents) > 0 {
+					ragCtx.AddUsedChannel(r.ChannelName)
+				}
+			}
+
+			documents := e.fuseByRRF(filteredResults)
+			parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(timeoutCtx, documents, e.parentEvidenceMaxChars)
+			if err != nil {
+				Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+			}
+
+			rerankedCandidates := e.applyRerank(subQuestion, parentCandidates, usedChannels)
+
+			finalTopK := e.properties.FinalTopK
+			if finalTopK <= 0 {
+				finalTopK = 5
+			}
+			finalDocuments := make([]*ragCtx.DocumentCandidate, 0, len(rerankedCandidates))
+			for i, doc := range rerankedCandidates {
+				if i >= finalTopK {
+					break
+				}
+				finalDocuments = append(finalDocuments, doc)
+			}
+
+			ragCtx.AddRetrievalNotef(fmt.Sprintf("子问题%d检索完成：%s，final=%d",
+				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments)))
+
+			fusedCount := len(mergedCandidates)
+			parentCount := len(parentCandidates)
+			rerankedCount := len(rerankedCandidates)
+
+			// return &ragCtx.SubQuestionEvidence{
+			// 	SubQuestionIndex:       subQuestionIndex,
+			// 	SubQuestion:            subQuestion,
+			// 	Documents:              finalDocuments,
+			// 	References:             nil,
+			// 	ChannelTraces:          channelTraces,
+			// 	FusedCandidateCount:    &fusedCount,
+			// 	ParentCandidateCount:   &parentCount,
+			// 	RerankedCandidateCount: &rerankedCount,
+			// }
+		}(i+1, sq)
 	}
 
-	rawChannelResults := slice.Filter(channelResults, func(index int, result *RetrievalChannelResult) bool {
-		return len(result.Documents) > 0
-	})
-	filteredResults := slice.Map(rawChannelResults, func(index int, result *RetrievalChannelResult) *RetrievalChannelResult {
-		return e.applyEvidenceGate(result)
-	})
-
-	channelTraces := e.buildChannelTraces(rawChannelResults, filteredResults)
-
-	for _, r := range filteredResults {
-		if len(r.Documents) > 0 {
-			ragCtx.AddUsedChannel(r.ChannelName)
-		}
-	}
-
-	mergedCandidates := e.fuseByRRF(filteredResults)
-
-	elevationCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(elevationCtx, searchDocs, e.parentEvidenceMaxChars)
-	cancel()
-	if err != nil {
-		Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
-		parentSearchDocs = searchDocs
-	}
-	parentCandidates := ToDocumentCandidates(parentSearchDocs, "")
-
-	rerankedCandidates := e.applyRerank(subQuestion, parentCandidates, usedChannels, mu)
-
-	finalTopK := e.properties.FinalTopK
-	if finalTopK <= 0 {
-		finalTopK = 5
-	}
-	finalDocuments := make([]*ragCtx.DocumentCandidate, 0, len(rerankedCandidates))
-	for i, doc := range rerankedCandidates {
-		if i >= finalTopK {
-			break
-		}
-		finalDocuments = append(finalDocuments, doc)
-	}
-
-	ragCtx.AddRetrievalNotef(fmt.Sprintf("子问题%d检索完成：%s，final=%d",
-		subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments)))
-
-	fusedCount := len(mergedCandidates)
-	parentCount := len(parentCandidates)
-	rerankedCount := len(rerankedCandidates)
-
-	return &ragCtx.SubQuestionEvidence{
-		SubQuestionIndex:       subQuestionIndex,
-		SubQuestion:            subQuestion,
-		Documents:              finalDocuments,
-		References:             nil,
-		ChannelTraces:          channelTraces,
-		FusedCandidateCount:    &fusedCount,
-		ParentCandidateCount:   &parentCount,
-		RerankedCandidateCount: &rerankedCount,
-	}
 }
 
 // retrieveChannelParallel 并行检索单个子问题的所有通道
@@ -289,7 +265,7 @@ func (e *RagRetrievalEngine) accumulateRRF(channelResult *RetrievalChannelResult
 	}
 }
 
-func (e *RagRetrievalEngine) applyRerank(subQuestion string, candidates []*klvo.Document, usedChannels []string, mu *sync.Mutex) []*klvo.Document {
+func (e *RagRetrievalEngine) applyRerank(subQuestion string, candidates []*klvo.Document, usedChannels []string) []*klvo.Document {
 	if !e.properties.RerankEnabled || len(candidates) == 0 || e.rerankPostProcessor == nil {
 		return candidates
 	}

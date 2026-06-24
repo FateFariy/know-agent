@@ -219,7 +219,7 @@ func extractMeaningfulTerms(question string) []string {
 	if strutil.IsBlank(question) {
 		return nil
 	}
-	separators := regexp.MustCompile(`[\s、，,；:：:（）()\-的和及与或]+`)
+	separators := regexp.MustCompile(`[\s、，,；:：（）()\-的和及与或]+`)
 	segments := separators.Split(question, -1)
 	return stream.FromSlice(segments).
 		Map(func(s string) string { return strutil.Trim(s) }).
