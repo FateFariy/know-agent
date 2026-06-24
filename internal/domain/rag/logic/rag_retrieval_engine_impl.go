@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	kl "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
@@ -25,10 +26,12 @@ const rrfK = 60
 type RagRetrievalEngine struct {
 	channels                  []RetrievalChannel
 	documentKnowledgeLogic    kl.DocumentKnowledgeLogic
+	channelTimeout            time.Duration
 	subQuestionTimeout        time.Duration
 	minVectorSimilarity       float64
 	keywordRelativeScoreFloor float64
 	candidateTopK             int
+	parentEvidenceMaxChars    int
 }
 
 func NewRagRetrievalEngine(svcCtx *svc.ServiceContext, channels []RetrievalChannel, documentKnowledgeLogic kl.DocumentKnowledgeLogic) *RagRetrievalEngine {
@@ -36,9 +39,11 @@ func NewRagRetrievalEngine(svcCtx *svc.ServiceContext, channels []RetrievalChann
 		channels:                  channels,
 		documentKnowledgeLogic:    documentKnowledgeLogic,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
+		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
 		minVectorSimilarity:       svcCtx.Config.Chat.Rag.MinVectorSimilarity,
 		keywordRelativeScoreFloor: svcCtx.Config.Chat.Rag.KeywordRelativeScoreFloor,
 		candidateTopK:             svcCtx.Config.Chat.Rag.CandidateTopK,
+		parentEvidenceMaxChars:    svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars,
 	}
 }
 
@@ -122,9 +127,8 @@ func (e *RagRetrievalEngine) retrieveSingleSubQuestion(ctx context.Context, ragC
 
 	mergedCandidates := e.fuseByRRF(filteredResults)
 
-	searchDocs := ToSearchDocuments(mergedCandidates)
 	elevationCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(elevationCtx, searchDocs, e.properties.ParentEvidenceMaxChars)
+	parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(elevationCtx, searchDocs, e.parentEvidenceMaxChars)
 	cancel()
 	if err != nil {
 		Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
@@ -165,14 +169,22 @@ func (e *RagRetrievalEngine) retrieveSingleSubQuestion(ctx context.Context, ragC
 	}
 }
 
-// retrieveChannelParallel 检索单个子问题的所有通道
+// retrieveChannelParallel 并行检索单个子问题的所有通道
+// 使用goroutine并发执行各通道检索，通过超时控制防止阻塞，失败自动降级返回空结果
 func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *rvo.RagRetrievalContext, subQuestionIndex int, subQuestion string, plan *vo.ConversationExecutionPlan) []*RetrievalChannelResult {
+	// 创建带超时的上下文，超时时间为通道超时配置
+	timeoutCtx, cancel := context.WithTimeout(ctx, e.channelTimeout)
+	defer cancel()
+
+	// 创建结果通道，缓冲大小为通道数量，避免goroutine阻塞
 	resultCh := make(chan *RetrievalChannelResult, len(e.channels))
 	defer close(resultCh)
+
+	// 遍历所有通道，并行启动检索（仅执行支持当前计划的通道）
 	for _, channel := range e.channels {
 		if channel.Supports(plan) {
 			go func(ch RetrievalChannel) {
-				result, err := ch.Retrieve(ctx, subQuestion, plan)
+				result, err := ch.Retrieve(timeoutCtx, subQuestion, plan)
 				if err != nil {
 					Warnf("检索通道失败: subQuestionIndex=%d, subQuestion='%s', channel='%s', error=%v",
 						subQuestionIndex, subQuestion, ch.ChannelName(), err)
@@ -183,17 +195,21 @@ func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx
 			}(channel)
 		}
 	}
+
+	// 收集结果（或超时退出），确保不会无限等待
 	channelResults := make([]*RetrievalChannelResult, 0, len(e.channels))
 	for {
 		select {
 		case result := <-resultCh:
 			channelResults = append(channelResults, result)
-		case <-ctx.Done():
+		case <-timeoutCtx.Done():
 			return channelResults
 		}
 	}
 }
 
+// applyEvidenceGate 应用证据门限过滤
+// 根据通道类型应用不同的分数过滤策略，过滤掉置信度不足的文档
 func (e *RagRetrievalEngine) applyEvidenceGate(result *RetrievalChannelResult) *RetrievalChannelResult {
 	if result == nil || len(result.Documents) == 0 {
 		return result
@@ -202,10 +218,12 @@ func (e *RagRetrievalEngine) applyEvidenceGate(result *RetrievalChannelResult) *
 	var documents []*klvo.Document
 	switch result.ChannelName {
 	case "vector":
+		// 向量通道：使用绝对相似度阈值过滤
 		documents = slice.Filter(result.Documents, func(index int, doc *klvo.Document) bool {
 			return doc.Score >= e.minVectorSimilarity
 		})
 	case "keyword":
+		// 关键词通道：使用相对分数阈值过滤（相对于最高分）
 		maxScore := slices.MaxFunc(result.Documents, func(doc1, doc2 *klvo.Document) int { return int(doc1.Score - doc2.Score) }).Score
 		documents = slice.Filter(result.Documents, func(index int, doc *klvo.Document) bool {
 			return doc.Score >= (e.keywordRelativeScoreFloor * maxScore)
@@ -226,45 +244,35 @@ type candidateHolder struct {
 	channels map[string]struct{}
 }
 
+// fuseByRRF 融合多个通道的候选结果（基于RRF算法）
+// RRF(Reciprocal Rank Fusion)通过合并各通道的排名信息，计算综合分数，实现多通道结果融合
 func (e *RagRetrievalEngine) fuseByRRF(channelResults []*RetrievalChannelResult) []*klvo.Document {
 	holders := make(map[string]*candidateHolder)
 
+	// 遍历所有通道结果，累积计算RRF分数
 	for _, channelResult := range channelResults {
 		e.accumulateRRF(channelResult, holders)
 	}
 
-	values := make([]*candidateHolder, 0, len(holders))
-	for _, h := range holders {
-		values = append(values, h)
-	}
-
-	sort.Slice(values, func(i, j int) bool {
-		return values[i].score > values[j].score
-	})
-
-	result := make([]*klvo.Document, 0, len(values))
-	for i, holder := range values {
-		if i >= e.candidateTopK {
-			break
-		}
-		if holder.document.Meta == nil {
-			holder.document.Meta = make(map[string]interface{})
-		}
-		holder.document.Meta[MetaScore] = holder.score
-		holder.document.Meta[MetaRRFScore] = holder.score
-		if len(holder.channels) > 1 {
-			holder.document.Meta[MetaChannel] = "hybrid"
-		} else {
-			for ch := range holder.channels {
-				holder.document.Meta[MetaChannel] = ch
-				break
+	// 按RRF分数降序排序，取前N个文档
+	result := make([]*klvo.Document, 0, len(holders))
+	stream.FromSlice(maputil.Values(holders)).
+		Sorted(func(a, b *candidateHolder) bool { return a.score > b.score }).
+		Limit(e.candidateTopK).
+		ForEach(func(holder *candidateHolder) {
+			// 填充文档元数据（分数、通道来源）
+			if holder.document.Meta == nil {
+				holder.document.Meta = make(map[string]any)
 			}
-		}
-		result = append(result, holder.document)
-	}
+			holder.document.Meta[klvo.MetaScore] = holder.score
+			holder.document.Meta[klvo.MetaRRFScore] = holder.score
+			holder.document.Meta[klvo.MetaChannel] = utils.Ternary(len(holder.channels) > 1, "hybrid", maputil.Keys(holder.channels)[0])
+			result = append(result, holder.document)
+		})
 	return result
 }
 
+// accumulateRRF 计算文档的RRF分数
 func (e *RagRetrievalEngine) accumulateRRF(channelResult *RetrievalChannelResult, holders map[string]*candidateHolder) {
 	for rank, doc := range channelResult.Documents {
 		rrfScore := 1.0 / float64(rrfK+rank+1)

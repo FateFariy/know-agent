@@ -11,6 +11,7 @@ type Config struct {
 	Minio     MinioConf
 	Neo4j     Neo4jConf
 	MQ        MQConf
+	Embedding EmbeddingConf
 	Chat      ChatConf
 	ChatModel map[string]*LLMConf
 }
@@ -96,11 +97,26 @@ type RewriteConf struct {
 
 // RagConf RAG配置
 type RagConf struct {
-	Enabled                 bool   `json:",optional,default=true"` // 是否启用RAG
-	NoEvidenceReply         string `json:",optional"`              // 无证据时的回复
-	VectorTopK              int    `json:",optional,default=5"`    // 向量检索TopK
-	PlanningHistoryMaxChars int    `json:",optional,default=2000"` // 规划历史最大字符数
-	QuestionHistoryMaxChars int    `json:",optional,default=1000"` // 问题历史最大字符数
+	Enabled                   bool          `json:",optional,default=true"` // 是否启用RAG
+	NoEvidenceReply           string        `json:",optional"`              // 无证据时的回复
+	ChannelTimeout            time.Duration `json:",optional,default=5s"`   // 通道超时时间
+	SubQuestionTimeout        time.Duration `json:",optional,default=12s"`  // 子问题超时时间
+	KeywordTopK               int           `json:",optional,default=5"`    // 关键词检索TopK
+	VectorTopK                int           `json:",optional,default=5"`    // 向量检索TopK
+	ParentEvidenceMaxChars    int           `json:",optional,default=1024"` // 父证据最大字符数
+	CandidateTopK             int           `json:",optional,default=10"`   // 候选项TopK
+	MinVectorSimilarity       float64       `json:",optional,default=0.5"`  // 向量相似度阈值
+	KeywordRelativeScoreFloor float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
+	PlanningHistoryMaxChars   int           `json:",optional,default=2000"` // 规划历史最大字符数
+	QuestionHistoryMaxChars   int           `json:",optional,default=1000"` // 问题历史最大字符数
+}
+
+// EmbeddingConf 嵌入配置
+type EmbeddingConf struct {
+	Model      string // 模型名称
+	APIKey     string // API密钥
+	APIType    string `json:",omitempty,default=text,options=text|multi_model"` // API类型
+	Dimensions int    // 嵌入维度
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {
