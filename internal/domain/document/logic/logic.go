@@ -19,8 +19,8 @@ type LifecycleLogic interface {
 	// QueryDocumentDetail 查询文档详情
 	QueryDocumentDetail(ctx context.Context, documentId int64) (*entity.Document, error)
 
-	// // DeleteDocument 删除文档
-	// DeleteDocument(ctx context.Context, documentId int64) (string, error)
+	// DeleteDocument 删除文档
+	DeleteDocument(ctx context.Context, documentId int64) (string, error)
 
 	// QueryStrategyPlan 查询策略方案
 	QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error)

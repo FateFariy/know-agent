@@ -26,16 +26,20 @@ const (
 )
 
 type DocumentRepositoryImpl struct {
-	db  *gorm.DB
-	rdb *redis.Client
+	db      *gorm.DB
+	rdb     *redis.Client
+	vdb     adapter.VectorDB
+	storage adapter.Storage
 }
 
 var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
-func NewDocumentRepository(svcCtx *svc.ServiceContext) *DocumentRepositoryImpl {
+func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorDB) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
-		db:  svcCtx.Db,
-		rdb: svcCtx.Rdb,
+		db:      svcCtx.Db,
+		rdb:     svcCtx.Rdb,
+		storage: storage,
+		vdb:     vdb,
 	}
 }
 
@@ -57,6 +61,7 @@ func (d *DocumentRepositoryImpl) InsertDocumentAggregate(ctx context.Context, ag
 	})
 }
 
+// UpdateDocumentAggregate 更新文档聚合根
 func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, aggregate *aggregate.Document) error {
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Updates(convert.ToDocumentModel(aggregate.Document)).Error; err != nil {
@@ -72,6 +77,7 @@ func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, ag
 	})
 }
 
+// InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
 func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Updates(convert.ToDocumentModel(agg.Document)).Error; err != nil {
@@ -85,6 +91,64 @@ func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Con
 		}
 		return nil
 	})
+}
+
+// DeleteDocumentRelatedDataById 删除文档关联数据
+func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error) {
+	var documentName string
+	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		document, err := d.SelectDocumentById(ctx, documentId)
+		if err != nil {
+			return err
+		}
+		documentName = document.DocumentName
+
+		// 删除存储对象
+		if err = d.storage.DeleteObjects(ctx, []string{document.ObjectName, document.ParseTextPath}); err != nil {
+			return err
+		}
+
+		// 删除向量索引
+		if err = d.vdb.DeleteDocumentById(ctx, documentId); err != nil {
+			return err
+		}
+
+		// 删除其他索引（TODO: 实现关键词搜索、导航索引、知识路由索引、结构图投影）
+
+		// 删除相关数据
+		if err = d.DeleteProfileByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteTopicDocumentRelationByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteParentBlockByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteChunkByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteStructureNodeByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteTaskLogByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteStepByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteTaskByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeletePlanByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteDocumentById(ctx, documentId); err != nil {
+			return err
+		}
+		return nil
+	})
+	return documentName, err
 }
 
 // ========== 文档相关 ==========
@@ -117,9 +181,9 @@ func (d *DocumentRepositoryImpl) UpdateDocument(ctx context.Context, document *e
 	panic("implement me")
 }
 
+// DeleteDocumentById  根据ID删除文档
 func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("id = ?", documentId).Delete(&model.Document{}).Error
 }
 
 // ========== 任务相关 ==========
@@ -135,9 +199,9 @@ func (d *DocumentRepositoryImpl) UpdateTask(ctx context.Context, task *entity.Do
 	panic("implement me")
 }
 
+// DeleteTaskByDocumentId  根据文档ID删除任务
 func (d *DocumentRepositoryImpl) DeleteTaskByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTask{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error) {
@@ -186,9 +250,9 @@ func (d *DocumentRepositoryImpl) InsertTaskLog(ctx context.Context, log *entity.
 	panic("implement me")
 }
 
+// DeleteTaskLogByDocumentId  根据文档ID删除任务日志
 func (d *DocumentRepositoryImpl) DeleteTaskLogByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTaskLog{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectTaskLogPage(ctx context.Context, taskId int64, pageNo, pageSize int) ([]*entity.DocumentTaskLog, int64, error) {
@@ -208,9 +272,9 @@ func (d *DocumentRepositoryImpl) UpdatePlan(ctx context.Context, plan *entity.Do
 	panic("implement me")
 }
 
+// DeletePlanByDocumentId  根据文档ID删除方案/策略
 func (d *DocumentRepositoryImpl) DeletePlanByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyPlan{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int64) (*entity.DocumentStrategyPlan, error) {
@@ -241,9 +305,9 @@ func (d *DocumentRepositoryImpl) InsertStep(ctx context.Context, step *entity.Do
 	panic("implement me")
 }
 
+// DeleteStepByDocumentId  根据文档ID删除步骤
 func (d *DocumentRepositoryImpl) DeleteStepByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyStep{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error) {
@@ -282,9 +346,9 @@ func (d *DocumentRepositoryImpl) UpdateChunk(ctx context.Context, chunk *entity.
 	panic("implement me")
 }
 
+// DeleteChunkByDocumentId 根据文档ID删除块
 func (d *DocumentRepositoryImpl) DeleteChunkByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentChunk{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectChunkPage(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, error) {
@@ -314,9 +378,9 @@ func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blo
 	panic("implement me")
 }
 
+// DeleteParentBlockByDocumentId 根据文档ID删除父块
 func (d *DocumentRepositoryImpl) DeleteParentBlockByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentBlock{}).Error
 }
 
 func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentBlock, error) {
@@ -342,8 +406,7 @@ func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, n
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStructureNode{}).Error
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, documentId int64, nodeIds []int64) error {
@@ -358,19 +421,20 @@ func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context
 
 // ========== 属性相关 ==========
 
+// InsertProfile 插入文档属性
 func (d *DocumentRepositoryImpl) InsertProfile(ctx context.Context, profile *entity.DocumentProfile) error {
 	// TODO implement me
 	panic("implement me")
 }
 
+// DeleteProfileByDocumentId 根据文档ID删除文档属性
 func (d *DocumentRepositoryImpl) DeleteProfileByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentProfile{}).Error
 }
 
 // ========== 话题关联相关 ==========
 
+// DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 func (d *DocumentRepositoryImpl) DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.TopicDocumentRelation{}).Error
 }

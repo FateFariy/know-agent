@@ -38,3 +38,7 @@ type Storage interface {
 type MessageProducer interface {
 	Send(ctx context.Context, topic, key string, message any) error
 }
+
+type VectorDB interface {
+	DeleteDocumentById(ctx context.Context, documentId int64) error
+}

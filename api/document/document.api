@@ -11,12 +11,12 @@ info (
 type (
 	// 文档上传请求
 	UploadDocumentReq {
-		DocumentName       string `json:"documentName"` // 文档名称
-		OperatorId         int64  `json:"operatorId"` // 操作人ID
-		KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
-		KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
-		BusinessCategory   string `json:"businessCategory"` // 业务分类
-		DocumentTags       string `json:"documentTags"` // 文档标签
+		DocumentName       string `json:"documentName,optional"` // 文档名称
+		OperatorId         int64  `json:"operatorId,optional"` // 操作人ID
+		KnowledgeScopeCode string `json:"knowledgeScopeCode,optional"` // 知识范围编码
+		KnowledgeScopeName string `json:"knowledgeScopeName,optional"` // 知识范围名称
+		BusinessCategory   string `json:"businessCategory,optional"` // 业务分类
+		DocumentTags       string `json:"documentTags,optional"` // 文档标签
 	}
 	// 分页查询文档列表请求
 	QueryDocumentPageReq {
@@ -128,7 +128,8 @@ type (
 	}
 	// 删除文档响应
 	DeleteDocumentResp {
-		Success bool // 是否成功
+		DocumentId   int64  `json:"documentId"` // 文档ID
+		DocumentName string `json:"documentName"` // 文档名称
 	}
 	// 查询文档策略方案响应
 	QueryStrategyPlanResp {

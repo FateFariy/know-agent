@@ -7,10 +7,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
@@ -19,24 +19,25 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/config"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type LifecycleLogicImpl struct {
-	conf config.Config
-	port *adapter.DocumentPort
-	repo adapter.DocumentRepository
+	port       *adapter.DocumentPort
+	repo       adapter.DocumentRepository
+	parseTopic string
+	indexTopic string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
 func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
-		conf: svcCtx.Config,
-		port: port,
-		repo: repo,
+		port:       port,
+		repo:       repo,
+		parseTopic: svcCtx.Config.MQ.ParseTopic,
+		indexTopic: svcCtx.Config.MQ.IndexTopic,
 	}
 }
 
@@ -64,14 +65,14 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	documentId := utils.GetSnowflakeNextID()
 
 	// 上传原文件至MinIO存储
-	storedObjectInfo, err := d.port.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, header.Header.Get("Content-Type"))
+	storedObjectInfo, err := d.port.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, mimeType)
 	if err != nil {
 		return nil, err
 	}
 
 	// 填充文档实体字段
 	document.ID = documentId
-	document.DocumentName = utils.Ternary(strings.TrimSpace(document.DocumentName) != "", document.DocumentName, header.Filename)
+	document.DocumentName = utils.Ternary(strutil.IsNotBlank(document.DocumentName), strutil.Trim(document.DocumentName), header.Filename)
 	document.OriginalFileName = header.Filename
 	document.FileType = fileType
 	document.MimeType = mimeType
@@ -83,10 +84,10 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	document.ParseStatus = vo.ParseStatusParsing
 	document.StrategyStatus = vo.StrategyStatusWaitRecommend
 	document.IndexStatus = vo.IndexStatusWaitBuild
-	document.KnowledgeScopeCode = strings.TrimSpace(document.KnowledgeScopeCode)
-	document.KnowledgeScopeName = strings.TrimSpace(document.KnowledgeScopeName)
-	document.BusinessCategory = strings.TrimSpace(document.BusinessCategory)
-	document.DocumentTags = strings.TrimSpace(document.DocumentTags)
+	document.KnowledgeScopeCode = strutil.Trim(document.KnowledgeScopeCode)
+	document.KnowledgeScopeName = strutil.Trim(document.KnowledgeScopeName)
+	document.BusinessCategory = strutil.Trim(document.BusinessCategory)
+	document.DocumentTags = strutil.Trim(document.DocumentTags)
 
 	// 创建解析任务
 	taskId := utils.GetSnowflakeNextID()
@@ -129,7 +130,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 
 	// 发送解析消息至MQ，触发后续解析流程
 	parseMessage := map[string]any{"documentId": documentId, "taskId": taskId}
-	if err = d.port.Send(ctx, d.conf.MQ.ParseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
+	if err = d.port.Send(ctx, d.parseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
 		return nil, err
 	}
 
@@ -197,84 +198,19 @@ func (d *LifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId
 	return document, nil
 }
 
-// // DeleteDocument 删除文档
-// func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
-// 	document, err := d.repo.SelectDocumentById(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	// 检查是否有活跃任务
-// 	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskStatusNew, vo.TaskStatusRunning)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	if activeTaskCount > 0 {
-// 		return "", errorx.ErrDocumentStatusInvalid.Format("当前文档存在进行中的任务，请等待任务结束后再删除")
-// 	}
-//
-// 	// 删除存储对象
-// 	err = d.port.DeleteObjects(ctx, []string{document.ObjectName, document.ParseTextPath})
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	// 删除向量索引（TODO: 实现向量网关）
-// 	// d.vectorGateway.DeleteByDocumentId(documentId)
-//
-// 	// 删除其他索引（TODO: 实现关键词搜索、导航索引、知识路由索引、结构图投影）
-//
-// 	// 删除相关数据
-// 	err = d.repo.DeleteProfileByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteTopicDocumentRelationByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteParentBlockByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteChunkByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	// TODO: 删除结构化节点
-// 	// d.structureNodeService.DeleteByDocumentId(documentId)
-//
-// 	err = d.repo.DeleteTaskLogByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteStepByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteTaskByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeletePlanByDocumentId(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	err = d.repo.DeleteDocumentById(ctx, documentId)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	return "", nil
-// }
+// DeleteDocument 删除文档
+func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
+	// 检查是否有活跃任务
+	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, 0, vo.TaskStatusNew, vo.TaskStatusRunning)
+	if err != nil {
+		return "", err
+	}
+	if activeTaskCount > 0 {
+		return "", errorx.ErrDocumentStatusInvalid.Format("当前文档存在进行中的任务，请等待任务结束后再删除")
+	}
+
+	return d.repo.DeleteDocumentRelatedDataById(ctx, documentId)
+}
 
 // QueryStrategyPlan 查询策略方案
 func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error) {
@@ -587,7 +523,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 
 	// 发送MQ消息触发异步索引构建
 	indexBuildMessage := map[string]any{"documentId": documentId, "taskId": taskId, "planId": planId}
-	if err = d.port.Send(ctx, d.conf.MQ.IndexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
+	if err = d.port.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
 		return nil, err
 	}
 

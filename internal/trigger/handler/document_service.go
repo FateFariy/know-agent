@@ -3,7 +3,8 @@ package handler
 import (
 	"context"
 	"mime/multipart"
-	"strings"
+
+	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/internal/convert"
@@ -31,8 +32,7 @@ func (d *DocumentService) UploadDocument(ctx context.Context, file multipart.Fil
 
 // QueryDocumentPage 查询文档分页列表
 func (d *DocumentService) QueryDocumentPage(ctx context.Context, req *document.QueryDocumentPageReq) (*document.QueryDocumentPageResp, error) {
-	keyword := strings.TrimSpace(req.Keyword)
-	documents, total, err := d.l.QueryDocumentPage(ctx, req.PageNo, req.PageSize, keyword)
+	documents, total, err := d.l.QueryDocumentPage(ctx, req.PageNo, req.PageSize, strutil.Trim(req.Keyword))
 	return &document.QueryDocumentPageResp{
 		PageNo:   req.PageNo,
 		PageSize: req.PageSize,

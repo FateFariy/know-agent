@@ -20,6 +20,9 @@ type DocumentRepository interface {
 	// InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
 	InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
 
+	// DeleteDocumentRelatedDataById 删除文档关联数据
+	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
+
 	// ========== 文档相关 ==========
 
 	// SelectDocumentPage 分页查询文档
@@ -30,9 +33,6 @@ type DocumentRepository interface {
 
 	// UpdateDocument 更新文档
 	UpdateDocument(ctx context.Context, document *entity.Document) error
-
-	// DeleteDocumentById 删除文档
-	DeleteDocumentById(ctx context.Context, documentId int64) error
 
 	// ========== 任务相关 ==========
 
