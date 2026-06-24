@@ -54,6 +54,7 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, subQuestion strin
 
 	return &logic.RetrievalChannelResult{
 		ChannelName: c.ChannelName(),
+		Documents:   docs,
 	}, nil
 }
 

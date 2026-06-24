@@ -3,7 +3,7 @@ package channel
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	kl "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
@@ -32,12 +32,12 @@ func (c *KeywordRetrievalChannel) ChannelName() string {
 }
 
 // Supports 判断是否支持该执行计划
-func (c *KeywordRetrievalChannel) Supports(plan *vo.ConversationExecutionPlan) bool {
+func (c *KeywordRetrievalChannel) Supports(plan *cvo.ConversationExecutionPlan) bool {
 	return plan.SelectedDocumentId != 0
 }
 
 // Retrieve 执行关键词检索
-func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, subQuestion string, plan *vo.ConversationExecutionPlan) (*logic.RetrievalChannelResult, error) {
+func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, subQuestion string, plan *cvo.ConversationExecutionPlan) (*logic.RetrievalChannelResult, error) {
 	documentRetrieve := klvo.NewDocumentRetrieve(subQuestion, plan, c.keywordTopK)
 
 	docs, err := c.documentKnowledgeLogic.KeywordSearch(ctx, documentRetrieve)
@@ -48,5 +48,6 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, subQuestion stri
 
 	return &logic.RetrievalChannelResult{
 		ChannelName: c.ChannelName(),
+		Documents:   docs,
 	}, nil
 }
