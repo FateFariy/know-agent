@@ -7,7 +7,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -198,7 +197,7 @@ func (d *LifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId
 	return document, nil
 }
 
-// DeleteDocument 删除文档
+// DeleteDocument 删除文档 todo 删除其他索引,实现关键词搜索、导航索引、知识路由索引、结构图投影
 func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
 	// 检查是否有活跃任务
 	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, 0, vo.TaskStatusNew, vo.TaskStatusRunning)
@@ -231,13 +230,13 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 		if err != nil {
 			return nil, nil, err
 		}
+		plan.FillEnumNames()
 		plan.ParentPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeParent}
 		plan.ParentPipeline.FillAndProcessSteps(stepList)
 		plan.ChildPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeChild}
 		plan.ChildPipeline.FillAndProcessSteps(stepList)
 		document.PlanReady = true
 		document.FillEnumNames()
-		time.After(time.Second * 1)
 	}
 
 	return document, plan, nil

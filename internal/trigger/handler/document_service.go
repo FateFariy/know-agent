@@ -49,10 +49,11 @@ func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document
 
 // DeleteDocument 删除文档
 func (d *DocumentService) DeleteDocument(ctx context.Context, req *document.DeleteDocumentReq) (*document.DeleteDocumentResp, error) {
-	// TODO implement me
-	panic("implement me")
+	documentName, err := d.l.DeleteDocument(ctx, req.DocumentId)
+	return &document.DeleteDocumentResp{DocumentId: req.DocumentId, DocumentName: documentName}, err
 }
 
+// QueryStrategyPlan 查询策略计划
 func (d *DocumentService) QueryStrategyPlan(ctx context.Context, req *document.QueryStrategyPlanReq) (*document.QueryStrategyPlanResp, error) {
 	doc, plan, err := d.l.QueryStrategyPlan(ctx, req.DocumentId)
 	if err != nil {

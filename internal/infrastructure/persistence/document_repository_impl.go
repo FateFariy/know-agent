@@ -310,9 +310,12 @@ func (d *DocumentRepositoryImpl) DeleteStepByDocumentId(ctx context.Context, doc
 	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyStep{}).Error
 }
 
+// SelectStepListByPlanId  根据方案/策略ID查询步骤列表
 func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error) {
 	var steps []*entity.DocumentStrategyStep
-	res := d.db.WithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps)
+	if err := d.db.WithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps).Error; err != nil {
+		return nil, err
+	}
 	slices.SortFunc(steps, func(a, b *entity.DocumentStrategyStep) int {
 		if a.PipelineType != b.PipelineType {
 			return a.PipelineType - b.PipelineType
@@ -321,7 +324,7 @@ func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, pla
 		}
 		return int(a.ID - b.ID)
 	})
-	return steps, res.Error
+	return steps, nil
 }
 
 func (d *DocumentRepositoryImpl) UpdateStepExecuteStatus(ctx context.Context, planId int64, status int) error {
