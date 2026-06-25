@@ -294,8 +294,9 @@ func (d *DocumentRepositoryImpl) DeletePlanByDocumentId(ctx context.Context, doc
 	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyPlan{}).Error
 }
 
+// SelectPlanById 根据方案/策略ID获取方案/策略
 func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int64) (*entity.DocumentStrategyPlan, error) {
-	var plan = &entity.DocumentStrategyPlan{ID: planId}
+	plan := &entity.DocumentStrategyPlan{ID: planId}
 	if err := d.db.WithContext(ctx).Model(&model.DocumentStrategyPlan{}).First(plan).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrStrategyPlanNotFound.Format(planId)
@@ -305,9 +306,11 @@ func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int6
 	return plan, nil
 }
 
+// SelectLatestPlanVersion 根据文档ID获取最新方案/策略版本
 func (d *DocumentRepositoryImpl) SelectLatestPlanVersion(ctx context.Context, documentId int64) (int, error) {
-	// TODO implement me
-	panic("implement me")
+	plan := &model.DocumentStrategyPlan{DocumentId: documentId}
+	err := d.db.WithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error
+	return plan.PlanVersion, err
 }
 
 func (d *DocumentRepositoryImpl) UpdatePlanStatus(ctx context.Context, planId int64, status int) error {

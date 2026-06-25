@@ -26,8 +26,8 @@ type LifecycleLogic interface {
 	// QueryStrategyPlan 查询策略方案
 	QueryStrategyPlan(ctx context.Context, documentId int64) (*entity.Document, *entity.DocumentStrategyPlan, error)
 
-	// // ConfirmStrategy 确认策略
-	// ConfirmStrategy(ctx context.Context, req *vo.DocumentStrategyConfirm) (*vo.DocumentStrategyConfirmVo, error)
+	// ConfirmStrategy 确认策略
+	ConfirmStrategy(ctx context.Context, cmd *vo.DocumentStrategyConfirmCmd) (*entity.DocumentStrategyPlan, error)
 
 	// BuildIndex 构建索引
 	BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error)

@@ -48,7 +48,7 @@ type (
 	// 策略步骤项
 	StrategyStepItem {
 		StepNo       int `json:"stepNo"` // 步骤序号
-		StrategyType int `json:"strategyType"` // 策略类型
+		StrategyType int `json:"strategyType,options=1|2|3"` // 策略类型
 	}
 	// 执行文档索引构建请求
 	BuildIndexReq {

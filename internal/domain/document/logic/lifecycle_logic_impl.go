@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
@@ -232,10 +233,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 			return nil, nil, err
 		}
 		plan.FillEnumNames()
-		plan.ParentPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeParent}
-		plan.ParentPipeline.FillAndProcessSteps(stepList)
-		plan.ChildPipeline = &entity.DocumentStrategyPipeline{PipelineType: vo.PipelineTypeChild}
-		plan.ChildPipeline.FillAndProcessSteps(stepList)
+		plan.FillAndProcessPipeline(stepList)
 		document.PlanReady = true
 		document.FillEnumNames()
 	}
@@ -244,129 +242,113 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 }
 
 // ConfirmStrategy 确认策略
-func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
-	document, err := d.repo.SelectDocumentById(ctx, req.DocumentId)
+func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.DocumentStrategyConfirmCmd) (*entity.DocumentStrategyPlan, error) {
+	document, err := d.repo.SelectDocumentById(ctx, cmd.DocumentId)
 	if err != nil {
 		return nil, err
 	}
 
 	if document.ParseStatus != vo.ParseStatusParseSuccess {
-		return nil, common.NewBizError(DocumentManageCodeDocumentStatusInvalid, "当前文档还未完成解析，不能确认策略。")
+		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, "当前文档还未完成解析，不能确认策略。")
 	}
 
-	if document.CurrentPlanId != req.BasePlanId {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "当前文档的基础方案不存在或已切换。")
+	if document.CurrentPlanId != cmd.BasePlanId {
+		return nil, common.NewBizError(errorx.ErrStrategyPlanNotFound.Code, "当前文档的基础方案不存在或已切换。")
 	}
 
-	basePlan, err := d.repo.GetPlanById(ctx, req.BasePlanId)
-	if err != nil {
-		return nil, err
-	}
-	if basePlan == nil || basePlan.Status != int(entity.BusinessStatusYes) {
-		return nil, common.NewBizError(DocumentManageCodeStrategyPlanNotFound, "策略方案不存在")
-	}
-
-	baseStepList, err := d.repo.QueryStepListByPlanId(ctx, basePlan.Id)
+	basePlan, err := d.repo.SelectPlanById(ctx, cmd.BasePlanId)
 	if err != nil {
 		return nil, err
 	}
 
-	requestParentTypeList := d.extractStrategyTypes(req.ParentSteps)
-	requestChildTypeList := d.extractStrategyTypes(req.ChildSteps)
+	baseStepList, err := d.repo.SelectStepListByPlanId(ctx, basePlan.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	extractStrategyTypes := func(steps []*vo.DocumentStrategyStepItem) []int {
+		slice.SortBy(steps, func(a, b *vo.DocumentStrategyStepItem) bool { return a.StepNo < b.StepNo })
+		return slice.Map(steps, func(index int, item *vo.DocumentStrategyStepItem) int { return item.StrategyType })
+	}
+	parentTypeList := extractStrategyTypes(cmd.ParentSteps)
+	childTypeList := extractStrategyTypes(cmd.ChildSteps)
 
 	// TODO: 实现策略标准化
 	// normalizedStepList := d.strategyService.NormalizeSteps(basePlan, baseStepList, requestParentTypeList, requestChildTypeList, req.DocumentId)
 	normalizedStepList := baseStepList
 
+	if len(normalizedStepList) == 0 {
+		return nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "策略步骤不能为空。")
+	}
+
 	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeParent)
 	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeChild)
-
 	if len(normalizedParentTypeList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "父块流水线不能为空。")
+		return nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "父块流水线不能为空。")
 	}
 	if len(normalizedChildTypeList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "子块流水线不能为空。")
-	}
-
-	if len(normalizedStepList) == 0 {
-		return nil, common.NewBizError(DocumentManageCodeStrategyStepEmpty, "策略步骤不能为空。")
+		return nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "子块流水线不能为空。")
 	}
 
 	baseParentTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeParent)
 	baseChildTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeChild)
 
-	requestDistinctParentTypeList := d.distinctIntList(requestParentTypeList)
-	requestDistinctChildTypeList := d.distinctIntList(requestChildTypeList)
+	distinctParentTypeList := d.distinctIntList(parentTypeList)
+	distinctChildTypeList := d.distinctIntList(childTypeList)
 
-	normalized := !d.intListEqual(requestDistinctParentTypeList, normalizedParentTypeList) ||
-		!d.intListEqual(requestDistinctChildTypeList, normalizedChildTypeList)
+	normalized := slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
 
-	changed := !d.intListEqual(baseParentTypeList, normalizedParentTypeList) ||
-		!d.intListEqual(baseChildTypeList, normalizedChildTypeList)
+	changed := !slice.Equal(baseParentTypeList, normalizedParentTypeList) || !slice.Equal(baseChildTypeList, normalizedChildTypeList)
 
 	var targetPlanId int64
 	var targetPlanVersion int
 	var targetStepList []*entity.DocumentStrategyStep
 
 	if !changed {
-		basePlan.PlanStatus = int(vo.PlanStatusConfirmed)
-		if basePlan.PlanSource == 0 {
-			basePlan.PlanSource = int(vo.PlanSourceSystemRecommend)
-		}
-		basePlan.AdjustNote = req.AdjustNote
-		basePlan.ConfirmUserId = d.parseOptionalLong(req.OperatorId)
-		basePlan.ConfirmTime = time.Now().UnixMilli()
-		err = d.repo.UpdatePlan(ctx, basePlan)
-		if err != nil {
+		basePlan.PlanStatus = vo.PlanStatusConfirmed
+		basePlan.PlanSource = utils.Ternary(basePlan.PlanSource == 0, vo.PlanSourceSystemRecommend, basePlan.PlanSource)
+		basePlan.AdjustNote = cmd.AdjustNote
+		basePlan.ConfirmUserId = cmd.OperatorId
+		basePlan.ConfirmTime = time.Now()
+		if err = d.repo.UpdatePlan(ctx, basePlan); err != nil {
 			return nil, err
 		}
-		targetPlanId = basePlan.Id
+		targetPlanId = basePlan.ID
 		targetPlanVersion = basePlan.PlanVersion
 		targetStepList = baseStepList
 	} else {
-		basePlan.PlanStatus = int(vo.PlanStatusDiscarded)
-		err = d.repo.UpdatePlan(ctx, basePlan)
-		if err != nil {
+		basePlan.PlanStatus = vo.PlanStatusDiscarded
+		if err = d.repo.UpdatePlan(ctx, basePlan); err != nil {
 			return nil, err
 		}
 
 		newPlanId := utils.GetSnowflakeNextID()
-		newPlanVersion, err := d.repo.GetLatestPlanVersion(ctx, document.Id)
+		latestPlanVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
 		if err != nil {
 			return nil, err
 		}
-		if newPlanVersion == 0 {
-			newPlanVersion = 1
-		}
 
 		newPlan := &entity.DocumentStrategyPlan{
-			Model: common.Model{
-				Id:         newPlanId,
-				CreateTime: time.Now().UnixMilli(),
-				EditTime:   time.Now().UnixMilli(),
-				Status:     int(entity.BusinessStatusYes),
-			},
-			DocumentId:       document.Id,
-			PlanVersion:      newPlanVersion,
-			PlanSource:       int(vo.PlanSourceUserAdjust),
-			PlanStatus:       int(vo.PlanStatusConfirmed),
+			ID:               newPlanId,
+			DocumentId:       document.ID,
+			PlanVersion:      latestPlanVersion + 1,
+			PlanSource:       vo.PlanSourceUserAdjust,
+			PlanStatus:       vo.PlanStatusConfirmed,
 			StrategyCount:    len(normalizedStepList),
 			StrategySnapshot: d.buildStrategySnapshot(normalizedStepList),
 			RecommendReason:  basePlan.RecommendReason,
-			AdjustNote:       req.AdjustNote,
-			ConfirmUserId:    d.parseOptionalLong(req.OperatorId),
-			ConfirmTime:      time.Now().UnixMilli(),
+			AdjustNote:       cmd.AdjustNote,
+			ConfirmUserId:    cmd.OperatorId,
+			ConfirmTime:      time.Now(),
 		}
 
-		err = d.repo.InsertPlan(ctx, newPlan)
-		if err != nil {
+		if err = d.repo.InsertPlan(ctx, newPlan); err != nil {
 			return nil, err
 		}
 
 		for _, step := range normalizedStepList {
-			step.Id = utils.GetSnowflakeNextID()
+			step.ID = utils.GetSnowflakeNextID()
 			step.PlanId = newPlanId
-			step.Status = int(entity.BusinessStatusYes)
 			err = d.repo.InsertStep(ctx, step)
 			if err != nil {
 				return nil, err
@@ -374,73 +356,74 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.Do
 		}
 
 		targetPlanId = newPlanId
-		targetPlanVersion = newPlanVersion
+		targetPlanVersion = latestPlanVersion + 1
 		targetStepList = normalizedStepList
 	}
 
 	document.CurrentPlanId = targetPlanId
-	document.StrategyStatus = int(vo.StrategyStatusConfirmed)
+	document.StrategyStatus = vo.StrategyStatusConfirmed
 	err = d.repo.UpdateDocument(ctx, document)
 	if err != nil {
 		return nil, err
 	}
 
-	latestParseTask, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeParseRoute))
+	latestParseTask, err := d.repo.SelectLatestTask(ctx, document.ID)
 	if err != nil {
 		return nil, err
 	}
 	if latestParseTask != nil {
-		latestParseTask.CurrentStage = int(vo.TaskStageStrategyConfirm)
+		latestParseTask.CurrentStage = vo.TaskStageStrategyConfirm
 		err = d.repo.UpdateTask(ctx, latestParseTask)
 		if err != nil {
 			return nil, err
 		}
+		logRecord := &entity.DocumentTaskLog{
+			TaskId:       latestParseTask.ID,
+			DocumentId:   document.ID,
+			StageType:    vo.TaskStageStrategyConfirm,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+			OperatorId:   cmd.OperatorId,
+		}
 
 		if changed {
-			err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
-				int(vo.TaskStageStrategyConfirm),
-				int(vo.TaskEventUserAdjust),
-				int(vo.LogLevelInfo),
-				d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-				d.parseOptionalLong(req.OperatorId),
-				"用户调整了系统推荐策略。",
-				d.detail(
-					"parentStrategyTypes", normalizedParentTypeList,
-					"childStrategyTypes", normalizedChildTypeList,
-					"adjustNote", req.AdjustNote,
-				))
+			detailJson, _ := json.Marshal(map[string]any{
+				"parentStrategyTypes": normalizedParentTypeList,
+				"childStrategyTypes":  normalizedChildTypeList,
+				"adjustNote":          cmd.AdjustNote,
+			})
+			logRecord.ID = utils.GetSnowflakeNextID()
+			logRecord.EventType = vo.TaskEventUserAdjust
+			logRecord.Content = "用户调整了系统推荐策略。"
+			logRecord.DetailJson = string(detailJson)
+			err = d.repo.InsertTaskLog(ctx, logRecord)
 			if err != nil {
 				return nil, err
 			}
 		}
-
-		err = d.saveTaskLog(ctx, latestParseTask.ID, document.Id,
-			int(vo.TaskStageStrategyConfirm),
-			int(vo.TaskEventUserConfirm),
-			int(vo.LogLevelInfo),
-			d.resolveOperatorType(d.parseOptionalLong(req.OperatorId)),
-			d.parseOptionalLong(req.OperatorId),
-			"用户已确认最终策略方案。",
-			map[string]any{
-				"planId":              targetPlanId,
-				"parentStrategyTypes": normalizedParentTypeList,
-				"childStrategyTypes":  normalizedChildTypeList,
-			})
+		detailJson, _ := json.Marshal(map[string]any{
+			"planId":              targetPlanId,
+			"parentStrategyTypes": normalizedParentTypeList,
+			"childStrategyTypes":  normalizedChildTypeList,
+		})
+		logRecord.ID = utils.GetSnowflakeNextID()
+		logRecord.EventType = vo.TaskEventUserConfirm
+		logRecord.Content = "用户确认了最终策略方案。"
+		logRecord.DetailJson = string(detailJson)
+		err = d.repo.InsertTaskLog(ctx, logRecord)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return &vo.DocumentStrategyConfirmVo{
-		DocumentId:        document.Id,
-		PlanId:            targetPlanId,
-		PlanVersion:       targetPlanVersion,
-		StrategyStatus:    document.StrategyStatus,
-		StrategyStatusMsg: d.enumMsg(vo.StrategyStatus(document.StrategyStatus)),
-		Normalized:        normalized,
-		ParentPipeline:    d.toPipelineVo(vo.PipelineTypeParent, targetStepList),
-		ChildPipeline:     d.toPipelineVo(vo.PipelineTypeChild, targetStepList),
-	}, nil
+	plan := &entity.DocumentStrategyPlan{
+		ID:          targetPlanId,
+		DocumentId:  document.ID,
+		PlanVersion: targetPlanVersion,
+		Normalized:  normalized,
+	}
+	plan.FillAndProcessPipeline(targetStepList)
+	return plan, nil
 }
 
 // BuildIndex 构建文档索引
@@ -490,7 +473,6 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		CurrentStage:     vo.TaskStageChunkExecute,                                                    // 当前阶段：切分执行
 		TriggerSource:    utils.Ternary(operatorId > 0, vo.TriggerSourceUser, vo.TriggerSourceSystem), // 判断触发来源
 		StrategySnapshot: plan.StrategySnapshot,                                                       // 策略快照，确保任务执行时策略不变
-		RetryCount:       0,                                                                           // 重试次数初始化为0
 	}
 
 	// 构建任务日志详情JSON
@@ -670,39 +652,6 @@ func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pa
 	return task, total, nil
 }
 
-//	func (d *LifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]any) error {
-//		// TODO: 序列化detail为JSON
-//		detailJson := ""
-//		if len(detail) > 0 {
-//			// 简化实现，实际应使用json.Marshal
-//			var parts []string
-//			for k, v := range detail {
-//				parts = append(parts, fmt.Sprintf("%s:%v", k, v))
-//			}
-//			detailJson = "{" + strings.Join(parts, ", ") + "}"
-//		}
-//
-//		logRecord := &entity.DocumentTaskLog{
-//			Model: common.Model{
-//				Id:         utils.GetSnowflakeNextID(),
-//				CreateTime: time.Now().UnixMilli(),
-//				EditTime:   time.Now().UnixMilli(),
-//				Status:     int(entity.BusinessStatusYes),
-//			},
-//			TaskId:       taskId,
-//			DocumentId:   documentId,
-//			StageType:    stageType,
-//			EventType:    eventType,
-//			LogLevel:     logLevel,
-//			OperatorType: operatorType,
-//			OperatorId:   operatorId,
-//			Content:      content,
-//			DetailJson:   detailJson,
-//		}
-//
-//		return d.repo.InsertTaskLog(ctx, logRecord)
-//	}
-
 // getChunkTaskId 获取文档块任务ID
 func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, document *entity.Document) int64 {
 	taskId = utils.Ternary(taskId == 0, document.LastIndexTaskId, taskId)
@@ -716,168 +665,20 @@ func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, d
 	return taskId
 }
 
-// 	// 按步骤序号排序
-// 	sort.Slice(pipelineSteps, func(i, j int) bool {
-// 		return pipelineSteps[i].StepNo < pipelineSteps[j].StepNo
-// 	})
-//
-// 	// 构建策略快照
-// 	var snapshotParts []string
-// 	for _, step := range pipelineSteps {
-// 		snapshotParts = append(snapshotParts, strconv.Itoa(step.StrategyType))
-// 	}
-// 	snapshot := strings.Join(snapshotParts, ",")
-//
-// 	return &vo.DocumentStrategyPipelineVo{
-// 		PipelineType:     int(pipelineType),
-// 		PipelineTypeMsg:  d.enumMsg(pipelineType),
-// 		StrategySnapshot: snapshot,
-// 		Steps:            d.toStepVoList(pipelineSteps),
-// 	}
-// }
-//
-// func (d *LifecycleLogicImpl) toStepVoList(stepList []*entity.DocumentStrategyStep) []*vo.DocumentStrategyStepVo {
-// 	// 排序
-// 	sortedSteps := make([]*entity.DocumentStrategyStep, len(stepList))
-// 	copy(sortedSteps, stepList)
-// 	sort.Slice(sortedSteps, func(i, j int) bool {
-// 		orderI := d.pipelineOrder(sortedSteps[i].PipelineType)
-// 		orderJ := d.pipelineOrder(sortedSteps[j].PipelineType)
-// 		if orderI != orderJ {
-// 			return orderI < orderJ
-// 		}
-// 		if sortedSteps[i].StepNo != sortedSteps[j].StepNo {
-// 			return sortedSteps[i].StepNo < sortedSteps[j].StepNo
-// 		}
-// 		return sortedSteps[i].Id < sortedSteps[j].Id
-// 	})
-//
-// 	voList := make([]*vo.DocumentStrategyStepVo, 0, len(sortedSteps))
-// 	for _, step := range sortedSteps {
-// 		voList = append(voList, &vo.DocumentStrategyStepVo{
-// 			StepNo:           step.StepNo,
-// 			PipelineType:     d.parsePipelineType(step.PipelineType),
-// 			PipelineTypeMsg:  d.enumMsg(vo.PipelineType(d.parsePipelineType(step.PipelineType))),
-// 			StrategyType:     step.StrategyType,
-// 			StrategyTypeMsg:  d.enumMsg(vo.StrategyType(step.StrategyType)),
-// 			StrategyRole:     step.StrategyRole,
-// 			StrategyRoleMsg:  d.enumMsg(vo.StrategyRole(step.StrategyRole)),
-// 			SourceType:       step.SourceType,
-// 			SourceTypeMsg:    d.enumMsg(vo.StrategySourceType(step.SourceType)),
-// 			ExecuteStatus:    step.ExecuteStatus,
-// 			ExecuteStatusMsg: d.enumMsg(vo.ExecuteStatus(step.ExecuteStatus)),
-// 			RecommendReason:  step.RecommendReason,
-// 		})
-// 	}
-// 	return voList
-// }
-//
-// // ===== 工具方法 =====
-//
-// func (d *LifecycleLogicImpl) extractStrategyTypes(items []*entity.DocumentStrategyStepItemDto) []int {
-// 	if items == nil {
-// 		return []int{}
-// 	}
-// 	// 按步骤序号排序
-// 	sortedItems := make([]*entity.DocumentStrategyStepItemDto, len(items))
-// 	copy(sortedItems, items)
-// 	sort.Slice(sortedItems, func(i, j int) bool {
-// 		noI := sortedItems[i].StepNo
-// 		noJ := sortedItems[j].StepNo
-// 		if noI == 0 {
-// 			noI = int(^uint(0) >> 1) // max int
-// 		}
-// 		if noJ == 0 {
-// 			noJ = int(^uint(0) >> 1)
-// 		}
-// 		return noI < noJ
-// 	})
-//
-// 	result := make([]int, 0, len(sortedItems))
-// 	for _, item := range sortedItems {
-// 		if item.StrategyType > 0 {
-// 			result = append(result, item.StrategyType)
-// 		}
-// 	}
-// 	return result
-// }
-//
-// func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
-// 	result := make([]*entity.DocumentStrategyStep, 0)
-// 	for _, step := range stepList {
-// 		pt := step.PipelineType
-// 		if pt == "" {
-// 			pt = "CHILD"
-// 		}
-// 		if strings.EqualFold(pt, vo.PipelineType(pipelineType).String()) {
-// 			result = append(result, step)
-// 		}
-// 	}
-//
-// 	sort.Slice(result, func(i, j int) bool {
-// 		return result[i].StepNo < result[j].StepNo
-// 	})
-//
-// 	types := make([]int, 0, len(result))
-// 	for _, step := range result {
-// 		types = append(types, step.StrategyType)
-// 	}
-// 	return types
-// }
-//
-// func (d *LifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
-// 	parentVo := d.toPipelineVo(vo.PipelineTypeParent, stepList)
-// 	childVo := d.toPipelineVo(vo.PipelineTypeChild, stepList)
-// 	return "PARENT:" + parentVo.StrategySnapshot + ";CHILD:" + childVo.StrategySnapshot
-// }
-//
-// func (d *LifecycleLogicImpl) pipelineOrder(pipelineType string) int {
-// 	if strings.EqualFold(pipelineType, "PARENT") {
-// 		return 0
-// 	}
-// 	return 1
-// }
-//
-// func (d *LifecycleLogicImpl) parsePipelineType(pipelineType string) int {
-// 	if strings.EqualFold(pipelineType, "PARENT") {
-// 		return int(vo.PipelineTypeParent)
-// 	}
-// 	return int(vo.PipelineTypeChild)
-// }
-//
-// func (d *LifecycleLogicImpl) parseRequiredLong(rawValue, fieldName string) int64 {
-// 	if strings.TrimSpace(rawValue) == "" {
-// 		panic(common.NewBizError(BaseCodeParameterError, fieldName+"不能为空。"))
-// 	}
-// 	value, err := strconv.ParseInt(rawValue, 10, 64)
-// 	if err != nil || value <= 0 {
-// 		panic(common.NewBizError(BaseCodeParameterError, fieldName+"格式不正确。"))
-// 	}
-// 	return value
-// }
-//
-//
-// func (d *LifecycleLogicImpl) distinctIntList(list []int) []int {
-// 	seen := make(map[int]bool)
-// 	result := make([]int, 0)
-// 	for _, v := range list {
-// 		if !seen[v] {
-// 			seen[v] = true
-// 			result = append(result, v)
-// 		}
-// 	}
-// 	return result
-// }
-//
-// func (d *LifecycleLogicImpl) intListEqual(a, b []int) bool {
-// 	if len(a) != len(b) {
-// 		return false
-// 	}
-// 	for i := range a {
-// 		if a[i] != b[i] {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
-//
+// extractPipelineTypes 提取流水线类型
+func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
+	result := slice.Filter(stepList, func(index int, item *entity.DocumentStrategyStep) bool { return item.PipelineType == pipelineType })
+	slice.SortBy(result, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
+	return slice.Map(result, func(index int, item *entity.DocumentStrategyStep) int { return item.PipelineType })
+}
+
+// buildStrategySnapshot 构建策略快照
+func (d *LifecycleLogicImpl) buildStrategySnapshot(stepList []*entity.DocumentStrategyStep) string {
+	parentPipeline := entity.NewDocumentStrategyPipeline(vo.PipelineTypeParent, stepList)
+	childPipeline := entity.NewDocumentStrategyPipeline(vo.PipelineTypeChild, stepList)
+	return "PARENT:" + parentPipeline.StrategySnapshot + ";CHILD:" + childPipeline.StrategySnapshot
+}
+
+func (d *LifecycleLogicImpl) distinctIntList(list []int) []int {
+	return stream.FromSlice(list).Distinct().ToSlice()
+}

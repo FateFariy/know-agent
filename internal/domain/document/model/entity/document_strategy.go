@@ -3,6 +3,7 @@ package entity
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -20,16 +21,22 @@ type DocumentStrategyPlan struct {
 	RecommendReason  string                    `gorm:"column:recommend_reason"`  // 推荐理由
 	AdjustNote       string                    `gorm:"column:adjust_note"`       // 调整备注
 	ConfirmUserId    int64                     `gorm:"column:confirm_user_id"`   // 确认人ID
-	ConfirmTime      int64                     `gorm:"column:confirm_time"`      // 确认时间
+	ConfirmTime      time.Time                 `gorm:"column:confirm_time"`      // 确认时间
 	PlanSourceName   string                    `gorm:"-"`                        // 方案来源名称
 	PlanStatusName   string                    `gorm:"-"`                        // 方案状态名称
+	Normalized       bool                      `gorm:"-"`                        // 是否归一化
 	ParentPipeline   *DocumentStrategyPipeline `gorm:"-"`                        // 父级流水线
 	ChildPipeline    *DocumentStrategyPipeline `gorm:"-"`                        // 子级流水线
 }
 
 func (d *DocumentStrategyPlan) FillEnumNames() {
-	d.PlanSourceName = vo.StrategySourceTypeName(d.PlanSource)
-	d.PlanStatusName = vo.StrategyStatusName(d.PlanStatus)
+	d.PlanSourceName = vo.PlanSourceName(d.PlanSource)
+	d.PlanStatusName = vo.ParseStatusName(d.PlanStatus)
+}
+
+func (d *DocumentStrategyPlan) FillAndProcessPipeline(stepList []*DocumentStrategyStep) {
+	d.ParentPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeParent, stepList)
+	d.ChildPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeChild, stepList)
 }
 
 // DocumentStrategyStep 策略步骤实体
@@ -64,6 +71,12 @@ type DocumentStrategyPipeline struct {
 	PipelineTypeName string
 	StrategySnapshot string
 	Steps            []*DocumentStrategyStep
+}
+
+func NewDocumentStrategyPipeline(pipelineType int, stepList []*DocumentStrategyStep) *DocumentStrategyPipeline {
+	pipeline := &DocumentStrategyPipeline{PipelineType: pipelineType}
+	pipeline.FillAndProcessSteps(stepList)
+	return pipeline
 }
 
 func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrategyStep) {

@@ -239,8 +239,8 @@ type QueryTaskLogsResp struct {
 }
 
 type StrategyStepItem struct {
-	StepNo       int `json:"stepNo"`       // 步骤序号
-	StrategyType int `json:"strategyType"` // 策略类型
+	StepNo       int `json:"stepNo"`                     // 步骤序号
+	StrategyType int `json:"strategyType,options=1|2|3"` // 策略类型
 }
 
 type TaskLog struct {
