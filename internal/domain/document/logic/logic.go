@@ -4,6 +4,7 @@ import (
 	"context"
 	"mime/multipart"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
@@ -32,10 +33,10 @@ type LifecycleLogic interface {
 	BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error)
 
 	// QueryDocumentChunks 查询文档块
-	QueryDocumentChunks(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, error)
+	QueryDocumentChunks(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, int64, error)
 
 	// QueryDocumentChunkDetail 查询文档块详情
-	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVO, error)
+	QueryDocumentChunkDetail(ctx context.Context, documentId, taskId, chunkId int64) (*aggregate.DocumentChunkDetail, error)
 
 	// QueryTaskLogs 查询任务日志
 	QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error)

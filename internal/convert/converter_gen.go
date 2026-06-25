@@ -9,6 +9,7 @@ import (
 	common "github.com/swiftbit/know-agent/common"
 	entity "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	aggregate "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
@@ -139,6 +140,16 @@ func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 		pDocumentBuildIndexResp = &documentBuildIndexResp
 	}
 	return pDocumentBuildIndexResp
+}
+func ToDocumentChunkItemList(source []*entity1.DocumentChunk) []*document.DocumentChunkItem {
+	var pDocumentDocumentChunkItemList []*document.DocumentChunkItem
+	if source != nil {
+		pDocumentDocumentChunkItemList = make([]*document.DocumentChunkItem, len(source))
+		for i := 0; i < len(source); i++ {
+			pDocumentDocumentChunkItemList[i] = pEntityDocumentChunkToPDocumentDocumentChunkItem(source[i])
+		}
+	}
+	return pDocumentDocumentChunkItemList
 }
 func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
@@ -280,6 +291,20 @@ func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 	}
 	return pModelDocumentTask
 }
+func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
+	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
+	if source != nil {
+		var documentQueryDocumentChunkDetailResp document.QueryDocumentChunkDetailResp
+		documentQueryDocumentChunkDetailResp.DocumentId = (*source).DocumentId
+		documentQueryDocumentChunkDetailResp.TaskId = (*source).TaskId
+		documentQueryDocumentChunkDetailResp.PlanId = (*source).PlanId
+		documentQueryDocumentChunkDetailResp.Chunk = pEntityDocumentChunkToPDocumentDocumentChunkItem((*source).Chunk)
+		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentBlockToPDocumentDocumentParentBlockItem((*source).ParentBlock)
+		documentQueryDocumentChunkDetailResp.SiblingChunks = ToDocumentChunkItemList((*source).SiblingChunks)
+		pDocumentQueryDocumentChunkDetailResp = &documentQueryDocumentChunkDetailResp
+	}
+	return pDocumentQueryDocumentChunkDetailResp
+}
 func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPlanResp {
 	var pDocumentQueryStrategyPlanResp *document.QueryStrategyPlanResp
 	if source != nil {
@@ -338,6 +363,45 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 		pDocumentUploadDocumentResp = &documentUploadDocumentResp
 	}
 	return pDocumentUploadDocumentResp
+}
+func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentChunk) *document.DocumentChunkItem {
+	var pDocumentDocumentChunkItem *document.DocumentChunkItem
+	if source != nil {
+		var documentDocumentChunkItem document.DocumentChunkItem
+		documentDocumentChunkItem.ParentBlockId = (*source).ParentBlockId
+		documentDocumentChunkItem.ParentBlockNo = (*source).ParentBlockNo
+		documentDocumentChunkItem.ParentChildCount = (*source).ParentChildCount
+		documentDocumentChunkItem.ParentStartChunkNo = (*source).ParentStartChunkNo
+		documentDocumentChunkItem.ParentEndChunkNo = (*source).ParentEndChunkNo
+		documentDocumentChunkItem.ChunkNo = (*source).ChunkNo
+		documentDocumentChunkItem.SectionPath = (*source).SectionPath
+		documentDocumentChunkItem.SourceType = (*source).SourceType
+		documentDocumentChunkItem.SourceTypeName = (*source).SourceTypeName
+		documentDocumentChunkItem.CharCount = (*source).CharCount
+		documentDocumentChunkItem.TokenCount = (*source).TokenCount
+		documentDocumentChunkItem.VectorStatus = (*source).VectorStatus
+		documentDocumentChunkItem.VectorStatusName = (*source).VectorStatusName
+		documentDocumentChunkItem.ChunkText = (*source).ChunkText
+		pDocumentDocumentChunkItem = &documentDocumentChunkItem
+	}
+	return pDocumentDocumentChunkItem
+}
+func pEntityDocumentParentBlockToPDocumentDocumentParentBlockItem(source *entity1.DocumentParentBlock) *document.DocumentParentBlockItem {
+	var pDocumentDocumentParentBlockItem *document.DocumentParentBlockItem
+	if source != nil {
+		var documentDocumentParentBlockItem document.DocumentParentBlockItem
+		documentDocumentParentBlockItem.SectionPath = (*source).SectionPath
+		documentDocumentParentBlockItem.SourceType = (*source).SourceType
+		documentDocumentParentBlockItem.SourceTypeName = (*source).SourceTypeName
+		documentDocumentParentBlockItem.CharCount = (*source).CharCount
+		documentDocumentParentBlockItem.TokenCount = (*source).TokenCount
+		documentDocumentParentBlockItem.ChildCount = (*source).ChildCount
+		documentDocumentParentBlockItem.StartChunkNo = (*source).StartChunkNo
+		documentDocumentParentBlockItem.EndChunkNo = (*source).EndChunkNo
+		documentDocumentParentBlockItem.ParentText = (*source).ParentText
+		pDocumentDocumentParentBlockItem = &documentDocumentParentBlockItem
+	}
+	return pDocumentDocumentParentBlockItem
 }
 func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity1.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline

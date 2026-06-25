@@ -245,7 +245,7 @@ func (d *LifecycleLogicImpl) QueryStrategyPlan(ctx context.Context, documentId i
 
 // ConfirmStrategy 确认策略
 func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, req *entity.DocumentStrategyConfirmDto) (*vo.DocumentStrategyConfirmVo, error) {
-	document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
+	document, err := d.repo.SelectDocumentById(ctx, req.DocumentId)
 	if err != nil {
 		return nil, err
 	}
@@ -540,168 +540,136 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	return indexBuild, nil
 }
 
-// QueryDocumentChunks 查询文档块
-
-func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, error) {
-	document, err := d.getDocumentOrThrow(ctx, documentId)
+// QueryDocumentChunks 分页查询文档块列表
+// 支持按任务ID查询，taskId为0时使用文档当前任务，返回文档块列表、总数、计划ID
+func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, int64, error) {
+	// 查询文档信息
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-
-	effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
+	// 获取有效的任务ID（taskId为0时使用文档当前任务）
+	effectiveTaskId := d.getChunkTaskId(ctx, taskId, document)
 	if effectiveTaskId == 0 {
-		return &vo.DocumentChunkQueryVo{
-			DocumentId: document.Id,
-			TaskId:     0,
-			PlanId:     document.CurrentPlanId,
-			PageNo:     pageNo,
-			PageSize:   pageSize,
-			Total:      0,
-			Records:    []*vo.DocumentChunkItemVo{},
-		}, nil
+		return nil, 0, document.CurrentPlanId, nil
 	}
 
-	task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
+	// 查询任务信息并验证任务归属
+	task, err := d.repo.SelectTaskById(ctx, effectiveTaskId)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
-	if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
-		return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
+	if task.DocumentId != document.ID {
+		return nil, 0, 0, common.NewBizError(errorx.ErrDocumentNotFound.Code, "切块任务不存在。")
 	}
 
-	chunkList, total, err := d.repo.QueryChunkPage(ctx, document.Id, effectiveTaskId, pageNo, pageSize)
+	// 分页查询文档块列表
+	chunkList, total, err := d.repo.SelectChunkPage(ctx, document.ID, effectiveTaskId, pageNo, pageSize)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	parentBlockIds := make([]int64, 0, len(chunkList))
-	for _, chunk := range chunkList {
-		if chunk.ParentBlockId > 0 {
-			parentBlockIds = append(parentBlockIds, chunk.ParentBlockId)
-		}
-	}
+	// 提取所有文档块的父块ID列表
+	parentBlockIds := slice.Map(chunkList, func(index int, item *entity.DocumentChunk) int64 { return item.ParentBlockId })
 
-	parentBlockMap, err := d.listParentBlockMap(ctx, parentBlockIds)
+	// 批量查询父块信息
+	parentBlockList, err := d.repo.SelectParentBlockListByIds(ctx, parentBlockIds)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	records := make([]*vo.DocumentChunkItemVo, 0, len(chunkList))
-	for _, chunk := range chunkList {
-		parentBlock := parentBlockMap[chunk.ParentBlockId]
-		records = append(records, d.toDocumentChunkItemVo(chunk, parentBlock))
-	}
+	// 构建父块ID到父块对象的映射
+	parentBlockMap := utils.SliceToMapBy(parentBlockList,
+		func(item *entity.DocumentParentBlock) (int64, *entity.DocumentParentBlock) { return item.ID, item })
 
-	return &vo.DocumentChunkQueryVo{
-		DocumentId: document.Id,
-		TaskId:     effectiveTaskId,
-		PlanId:     task.PlanId,
-		PageNo:     pageNo,
-		PageSize:   pageSize,
-		Total:      total,
-		Records:    records,
-	}, nil
+	// 填充每个文档块的父块信息和枚举名称
+	slice.ForEach(chunkList, func(index int, item *entity.DocumentChunk) {
+		item.FillParentInfo(parentBlockMap[item.ParentBlockId])
+		item.FillEnumName()
+	})
+
+	return chunkList, total, task.PlanId, nil
 }
 
-//
-// // QueryDocumentChunkDetail 查询文档块详情
-//
-//	func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, req *entity.DocumentChunkDetailQueryDto) (*vo.DocumentChunkDetailVo, error) {
-//		document, err := d.getDocumentOrThrow(ctx, req.DocumentId)
-//		if err != nil {
-//			return nil, err
-//		}
-//
-//		effectiveTaskId := d.resolveChunkTaskId(document, req.TaskId)
-//		if effectiveTaskId == 0 {
-//			return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "当前文档还没有可查看的 chunk 详情。")
-//		}
-//
-//		task, err := d.repo.GetTaskById(ctx, effectiveTaskId)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if task == nil || task.Status != int(entity.BusinessStatusYes) || task.DocumentId != document.Id {
-//			return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "切块任务不存在。")
-//		}
-//
-//		chunk, err := d.repo.GetChunkById(ctx, req.ChunkId, document.Id, effectiveTaskId)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if chunk == nil {
-//			return nil, common.NewBizError(DocumentManageCodeDocumentNotFound, "chunk 详情不存在。")
-//		}
-//
-//		var parentBlock *entity.DocumentParentBlock
-//		if chunk.ParentBlockId > 0 {
-//			parentBlock, err = d.repo.GetParentBlockById(ctx, chunk.ParentBlockId, document.Id, effectiveTaskId)
-//			if err != nil {
-//				return nil, err
-//			}
-//		}
-//
-//		var siblingChunkList []*entity.DocumentChunk
-//		if chunk.ParentBlockId > 0 {
-//			siblingChunkList, err = d.repo.QueryChunkListByParentBlockId(ctx, document.Id, effectiveTaskId, chunk.ParentBlockId)
-//			if err != nil {
-//				return nil, err
-//			}
-//		} else {
-//			siblingChunkList = []*entity.DocumentChunk{chunk}
-//		}
-//
-//		siblingVoList := make([]*vo.DocumentChunkItemVo, 0, len(siblingChunkList))
-//		for _, sibling := range siblingChunkList {
-//			siblingVoList = append(siblingVoList, d.toDocumentChunkItemVo(sibling, parentBlock))
-//		}
-//
-//		return &vo.DocumentChunkDetailVo{
-//			DocumentId:    document.Id,
-//			TaskId:        effectiveTaskId,
-//			PlanId:        task.PlanId,
-//			Chunk:         d.toDocumentChunkItemVo(chunk, parentBlock),
-//			ParentBlock:   d.toDocumentParentBlockItemVo(parentBlock),
-//			SiblingChunks: siblingVoList,
-//		}, nil
-//	}
-//
-//	func (d *LifecycleLogicImpl) resolveChunkTaskId(document *entity.Document, requestedTaskId int64) int64 {
-//		if requestedTaskId > 0 {
-//			return requestedTaskId
-//		}
-//		if document.LastIndexTaskId > 0 {
-//			return document.LastIndexTaskId
-//		}
-//		task, err := d.repo.GetLatestTask(ctx, document.Id, int(vo.TaskTypeBuildIndex))
-//		if err != nil || task == nil {
-//			return 0
-//		}
-//		return task.ID
-//	}
-//
-//	func (d *LifecycleLogicImpl) listParentBlockMap(ctx context.Context, parentBlockIds []int64) (map[int64]*entity.DocumentParentBlock, error) {
-//		if len(parentBlockIds) == 0 {
-//			return map[int64]*entity.DocumentParentBlock{}, nil
-//		}
-//
-//		parentBlockList, err := d.repo.QueryParentBlockListByIds(ctx, parentBlockIds)
-//		if err != nil {
-//			return nil, err
-//		}
-//
-//		result := make(map[int64]*entity.DocumentParentBlock)
-//		for _, pb := range parentBlockList {
-//			result[pb.Id] = pb
-//		}
-//		return result, nil
-//	}
-//
+// QueryDocumentChunkDetail 查询文档块详情
+// 返回文档块及其父块信息、兄弟块列表，taskId为0时使用文档当前任务
+func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, documentId, taskId, chunkId int64) (*aggregate.DocumentChunkDetail, error) {
+	// 查询文档信息
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取有效的任务ID（taskId为0时使用文档当前任务）
+	effectiveTaskId := d.getChunkTaskId(ctx, taskId, document)
+	if effectiveTaskId == 0 {
+		return nil, common.NewBizError(errorx.ErrDocumentNotFound.Code, "当前文档还没有可查看的 chunk 详情。")
+	}
+
+	// 查询任务信息并验证任务归属
+	task, err := d.repo.SelectTaskById(ctx, effectiveTaskId)
+	if err != nil {
+		return nil, err
+	}
+	if task.DocumentId != document.ID {
+		return nil, common.NewBizError(errorx.ErrDocumentNotFound.Code, "切块任务不存在。")
+	}
+
+	// 查询指定文档块
+	chunk, err := d.repo.SelectChunkById(ctx, chunkId, document.ID, effectiveTaskId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询父块信息和兄弟块列表（如果有父块）
+	var parentBlock *entity.DocumentParentBlock
+	var siblingChunkList []*entity.DocumentChunk
+	if chunk.ParentBlockId > 0 {
+		parentBlock, err = d.repo.SelectParentBlockById(ctx, chunk.ParentBlockId, document.ID, effectiveTaskId)
+		if err != nil {
+			return nil, err
+		}
+		siblingChunkList, err = d.repo.SelectChunkListByParentBlockId(ctx, document.ID, effectiveTaskId, chunk.ParentBlockId)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// 无父块时，兄弟块列表只包含自身
+		siblingChunkList = []*entity.DocumentChunk{chunk}
+	}
+
+	// 组装详情对象并填充父块信息
+	detail := &aggregate.DocumentChunkDetail{
+		DocumentId:    documentId,
+		TaskId:        taskId,
+		PlanId:        task.PlanId,
+		Chunk:         chunk,
+		SiblingChunks: siblingChunkList,
+	}
+	detail.FillParentInfo(parentBlock)
+
+	return detail, nil
+}
+
+// QueryTaskLogs 查询任务日志
+func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error) {
+	task, err := d.repo.SelectTaskById(ctx, taskId)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	logList, total, err := d.repo.SelectTaskLogPage(ctx, taskId, pageNo, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	task.Logs = logList
+	task.FillEnumNames()
+
+	return task, total, nil
+}
+
 //	func (d *LifecycleLogicImpl) saveTaskLog(ctx context.Context, taskId, documentId, stageType, eventType, logLevel, operatorType int, operatorId int64, content string, detail map[string]any) error {
 //		// TODO: 序列化detail为JSON
 //		detailJson := ""
@@ -735,73 +703,19 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 //		return d.repo.InsertTaskLog(ctx, logRecord)
 //	}
 
-// QueryTaskLogs 查询任务日志
-func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error) {
-	task, err := d.repo.SelectTaskById(ctx, taskId)
-	if err != nil {
-		return nil, 0, err
+// getChunkTaskId 获取文档块任务ID
+func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, document *entity.Document) int64 {
+	taskId = utils.Ternary(taskId == 0, document.LastIndexTaskId, taskId)
+	if taskId == 0 {
+		task, err := d.repo.SelectLatestTask(ctx, document.ID, vo.TaskTypeBuildIndex)
+		if err != nil {
+			return 0
+		}
+		taskId = task.ID
 	}
-
-	logList, total, err := d.repo.SelectTaskLogPage(ctx, taskId, pageNo, pageSize)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	task.Logs = logList
-	task.FillEnumNames()
-
-	return task, total, nil
+	return taskId
 }
 
-//
-// // ===== 转换方法 =====
-//
-// func (d *LifecycleLogicImpl) toDocumentChunkItemVo(chunk *entity.DocumentChunk, parentBlock *entity.DocumentParentBlock) *vo.DocumentChunkItemVo {
-// 	vo := &vo.DocumentChunkItemVo{
-// 		Id:              chunk.Id,
-// 		ParentBlockId:   chunk.ParentBlockId,
-// 		ChunkNo:         chunk.ChunkNo,
-// 		SectionPath:     chunk.SectionPath,
-// 		SourceType:      chunk.SourceType,
-// 		SourceTypeMsg:   d.enumMsg(vo.ChunkSourceType(chunk.SourceType)),
-// 		CharCount:       chunk.CharCount,
-// 		TokenCount:      chunk.TokenCount,
-// 		VectorStatus:    chunk.VectorStatus,
-// 		VectorStatusMsg: d.enumMsg(vo.VectorStatus(chunk.VectorStatus)),
-// 		ChunkText:       chunk.ChunkText,
-// 	}
-//
-// 	if parentBlock != nil {
-// 		vo.ParentNo = parentBlock.ParentNo
-// 		vo.ChildCount = parentBlock.ChildCount
-// 		vo.StartChunkNo = parentBlock.StartChunkNo
-// 		vo.EndChunkNo = parentBlock.EndChunkNo
-// 	}
-//
-// 	return vo
-// }
-//
-// func (d *LifecycleLogicImpl) toDocumentParentBlockItemVo(parentBlock *entity.DocumentParentBlock) *vo.DocumentParentBlockItemVo {
-// 	if parentBlock == nil {
-// 		return nil
-// 	}
-// 	return &vo.DocumentParentBlockItemVo{
-// 		Id:            parentBlock.Id,
-// 		ParentNo:      parentBlock.ParentNo,
-// 		SectionPath:   parentBlock.SectionPath,
-// 		SourceType:    parentBlock.SourceType,
-// 		SourceTypeMsg: d.enumMsg(vo.ChunkSourceType(parentBlock.SourceType)),
-// 		CharCount:     parentBlock.CharCount,
-// 		TokenCount:    parentBlock.TokenCount,
-// 		ChildCount:    parentBlock.ChildCount,
-// 		StartChunkNo:  parentBlock.StartChunkNo,
-// 		EndChunkNo:    parentBlock.EndChunkNo,
-// 		ParentText:    parentBlock.ParentText,
-// 	}
-// }
-//
-
-//
 // 	// 按步骤序号排序
 // 	sort.Slice(pipelineSteps, func(i, j int) bool {
 // 		return pipelineSteps[i].StepNo < pipelineSteps[j].StepNo

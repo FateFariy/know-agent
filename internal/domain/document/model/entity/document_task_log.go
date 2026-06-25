@@ -19,9 +19,9 @@ type DocumentTaskLog struct {
 	Content       string    `gorm:"column:content"`       // 日志内容
 	DetailJson    string    `gorm:"column:detail_json"`   // 详情JSON
 	CreateTime    time.Time `gorm:"column:create_time"`   // 创建时间
-	StageTypeName string    `gorm:"column:-"`             // 阶段类型名称
-	EventTypeName string    `gorm:"column:-"`             // 事件类型名称
-	LogLevelName  string    `gorm:"column:-"`             // 日志级别名称
+	StageTypeName string    `gorm:"-"`                    // 阶段类型名称
+	EventTypeName string    `gorm:"-"`                    // 事件类型名称
+	LogLevelName  string    `gorm:"-"`                    // 日志级别名称
 }
 
 func (d *DocumentTaskLog) FillEnumNames() {

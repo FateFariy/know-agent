@@ -148,9 +148,9 @@ type DocumentStrategyStep struct {
 }
 
 type QueryDocumentChunkDetailReq struct {
-	DocumentId int64 `json:"documentId"` // 文档ID
-	TaskId     int64 `json:"taskId"`     // 任务ID
-	ChunkId    int64 `json:"chunkId"`    // 块ID
+	DocumentId int64 `json:"documentId"`      // 文档ID
+	ChunkId    int64 `json:"chunkId"`         // 块ID
+	TaskId     int64 `json:"taskId,optional"` // 任务ID
 }
 
 type QueryDocumentChunkDetailResp struct {
@@ -164,7 +164,7 @@ type QueryDocumentChunkDetailResp struct {
 
 type QueryDocumentChunksReq struct {
 	DocumentId int64 `json:"documentId"`                   // 文档ID
-	TaskId     int64 `json:"taskId"`                       // 任务ID
+	TaskId     int64 `json:"taskId,optional"`              // 任务ID
 	PageNo     int   `json:"pageNo,optional,default=1"`    // 页码
 	PageSize   int   `json:"pageSize,optional,default=10"` // 每页大小
 }

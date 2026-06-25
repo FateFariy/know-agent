@@ -25,10 +25,10 @@ type DocumentTask struct {
 	ErrorCode        string             `gorm:"column:error_code"`        // 错误码
 	ErrorMsg         string             `gorm:"column:error_msg"`         // 错误信息
 	ExtJson          string             `gorm:"column:ext_json"`          // 扩展JSON
-	TaskTypeName     string             `gorm:"column:-"`                 // 任务类型名称
-	TaskStatusName   string             `gorm:"column:-"`                 // 任务状态名称
-	CurrentStageName string             `gorm:"column:-"`                 // 当前阶段名称
-	Logs             []*DocumentTaskLog `gorm:"column:-"`                 // 日志
+	TaskTypeName     string             `gorm:"-"`                        // 任务类型名称
+	TaskStatusName   string             `gorm:"-"`                        // 任务状态名称
+	CurrentStageName string             `gorm:"-"`                        // 当前阶段名称
+	Logs             []*DocumentTaskLog `gorm:"-"`                        // 日志
 }
 
 func (d *DocumentTask) FillEnumNames() {

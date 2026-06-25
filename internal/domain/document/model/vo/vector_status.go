@@ -4,12 +4,12 @@ package vo
 type VectorStatus = int
 
 const (
-	VectorStatusUnknown VectorStatus = iota
-	VectorStatusPending
-	VectorStatusBuilding
-	VectorStatusBuilt
-	VectorStatusFailed
-	VectorStatusBuildSuccess // 构建成功
+	VectorStatusUnknown      VectorStatus = iota
+	VectorStatusPending                   // 待构建
+	VectorStatusBuilding                  // 构建中
+	VectorStatusBuilt                     // 已构建
+	VectorStatusFailed                    // 构建失败
+	VectorStatusBuildSuccess              // 构建成功
 )
 
 func VectorStatusName(vs VectorStatus) string {

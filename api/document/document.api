@@ -59,15 +59,15 @@ type (
 	// 查询文档chunk列表请求
 	QueryDocumentChunksReq {
 		DocumentId int64 `json:"documentId"` // 文档ID
-		TaskId     int64 `json:"taskId"` // 任务ID
+		TaskId     int64 `json:"taskId,optional"` // 任务ID
 		PageNo     int   `json:"pageNo,optional,default=1"` // 页码
 		PageSize   int   `json:"pageSize,optional,default=10"` // 每页大小
 	}
 	// 查询单个文档chunk详情请求
 	QueryDocumentChunkDetailReq {
 		DocumentId int64 `json:"documentId"` // 文档ID
-		TaskId     int64 `json:"taskId"` // 任务ID
 		ChunkId    int64 `json:"chunkId"` // 块ID
+		TaskId     int64 `json:"taskId,optional"` // 任务ID
 	}
 	// 查询任务执行日志请求
 	QueryTaskLogsReq {

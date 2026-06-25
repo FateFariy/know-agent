@@ -7,6 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/api/document"
 	cen "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	dagg "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
@@ -33,8 +34,10 @@ type DocumentConverter interface {
 	// goverter:map ID PlanId
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
+	ToDocumentChunkItemList(src []*den.DocumentChunk) []*document.DocumentChunkItem
+	ToQueryDocumentChunkDetailResp(src *dagg.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp
 	// goverter:map ID TaskId
-	ToQueryTaskLogsResp(task *den.DocumentTask) *document.QueryTaskLogsResp
+	ToQueryTaskLogsResp(src *den.DocumentTask) *document.QueryTaskLogsResp
 
 	ToDocumentModel(src *den.Document) *model.Document
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask

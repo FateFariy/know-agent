@@ -49,7 +49,7 @@ type DocumentRepository interface {
 	SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error)
 
 	// SelectLatestTask 查询最新任务
-	SelectLatestTask(ctx context.Context, documentId int64) (*entity.DocumentTask, error)
+	SelectLatestTask(ctx context.Context, documentId int64, taskTypes ...int) (*entity.DocumentTask, error)
 
 	// SelectTaskListByDocumentIds 根据文档ID列表查询任务
 	SelectTaskListByDocumentIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentTask, error)
