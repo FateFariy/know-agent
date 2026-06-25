@@ -672,8 +672,10 @@ func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, d
 }
 
 // extractPipelineTypes 提取流水线类型
-func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType vo.PipelineType) []int {
-	result := slice.Filter(stepList, func(index int, item *entity.DocumentStrategyStep) bool { return item.PipelineType == pipelineType })
+func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType string) []int {
+	result := slice.Filter(stepList, func(index int, item *entity.DocumentStrategyStep) bool {
+		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, vo.PipelineTypeChild))
+	})
 	slice.SortBy(result, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
-	return slice.Map(result, func(index int, item *entity.DocumentStrategyStep) int { return item.PipelineType })
+	return slice.Map(result, func(index int, item *entity.DocumentStrategyStep) int { return item.StrategyType })
 }

@@ -113,7 +113,7 @@ type DocumentParentBlockItem struct {
 }
 
 type DocumentStrategyPipeline struct {
-	PipelineType     int                     `json:"pipelineType"`     // 流水线类型
+	PipelineType     string                  `json:"pipelineType"`     // 流水线类型
 	PipelineTypeName string                  `json:"pipelineTypeName"` // 流水线类型名称
 	StrategySnapshot string                  `json:"strategySnapshot"` // 策略快照
 	Steps            []*DocumentStrategyStep `json:"steps"`            // 步骤列表
@@ -134,7 +134,7 @@ type DocumentStrategyPlan struct {
 
 type DocumentStrategyStep struct {
 	StepNo            int    `json:"stepNo"`            // 步骤序号
-	PipelineType      int    `json:"pipelineType"`      // 流水线类型
+	PipelineType      string `json:"pipelineType"`      // 流水线类型
 	PipelineTypeName  string `json:"pipelineTypeName"`  // 流水线类型名称
 	StrategyType      int    `json:"strategyType"`      // 策略类型
 	StrategyTypeName  string `json:"strategyTypeName"`  // 策略类型名称

@@ -46,7 +46,7 @@ type DocumentStrategyStep struct {
 	DocumentId        int64  `gorm:"column:document_id"`      // 文档ID
 	PlanId            int64  `gorm:"column:plan_id"`          // 方案ID
 	StepNo            int    `gorm:"column:step_no"`          // 步骤序号
-	PipelineType      int    `gorm:"column:pipeline_type"`    // 流水线类型
+	PipelineType      string `gorm:"column:pipeline_type"`    // 流水线类型
 	StrategyType      int    `gorm:"column:strategy_type"`    // 策略类型
 	StrategyRole      int    `gorm:"column:strategy_role"`    // 策略角色
 	SourceType        int    `gorm:"column:source_type"`      // 来源类型
@@ -68,13 +68,13 @@ func (d *DocumentStrategyStep) FillEnumNames() {
 }
 
 type DocumentStrategyPipeline struct {
-	PipelineType     int
+	PipelineType     string
 	PipelineTypeName string
 	StrategySnapshot string
 	Steps            []*DocumentStrategyStep
 }
 
-func NewDocumentStrategyPipeline(pipelineType int, stepList []*DocumentStrategyStep) *DocumentStrategyPipeline {
+func NewDocumentStrategyPipeline(pipelineType string, stepList []*DocumentStrategyStep) *DocumentStrategyPipeline {
 	pipeline := &DocumentStrategyPipeline{PipelineType: pipelineType}
 	pipeline.FillAndProcessSteps(stepList)
 	return pipeline
@@ -85,7 +85,7 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 	steps := make([]*DocumentStrategyStep, 0, len(stepList))
 	strategyTypes := make([]string, 0, len(stepList))
 	for i := range stepList {
-		stepList[i].PipelineType = utils.Ternary(stepList[i].PipelineType == 0, vo.PipelineTypeChild, stepList[i].PipelineType)
+		stepList[i].PipelineType = utils.Ternary(stepList[i].PipelineType == "", vo.PipelineTypeChild, stepList[i].PipelineType)
 		if stepList[i].PipelineType == d.PipelineType {
 			stepList[i].FillEnumNames()
 			steps = append(steps, stepList[i])

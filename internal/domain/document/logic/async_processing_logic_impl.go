@@ -307,7 +307,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	parentBlockCandidates := make([]*vo.ParentBlockCandidate, 0)
 
 	// 更新步骤执行状态为执行成功
-	if err := d.repo.UpdateStepExecuteStatus(ctx, planId, vo.ExecuteStatusExecuteSuccess); err != nil {
+	if err = d.repo.UpdateStepExecuteStatus(ctx, planId, vo.ExecuteStatusExecuteSuccess); err != nil {
 		log.Printf("更新步骤执行状态失败: planId=%d, err=%v", planId, err)
 	}
 

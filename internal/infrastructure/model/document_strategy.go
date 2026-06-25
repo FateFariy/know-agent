@@ -27,7 +27,7 @@ type DocumentStrategyStep struct {
 	DocumentId      int64  `gorm:"column:document_id"`      // 文档ID
 	PlanId          int64  `gorm:"column:plan_id"`          // 方案ID
 	StepNo          int    `gorm:"column:step_no"`          // 步骤序号
-	PipelineType    int    `gorm:"column:pipeline_type"`    // 流水线类型
+	PipelineType    string `gorm:"column:pipeline_type"`    // 流水线类型
 	StrategyType    int    `gorm:"column:strategy_type"`    // 策略类型
 	StrategyRole    int    `gorm:"column:strategy_role"`    // 策略角色
 	SourceType      int    `gorm:"column:source_type"`      // 来源类型

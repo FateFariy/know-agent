@@ -26,8 +26,10 @@ func StrategyRoleName(role StrategyRole) string {
 type StrategySourceType = int
 
 const (
-	StrategySourceTypeOriginal StrategySourceType = iota + 1
-	StrategySourceTypeParsed
+	StrategySourceTypeOriginal        StrategySourceType = iota + 1 // 原始
+	StrategySourceTypeParsed                                        // 已解析
+	StrategySourceTypeSystemRecommend                               // 系统推荐
+	StrategySourceTypeUserAdd                                       // 用户添加
 )
 
 func StrategySourceTypeName(sourceType StrategySourceType) string {
@@ -36,6 +38,10 @@ func StrategySourceTypeName(sourceType StrategySourceType) string {
 		return "原始"
 	case StrategySourceTypeParsed:
 		return "已解析"
+	case StrategySourceTypeSystemRecommend:
+		return "系统推荐"
+	case StrategySourceTypeUserAdd:
+		return "用户添加"
 	default:
 		return ""
 	}
@@ -70,19 +76,25 @@ func StrategyStatusName(status StrategyStatus) string {
 type StrategyType = int
 
 const (
-	StrategyTypeSemanticChunk  StrategyType = iota + 1 // 语义切块
-	StrategyTypeMarkdownChunk                          // Markdown切块
-	StrategyTypeRecursiveChunk                         // 递归切块
+	StrategyTypeStructure StrategyType = iota + 1 // 结构切块
+	StrategyTypeRecursive                         // 递归切块
+	StrategyTypeSemantic                          // 语义切块
+	StrategyTypeLlm                               // 大模型智能切块
+	StrategyTypeMarkdown                          // Markdown切块
 )
 
 func StrategyTypeName(st StrategyType) string {
 	switch st {
-	case StrategyTypeSemanticChunk:
-		return "语义切块"
-	case StrategyTypeMarkdownChunk:
-		return "Markdown切块"
-	case StrategyTypeRecursiveChunk:
+	case StrategyTypeStructure:
+		return "结构切块"
+	case StrategyTypeRecursive:
 		return "递归切块"
+	case StrategyTypeSemantic:
+		return "语义切块"
+	case StrategyTypeLlm:
+		return "大模型智能切块"
+	case StrategyTypeMarkdown:
+		return "Markdown切块"
 	default:
 		return ""
 	}
