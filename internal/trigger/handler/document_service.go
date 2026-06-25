@@ -80,12 +80,18 @@ func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document
 	panic("implement me")
 }
 
-func (d *DocumentService) QueryDocumentChunkDetail(ctx context.Context, req *document.QueryDocumentChunkDetailReq) (*document.DocumentChunk, error) {
+func (d *DocumentService) QueryDocumentChunkDetail(ctx context.Context, req *document.QueryDocumentChunkDetailReq) (*document.QueryDocumentChunkDetailResp, error) {
 	// TODO implement me
 	panic("implement me")
 }
 
+// QueryTaskLogs 查询任务日志
 func (d *DocumentService) QueryTaskLogs(ctx context.Context, req *document.QueryTaskLogsReq) (*document.QueryTaskLogsResp, error) {
-	// TODO implement me
-	panic("implement me")
+	task, total, err := d.l.QueryTaskLogs(ctx, req.TaskId, req.PageNo, req.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	queryTaskLogsResp := convert.ToQueryTaskLogsResp(task)
+	queryTaskLogsResp.Total = total
+	return queryTaskLogsResp, nil
 }

@@ -45,14 +45,26 @@ type DeleteDocumentReq struct {
 }
 
 type DeleteDocumentResp struct {
-	Success bool // 是否成功
+	DocumentId   int64  `json:"documentId"`   // 文档ID
+	DocumentName string `json:"documentName"` // 文档名称
 }
 
-type DocumentChunk struct {
-	ChunkId    int64  `json:"chunkId"`    // 块ID
-	DocumentId int64  `json:"documentId"` // 文档ID
-	TaskId     int64  `json:"taskId"`     // 任务ID
-	Content    string `json:"content"`    // 块内容
+type DocumentChunkItem struct {
+	ChunkId            int64  `json:"chunkId"`            // 分片ID
+	ParentBlockId      int64  `json:"parentBlockId"`      // 父块ID
+	ParentBlockNo      int    `json:"parentBlockNo"`      // 父块编号
+	ParentChildCount   int    `json:"parentChildCount"`   // 父块下子分片总数
+	ParentStartChunkNo int    `json:"parentStartChunkNo"` // 父块起始分片号
+	ParentEndChunkNo   int    `json:"parentEndChunkNo"`   // 父块结束分片号
+	ChunkNo            int    `json:"chunkNo"`            // 当前分片编号
+	SectionPath        string `json:"sectionPath"`        // 章节路径
+	SourceType         int    `json:"sourceType"`         // 来源类型
+	SourceTypeName     string `json:"sourceTypeName"`     // 来源类型名称
+	CharCount          int    `json:"charCount"`          // 字符数量
+	TokenCount         int    `json:"tokenCount"`         // Token数量
+	VectorStatus       int    `json:"vectorStatus"`       // 向量化状态
+	VectorStatusName   string `json:"vectorStatusName"`   // 向量化状态名称
+	ChunkText          string `json:"chunkText"`          // 分片文本内容
 }
 
 type DocumentListItem struct {
@@ -84,6 +96,20 @@ type DocumentListItem struct {
 	LatestTaskStatusName string `json:"latestTaskStatusName"` // 最新任务状态名
 	CreateTime           string `json:"createTime"`           // 创建时间
 	UpdateTime           string `json:"updateTime"`           // 更新时间
+}
+
+type DocumentParentBlockItem struct {
+	ParentBlockId  int64  `json:"parentBlockId"`  // 父块ID
+	ParentBlockNo  int    `json:"parentBlockNo"`  // 父块编号
+	SectionPath    string `json:"sectionPath"`    // 章节路径
+	SourceType     int    `json:"sourceType"`     // 来源类型
+	SourceTypeName string `json:"sourceTypeName"` // 来源类型名称
+	CharCount      int    `json:"charCount"`      // 字符总数
+	TokenCount     int    `json:"tokenCount"`     // Token总数
+	ChildCount     int    `json:"childCount"`     // 子分片数量
+	StartChunkNo   int    `json:"startChunkNo"`   // 起始分片编号
+	EndChunkNo     int    `json:"endChunkNo"`     // 结束分片编号
+	ParentText     string `json:"parentText"`     // 父块文本内容
 }
 
 type DocumentStrategyPipeline struct {
@@ -127,16 +153,30 @@ type QueryDocumentChunkDetailReq struct {
 	ChunkId    int64 `json:"chunkId"`    // 块ID
 }
 
+type QueryDocumentChunkDetailResp struct {
+	DocumentId    int64                    `json:"documentId"`    // 文档ID
+	TaskId        int64                    `json:"taskId"`        // 任务ID
+	PlanId        int64                    `json:"planId"`        // 方案ID
+	Chunk         *DocumentChunkItem       `json:"chunk"`         // 当前分片信息
+	ParentBlock   *DocumentParentBlockItem `json:"parentBlock"`   // 父级块信息
+	SiblingChunks []*DocumentChunkItem     `json:"siblingChunks"` // 同级分片列表
+}
+
 type QueryDocumentChunksReq struct {
-	DocumentId int64 `json:"documentId"` // 文档ID
-	TaskId     int64 `json:"taskId"`     // 任务ID
-	PageNo     int   `json:"pageNo"`     // 页码
-	PageSize   int   `json:"pageSize"`   // 每页大小
+	DocumentId int64 `json:"documentId"`                   // 文档ID
+	TaskId     int64 `json:"taskId"`                       // 任务ID
+	PageNo     int   `json:"pageNo,optional,default=1"`    // 页码
+	PageSize   int   `json:"pageSize,optional,default=10"` // 每页大小
 }
 
 type QueryDocumentChunksResp struct {
-	List  []*DocumentChunk `json:"list"`  // chunk列表
-	Total int64            `json:"total"` // 总记录数
+	DocumentId int64                `json:"documentId"` // 文档ID
+	TaskId     int64                `json:"taskId"`     // 任务ID
+	PlanId     int64                `json:"planId"`     // 方案ID
+	PageNo     int                  `json:"pageNo"`     // 页码
+	PageSize   int                  `json:"pageSize"`   // 页大小
+	Total      int64                `json:"total"`      // 总条数
+	Records    []*DocumentChunkItem `json:"records"`    // 分片数据列表
 }
 
 type QueryDocumentDetailReq struct {
@@ -175,14 +215,27 @@ type QueryStrategyPlanResp struct {
 }
 
 type QueryTaskLogsReq struct {
-	TaskId   int64 `json:"taskId"`   // 任务ID
-	PageNo   int   `json:"pageNo"`   // 页码
-	PageSize int   `json:"pageSize"` // 每页大小
+	TaskId   int64 `json:"taskId"`                       // 任务ID
+	PageNo   int   `json:"pageNo,optional,default=1"`    // 页码
+	PageSize int   `json:"pageSize,optional,default=10"` // 每页大小
 }
 
 type QueryTaskLogsResp struct {
-	List  []*TaskLog `json:"list"`  // 日志列表
-	Total int64      `json:"total"` // 总记录数
+	TaskId           int64      `json:"taskId"`           // 任务ID
+	DocumentId       int64      `json:"documentId"`       // 文档ID
+	TaskType         int        `json:"taskType"`         // 任务类型
+	TaskTypeName     string     `json:"taskTypeName"`     // 任务类型名称
+	TaskStatus       int        `json:"taskStatus"`       // 任务状态
+	TaskStatusName   string     `json:"taskStatusName"`   // 任务状态名称
+	CurrentStage     int        `json:"currentStage"`     // 当前阶段编码
+	CurrentStageName string     `json:"currentStageName"` // 当前阶段名称
+	StartTime        string     `json:"startTime"`        // 开始时间
+	FinishTime       string     `json:"finishTime"`       // 结束时间
+	CostMillis       int64      `json:"costMillis"`       // 耗时毫秒数
+	ErrorCode        string     `json:"errorCode"`        // 错误码
+	ErrorMsg         string     `json:"errorMsg"`         // 错误信息
+	Total            int64      `json:"total"`            // 数据总量
+	Logs             []*TaskLog `json:"logs"`             // 任务日志明细列表
 }
 
 type StrategyStepItem struct {
@@ -191,20 +244,25 @@ type StrategyStepItem struct {
 }
 
 type TaskLog struct {
-	LogId      int64  `json:"logId"`      // 日志ID
-	TaskId     int64  `json:"taskId"`     // 任务ID
-	LogLevel   string `json:"logLevel"`   // 日志级别
-	LogMessage string `json:"logMessage"` // 日志内容
-	CreateTime string `json:"createTime"` // 创建时间
+	ID            int64  `json:"id"`            // 主键ID
+	StageType     int    `json:"stageType"`     // 阶段类型编码
+	StageTypeName string `json:"stageTypeName"` // 阶段类型名称
+	EventType     int    `json:"eventType"`     // 事件类型编码
+	EventTypeName string `json:"eventTypeName"` // 事件类型名称
+	LogLevel      int    `json:"logLevel"`      // 日志等级编码
+	LogLevelName  string `json:"logLevelName"`  // 日志等级名称
+	Content       string `json:"content"`       // 日志简短内容
+	DetailJson    string `json:"detailJson"`    // 详细JSON数据
+	CreateTime    string `json:"createTime"`    // 创建时间
 }
 
 type UploadDocumentReq struct {
-	DocumentName       string `json:"documentName"`       // 文档名称
-	OperatorId         int64  `json:"operatorId"`         // 操作人ID
-	KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 知识范围编码
-	KnowledgeScopeName string `json:"knowledgeScopeName"` // 知识范围名称
-	BusinessCategory   string `json:"businessCategory"`   // 业务分类
-	DocumentTags       string `json:"documentTags"`       // 文档标签
+	DocumentName       string `json:"documentName,optional"`       // 文档名称
+	OperatorId         int64  `json:"operatorId,optional"`         // 操作人ID
+	KnowledgeScopeCode string `json:"knowledgeScopeCode,optional"` // 知识范围编码
+	KnowledgeScopeName string `json:"knowledgeScopeName,optional"` // 知识范围名称
+	BusinessCategory   string `json:"businessCategory,optional"`   // 业务分类
+	DocumentTags       string `json:"documentTags,optional"`       // 文档标签
 }
 
 type UploadDocumentResp struct {

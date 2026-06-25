@@ -255,9 +255,18 @@ func (d *DocumentRepositoryImpl) DeleteTaskLogByDocumentId(ctx context.Context, 
 	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTaskLog{}).Error
 }
 
+// SelectTaskLogPage 根据任务ID查询任务日志分页列表
 func (d *DocumentRepositoryImpl) SelectTaskLogPage(ctx context.Context, taskId int64, pageNo, pageSize int) ([]*entity.DocumentTaskLog, int64, error) {
-	// TODO implement me
-	panic("implement me")
+	var logs []*entity.DocumentTaskLog
+	var total int64
+	query := d.db.WithContext(ctx).Model(&model.DocumentTaskLog{}).Where("task_id = ?", taskId)
+	if err := query.Scopes(utils.Paginate(pageNo, pageSize)).Order("create_time ASC, id ASC").Find(&logs).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	return logs, total, nil
 }
 
 // ========== 方案/策略相关 ==========

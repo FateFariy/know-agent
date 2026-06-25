@@ -31,14 +31,14 @@ type LifecycleLogic interface {
 	// BuildIndex 构建索引
 	BuildIndex(ctx context.Context, documentId, planId, operatorId int64) (*vo.DocumentIndexBuild, error)
 
-	// // QueryTaskLogs 查询任务日志
-	// QueryTaskLogs(ctx context.Context, req *vo.DocumentTaskLogQuery) (*vo.DocumentTaskLogQueryVo, error)
-	//
-	// // QueryDocumentChunks 查询文档块
-	// QueryDocumentChunks(ctx context.Context, req *vo.DocumentChunkQuery) (*vo.DocumentChunkQueryVo, error)
-	//
-	// // QueryDocumentChunkDetail 查询文档块详情
-	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVo, error)
+	// QueryDocumentChunks 查询文档块
+	QueryDocumentChunks(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, error)
+
+	// QueryDocumentChunkDetail 查询文档块详情
+	// QueryDocumentChunkDetail(ctx context.Context, req *vo.DocumentChunkDetailQuery) (*vo.DocumentChunkDetailVO, error)
+
+	// QueryTaskLogs 查询任务日志
+	QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error)
 }
 
 // AsyncProcessingLogic 异步处理业务逻辑接口

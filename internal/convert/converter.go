@@ -33,6 +33,8 @@ type DocumentConverter interface {
 	// goverter:map ID PlanId
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
+	// goverter:map ID TaskId
+	ToQueryTaskLogsResp(task *den.DocumentTask) *document.QueryTaskLogsResp
 
 	ToDocumentModel(src *den.Document) *model.Document
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask

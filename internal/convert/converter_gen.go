@@ -107,7 +107,6 @@ func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemor
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
 }
-
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
 }
@@ -299,6 +298,33 @@ func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPl
 	}
 	return pDocumentQueryStrategyPlanResp
 }
+func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsResp {
+	var pDocumentQueryTaskLogsResp *document.QueryTaskLogsResp
+	if source != nil {
+		var documentQueryTaskLogsResp document.QueryTaskLogsResp
+		documentQueryTaskLogsResp.TaskId = (*source).ID
+		documentQueryTaskLogsResp.DocumentId = (*source).DocumentId
+		documentQueryTaskLogsResp.TaskType = (*source).TaskType
+		documentQueryTaskLogsResp.TaskTypeName = (*source).TaskTypeName
+		documentQueryTaskLogsResp.TaskStatus = (*source).TaskStatus
+		documentQueryTaskLogsResp.TaskStatusName = (*source).TaskStatusName
+		documentQueryTaskLogsResp.CurrentStage = (*source).CurrentStage
+		documentQueryTaskLogsResp.CurrentStageName = (*source).CurrentStageName
+		documentQueryTaskLogsResp.StartTime = TimeToString((*source).StartTime)
+		documentQueryTaskLogsResp.FinishTime = TimeToString((*source).FinishTime)
+		documentQueryTaskLogsResp.CostMillis = (*source).CostMillis
+		documentQueryTaskLogsResp.ErrorCode = (*source).ErrorCode
+		documentQueryTaskLogsResp.ErrorMsg = (*source).ErrorMsg
+		if (*source).Logs != nil {
+			documentQueryTaskLogsResp.Logs = make([]*document.TaskLog, len((*source).Logs))
+			for i := 0; i < len((*source).Logs); i++ {
+				documentQueryTaskLogsResp.Logs[i] = pEntityDocumentTaskLogToPDocumentTaskLog((*source).Logs[i])
+			}
+		}
+		pDocumentQueryTaskLogsResp = &documentQueryTaskLogsResp
+	}
+	return pDocumentQueryTaskLogsResp
+}
 func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentResp {
 	var pDocumentUploadDocumentResp *document.UploadDocumentResp
 	if source != nil {
@@ -313,7 +339,6 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 	}
 	return pDocumentUploadDocumentResp
 }
-
 func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity1.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline
 	if source != nil {
@@ -350,6 +375,24 @@ func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity1.
 		pDocumentDocumentStrategyStep = &documentDocumentStrategyStep
 	}
 	return pDocumentDocumentStrategyStep
+}
+func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *document.TaskLog {
+	var pDocumentTaskLog *document.TaskLog
+	if source != nil {
+		var documentTaskLog document.TaskLog
+		documentTaskLog.ID = (*source).ID
+		documentTaskLog.StageType = (*source).StageType
+		documentTaskLog.StageTypeName = (*source).StageTypeName
+		documentTaskLog.EventType = (*source).EventType
+		documentTaskLog.EventTypeName = (*source).EventTypeName
+		documentTaskLog.LogLevel = (*source).LogLevel
+		documentTaskLog.LogLevelName = (*source).LogLevelName
+		documentTaskLog.Content = (*source).Content
+		documentTaskLog.DetailJson = (*source).DetailJson
+		documentTaskLog.CreateTime = TimeToString((*source).CreateTime)
+		pDocumentTaskLog = &documentTaskLog
+	}
+	return pDocumentTaskLog
 }
 func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source

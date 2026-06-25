@@ -37,7 +37,7 @@ type HTTPServer interface {
 	QueryDocumentChunks(ctx context.Context, req *QueryDocumentChunksReq) (*QueryDocumentChunksResp, error)
 
 	// QueryDocumentChunkDetail 查询文档chunk详情
-	QueryDocumentChunkDetail(ctx context.Context, req *QueryDocumentChunkDetailReq) (*DocumentChunk, error)
+	QueryDocumentChunkDetail(ctx context.Context, req *QueryDocumentChunkDetailReq) (*QueryDocumentChunkDetailResp, error)
 
 	// QueryTaskLogs 查询任务日志
 	QueryTaskLogs(ctx context.Context, req *QueryTaskLogsReq) (*QueryTaskLogsResp, error)

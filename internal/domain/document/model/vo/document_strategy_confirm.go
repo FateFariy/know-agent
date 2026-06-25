@@ -8,3 +8,8 @@ type DocumentStrategyConfirm struct {
 	ParentSteps []*DocumentStrategyStepItem
 	ChildSteps  []*DocumentStrategyStepItem
 }
+
+type DocumentStrategyStepItem struct {
+	StepNo       int
+	StrategyType int
+}
