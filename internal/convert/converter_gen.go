@@ -111,6 +111,30 @@ func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray 
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
 }
+func FromConfirmStrategyReq(source *document.ConfirmStrategyReq) *vo1.DocumentStrategyConfirmCmd {
+	var pVoDocumentStrategyConfirmCmd *vo1.DocumentStrategyConfirmCmd
+	if source != nil {
+		var voDocumentStrategyConfirmCmd vo1.DocumentStrategyConfirmCmd
+		voDocumentStrategyConfirmCmd.DocumentId = (*source).DocumentId
+		voDocumentStrategyConfirmCmd.BasePlanId = (*source).BasePlanId
+		voDocumentStrategyConfirmCmd.OperatorId = (*source).OperatorId
+		voDocumentStrategyConfirmCmd.AdjustNote = (*source).AdjustNote
+		if (*source).ParentSteps != nil {
+			voDocumentStrategyConfirmCmd.ParentSteps = make([]*vo1.DocumentStrategyStepItem, len((*source).ParentSteps))
+			for i := 0; i < len((*source).ParentSteps); i++ {
+				voDocumentStrategyConfirmCmd.ParentSteps[i] = pDocumentStrategyStepItemToPVoDocumentStrategyStepItem((*source).ParentSteps[i])
+			}
+		}
+		if (*source).ChildSteps != nil {
+			voDocumentStrategyConfirmCmd.ChildSteps = make([]*vo1.DocumentStrategyStepItem, len((*source).ChildSteps))
+			for j := 0; j < len((*source).ChildSteps); j++ {
+				voDocumentStrategyConfirmCmd.ChildSteps[j] = pDocumentStrategyStepItemToPVoDocumentStrategyStepItem((*source).ChildSteps[j])
+			}
+		}
+		pVoDocumentStrategyConfirmCmd = &voDocumentStrategyConfirmCmd
+	}
+	return pVoDocumentStrategyConfirmCmd
+}
 func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity1.Document {
 	var pEntityDocument *entity1.Document
 	if source != nil {
@@ -140,6 +164,20 @@ func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 		pDocumentBuildIndexResp = &documentBuildIndexResp
 	}
 	return pDocumentBuildIndexResp
+}
+func ToConfirmStrategyResp(source *entity1.DocumentStrategyPlan) *document.ConfirmStrategyResp {
+	var pDocumentConfirmStrategyResp *document.ConfirmStrategyResp
+	if source != nil {
+		var documentConfirmStrategyResp document.ConfirmStrategyResp
+		documentConfirmStrategyResp.DocumentId = (*source).DocumentId
+		documentConfirmStrategyResp.PlanId = (*source).ID
+		documentConfirmStrategyResp.PlanVersion = (*source).PlanVersion
+		documentConfirmStrategyResp.Normalized = (*source).Normalized
+		documentConfirmStrategyResp.ParentPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ParentPipeline)
+		documentConfirmStrategyResp.ChildPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ChildPipeline)
+		pDocumentConfirmStrategyResp = &documentConfirmStrategyResp
+	}
+	return pDocumentConfirmStrategyResp
 }
 func ToDocumentChunkItemList(source []*entity1.DocumentChunk) []*document.DocumentChunkItem {
 	var pDocumentDocumentChunkItemList []*document.DocumentChunkItem
@@ -249,6 +287,43 @@ func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.Docu
 		pDocumentDocumentStrategyPlan = &documentDocumentStrategyPlan
 	}
 	return pDocumentDocumentStrategyPlan
+}
+func ToDocumentStrategyPlanModel(source *entity1.DocumentStrategyPlan) *model.DocumentStrategyPlan {
+	var pModelDocumentStrategyPlan *model.DocumentStrategyPlan
+	if source != nil {
+		var modelDocumentStrategyPlan model.DocumentStrategyPlan
+		modelDocumentStrategyPlan.ID = (*source).ID
+		modelDocumentStrategyPlan.DocumentId = (*source).DocumentId
+		modelDocumentStrategyPlan.PlanVersion = (*source).PlanVersion
+		modelDocumentStrategyPlan.PlanSource = (*source).PlanSource
+		modelDocumentStrategyPlan.PlanStatus = (*source).PlanStatus
+		modelDocumentStrategyPlan.StrategyCount = (*source).StrategyCount
+		modelDocumentStrategyPlan.StrategySnapshot = (*source).StrategySnapshot
+		modelDocumentStrategyPlan.RecommendReason = (*source).RecommendReason
+		modelDocumentStrategyPlan.AdjustNote = (*source).AdjustNote
+		modelDocumentStrategyPlan.ConfirmUserId = (*source).ConfirmUserId
+		modelDocumentStrategyPlan.ConfirmTime = (*source).ConfirmTime
+		pModelDocumentStrategyPlan = &modelDocumentStrategyPlan
+	}
+	return pModelDocumentStrategyPlan
+}
+func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.DocumentStrategyStep {
+	var pModelDocumentStrategyStep *model.DocumentStrategyStep
+	if source != nil {
+		var modelDocumentStrategyStep model.DocumentStrategyStep
+		modelDocumentStrategyStep.ID = (*source).ID
+		modelDocumentStrategyStep.DocumentId = (*source).DocumentId
+		modelDocumentStrategyStep.PlanId = (*source).PlanId
+		modelDocumentStrategyStep.StepNo = (*source).StepNo
+		modelDocumentStrategyStep.PipelineType = (*source).PipelineType
+		modelDocumentStrategyStep.StrategyType = (*source).StrategyType
+		modelDocumentStrategyStep.StrategyRole = (*source).StrategyRole
+		modelDocumentStrategyStep.SourceType = (*source).SourceType
+		modelDocumentStrategyStep.ExecuteStatus = (*source).ExecuteStatus
+		modelDocumentStrategyStep.RecommendReason = (*source).RecommendReason
+		pModelDocumentStrategyStep = &modelDocumentStrategyStep
+	}
+	return pModelDocumentStrategyStep
 }
 func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTaskLog {
 	var pModelDocumentTaskLog *model.DocumentTaskLog
@@ -363,6 +438,16 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 		pDocumentUploadDocumentResp = &documentUploadDocumentResp
 	}
 	return pDocumentUploadDocumentResp
+}
+func pDocumentStrategyStepItemToPVoDocumentStrategyStepItem(source *document.StrategyStepItem) *vo1.DocumentStrategyStepItem {
+	var pVoDocumentStrategyStepItem *vo1.DocumentStrategyStepItem
+	if source != nil {
+		var voDocumentStrategyStepItem vo1.DocumentStrategyStepItem
+		voDocumentStrategyStepItem.StepNo = (*source).StepNo
+		voDocumentStrategyStepItem.StrategyType = (*source).StrategyType
+		pVoDocumentStrategyStepItem = &voDocumentStrategyStepItem
+	}
+	return pVoDocumentStrategyStepItem
 }
 func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentChunk) *document.DocumentChunkItem {
 	var pDocumentDocumentChunkItem *document.DocumentChunkItem

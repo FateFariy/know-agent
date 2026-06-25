@@ -182,14 +182,14 @@ type (
 	}
 	// 确认文档策略方案响应
 	ConfirmStrategyResp {
-		DocumentId        int64                     `json:"documentId"` // 文档ID
-		PlanId            int64                     `json:"planId"` // 方案ID
-		PlanVersion       int                       `json:"planVersion"` // 方案版本
-		StrategyStatus    int                       `json:"strategyStatus"` // 策略状态
-		StrategyStatusMsg string                    `json:"strategyStatusMsg"` // 策略状态描述
-		Normalized        bool                      `json:"normalized"` // 是否经过标准化
-		ParentPipeline    *DocumentStrategyPipeline `json:"parentPipeline"` // 父块流水线
-		ChildPipeline     *DocumentStrategyPipeline `json:"childPipeline"` // 子块流水线
+		DocumentId         int64                     `json:"documentId"` // 文档ID
+		PlanId             int64                     `json:"planId"` // 方案ID
+		PlanVersion        int                       `json:"planVersion"` // 方案版本
+		StrategyStatus     int                       `json:"strategyStatus"` // 策略状态
+		StrategyStatusName string                    `json:"strategyStatusName"` // 策略状态描述
+		Normalized         bool                      `json:"normalized"` // 是否经过标准化
+		ParentPipeline     *DocumentStrategyPipeline `json:"parentPipeline"` // 父块流水线
+		ChildPipeline      *DocumentStrategyPipeline `json:"childPipeline"` // 子块流水线
 	}
 	// 执行文档索引构建响应
 	BuildIndexResp {

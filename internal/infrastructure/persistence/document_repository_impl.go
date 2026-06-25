@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
@@ -90,6 +91,87 @@ func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Con
 		if err := tx.Create(convert.ToDocumentTaskLogModel(agg.TaskLog)).Error; err != nil {
 			return err
 		}
+		return nil
+	})
+}
+
+// SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
+// 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志
+func (d *DocumentRepositoryImpl) SaveConfirmStrategyAggregate(ctx context.Context, agg *aggregate.ConfirmStrategy) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 更新文档状态（CurrentPlanId和StrategyStatus）
+		if err := tx.Model(&model.Document{}).Where("id = ?", agg.Document.ID).
+			Updates(map[string]any{
+				"current_plan_id": agg.Document.CurrentPlanId,
+				"strategy_status": agg.Document.StrategyStatus,
+			}).Error; err != nil {
+			return err
+		}
+
+		// 更新任务阶段（如果任务存在）
+		if agg.Task != nil {
+			if err := tx.Model(&model.DocumentTask{}).Where("id = ?", agg.Task.ID).
+				Updates(map[string]any{
+					"current_stage": agg.Task.CurrentStage,
+				}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 根据是否变更处理方案
+		if agg.IsChanged {
+			// 策略发生变更：废弃旧方案
+			if err := tx.Model(&model.DocumentStrategyPlan{}).Where("id = ?", agg.OldStrategyPlan.ID).
+				Updates(map[string]any{
+					"plan_status": agg.OldStrategyPlan.PlanStatus,
+				}).Error; err != nil {
+				return err
+			}
+
+			// 创建新方案
+			if err := tx.Create(convert.ToDocumentStrategyPlanModel(agg.NewStrategyPlan)).Error; err != nil {
+				return err
+			}
+
+			// 插入新方案的步骤
+			if len(agg.Steps) > 0 {
+				stepModels := slice.Map(agg.Steps, func(i int, step *entity.DocumentStrategyStep) *model.DocumentStrategyStep {
+					return convert.ToDocumentStrategyStepModel(step)
+				})
+				if err := tx.CreateInBatches(stepModels, 100).Error; err != nil {
+					return err
+				}
+			}
+
+			// 记录调整日志（如果存在）
+			if agg.AdjustLog != nil {
+				agg.AdjustLog.ID = utils.GetSnowflakeNextID()
+				if err := tx.Create(convert.ToDocumentTaskLogModel(agg.AdjustLog)).Error; err != nil {
+					return err
+				}
+			}
+		} else {
+			// 策略未变更：更新基础方案状态
+			if err := tx.Model(&model.DocumentStrategyPlan{}).Where("id = ?", agg.NewStrategyPlan.ID).
+				Updates(map[string]any{
+					"plan_status":     agg.NewStrategyPlan.PlanStatus,
+					"plan_source":     agg.NewStrategyPlan.PlanSource,
+					"adjust_note":     agg.NewStrategyPlan.AdjustNote,
+					"confirm_user_id": agg.NewStrategyPlan.ConfirmUserId,
+					"confirm_time":    agg.NewStrategyPlan.ConfirmTime,
+				}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 记录确认日志（如果存在）
+		if agg.ConfirmLog != nil {
+			agg.ConfirmLog.ID = utils.GetSnowflakeNextID()
+			if err := tx.Create(convert.ToDocumentTaskLogModel(agg.ConfirmLog)).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }

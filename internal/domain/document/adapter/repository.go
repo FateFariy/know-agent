@@ -20,6 +20,10 @@ type DocumentRepository interface {
 	// InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
 	InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
 
+	// SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
+	// 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志
+	SaveConfirmStrategyAggregate(ctx context.Context, agg *aggregate.ConfirmStrategy) error
+
 	// DeleteDocumentRelatedDataById 删除文档关联数据
 	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
 

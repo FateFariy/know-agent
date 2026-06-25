@@ -24,6 +24,7 @@ import (
 //go:generate goverter gen .
 type DocumentConverter interface {
 	FromUploadDocumentReq(src *document.UploadDocumentReq) *den.Document
+	FromConfirmStrategyReq(req *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
 
 	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
 	// goverter:map ID DocumentId
@@ -33,6 +34,8 @@ type DocumentConverter interface {
 	ToQueryStrategyPlanResp(src *den.Document) *document.QueryStrategyPlanResp
 	// goverter:map ID PlanId
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
+	// goverter:map ID PlanId
+	ToConfirmStrategyResp(plan *den.DocumentStrategyPlan) *document.ConfirmStrategyResp
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
 	ToDocumentChunkItemList(src []*den.DocumentChunk) []*document.DocumentChunkItem
 	ToQueryDocumentChunkDetailResp(src *dagg.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp
@@ -42,6 +45,8 @@ type DocumentConverter interface {
 	ToDocumentModel(src *den.Document) *model.Document
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
 	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
+	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan
+	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model.DocumentStrategyStep
 }
 
 // goverter:converter

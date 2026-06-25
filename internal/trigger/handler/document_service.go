@@ -66,8 +66,14 @@ func (d *DocumentService) QueryStrategyPlan(ctx context.Context, req *document.Q
 }
 
 func (d *DocumentService) ConfirmStrategy(ctx context.Context, req *document.ConfirmStrategyReq) (*document.ConfirmStrategyResp, error) {
-	// TODO implement me
-	panic("implement me")
+	plan, doc, err := d.l.ConfirmStrategy(ctx, convert.FromConfirmStrategyReq(req))
+	if err != nil {
+		return nil, err
+	}
+	resp := convert.ToConfirmStrategyResp(plan)
+	resp.StrategyStatus = doc.StrategyStatus
+	resp.StrategyStatusName = doc.StrategyStatusName
+	return resp, nil
 }
 
 // BuildIndex 构建索引
@@ -76,6 +82,7 @@ func (d *DocumentService) BuildIndex(ctx context.Context, req *document.BuildInd
 	return convert.ToBuildIndexResp(resp), err
 }
 
+// QueryDocumentChunks 查询文档块列表
 func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document.QueryDocumentChunksReq) (*document.QueryDocumentChunksResp, error) {
 	chunks, total, planId, err := d.l.QueryDocumentChunks(ctx, req.DocumentId, req.TaskId, req.PageNo, req.PageSize)
 	return &document.QueryDocumentChunksResp{
@@ -89,6 +96,7 @@ func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document
 	}, err
 }
 
+// QueryDocumentChunkDetail 查询文档块详情
 func (d *DocumentService) QueryDocumentChunkDetail(ctx context.Context, req *document.QueryDocumentChunkDetailReq) (*document.QueryDocumentChunkDetailResp, error) {
 	detail, err := d.l.QueryDocumentChunkDetail(ctx, req.DocumentId, req.TaskId, req.ChunkId)
 	return convert.ToQueryDocumentChunkDetailResp(detail), err

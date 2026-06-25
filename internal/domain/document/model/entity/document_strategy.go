@@ -37,6 +37,7 @@ func (d *DocumentStrategyPlan) FillEnumNames() {
 func (d *DocumentStrategyPlan) FillAndProcessPipeline(stepList []*DocumentStrategyStep) {
 	d.ParentPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeParent, stepList)
 	d.ChildPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeChild, stepList)
+	d.StrategySnapshot = "PARENT:" + d.ParentPipeline.StrategySnapshot + ";CHILD:" + d.ChildPipeline.StrategySnapshot
 }
 
 // DocumentStrategyStep 策略步骤实体
