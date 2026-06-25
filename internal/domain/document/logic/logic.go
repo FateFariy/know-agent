@@ -54,3 +54,17 @@ type AsyncProcessingLogic interface {
 type ParserLogic interface {
 	Parse(ctx context.Context, bytes []byte, originalFileName string, mimeType, fileType int) (*vo.DocumentAnalysisResult, error)
 }
+
+// StrategyLogic 策略业务逻辑接口
+type StrategyLogic interface {
+	// RecommendStrategy 推荐策略方案
+	RecommendStrategy(document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
+
+	// NormalizeSteps 标准化策略步骤
+	NormalizeSteps(basePlan *entity.DocumentStrategyPlan, baseSteps []*entity.DocumentStrategyStep,
+		requestParentStrategyTypes []int, requestChildStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error)
+
+	// BuildParentBlocks 构建父子块结构
+	BuildParentBlocks(document *entity.Document, plan *entity.DocumentStrategyPlan,
+		steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error)
+}
