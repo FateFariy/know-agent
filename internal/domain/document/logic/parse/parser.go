@@ -5,7 +5,10 @@ import (
 )
 
 type Parser interface {
+	// Name 获取解析器名称
 	Name() string
+
+	// Parse 解析文件
 	Parse(ctx context.Context, bytesData []byte) (string, error)
 }
 
@@ -29,7 +32,10 @@ func (r *Registry) Register(parser Parser) {
 	r.parsers[parser.Name()] = parser
 }
 
-func (r *Registry) Get(fileType string) (Parser, bool) {
+func (r *Registry) Get(fileType string) Parser {
 	parser, ok := r.parsers[fileType]
-	return parser, ok
+	if !ok {
+		return r.fallbackParser
+	}
+	return parser
 }

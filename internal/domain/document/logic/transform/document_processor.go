@@ -1,56 +1,79 @@
-package parse
+package transform
 
 import (
 	"context"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
 var englishPattern = regexp.MustCompile(`[A-Za-z]`)
 var headingPattern = regexp.MustCompile(`^#{1,6}\s+.+`)
 
-type ParserLogicImpl struct {
-	parserRegistry ParserRegistry
+type DocumentProcessor struct {
+	registry parse.Registry
 }
 
-var _ logic.ParserLogic = (*ParserLogicImpl)(nil)
+type processorOption struct {
+	fileType string
+}
 
-func NewParserLogicImpl(parserRegistry ParserRegistry) *ParserLogicImpl {
-	return &ParserLogicImpl{
-		parserRegistry: parserRegistry,
+// WithFileType 设置文件类型
+func WithFileType(fileType string) TransformerOption {
+	return WrapTransformerImplSpecificOptFn(func(opts *processorOption) {
+		opts.fileType = fileType
+	})
+}
+
+func NewDocumentProcessor(registry parse.Registry) *DocumentProcessor {
+	return &DocumentProcessor{
+		registry: registry,
 	}
 }
 
-func (p *ParserLogicImpl) Parse(ctx context.Context, bytesData []byte, originalFileName string, mimeType int, fileType int) (*vo.DocumentAnalysisResult, error) {
-	rawText, err := p.extractRawText(ctx, bytesData, fileType)
+// Transform 处理文档并返回分析结果
+// 包括文本提取、清理、结构分析和质量评估，用于后续切块决策
+func (p *DocumentProcessor) Transform(ctx context.Context, bytesData []byte, opts ...TransformerOption) (any, error) {
+	// 获取处理器特定选项
+	opt := GetTransformerImplSpecificOptions[processorOption](&processorOption{}, opts...)
+
+	// 根据文件类型提取原始文本
+	rawText, err := p.extractRawText(ctx, bytesData, opt.fileType)
 	if err != nil {
 		return nil, err
 	}
 
+	// 清理文本（去除多余空格、格式化等）
 	cleanedText := p.cleanupText(rawText)
 
+	// 统计标题数量（用于评估文档结构）
+	// todo: 后续使用结构节点提取器增强标题识别
+	//   List<DocumentStructureNodeCandidate> structureNodes = structureNodeExtractor.extract(originalFileName, cleanedText);
+	//   int headingCount = countHeadings(cleanedText, structureNodes);
 	headingCount := p.countHeadings(cleanedText)
 
+	// 提取段落列表（用于分段统计）
 	paragraphList := p.extractParagraphs(cleanedText)
 
-	maxParagraphLength := 0
-	for _, para := range paragraphList {
-		if len(para) > maxParagraphLength {
-			maxParagraphLength = len(para)
-		}
-	}
+	// 计算最大段落长度（用于评估段落复杂度）
+	maxParagraph := slices.MaxFunc(paragraphList, func(a, b string) int { return len(a) - len(b) })
 
+	// 估算token数量（用于成本和分块决策）
 	tokenCount := p.estimateTokenCount(cleanedText)
 
+	// 评估文档结构级别（标题数量+段落数量综合判断）
 	structureLevel := p.evaluateStructureLevel(headingCount, len(paragraphList))
 
+	// 评估内容质量级别（基于文本完整性、可读性等）
 	contentQualityLevel := p.evaluateContentQuality(cleanedText)
 
+	// 返回文档分析结果
 	return &vo.DocumentAnalysisResult{
 		ParsedText:          cleanedText,
 		CharCount:           len(cleanedText),
@@ -59,18 +82,20 @@ func (p *ParserLogicImpl) Parse(ctx context.Context, bytesData []byte, originalF
 		ContentQualityLevel: contentQualityLevel,
 		HeadingCount:        headingCount,
 		ParagraphCount:      len(paragraphList),
-		MaxParagraphLength:  maxParagraphLength,
+		MaxParagraphLength:  len(maxParagraph),
 	}, nil
 }
 
-func (p *ParserLogicImpl) extractRawText(ctx context.Context, bytesData []byte, fileType int) (string, error) {
-	if parser := p.parserRegistry.Get(fileType); parser != nil {
+// extractRawText 提取原始文本
+func (p *DocumentProcessor) extractRawText(ctx context.Context, bytesData []byte, fileType string) (string, error) {
+	if parser := p.registry.Get(fileType); parser != nil {
 		return parser.Parse(ctx, bytesData)
 	}
-	return string(bytesData), nil
+	return "", errorx.ErrUnsupportedFileType
 }
 
-func (p *ParserLogicImpl) cleanupText(rawText string) string {
+// cleanupText 清理文本，移除换行符、制表符、空格等
+func (p *DocumentProcessor) cleanupText(rawText string) string {
 	if rawText == "" {
 		return ""
 	}
@@ -87,7 +112,8 @@ func (p *ParserLogicImpl) cleanupText(rawText string) string {
 	return strutil.Trim(cleaned)
 }
 
-func (p *ParserLogicImpl) countHeadings(text string) int {
+// todo 待完善，结构节点提取和 heading 计数
+func (p *DocumentProcessor) countHeadings(text string) int {
 	count := 0
 	for _, line := range strings.Split(text, "\n") {
 		if p.isHeading(line) {
@@ -97,7 +123,8 @@ func (p *ParserLogicImpl) countHeadings(text string) int {
 	return count
 }
 
-func (p *ParserLogicImpl) isHeading(line string) bool {
+// todo 待完善，判断行是否为标题
+func (p *DocumentProcessor) isHeading(line string) bool {
 	line = strutil.Trim(line)
 	if len(line) < 3 {
 		return false
@@ -108,7 +135,8 @@ func (p *ParserLogicImpl) isHeading(line string) bool {
 	return false
 }
 
-func (p *ParserLogicImpl) extractParagraphs(text string) []string {
+// extractParagraphs 提取段落
+func (p *DocumentProcessor) extractParagraphs(text string) []string {
 	paragraphs := strings.Split(text, "\n\n")
 	paragraphList := make([]string, 0, len(paragraphs))
 	for _, paragraph := range paragraphs {
@@ -120,7 +148,8 @@ func (p *ParserLogicImpl) extractParagraphs(text string) []string {
 	return paragraphList
 }
 
-func (p *ParserLogicImpl) estimateTokenCount(text string) int {
+// estimateTokenCount 估计token数量
+func (p *DocumentProcessor) estimateTokenCount(text string) int {
 	englishWordCount, chineseCharCount := 0, 0
 
 	for _, word := range strings.Fields(text) {
@@ -139,7 +168,8 @@ func (p *ParserLogicImpl) estimateTokenCount(text string) int {
 	return englishWordCount + chineseCharCount + max(1, nonChineseLength/4)
 }
 
-func (p *ParserLogicImpl) evaluateStructureLevel(headingCount, paragraphCount int) int {
+// evaluateStructureLevel 评估文档结构等级
+func (p *DocumentProcessor) evaluateStructureLevel(headingCount, paragraphCount int) int {
 	if headingCount >= 5 {
 		return vo.StructureLevelHigh
 	}
@@ -152,7 +182,8 @@ func (p *ParserLogicImpl) evaluateStructureLevel(headingCount, paragraphCount in
 	return vo.StructureLevelLow
 }
 
-func (p *ParserLogicImpl) evaluateContentQuality(text string) int {
+// evaluateContentQuality 评估文档内容质量等级
+func (p *DocumentProcessor) evaluateContentQuality(text string) int {
 	charCount := len(text)
 	if strutil.IsBlank(text) || charCount < 20 {
 		return vo.ContentQualityLevelLow
@@ -168,11 +199,4 @@ func (p *ParserLogicImpl) evaluateContentQuality(text string) int {
 	}
 
 	return vo.ContentQualityLevelHigh
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

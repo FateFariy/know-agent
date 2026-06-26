@@ -51,10 +51,6 @@ type AsyncProcessingLogic interface {
 	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) error
 }
 
-type ParserLogic interface {
-	Parse(ctx context.Context, bytes []byte, originalFileName string, mimeType, fileType int) (*vo.DocumentAnalysisResult, error)
-}
-
 // StrategyLogic 策略业务逻辑接口
 type StrategyLogic interface {
 	// RecommendStrategy 推荐策略方案

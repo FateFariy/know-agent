@@ -96,7 +96,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	}
 
 	// TODO: 实际解析逻辑 - 这里需要注入parserService
-	// 2. 解析文档: parserService.parse(fileBytes, document.OriginalFileName, document.MimeType, fileType)
+	// 2. 解析文档: parserService.parser(fileBytes, document.OriginalFileName, document.MimeType, fileType)
 	// 3. 上传解析文本: storageService.uploadParsedText(documentId, analysisResult.ParsedText)
 	// 4. 替换结构节点: structureNodeService.replaceDocumentNodes(documentId, taskId, analysisResult.StructureNodes)
 	// 5. 同步导航产物: syncNavigationArtifacts(documentId, taskId, structureNodes)
