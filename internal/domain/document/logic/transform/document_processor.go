@@ -10,7 +10,6 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
 var englishPattern = regexp.MustCompile(`[A-Za-z]`)
@@ -39,18 +38,9 @@ func NewDocumentProcessor(registry parse.Registry) *DocumentProcessor {
 
 // Transform 处理文档并返回分析结果
 // 包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *DocumentProcessor) Transform(ctx context.Context, bytesData []byte, opts ...TransformerOption) (any, error) {
-	// 获取处理器特定选项
-	opt := GetTransformerImplSpecificOptions[processorOption](&processorOption{}, opts...)
-
-	// 根据文件类型提取原始文本
-	rawText, err := p.extractRawText(ctx, bytesData, opt.fileType)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *DocumentProcessor) Transform(ctx context.Context, text string, opts ...TransformerOption) (any, error) {
 	// 清理文本（去除多余空格、格式化等）
-	cleanedText := p.cleanupText(rawText)
+	cleanedText := p.cleanupText(text)
 
 	// 统计标题数量（用于评估文档结构）
 	// todo: 后续使用结构节点提取器增强标题识别
@@ -84,14 +74,6 @@ func (p *DocumentProcessor) Transform(ctx context.Context, bytesData []byte, opt
 		ParagraphCount:      len(paragraphList),
 		MaxParagraphLength:  len(maxParagraph),
 	}, nil
-}
-
-// extractRawText 提取原始文本
-func (p *DocumentProcessor) extractRawText(ctx context.Context, bytesData []byte, fileType string) (string, error) {
-	if parser := p.registry.Get(fileType); parser != nil {
-		return parser.Parse(ctx, bytesData)
-	}
-	return "", errorx.ErrUnsupportedFileType
 }
 
 // cleanupText 清理文本，移除换行符、制表符、空格等

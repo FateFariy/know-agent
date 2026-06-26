@@ -12,24 +12,26 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
 // AsyncProcessingLogicImpl 异步处理业务逻辑实现
 type AsyncProcessingLogicImpl struct {
-	repo        adapter.DocumentRepository
-	port        *adapter.DocumentPort
-	parserLogic ParserLogic
+	repo     adapter.DocumentRepository
+	port     *adapter.DocumentPort
+	registry parse.Registry
 }
 
 // NewAsyncProcessingLogic 创建异步处理逻辑实例
-func NewAsyncProcessingLogic(repo adapter.DocumentRepository, port *adapter.DocumentPort, parserLogic ParserLogic) *AsyncProcessingLogicImpl {
+func NewAsyncProcessingLogic(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry parse.Registry) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
-		repo:        repo,
-		port:        port,
-		parserLogic: parserLogic,
+		repo:     repo,
+		port:     port,
+		registry: registry,
 	}
 }
 
@@ -88,6 +90,11 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	fileBytes, err := d.port.DownloadObject(ctx, document.ObjectName)
 	if err != nil {
 		Warnf("下载文件失败: documentId=%d, err=%v", documentId, err)
+		return err
+	}
+	rawText, err := d.parse(ctx, fileBytes, vo.FileTypeName(document.FileType))
+	if err != nil {
+		Warnf("解析文件失败: documentId=%d, err=%v", documentId, err)
 		return err
 	}
 
@@ -449,6 +456,14 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 			"parentBlockCount": len(parentBlockEntityList),
 			"chunkCount":       len(chunkEntityList),
 		})
+}
+
+// parse 解析原始文本
+func (d *AsyncProcessingLogicImpl) parse(ctx context.Context, bytes []byte, fileType string) (string, error) {
+	if parser := d.registry.Get(fileType); parser != nil {
+		return parser.Parse(ctx, bytes)
+	}
+	return "", errorx.ErrUnsupportedFileType
 }
 
 //
