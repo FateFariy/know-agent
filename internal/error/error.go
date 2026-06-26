@@ -17,4 +17,6 @@ var (
 	ErrDocumentIndexUnavailable = common.NewBizError(20012, "文档当前没有可用索引：%s")
 	ErrDocumentRetrieveEmpty    = common.NewBizError(20013, "未检索到可用资料：%s")
 	ErrTaskNotFound             = common.NewBizError(20014, "任务不存在：%s")
+	ErrParentBlockMissing       = common.NewBizError(20015, "当前方案缺少父块流水线，无法生成 Parent-Child 结构")
+	ErrChildBlockMissing        = common.NewBizError(20016, "当前方案缺少子块流水线，无法生成 Parent-Child 结构")
 )

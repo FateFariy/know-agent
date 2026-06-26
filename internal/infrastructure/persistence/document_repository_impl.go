@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/redis/go-redis/v9"
@@ -420,7 +421,7 @@ func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, pla
 	}
 	slices.SortFunc(steps, func(a, b *entity.DocumentStrategyStep) int {
 		if a.PipelineType != b.PipelineType {
-			return a.PipelineType - b.PipelineType
+			return strings.Compare(a.PipelineType, b.PipelineType)
 		} else if a.StepNo != b.StepNo {
 			return a.StepNo - b.StepNo
 		}
