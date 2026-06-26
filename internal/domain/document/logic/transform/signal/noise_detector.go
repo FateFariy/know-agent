@@ -4,8 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -15,49 +14,32 @@ var (
 	versionFooterPattern  = regexp.MustCompile(`.*(?:\bV\d+(?:\.\d+)*\b|版本|修订|Rev\.?\s*\d+).*`)
 )
 
-type NoiseDetector struct{}
-
-func (d *NoiseDetector) Name() string {
-	return "noise"
-}
-
-func (d *NoiseDetector) Order() int {
-	return 10
+// NoiseDetector 噪声检测器
+type NoiseDetector struct {
+	BaseDetector
 }
 
 func (d *NoiseDetector) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
-	if detCtx == nil || text == "" {
+	if text == "" {
 		return nil
 	}
 
-	frequency := 0
-	if detCtx.LineFrequency != nil {
-		frequency = detCtx.LineFrequency[text]
-	}
-
+	frequency := utils.Ternary(detCtx.LineFrequency == nil, 0, detCtx.LineFrequency[text])
 	if frequency >= 2 {
+		noise := &vo.DocumentStructureSignal{Kind: vo.SignalKindNoise, Confidence: 0.99}
 		if d.sameDocumentTitle(detCtx.DocumentTitle, text) {
-			return &vo.DocumentStructureSignal{
-				Kind:       vo.SignalKindNoise,
-				Reasons:    []string{"duplicate-document-title"},
-				Confidence: 0.99,
-			}
+			noise.Reasons = []string{"duplicate-document-title"}
+			return noise
 		}
 
 		if copyrightNoisePattern.MatchString(text) {
-			return &vo.DocumentStructureSignal{
-				Kind:       vo.SignalKindNoise,
-				Reasons:    []string{"copyright-noise"},
-				Confidence: 0.99,
-			}
+			noise.Reasons = []string{"copyright-noise"}
+			return noise
 		}
 
 		if frequency >= 3 && len(text) <= 120 && (versionFooterPattern.MatchString(text) || strings.Contains(text, "|")) {
-			return &vo.DocumentStructureSignal{
-				Kind:       vo.SignalKindNoise,
-				Reasons:    []string{"version-footer-noise"},
-				Confidence: 0.99,
-			}
+			noise.Reasons = []string{"version-footer-noise"}
+			return noise
 		}
 	}
 
@@ -72,22 +54,6 @@ func (d *NoiseDetector) Detect(detCtx *DetectorContext, text string) *vo.Documen
 	return nil
 }
 
-func (d *NoiseDetector) sameDocumentTitle(documentTitle, candidate string) bool {
-	if documentTitle == "" || candidate == "" {
-		return false
-	}
-	left := d.normalizeComparableTitle(documentTitle)
-	right := d.normalizeComparableTitle(candidate)
-	return left == right
-}
-
-func (d *NoiseDetector) normalizeComparableTitle(text string) string {
-	normalized := strutil.Trim(text)
-	if normalized == "" {
-		return ""
-	}
-	normalized = regexp.MustCompile(`^#+\s*`).ReplaceAllString(normalized, "")
-	normalized = regexp.MustCompile(`\.[A-Za-z0-9]{1,6}$`).ReplaceAllString(normalized, "")
-	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, "")
-	return strings.ToLower(normalized)
+func (d *NoiseDetector) Order() int {
+	return 10
 }

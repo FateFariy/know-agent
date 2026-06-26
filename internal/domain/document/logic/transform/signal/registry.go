@@ -10,6 +10,8 @@ type DefaultDetectorsManager struct {
 	detectors []Detector
 }
 
+var _ DetectorsManager = (*DefaultDetectorsManager)(nil)
+
 func NewDefaultDetectorsManager() *DefaultDetectorsManager {
 	mgr := &DefaultDetectorsManager{
 		detectors: make([]Detector, 0),
@@ -48,16 +50,9 @@ func (m *DefaultDetectorsManager) Register(detector Detector) {
 	})
 }
 
-func (m *DefaultDetectorsManager) Detect(text string, ctx *DetectorContext) *vo.DocumentStructureSignal {
-	if text == "" {
-		return &vo.DocumentStructureSignal{
-			Kind:       vo.SignalKindBlank,
-			Confidence: 1.0,
-		}
-	}
-
+func (m *DefaultDetectorsManager) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
 	for _, detector := range m.detectors {
-		result := detector.Detect(ctx, text)
+		result := detector.Detect(detCtx, text)
 		if result != nil {
 			return result
 		}
@@ -69,9 +64,3 @@ func (m *DefaultDetectorsManager) Detect(text string, ctx *DetectorContext) *vo.
 		Confidence: 1.0,
 	}
 }
-
-func (m *DefaultDetectorsManager) GetDetectors() []Detector {
-	return m.detectors
-}
-
-var _ DetectorsManager = (*DefaultDetectorsManager)(nil)

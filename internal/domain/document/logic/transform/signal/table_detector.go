@@ -14,14 +14,6 @@ var (
 
 type TableRowDetector struct{}
 
-func (d *TableRowDetector) Name() string {
-	return "table-row"
-}
-
-func (d *TableRowDetector) Order() int {
-	return 70
-}
-
 func (d *TableRowDetector) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
 	if text == "" {
 		return nil
@@ -49,4 +41,8 @@ func (d *TableRowDetector) isTableRow(text string) bool {
 		return true
 	}
 	return specialLinePattern.MatchString(text)
+}
+
+func (d *TableRowDetector) Order() int {
+	return 70
 }

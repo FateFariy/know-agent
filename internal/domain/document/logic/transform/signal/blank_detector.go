@@ -6,14 +6,6 @@ import (
 
 type BlankDetector struct{}
 
-func (d *BlankDetector) Name() string {
-	return "blank"
-}
-
-func (d *BlankDetector) Order() int {
-	return 0
-}
-
 func (d *BlankDetector) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
 	if text == "" {
 		return &vo.DocumentStructureSignal{
@@ -22,4 +14,8 @@ func (d *BlankDetector) Detect(detCtx *DetectorContext, text string) *vo.Documen
 		}
 	}
 	return nil
+}
+
+func (d *BlankDetector) Order() int {
+	return 0
 }

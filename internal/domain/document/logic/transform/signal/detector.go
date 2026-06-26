@@ -18,15 +18,13 @@ type LineClassification struct {
 }
 
 type Detector interface {
-	Name() string
-	Order() int
 	Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal
+	Order() int
 }
 
 type DetectorsManager interface {
 	Register(detector Detector)
-	Detect(text string, ctx *DetectorContext) *vo.DocumentStructureSignal
-	GetDetectors() []Detector
+	Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal
 }
 
 func NewDetectorContext(documentTitle string, lineFrequency map[string]int) *DetectorContext {

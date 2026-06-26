@@ -2,7 +2,6 @@ package signal
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -12,6 +11,7 @@ import (
 var singleLevelDigitPattern = regexp.MustCompile(`^(\d+)\s*[、.]\s*(.+)$`)
 
 type SingleLevelDigitDetector struct {
+	BaseDetector
 	maxPlainHeadingChars int
 }
 
@@ -22,14 +22,6 @@ func NewSingleLevelDigitDetector(maxPlainHeadingChars int) *SingleLevelDigitDete
 	return &SingleLevelDigitDetector{
 		maxPlainHeadingChars: maxPlainHeadingChars,
 	}
-}
-
-func (d *SingleLevelDigitDetector) Name() string {
-	return "single-level-digit"
-}
-
-func (d *SingleLevelDigitDetector) Order() int {
-	return 100
 }
 
 func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
@@ -47,7 +39,7 @@ func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string) 
 
 	return &vo.DocumentStructureSignal{
 		Kind:       vo.SignalKindListItem,
-		NodeCode:   strings.TrimSpace(matches[1]),
+		NodeCode:   strutil.Trim(matches[1]),
 		Title:      title,
 		ItemIndex:  itemIndex,
 		Reasons:    []string{"single-digit-list"},
@@ -55,21 +47,6 @@ func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string) 
 	}
 }
 
-func (d *SingleLevelDigitDetector) parseLooseNumber(text string) int {
-	normalized := strutil.Trim(text)
-	if normalized == "" {
-		return 0
-	}
-
-	for _, c := range normalized {
-		if c < '0' || c > '9' {
-			return 0
-		}
-	}
-
-	var num int
-	for _, c := range normalized {
-		num = num*10 + int(c-'0')
-	}
-	return num
+func (d *SingleLevelDigitDetector) Order() int {
+	return 100
 }
