@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
 
 type DefaultDetectorsManager struct {
@@ -32,7 +33,7 @@ func (m *DefaultDetectorsManager) registerDefaultDetectors() {
 	m.detectors = append(m.detectors, &QuoteDetector{})
 	m.detectors = append(m.detectors, &ListItemDetector{})
 	m.detectors = append(m.detectors, NewSingleLevelDigitDetector(80))
-	m.detectors = append(m.detectors, &ChineseOutlineDetector{})
+	m.detectors = append(m.detectors, &support.ChineseOutlineDetector{})
 	m.detectors = append(m.detectors, &BodyDetector{})
 
 	sort.Slice(m.detectors, func(i, j int) bool {

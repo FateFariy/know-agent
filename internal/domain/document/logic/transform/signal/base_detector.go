@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	arabicSingle = iota
+	arabicSingle = iota + 1
 	chineseOutline
 )
 
@@ -105,12 +105,12 @@ func (d *BaseDetector) extractCode(title string) string {
 	return ""
 }
 
-func (d *BaseDetector) isNeighborSequence(itemIndex *int, family int, context *lineContext) bool {
-	if itemIndex == nil {
+func (d *BaseDetector) isNeighborSequence(itemIndex, family int, lineCtx *lineContext) bool {
+	if itemIndex == 0 || family == 0 {
 		return false
 	}
-	return d.isSequenceNeighbor(context.previousNonBlank, *itemIndex, family, -1) ||
-		d.isSequenceNeighbor(context.nextNonBlank, *itemIndex, family, 1)
+	return d.isSequenceNeighbor(lineCtx.previousNonBlank, itemIndex, family, -1) ||
+		d.isSequenceNeighbor(lineCtx.nextNonBlank, itemIndex, family, 1)
 }
 
 func (d *BaseDetector) isSequenceNeighbor(candidate *vo.DocumentStructureLogicalLine, itemIndex, family, offset int) bool {
@@ -118,13 +118,13 @@ func (d *BaseDetector) isSequenceNeighbor(candidate *vo.DocumentStructureLogical
 		return false
 	}
 	candidateIndex := d.resolveOrderedIndex(candidate.NormalizedText, family)
-	return candidateIndex != nil && *candidateIndex == itemIndex+offset
+	return candidateIndex == itemIndex+offset
 }
 
-func (d *BaseDetector) resolveOrderedIndex(text string, family int) *int {
-	normalized, := strutil.Trim(text)
+func (d *BaseDetector) resolveOrderedIndex(text string, family int) int {
+	normalized := strutil.Trim(text)
 	if normalized == "" {
-		return nil
+		return 0
 	}
 
 	switch family {
@@ -137,5 +137,58 @@ func (d *BaseDetector) resolveOrderedIndex(text string, family int) *int {
 			return d.parseLooseNumber(matches[1])
 		}
 	}
-	return nil
+	return 0
+}
+
+func (d *BaseDetector) previousIntroducesList(previousNonBlank *vo.DocumentStructureLogicalLine) bool {
+	if previousNonBlank == nil {
+		return false
+	}
+	previous := strutil.Trim(previousNonBlank.NormalizedText)
+	return strings.HasSuffix(previous, "：") || strings.HasSuffix(previous, ":")
+}
+
+func (d *BaseDetector) looksLikePlainHeading(text string, ctx *lineContext) bool {
+	normalized := strutil.Trim(text)
+	if text == "" {
+		return false
+	}
+	if len(normalized) > d.maxPlainHeadingChars {
+		return false
+	}
+	if d.endsWithSentencePunctuation(normalized) {
+		return false
+	}
+	if strings.Contains(normalized, "http://") || strings.Contains(normalized, "https://") {
+		return false
+	}
+	if strings.HasPrefix(normalized, "|") || strings.HasSuffix(normalized, "|") {
+		return false
+	}
+	if regexp.MustCompile(`^[\-=_]{3,}$`).MatchString(normalized) {
+		return false
+	}
+
+	isolated := ctx.blankBefore || ctx.blankAfter
+	nextLooksContent := ctx.nextNonBlank != nil &&
+		ctx.nextNonBlank.NormalizedText != "" &&
+		!regexp.MustCompile(`^[:\-\\s|]+$`).MatchString(ctx.nextNonBlank.NormalizedText)
+	nounLike := !strings.Contains(normalized, "，") &&
+		!strings.Contains(normalized, "；") &&
+		!strings.Contains(normalized, "。") &&
+		!strings.Contains(normalized, "：") &&
+		!strings.HasPrefix(strings.ToLower(normalized), "http")
+
+	return isolated && nextLooksContent && nounLike
+}
+
+func (d *BaseDetector) endsWithSentencePunctuation(text string) bool {
+	return strings.HasSuffix(text, "。") ||
+		strings.HasSuffix(text, "！") ||
+		strings.HasSuffix(text, "？") ||
+		strings.HasSuffix(text, "；") ||
+		strings.HasSuffix(text, ".") ||
+		strings.HasSuffix(text, "!") ||
+		strings.HasSuffix(text, "?") ||
+		strings.HasSuffix(text, ";")
 }

@@ -23,7 +23,7 @@ func (d *ChineseOutlineDetector) Order() int {
 	return 110
 }
 
-func (d *ChineseOutlineDetector) Detect(text string, ctx *DetectorContext) *vo.DocumentStructureSignal {
+func (d *ChineseOutlineDetector) Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal {
 	if text == "" {
 		return nil
 	}
@@ -31,6 +31,37 @@ func (d *ChineseOutlineDetector) Detect(text string, ctx *DetectorContext) *vo.D
 	matches := chineseOutlinePattern.FindStringSubmatch(text)
 	if len(matches) != 3 {
 		return nil
+	}
+	title := strutil.Trim(matches[2])
+	itemIndex := d.parseLooseNumber(matches[1])
+	sequential := d.isNeighborSequence(itemIndex, chineseOutline, context)
+	introducedByLeadIn := d.previousIntroducesList(context.previousNonBlank)
+	headingLike := !sequential && !introducedByLeadIn && d.looksLikePlainHeading(title, context)
+
+	var kind vo.DocumentStructureSignalKind
+	var reasons []string
+	var confidence float64
+
+	if headingLike {
+		kind = vo.SignalKindHeadingCandidate
+		reasons = []string{"chinese-outline-ambiguous-heading"}
+		confidence = 0.60
+	} else if sequential {
+		kind = vo.SignalKindListItem
+		reasons = []string{"chinese-outline-sequence-list"}
+		confidence = 0.92
+	} else {
+		kind = vo.SignalKindListItem
+		reasons = []string{"chinese-outline-list"}
+		confidence = 0.86
+	}
+
+	baseSignal.Kind = kind
+	baseSignal.Reasons = reasons
+	baseSignal.Confidence = confidence
+
+	if headingLike && itemIndex != nil && *itemIndex > 0 {
+		baseSignal.NumericPath = []int{*itemIndex}
 	}
 
 	title := strutil.Trim(matches[2])

@@ -9,14 +9,6 @@ type DetectorContext struct {
 	LineFrequency map[string]int
 }
 
-type LineClassifier interface {
-	Classify(text string) LineClassification
-}
-
-type LineClassification struct {
-	IsHeading bool
-}
-
 type Detector interface {
 	Detect(detCtx *DetectorContext, text string) *vo.DocumentStructureSignal
 	Order() int
