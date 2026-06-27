@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -20,12 +19,6 @@ var (
 
 	// specialLinePattern 整行仅由分隔符构成，视为特殊结构（表格/列表装饰）
 	specialLinePattern = regexp.MustCompile(`^[:\-\\s|]+$`)
-
-	// tableBorderRegex 识别纯分割线（例如 ====、----、____），排除表格线/装饰线
-	tableBorderRegex = regexp.MustCompile(`^[\-=_]{3,}$`)
-
-	// nonContentRegex 整行仅由分隔符/空白构成，不作为正文内容参与标题推断
-	nonContentRegex = regexp.MustCompile(`^[:\-\\s|]+$`)
 )
 
 // SignalExtractor 文档结构信号抽取器：按行对文本进行结构识别，产出标题/正文/候选标题等信号
@@ -158,7 +151,7 @@ func (e *SignalExtractor) classify(detCtx *signal.DetectorContext, logicalLines 
 	// - 当分类器未识别为标题，但 looksLikePlainHeading 为真时，标记为 HeadingCandidate（0.58 置信度）
 	// - LevelHint：有空行在前 → 认为更像一级标题；否则更像二级小标题
 	fallback := e.lineClassifier.Classify(normalized)
-	if !fallback.IsHeading() && e.looksLikePlainHeading(lineContext, normalized) {
+	if !fallback.IsHeading() && support.LooksLikePlainHeading(lineContext, normalized, e.maxPlainHeadingChars) {
 		fallbackSignal.Kind = vo.SignalKindHeadingCandidate
 		fallbackSignal.Reasons = []string{"plain-heading-candidate"}
 		// 有空行间隔的标题通常层级更高，无空行则视为二级候选
@@ -345,62 +338,4 @@ func (e *SignalExtractor) countIndentLevel(text string) int {
 		break
 	}
 	return indent
-}
-
-// looksLikePlainHeading 启发式判断一行是否像「朴素标题」（无编号/无符号的纯文字标题）
-/*
-  判断要点：
-  1. 文本非空且字符数 ≤ maxPlainHeadingChars
-  2. 不以句末标点结尾（排除完整句子）
-  3. 不含 http(s):// 前缀（排除链接行）
-  4. 不以 | 开头或结尾（排除表格行）
-  5. 不是纯分割线
-  6. 上下文判断：前后至少一侧有空行，且下一行看起来像正文内容
-  7. 名词性特征：不含内部中英文逗号/分号/句号等
-*/
-func (e *SignalExtractor) looksLikePlainHeading(lineContext *vo.LineContext, text string) bool {
-	normalized := strutil.Trim(text)
-	if normalized == "" {
-		return false
-	}
-
-	// 字符数上限约束：长行更可能是段落而非标题
-	charLen := utf8.RuneCountInString(normalized)
-	if charLen > e.maxPlainHeadingChars {
-		return false
-	}
-
-	// 以句子结束标点结尾 → 视为句子，不是标题
-	if strings.ContainsAny(normalized[charLen-1:], "\"。！？；.!?;") {
-		return false
-	}
-
-	// 包含 URL 前缀 → 视为链接行
-	lower := strings.ToLower(normalized)
-	if strings.Contains(lower, "http://") || strings.Contains(lower, "https://") {
-		return false
-	}
-
-	// 以 | 开头或结尾 → 表格内容
-	if strings.HasPrefix(normalized, "|") || strings.HasSuffix(normalized, "|") {
-		return false
-	}
-
-	// 纯分割线（如 ====, ----, ____）→ 不是标题
-	if tableBorderRegex.MatchString(normalized) {
-		return false
-	}
-
-	// 上下文判断：前后至少一侧有空行（标题通常与正文有视觉间隔）
-	isolated := lineContext.BlankBefore || lineContext.BlankAfter
-
-	// 下一行看起来像内容（不是纯分隔符），才能支撑「标题→正文」的结构假设
-	nextLooksContent := lineContext.NextNonBlank != nil &&
-		strutil.IsNotBlank(lineContext.NextNonBlank.NormalizedText) &&
-		!nonContentRegex.MatchString(lineContext.NextNonBlank.NormalizedText)
-
-	// 名词性特征：不含内部标点（逗号/分号/句号等），不以 http 开头
-	nounLike := !strings.ContainsAny(normalized, "，；。：") && !strings.HasPrefix(lower, "http")
-
-	return isolated && nextLooksContent && nounLike
 }

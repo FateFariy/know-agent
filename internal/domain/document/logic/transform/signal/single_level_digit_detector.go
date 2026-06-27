@@ -7,6 +7,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
 
 // singleLevelDigitPattern 单层数字编号模式（如：1. 标题、1、标题）
@@ -54,7 +55,7 @@ func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string, 
 	introducedByLeadIn := d.previousIntroducesList(detCtx.LineContext.PreviousNonBlank)
 
 	// 判断是否更像标题：非序列、非引导、且满足标题特征
-	headingLike := !sequential && !introducedByLeadIn && d.looksLikePlainHeading(detCtx.LineContext, title, opt.maxPlainHeadingChars)
+	headingLike := !sequential && !introducedByLeadIn && support.LooksLikePlainHeading(detCtx.LineContext, title, opt.maxPlainHeadingChars)
 
 	// 根据判断结果确定类型、原因和置信度
 	reason := utils.Ternary(headingLike, "single-digit-ambiguous-heading",

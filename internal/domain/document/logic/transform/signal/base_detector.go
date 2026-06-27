@@ -1,24 +1,14 @@
 package signal
 
 import (
-	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-)
-
-// 标题比较和噪声检测
-var (
-	titleHashPrefixRegex = regexp.MustCompile(`^#+\s*`)              // Markdown 标题前缀（如 ###）
-	titleExtRegex        = regexp.MustCompile(`\.[A-Za-z0-9]{1,6}$`) // 文件扩展名
-	titleSpaceRegex      = regexp.MustCompile(`\s+`)                 // 空白字符
-	tableBorderRegex     = regexp.MustCompile(`^[\-=_]{3,}$`)        // 表格分割线（如 ----）
-	nonContentRegex      = regexp.MustCompile(`^[:\-\\s|]+$`)        // 非内容行（纯分隔符）
+	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
 
 // 数字序列类型枚举
@@ -35,21 +25,9 @@ func (d *BaseDetector) sameDocumentTitle(documentTitle, candidate string) bool {
 	if documentTitle == "" || candidate == "" {
 		return false
 	}
-	left := d.normalizeComparableTitle(documentTitle)
-	right := d.normalizeComparableTitle(candidate)
+	left := support.NormalizeComparableTitle(documentTitle)
+	right := support.NormalizeComparableTitle(candidate)
 	return left == right
-}
-
-// normalizeComparableTitle 标准化标题用于比较, 去除 Markdown 前缀、文件扩展名、空白字符，转为小写
-func (d *BaseDetector) normalizeComparableTitle(text string) string {
-	normalized := strutil.Trim(text)
-	if normalized == "" {
-		return ""
-	}
-	normalized = titleHashPrefixRegex.ReplaceAllString(normalized, "")
-	normalized = titleExtRegex.ReplaceAllString(normalized, "")
-	normalized = titleSpaceRegex.ReplaceAllString(normalized, "")
-	return strings.ToLower(normalized)
 }
 
 // parseLooseNumber 解析松散格式的数字（支持阿拉伯数字和中文数字）
@@ -177,51 +155,4 @@ func (d *BaseDetector) previousIntroducesList(previousNonBlank *vo.DocumentStruc
 	}
 	previous := strutil.Trim(previousNonBlank.NormalizedText)
 	return strings.HasSuffix(previous, "：") || strings.HasSuffix(previous, ":")
-}
-
-// looksLikePlainHeading 判断文本是否看起来像纯文本标题（无编号前缀）, 通过长度、标点、上下文等多维度特征判断
-func (d *BaseDetector) looksLikePlainHeading(lineContext *vo.LineContext, text string, maxPlainHeadingChars int) bool {
-	normalized := strutil.Trim(text)
-	if normalized == "" {
-		return false
-	}
-
-	charLen := utf8.RuneCountInString(normalized)
-	// 长度超过阈值 → 不是标题
-	if charLen > maxPlainHeadingChars {
-		return false
-	}
-
-	// 以句子结束标点结尾 → 不是标题
-	if strings.ContainsAny(normalized[charLen-1:], "。！？；.!?;") {
-		return false
-	}
-
-	// 包含 URL 前缀 → 不是标题
-	lower := strings.ToLower(normalized)
-	if strings.Contains(lower, "http://") || strings.Contains(lower, "https://") {
-		return false
-	}
-
-	// 以 | 开头或结尾 → 表格内容
-	if strings.HasPrefix(normalized, "|") || strings.HasSuffix(normalized, "|") {
-		return false
-	}
-
-	// 纯分割线（如 ====, ----, ____）→ 不是标题
-	if tableBorderRegex.MatchString(normalized) {
-		return false
-	}
-
-	// 上下文判断：前后有空白行且下一行有内容
-	isolated := lineContext.BlankBefore || lineContext.BlankAfter
-
-	nextLooksContent := lineContext.NextNonBlank != nil &&
-		strutil.IsNotBlank(lineContext.NextNonBlank.NormalizedText) &&
-		!nonContentRegex.MatchString(lineContext.NextNonBlank.NormalizedText)
-
-	// 名词性特征：不含内部标点（，；。：）
-	nounLike := !strings.ContainsAny(normalized, "，；。：") && !strings.HasPrefix(lower, "http")
-
-	return isolated && nextLooksContent && nounLike
 }
