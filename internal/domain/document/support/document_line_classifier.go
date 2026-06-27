@@ -3,6 +3,7 @@ package support
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 )
@@ -124,8 +125,8 @@ func (c *DocumentLineClassifier) looksLikeHeadingContent(content string) bool {
 		return false
 	}
 
-	strLen := len([]rune(normalized))
-	if strings.ContainsAny(normalized[strLen-1:], "。！？；.!?;") || strLen > maxHeadingLength {
+	charLen := utf8.RuneCountInString(normalized)
+	if strings.ContainsAny(normalized[charLen-1:], "。！？；.!?;") || charLen > maxHeadingLength {
 		return false
 	}
 	return !strings.ContainsAny(normalized, "，；。：")
