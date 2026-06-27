@@ -2,6 +2,7 @@ package support
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -85,4 +86,16 @@ func LooksLikePlainHeading(lineContext *vo.LineContext, text string, maxPlainHea
 	nounLike := !strings.ContainsAny(normalized, "，；。：") && !strings.HasPrefix(lower, "http")
 
 	return isolated && nextLooksContent && nounLike
+}
+
+// NumericKey 将整数数字路径拼接成点号分隔的字符串（如 [1,2,3] → "1.2.3"）
+func NumericKey(numericPath []int) string {
+	var sb strings.Builder
+	for i, num := range numericPath {
+		if i > 0 {
+			sb.WriteString(".")
+		}
+		sb.WriteString(strconv.Itoa(num))
+	}
+	return sb.String()
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
 
 type listContext struct {
@@ -225,7 +226,7 @@ func (r *HierarchyResolver) buildHeadingNode(signal *vo.DocumentStructureSignal,
 	}
 	latestHeadingByDepth[depth] = nodeNo
 	// 如果存在数字路径，登记到 numericPath → nodeNo 映射
-	numericKey := r.numericKey(signal.NumericPath)
+	numericKey := support.NumericKey(signal.NumericPath)
 	if numericKey != "" {
 		latestHeadingByNumericPath[numericKey] = nodeNo
 	}
@@ -263,7 +264,7 @@ func (r *HierarchyResolver) resolveHeadingDepth(signal *vo.DocumentStructureSign
 		}
 
 		// 尝试「上一级数字路径」精确匹配父节点
-		parentKey := r.numericKey(numericPath[:len(numericPath)-1])
+		parentKey := support.NumericKey(numericPath[:len(numericPath)-1])
 		if parentNodeNo, ok := latestHeadingByNumericPath[parentKey]; ok {
 			if parent, exists := r.findByNodeNo(drafts, parentNodeNo); exists {
 				return parent.Depth + 1
@@ -304,7 +305,7 @@ func (r *HierarchyResolver) resolveHeadingParentNodeNo(signal *vo.DocumentStruct
 
 	// 数字编号型多级标题：尝试按数字路径精确回找父
 	if family == "decimal" && len(numericPath) > 1 {
-		exactParentKey := r.numericKey(numericPath[:len(numericPath)-1])
+		exactParentKey := support.NumericKey(numericPath[:len(numericPath)-1])
 		if exactParent, ok := latestHeadingByNumericPath[exactParentKey]; ok {
 			return exactParent
 		}
@@ -358,18 +359,6 @@ func (r *HierarchyResolver) buildHeadingAnchorText(signal *vo.DocumentStructureS
 		return title
 	}
 	return code + " " + title
-}
-
-// numericKey 将整数数字路径拼接成点号分隔的字符串（如 [1,2,3] → "1.2.3"）
-func (r *HierarchyResolver) numericKey(numericPath []int) string {
-	var sb strings.Builder
-	for i, num := range numericPath {
-		if i > 0 {
-			sb.WriteString(".")
-		}
-		sb.WriteString(strconv.Itoa(num))
-	}
-	return sb.String()
 }
 
 // findByNodeNo 在 drafts 中按 NodeNo 线性查找
