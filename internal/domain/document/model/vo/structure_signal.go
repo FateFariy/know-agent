@@ -1,6 +1,10 @@
 package vo
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/duke-git/lancet/v2/strutil"
+)
 
 type DocumentStructureSignalKind = int
 
@@ -87,17 +91,17 @@ type DocumentStructureNodeDraft struct {
 	NodeNo            int                       `json:"nodeNo"`            // 节点编号
 	LineNo            int                       `json:"lineNo"`            // 行号
 	NodeType          DocumentStructureNodeType `json:"nodeType"`          // 节点类型
-	ParentNodeNo      *int                      `json:"parentNodeNo"`      // 父节点编号
-	PrevSiblingNodeNo *int                      `json:"prevSiblingNodeNo"` // 前兄弟节点编号
-	NextSiblingNodeNo *int                      `json:"nextSiblingNodeNo"` // 后兄弟节点编号
+	ParentNodeNo      int                       `json:"parentNodeNo"`      // 父节点编号
+	PrevSiblingNodeNo int                       `json:"prevSiblingNodeNo"` // 前兄弟节点编号
+	NextSiblingNodeNo int                       `json:"nextSiblingNodeNo"` // 后兄弟节点编号
 	Depth             int                       `json:"depth"`             // 深度
 	NodeCode          string                    `json:"nodeCode"`          // 节点代码
 	Title             string                    `json:"title"`             // 标题
 	AnchorText        string                    `json:"anchorText"`        // 锚文本
 	CanonicalPath     string                    `json:"canonicalPath"`     // 规范路径
 	SectionPath       string                    `json:"sectionPath"`       // 段落路径
-	ContentText       string                    `json:"contentText"`       // 内容文本
-	ItemIndex         *int                      `json:"itemIndex"`         // 项目索引
+	ContentText       strings.Builder           `json:"contentText"`       // 内容文本
+	ItemIndex         int                       `json:"itemIndex"`         // 项目索引
 	NumericPath       []int                     `json:"numericPath"`       // 数值路径
 	SourceFamily      string                    `json:"sourceFamily"`      // 源家族
 	Confidence        float64                   `json:"confidence"`        // 置信度
@@ -112,27 +116,13 @@ func (d *DocumentStructureNodeDraft) IsListLike() bool {
 }
 
 func (d *DocumentStructureNodeDraft) AppendLine(line string) {
-	if d.ContentText == "" {
-		d.ContentText = line
-	} else {
-		d.ContentText += "\n" + line
+	if strutil.IsBlank(line) {
+		return
 	}
-}
-
-type DocumentStructureNodeCandidate struct {
-	NodeNo            int                       `json:"nodeNo"`
-	NodeType          DocumentStructureNodeType `json:"nodeType"`
-	ParentNodeNo      *int                      `json:"parentNodeNo"`
-	PrevSiblingNodeNo *int                      `json:"prevSiblingNodeNo"`
-	NextSiblingNodeNo *int                      `json:"nextSiblingNodeNo"`
-	Depth             int                       `json:"depth"`
-	NodeCode          string                    `json:"nodeCode"`
-	Title             string                    `json:"title"`
-	AnchorText        string                    `json:"anchorText"`
-	CanonicalPath     string                    `json:"canonicalPath"`
-	SectionPath       string                    `json:"sectionPath"`
-	ContentText       string                    `json:"contentText"`
-	ItemIndex         *int                      `json:"itemIndex"`
+	if d.ContentText.Len() > 0 {
+		d.ContentText.WriteString("\n")
+	}
+	d.ContentText.WriteString(strutil.Trim(line))
 }
 
 type DocumentStructureNodeType = int
@@ -143,6 +133,22 @@ const (
 	NodeTypeListItem
 	NodeTypeStep
 )
+
+type DocumentStructureNodeCandidate struct {
+	NodeNo            int                       `json:"nodeNo"`
+	NodeType          DocumentStructureNodeType `json:"nodeType"`
+	ParentNodeNo      int                       `json:"parentNodeNo"`
+	PrevSiblingNodeNo int                       `json:"prevSiblingNodeNo"`
+	NextSiblingNodeNo int                       `json:"nextSiblingNodeNo"`
+	Depth             int                       `json:"depth"`
+	NodeCode          string                    `json:"nodeCode"`
+	Title             string                    `json:"title"`
+	AnchorText        string                    `json:"anchorText"`
+	CanonicalPath     string                    `json:"canonicalPath"`
+	SectionPath       string                    `json:"sectionPath"`
+	ContentText       string                    `json:"contentText"`
+	ItemIndex         int                       `json:"itemIndex"`
+}
 
 type DisambiguationResult struct {
 	LineNo       int    `json:"line_no"`
