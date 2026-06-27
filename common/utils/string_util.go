@@ -3,7 +3,7 @@ package utils
 import "strings"
 
 func EqualsIgnoreCase(a, b string) bool {
-	return strings.ToLower(a) == strings.ToLower(b)
+	return strings.EqualFold(a, b)
 }
 
 func BlankToDefault(s string, defaultValue string) string {

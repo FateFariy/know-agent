@@ -1,5 +1,7 @@
 package vo
 
+import "strings"
+
 type DocumentStructureSignalKind = int
 
 const (
@@ -8,12 +10,38 @@ const (
 	SignalKindDocumentTitle
 	SignalKindHeading
 	SignalKindHeadingCandidate
-	SignalKindBody
 	SignalKindListItem
 	SignalKindStepItem
 	SignalKindTableRow
 	SignalKindQuote
+	SignalKindBody
 )
+
+// SignalKindName 信号类型名称
+func SignalKindName(kind DocumentStructureSignalKind) string {
+	switch kind {
+	case SignalKindBlank:
+		return "BLANK"
+	case SignalKindNoise:
+		return "NOISE"
+	case SignalKindDocumentTitle:
+		return "DOCUMENT_TITLE"
+	case SignalKindHeading:
+		return "HEADING"
+	case SignalKindHeadingCandidate:
+		return "HEADING_CANDIDATE"
+	case SignalKindListItem:
+		return "LIST_ITEM"
+	case SignalKindStepItem:
+		return "STEP_ITEM"
+	case SignalKindTableRow:
+		return "TABLE_ROW"
+	case SignalKindBody:
+		return "BODY"
+	default:
+		return ""
+	}
+}
 
 type DocumentStructureSignal struct {
 	LineNo         int                         // 逻辑行号
@@ -31,7 +59,7 @@ type DocumentStructureSignal struct {
 }
 
 func (s *DocumentStructureSignal) IsAmbiguous() bool {
-	return (s.Kind == SignalKindHeadingCandidate) || (s.Confidence > 0.5 && s.Confidence < 0.7)
+	return s.Kind == SignalKindHeadingCandidate
 }
 
 type DocumentStructureLogicalLine struct {
@@ -107,7 +135,7 @@ type DocumentStructureNodeCandidate struct {
 	ItemIndex         *int                      `json:"itemIndex"`
 }
 
-type DocumentStructureNodeType int
+type DocumentStructureNodeType = int
 
 const (
 	NodeTypeDocument DocumentStructureNodeType = iota + 1
@@ -117,7 +145,19 @@ const (
 )
 
 type DisambiguationResult struct {
-	LineNo       int    `json:"lineNo"`
-	ResolvedKind string `json:"resolvedKind"`
-	LevelHint    *int   `json:"levelHint"`
+	LineNo       int    `json:"line_no"`
+	ResolvedKind string `json:"resolved_kind"`
+	LevelHint    int    `json:"level_hint"`
+}
+
+// ToSignalKind 转换为信号 Kind
+func (d *DisambiguationResult) ToSignalKind() int {
+	switch strings.ToUpper(strings.TrimSpace(d.ResolvedKind)) {
+	case "HEADING":
+		return SignalKindHeading
+	case "LIST_ITEM":
+		return SignalKindListItem
+	default:
+		return SignalKindBody
+	}
 }

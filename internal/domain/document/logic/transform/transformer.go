@@ -5,7 +5,7 @@ import (
 )
 
 type Transformer interface {
-	Transform(ctx context.Context, text string, opts ...TransformerOption) (any, error)
+	Transform(ctx context.Context, opts ...TransformerOption) (any, error)
 }
 
 type TransformerOption struct {

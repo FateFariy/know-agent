@@ -8,13 +8,14 @@ import (
 
 type Config struct {
 	common.BaseConfig
-	Minio     MinioConf
-	Neo4j     Neo4jConf
-	MQ        MQConf
-	Embedding EmbeddingConf
-	Milvus    MilvusConf
-	Chat      ChatConf
-	ChatModel map[string]*LLMConf
+	Minio            MinioConf
+	Neo4j            Neo4jConf
+	MQ               MQConf
+	StructureParsing StructureParsingConf
+	Embedding        EmbeddingConf
+	Milvus           MilvusConf
+	Chat             ChatConf
+	ChatModel        map[string]*LLMConf
 }
 type MinioConf struct {
 	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
@@ -56,6 +57,24 @@ type LLMConf struct {
 	TopP              float32 `json:",optional"`
 	InputTokenCost1k  float64 `json:",optional"`
 	OutputTokenCost1k float64 `json:",optional"`
+}
+
+// StructureParsingConf 结构解析配置
+type StructureParsingConf struct {
+	LLMDisambiguationEnabled   bool    `json:",optional,default=true"` // 是否启用 LLM 消歧能力，默认启用
+	MaxAmbiguousSignalsPerCall int     `json:",optional,default=8"`    // 单次 LLM 调用最多处理的歧义信号数量，默认 8
+	ContextWindowLines         int     `json:",optional,default=2"`    // 歧义判定时参考的上下文窗口行数，默认 2 行
+	MaxPlainHeadingChars       int     `json:",optional,default=32"`   // 纯文本标题判定的最大字符数阈值，默认 32
+	AmbiguityConfidenceFloor   float64 `json:",optional,default=0.45"` // 歧义置信度下限，低于该值判定为明确非标题，默认 0.45
+	AmbiguityConfidenceCeil    float64 `json:",optional,default=0.80"` // 歧义置信度上限，高于该值判定为明确标题，默认 0.80
+}
+
+// EmbeddingConf 嵌入配置
+type EmbeddingConf struct {
+	Model      string // 模型名称
+	APIKey     string // API密钥
+	APIType    string `json:",omitempty,default=text,options=text|multi_model"` // API类型
+	Dimensions int    // 嵌入维度
 }
 
 type ChatConf struct {
@@ -118,14 +137,6 @@ type RagConf struct {
 	KeywordRelativeScoreFloor float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
 	PlanningHistoryMaxChars   int           `json:",optional,default=2000"` // 规划历史最大字符数
 	QuestionHistoryMaxChars   int           `json:",optional,default=1000"` // 问题历史最大字符数
-}
-
-// EmbeddingConf 嵌入配置
-type EmbeddingConf struct {
-	Model      string // 模型名称
-	APIKey     string // API密钥
-	APIType    string `json:",omitempty,default=text,options=text|multi_model"` // API类型
-	Dimensions int    // 嵌入维度
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {
