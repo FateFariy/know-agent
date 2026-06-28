@@ -56,10 +56,6 @@ const (
 
 type DocumentLineClassifier struct{}
 
-func NewDocumentLineClassifier() *DocumentLineClassifier {
-	return &DocumentLineClassifier{}
-}
-
 func (c *DocumentLineClassifier) Classify(line string) *LineClassification {
 	normalized := strutil.Trim(line)
 	if normalized == "" {

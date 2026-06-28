@@ -1,52 +1,5 @@
 package vo
 
-// StrategyRole 策略角色
-type StrategyRole = int
-
-const (
-	StrategyRoleSplitter StrategyRole = iota + 1
-	StrategyRoleParser
-	StrategyRoleIndexer
-)
-
-func StrategyRoleName(role StrategyRole) string {
-	switch role {
-	case StrategyRoleSplitter:
-		return "切块器"
-	case StrategyRoleParser:
-		return "解析器"
-	case StrategyRoleIndexer:
-		return "索引器"
-	default:
-		return ""
-	}
-}
-
-// StrategySourceType 策略来源类型
-type StrategySourceType = int
-
-const (
-	StrategySourceTypeOriginal        StrategySourceType = iota + 1 // 原始
-	StrategySourceTypeParsed                                        // 已解析
-	StrategySourceTypeSystemRecommend                               // 系统推荐
-	StrategySourceTypeUserAdd                                       // 用户添加
-)
-
-func StrategySourceTypeName(sourceType StrategySourceType) string {
-	switch sourceType {
-	case StrategySourceTypeOriginal:
-		return "原始"
-	case StrategySourceTypeParsed:
-		return "已解析"
-	case StrategySourceTypeSystemRecommend:
-		return "系统推荐"
-	case StrategySourceTypeUserAdd:
-		return "用户添加"
-	default:
-		return ""
-	}
-}
-
 // StrategyStatus 策略状态
 type StrategyStatus = int
 
@@ -79,7 +32,7 @@ const (
 	StrategyTypeStructure StrategyType = iota + 1 // 结构切块
 	StrategyTypeRecursive                         // 递归切块
 	StrategyTypeSemantic                          // 语义切块
-	StrategyTypeLlm                               // 大模型智能切块
+	StrategyTypeLLM                               // 大模型智能切块
 	StrategyTypeMarkdown                          // Markdown切块
 )
 
@@ -91,10 +44,100 @@ func StrategyTypeName(st StrategyType) string {
 		return "递归切块"
 	case StrategyTypeSemantic:
 		return "语义切块"
-	case StrategyTypeLlm:
+	case StrategyTypeLLM:
 		return "大模型智能切块"
 	case StrategyTypeMarkdown:
 		return "Markdown切块"
+	default:
+		return ""
+	}
+}
+
+type StrategyExecuteStatus = int
+
+const (
+	StrategyExecuteStatusWaitExecute StrategyExecuteStatus = iota + 1
+	StrategyExecuteStatusExecuting
+	StrategyExecuteStatusExecuteSuccess
+	StrategyExecuteStatusExecuteFailed
+	StrategyExecuteStatusSkipped
+)
+
+func StrategyExecuteStatusName(status StrategyExecuteStatus) string {
+	switch status {
+	case StrategyExecuteStatusWaitExecute:
+		return "待执行"
+	case StrategyExecuteStatusExecuting:
+		return "执行中"
+	case StrategyExecuteStatusExecuteSuccess:
+		return "执行成功"
+	case StrategyExecuteStatusExecuteFailed:
+		return "执行失败"
+	case StrategyExecuteStatusSkipped:
+		return "已跳过"
+	default:
+		return ""
+	}
+}
+
+type StrategyPipelineType = string
+
+const (
+	StrategyPipelineTypeParent StrategyPipelineType = "PARENT"
+	StrategyPipelineTypeChild  StrategyPipelineType = "CHILD"
+)
+
+func StrategyPipelineTypeName(pipelineType StrategyPipelineType) string {
+	switch pipelineType {
+	case StrategyPipelineTypeParent:
+		return "父块流水线"
+	case StrategyPipelineTypeChild:
+		return "子块流水线"
+	default:
+		return ""
+	}
+}
+
+type StrategyRole = int
+
+const (
+	StrategyRolePrimary StrategyRole = iota + 1
+	StrategyRoleOptimize
+	StrategyRoleFallback
+	StrategyRoleEnhance
+)
+
+func StrategyRoleName(role StrategyRole) string {
+	switch role {
+	case StrategyRolePrimary:
+		return "主策略"
+	case StrategyRoleOptimize:
+		return "优化策略"
+	case StrategyRoleFallback:
+		return "回退策略"
+	case StrategyRoleEnhance:
+		return "增强策略"
+	default:
+		return ""
+	}
+}
+
+type StrategySourceType = int
+
+const (
+	StrategySourceTypeSystemRecommend StrategySourceType = iota + 1
+	StrategySourceTypeUserAdd
+	StrategySourceTypeUserKeep
+)
+
+func StrategySourceTypeName(sourceType StrategySourceType) string {
+	switch sourceType {
+	case StrategySourceTypeSystemRecommend:
+		return "系统推荐"
+	case StrategySourceTypeUserAdd:
+		return "用户添加"
+	case StrategySourceTypeUserKeep:
+		return "用户保留"
 	default:
 		return ""
 	}

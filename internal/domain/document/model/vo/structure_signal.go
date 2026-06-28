@@ -88,23 +88,23 @@ type DocumentStructureSignalBatch struct {
 }
 
 type DocumentStructureNodeDraft struct {
-	NodeNo            int                       `json:"nodeNo"`            // 节点编号
-	LineNo            int                       `json:"lineNo"`            // 行号
-	NodeType          DocumentStructureNodeType `json:"nodeType"`          // 节点类型
-	ParentNodeNo      int                       `json:"parentNodeNo"`      // 父节点编号
-	PrevSiblingNodeNo int                       `json:"prevSiblingNodeNo"` // 前兄弟节点编号
-	NextSiblingNodeNo int                       `json:"nextSiblingNodeNo"` // 后兄弟节点编号
-	Depth             int                       `json:"depth"`             // 深度
-	NodeCode          string                    `json:"nodeCode"`          // 节点代码
-	Title             string                    `json:"title"`             // 标题
-	AnchorText        string                    `json:"anchorText"`        // 锚文本
-	CanonicalPath     string                    `json:"canonicalPath"`     // 规范路径
-	SectionPath       string                    `json:"sectionPath"`       // 段落路径
-	ContentText       strings.Builder           `json:"contentText"`       // 内容文本
-	ItemIndex         int                       `json:"itemIndex"`         // 项目索引
-	NumericPath       []int                     `json:"numericPath"`       // 数值路径
-	SourceFamily      string                    `json:"sourceFamily"`      // 源家族
-	Confidence        float64                   `json:"confidence"`        // 置信度
+	NodeNo            int               `json:"nodeNo"`            // 节点编号
+	LineNo            int               `json:"lineNo"`            // 行号
+	NodeType          StructureNodeType `json:"nodeType"`          // 节点类型
+	ParentNodeNo      int               `json:"parentNodeNo"`      // 父节点编号
+	PrevSiblingNodeNo int               `json:"prevSiblingNodeNo"` // 前兄弟节点编号
+	NextSiblingNodeNo int               `json:"nextSiblingNodeNo"` // 后兄弟节点编号
+	Depth             int               `json:"depth"`             // 深度
+	NodeCode          string            `json:"nodeCode"`          // 节点代码
+	Title             string            `json:"title"`             // 标题
+	AnchorText        string            `json:"anchorText"`        // 锚文本
+	CanonicalPath     string            `json:"canonicalPath"`     // 规范路径
+	SectionPath       string            `json:"sectionPath"`       // 段落路径
+	ContentText       strings.Builder   `json:"contentText"`       // 内容文本
+	ItemIndex         int               `json:"itemIndex"`         // 项目索引
+	NumericPath       []int             `json:"numericPath"`       // 数值路径
+	SourceFamily      string            `json:"sourceFamily"`      // 源家族
+	Confidence        float64           `json:"confidence"`        // 置信度
 }
 
 func (d *DocumentStructureNodeDraft) IsSection() bool {
@@ -143,29 +143,29 @@ func (d *DocumentStructureNodeDraft) ToCandidate() *DocumentStructureNodeCandida
 	}
 }
 
-type DocumentStructureNodeType = int
+type StructureNodeType = int
 
 const (
-	NodeTypeDocument DocumentStructureNodeType = iota + 1
+	NodeTypeDocument StructureNodeType = iota + 1
 	NodeTypeSection
 	NodeTypeListItem
 	NodeTypeStep
 )
 
 type DocumentStructureNodeCandidate struct {
-	NodeNo            int                       `json:"nodeNo"`            // 节点编号
-	NodeType          DocumentStructureNodeType `json:"nodeType"`          // 节点类型
-	ParentNodeNo      int                       `json:"parentNodeNo"`      // 父节点编号
-	PrevSiblingNodeNo int                       `json:"prevSiblingNodeNo"` // 前兄弟节点编号
-	NextSiblingNodeNo int                       `json:"nextSiblingNodeNo"` // 后兄弟节点编号
-	Depth             int                       `json:"depth"`             // 深度
-	NodeCode          string                    `json:"nodeCode"`          // 节点代码
-	Title             string                    `json:"title"`             // 标题
-	AnchorText        string                    `json:"anchorText"`        // 锚文本
-	CanonicalPath     string                    `json:"canonicalPath"`     // 规范路径
-	SectionPath       string                    `json:"sectionPath"`       // 段落路径
-	ContentText       string                    `json:"contentText"`       // 内容文本
-	ItemIndex         int                       `json:"itemIndex"`         // 项目索引
+	NodeNo            int               `json:"nodeNo"`            // 节点编号
+	NodeType          StructureNodeType `json:"nodeType"`          // 节点类型
+	ParentNodeNo      int               `json:"parentNodeNo"`      // 父节点编号
+	PrevSiblingNodeNo int               `json:"prevSiblingNodeNo"` // 前兄弟节点编号
+	NextSiblingNodeNo int               `json:"nextSiblingNodeNo"` // 后兄弟节点编号
+	Depth             int               `json:"depth"`             // 深度
+	NodeCode          string            `json:"nodeCode"`          // 节点代码
+	Title             string            `json:"title"`             // 标题
+	AnchorText        string            `json:"anchorText"`        // 锚文本
+	CanonicalPath     string            `json:"canonicalPath"`     // 规范路径
+	SectionPath       string            `json:"sectionPath"`       // 段落路径
+	ContentText       string            `json:"contentText"`       // 内容文本
+	ItemIndex         int               `json:"itemIndex"`         // 项目索引
 }
 
 type DisambiguationResult struct {
