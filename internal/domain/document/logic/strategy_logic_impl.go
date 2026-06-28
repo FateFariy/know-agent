@@ -2,17 +2,22 @@ package logic
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
@@ -36,10 +41,12 @@ var (
 )
 
 // StrategyLogicImpl 策略业务逻辑实现
+// 核心的分块策略由 chunk 包的 Registry 管理，支持动态注册和组合
 type StrategyLogicImpl struct {
-	chatModel      chatlogic.ObservedChatModelImpl[*schema.Message]
-	promptTemplate chatlogic.PromptTemplateLogic
-	structureNode  StructureNodeLogic
+	chatModel        chatlogic.ObservedChatModelImpl[*schema.Message]
+	promptTemplate   chatlogic.PromptTemplateLogic
+	structureNode    StructureNodeLogic
+	strategyRegistry *chunk.Registry
 	support.DocumentLineClassifier
 	*strategyOption
 }
@@ -57,10 +64,32 @@ type strategyOption struct {
 
 func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel chatlogic.ObservedChatModelImpl[*schema.Message],
 	promptTemplate chatlogic.PromptTemplateLogic, structureNode StructureNodeLogic) StrategyLogic {
+
+	// 构建策略注册表：默认内置 结构/递归/语义 三种策略，大模型策略根据配置注入
+	registry := chunk.NewRegistry()
+
+	// 覆盖默认的递归/语义策略，使其使用应用配置
+	registry.RegisterOverride(chunk.NewRecursiveStrategy(
+		chunk.WithRecursive(svcCtx.Config.Chunk.RecursiveMaxChars, svcCtx.Config.Chunk.RecursiveOverlapChars),
+	))
+	registry.RegisterOverride(chunk.NewSemanticStrategy(
+		chunk.WithSemantic(svcCtx.Config.Chunk.SemanticMinChars, svcCtx.Config.Chunk.SemanticMaxChars, svcCtx.Config.Chunk.SemanticSimilarityThreshold),
+	))
+
+	// 大模型策略需要业务层注入 chatModel 和 promptTemplate；注册失败静默降级为语义切块
+	llmModel := newLLMModelAdapter(&chatModel)
+	llmRenderer := newLLMRenderer(promptTemplate)
+	_ = registry.Register(chunk.NewLLMStrategy(
+		llmModel,
+		llmRenderer,
+		chunk.WithLLM(svcCtx.Config.Chunk.LlmEnabled, svcCtx.Config.Chunk.LlmMaxChars),
+	))
+
 	return &StrategyLogicImpl{
-		chatModel:      chatModel,
-		promptTemplate: promptTemplate,
-		structureNode:  structureNode,
+		chatModel:        chatModel,
+		promptTemplate:   promptTemplate,
+		structureNode:    structureNode,
+		strategyRegistry: registry,
 		strategyOption: &strategyOption{
 			recursiveMaxChars:           svcCtx.Config.Chunk.RecursiveMaxChars,
 			recursiveOverlapChars:       svcCtx.Config.Chunk.RecursiveOverlapChars,
@@ -72,6 +101,37 @@ func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel chatlogic.ObservedCh
 			recommendLlmWhenLowQuality:  svcCtx.Config.Chunk.RecommendLlmWhenLowQuality,
 		},
 	}
+}
+
+// Registry 返回底层的策略注册表，便于单元测试动态替换策略
+func (s *StrategyLogicImpl) Registry() *chunk.Registry {
+	return s.strategyRegistry
+}
+
+// llmModelAdapter 将业务层 chatModel 适配为 chunk 包的 LLMModel 接口
+type llmModelAdapter struct {
+	model *chatlogic.ObservedChatModelImpl[*schema.Message]
+}
+
+func newLLMModelAdapter(model *chatlogic.ObservedChatModelImpl[*schema.Message]) chunk.LLMModel {
+	return &llmModelAdapter{model: model}
+}
+
+func (a *llmModelAdapter) Generate(ctx context.Context, prompt string) (string, error) {
+	return a.model.Generate(ctx, "", prompt)
+}
+
+// llmRendererAdapter 将业务层 promptTemplate 适配为 chunk 包的 LLMPromptRenderer 接口
+type llmRendererAdapter struct {
+	template chatlogic.PromptTemplateLogic
+}
+
+func newLLMRenderer(template chatlogic.PromptTemplateLogic) chunk.LLMPromptRenderer {
+	return &llmRendererAdapter{template: template}
+}
+
+func (r *llmRendererAdapter) Render(ctx context.Context, sourceText string) (string, error) {
+	return r.template.Render(prompt.DocumentLlmSplit, map[string]any{"sourceText": sourceText})
 }
 
 // RecommendStrategy 推荐策略方案
@@ -631,24 +691,70 @@ func (s *StrategyLogicImpl) cloneParentBlockCandidate(source *vo.ParentBlockCand
 
 // executePipeline 执行流水线
 // 按步骤顺序将种子列表传递给各切块策略，产生最终的块候选列表
+// 委托给 chunk.Registry 执行，实现策略模式 + 注册表的统一调度
 func (s *StrategyLogicImpl) executePipeline(inputSeeds []*vo.ChunkCandidate, steps []*entity.DocumentStrategyStep, pipelineType string) []*vo.ChunkCandidate {
 	currentChunks := s.cleanupChunkList(inputSeeds)
+	if len(currentChunks) == 0 || s.strategyRegistry == nil {
+		return currentChunks
+	}
+
+	// 映射到 chunk 包的 PipelineType
+	var targetPipeline chunk.PipelineType
+	switch pipelineType {
+	case vo.PipelineTypeParent:
+		targetPipeline = chunk.PipelineTypeParent
+	default:
+		targetPipeline = chunk.PipelineTypeChild
+	}
+
+	// 按步骤顺序调用 Registry 中的策略
 	for _, step := range steps {
 		strategyType := step.StrategyType
 		if !s.isValidStrategyType(strategyType) {
 			continue
 		}
-		switch strategyType {
-		case vo.StrategyTypeStructure:
-			currentChunks = s.applyStructureChunking(currentChunks, pipelineType)
-		case vo.StrategyTypeRecursive:
-			currentChunks = s.applyRecursiveChunking(currentChunks, pipelineType)
-		case vo.StrategyTypeSemantic:
-			currentChunks = s.applySemanticChunking(context.Background(), currentChunks, pipelineType)
-		case vo.StrategyTypeLLM:
-			currentChunks = s.applyLlmChunking(context.Background(), currentChunks, pipelineType)
+
+		strategyName := s.getStrategyTypeName(strategyType)
+		if !s.strategyRegistry.Has(strategyName) {
+			continue
 		}
-		currentChunks = s.cleanupChunkList(currentChunks)
+
+		// 将当前块候选转换为 chunk.Input
+		outputList := make([]*chunk.Output, 0, len(currentChunks))
+		for _, c := range currentChunks {
+			if c == nil || strutil.IsBlank(c.Text) {
+				continue
+			}
+			outs, err := s.strategyRegistry.Run(context.Background(), strategyName, &chunk.Input{
+				Text:        strings.TrimSpace(c.Text),
+				SectionPath: c.SectionPath,
+				SourceType:  c.SourceType,
+			}, targetPipeline)
+			if err != nil {
+				// 单个策略失败不中断，降级为保持原样
+				outputList = append(outputList, &chunk.Output{
+					Text:        strings.TrimSpace(c.Text),
+					SectionPath: c.SectionPath,
+					SourceType:  c.SourceType,
+				})
+				continue
+			}
+			outputList = append(outputList, outs...)
+		}
+
+		// 转换回 vo.ChunkCandidate
+		nextChunks := make([]*vo.ChunkCandidate, 0, len(outputList))
+		for _, out := range outputList {
+			if out == nil || strutil.IsBlank(out.Text) {
+				continue
+			}
+			nextChunks = append(nextChunks, &vo.ChunkCandidate{
+				SectionPath: out.SectionPath,
+				Text:        strings.TrimSpace(out.Text),
+				SourceType:  out.SourceType,
+			})
+		}
+		currentChunks = s.cleanupChunkList(nextChunks)
 	}
 	return s.cleanupChunkList(currentChunks)
 }
@@ -1043,6 +1149,7 @@ func (s *StrategyLogicImpl) semanticSplit(candidate *vo.ChunkCandidate, pipeline
 // extractTokens 提取文本的词元集合：英文单词 + 单个中文字符
 func (s *StrategyLogicImpl) extractTokens(text string) map[string]bool {
 	tokenSet := make(map[string]bool)
+	// 英文单词逐个作为词元
 	lower := strings.ToLower(text)
 	matches := englishWordPattern.FindAllString(lower, -1)
 	for _, m := range matches {
@@ -1074,6 +1181,7 @@ func (s *StrategyLogicImpl) jaccard(left, right map[string]bool) float64 {
 	if unionSize == 0 {
 		return 0
 	}
+
 	return float64(intersectionSize) / float64(unionSize)
 }
 
@@ -1135,24 +1243,23 @@ func (s *StrategyLogicImpl) applyLlmChunking(ctx context.Context, sourceList []*
 
 // llmSplit 调用大模型提示模板切分文本，并从返回内容中解析 JSON 数组作为切块结果
 func (s *StrategyLogicImpl) llmSplit(ctx context.Context, sourceText string) []string {
-	if s.promptTemplate == nil {
-		return []string{}
-	}
-	prompt, err := s.promptTemplate.Render("DOCUMENT_LLM_SPLIT", map[string]any{
+	userPrompt, err := s.promptTemplate.Render(prompt.DocumentLlmSplit, map[string]any{
 		"sourceText": sourceText,
 	})
-	if err != nil || strutil.Trim(prompt) == "" {
-		return []string{}
+	if err != nil {
+		Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
+		return nil
 	}
 
-	content, err := s.chatModel.Generate(ctx, "", prompt)
-	if err != nil || strutil.Trim(content) == "" {
-		return []string{}
+	content, err := s.chatModel.Generate(ctx, "", userPrompt)
+	if err != nil {
+		Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
+		return nil
 	}
 
 	jsonArray := s.extractJsonArray(content)
-	if jsonArray == "" {
-		return []string{}
+	if strutil.IsBlank(jsonArray) {
+		return nil
 	}
 	// 简单按字符串方式解析 JSON 数组，避免额外依赖
 	elements := s.parseStringJsonArray(jsonArray)
@@ -1259,49 +1366,33 @@ func (s *StrategyLogicImpl) resolveLlmMaxChars(pipelineType string) int {
 func (s *StrategyLogicImpl) cleanupChunkList(chunks []*vo.ChunkCandidate) []*vo.ChunkCandidate {
 	uniqueMap := make(map[string]*vo.ChunkCandidate)
 	for _, chunk := range chunks {
-		if chunk == nil || strutil.IsBlank(chunk.Text) {
+		if strutil.IsBlank(chunk.Text) {
 			continue
 		}
 		normalizedText := strutil.Trim(chunk.Text)
-		canonical := utils.BlankToDefault(chunk.CanonicalPath, chunk.SectionPath)
-		uniqueKey := canonical + "||" + intToString(chunk.ItemIndex) + "||" + normalizedText
-		if _, exists := uniqueMap[uniqueKey]; exists {
-			continue
+		uniqueKey := fmt.Sprintf("%s||%d||%s", utils.BlankToDefault(chunk.CanonicalPath, chunk.SectionPath), chunk.ItemIndex, normalizedText)
+		if _, exists := uniqueMap[uniqueKey]; !exists {
+			uniqueMap[uniqueKey] = s.cloneChunkCandidate(chunk, normalizedText)
 		}
-		uniqueMap[uniqueKey] = s.cloneChunkCandidate(chunk, normalizedText)
 	}
-	result := make([]*vo.ChunkCandidate, 0, len(uniqueMap))
-	for _, v := range uniqueMap {
-		result = append(result, v)
-	}
-	return result
+	return maputil.Values(uniqueMap)
 }
 
 // cleanupParentBlockList 去除空/重复父块候选
 func (s *StrategyLogicImpl) cleanupParentBlockList(blocks []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
 	uniqueMap := make(map[string]*vo.ParentBlockCandidate)
 	for _, block := range blocks {
-		if block == nil || strutil.IsBlank(block.Text) {
+		if strutil.IsBlank(block.Text) {
 			continue
 		}
 		normalizedText := strutil.Trim(block.Text)
-		uniqueKey := block.SectionPath + "||" + intToString(block.ItemIndex) + "||" + normalizedText
-		if _, exists := uniqueMap[uniqueKey]; exists {
-			continue
+		uniqueKey := fmt.Sprintf("%s||%d||%s", utils.BlankToDefault(block.CanonicalPath, block.SectionPath), block.ItemIndex, normalizedText)
+		if _, exists := uniqueMap[uniqueKey]; !exists {
+			childChunks := append([]*vo.ChunkCandidate{}, block.ChildChunks...)
+			uniqueMap[uniqueKey] = s.cloneParentBlockCandidate(block, childChunks, normalizedText)
 		}
-		childChunks := make([]*vo.ChunkCandidate, 0, len(block.ChildChunks))
-		for _, c := range block.ChildChunks {
-			if c != nil && !strutil.IsBlank(c.Text) {
-				childChunks = append(childChunks, c)
-			}
-		}
-		uniqueMap[uniqueKey] = s.cloneParentBlockCandidate(block, childChunks, normalizedText)
 	}
-	result := make([]*vo.ParentBlockCandidate, 0, len(uniqueMap))
-	for _, v := range uniqueMap {
-		result = append(result, v)
-	}
-	return result
+	return maputil.Values(uniqueMap)
 }
 
 // ---------------- 小工具 ----------------
@@ -1332,4 +1423,8 @@ func intToString(v int) string {
 // newStrategyError 构造策略业务错误
 func newStrategyError(msg string) error {
 	return common.NewBizError(20005, msg)
+}
+
+func (s *StrategyLogicImpl) Warnf(format string, args ...any) {
+	logx.Alert(fmt.Sprintf(format, args...))
 }
