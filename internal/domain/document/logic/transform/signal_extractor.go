@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -98,10 +99,7 @@ func (e *SignalExtractor) Transform(ctx context.Context, text string, opts ...Tr
 	}
 
 	// 汇总规范化文本作为上下文，便于下游做语义与格式回查
-	contextLines := make([]string, len(logicalLines))
-	for i, line := range logicalLines {
-		contextLines[i] = line.NormalizedText
-	}
+	contextLines := slice.Map(logicalLines, func(index int, line *vo.DocumentStructureLogicalLine) string { return line.NormalizedText })
 
 	return &vo.DocumentStructureSignalBatch{
 		ContextLines: contextLines,

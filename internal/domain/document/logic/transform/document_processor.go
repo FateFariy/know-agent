@@ -38,9 +38,9 @@ func NewDocumentProcessor(registry parse.Registry) *DocumentProcessor {
 
 // Transform 处理文档并返回分析结果
 // 包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *DocumentProcessor) Transform(ctx context.Context, text string, opts ...TransformerOption) (any, error) {
+func (p *DocumentProcessor) Transform(ctx context.Context, parsedText string, opts ...TransformerOption) (any, error) {
 	// 清理文本（去除多余空格、格式化等）
-	cleanedText := p.cleanupText(text)
+	cleanedText := p.cleanupText(parsedText)
 
 	// 统计标题数量（用于评估文档结构）
 	// todo: 后续使用结构节点提取器增强标题识别
