@@ -12,8 +12,18 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-var englishPattern = regexp.MustCompile(`[A-Za-z]`)
-var headingPattern = regexp.MustCompile(`^#{1,6}\s+.+`)
+var (
+	englishPattern = regexp.MustCompile(`[A-Za-z]`)
+	headingPattern = regexp.MustCompile(`^#{1,6}\s+.+`)
+	// 匹配制表符、垂直制表符、换页符等空白字符（但不包括空格、换行）
+	controlSpaceRegex = regexp.MustCompile(`[\t\x0B\f]+`)
+	// 匹配连续3个或更多换行符
+	multiNewlineRegex = regexp.MustCompile(`\n{3,}`)
+	// 匹配连续2个或更多空格
+	multiSpaceRegex = regexp.MustCompile(` {2,}`)
+
+	paragraphSplitRegex = regexp.MustCompile(`\n\s*\n`)
+)
 
 type DocumentProcessor struct {
 	registry parse.Registry
@@ -87,9 +97,9 @@ func (p *DocumentProcessor) cleanupText(rawText string) string {
 	cleaned = strings.ReplaceAll(cleaned, "\r", "\n")
 	cleaned = strings.ReplaceAll(cleaned, "\x00", " ")
 
-	cleaned = regexp.MustCompile(`[\t\x0B\f]+`).ReplaceAllString(cleaned, " ")
-	cleaned = regexp.MustCompile(`\n{3,}`).ReplaceAllString(cleaned, "\n\n")
-	cleaned = regexp.MustCompile(` {2,}`).ReplaceAllString(cleaned, " ")
+	cleaned = controlSpaceRegex.ReplaceAllString(cleaned, " ")
+	cleaned = multiNewlineRegex.ReplaceAllString(cleaned, "\n\n")
+	cleaned = multiSpaceRegex.ReplaceAllString(cleaned, " ")
 
 	return strutil.Trim(cleaned)
 }
@@ -119,9 +129,9 @@ func (p *DocumentProcessor) isHeading(line string) bool {
 
 // extractParagraphs 提取段落
 func (p *DocumentProcessor) extractParagraphs(text string) []string {
-	paragraphs := strings.Split(text, "\n\n")
-	paragraphList := make([]string, 0, len(paragraphs))
-	for _, paragraph := range paragraphs {
+	rawParagraphs := paragraphSplitRegex.Split(text, -1)
+	paragraphList := make([]string, 0, len(rawParagraphs))
+	for _, paragraph := range rawParagraphs {
 		trimmed := strutil.Trim(paragraph)
 		if trimmed != "" {
 			paragraphList = append(paragraphList, trimmed)

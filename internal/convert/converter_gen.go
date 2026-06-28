@@ -325,6 +325,16 @@ func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.Do
 	}
 	return pModelDocumentStrategyStep
 }
+func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) []*model.DocumentStructureNode {
+	var pModelDocumentStructureNodeList []*model.DocumentStructureNode
+	if source != nil {
+		pModelDocumentStructureNodeList = make([]*model.DocumentStructureNode, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentStructureNodeList[i] = pEntityDocumentStructureNodeToPModelDocumentStructureNode(source[i])
+		}
+	}
+	return pModelDocumentStructureNodeList
+}
 func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTaskLog {
 	var pModelDocumentTaskLog *model.DocumentTaskLog
 	if source != nil {
@@ -524,6 +534,30 @@ func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity1.
 		pDocumentDocumentStrategyStep = &documentDocumentStrategyStep
 	}
 	return pDocumentDocumentStrategyStep
+}
+func pEntityDocumentStructureNodeToPModelDocumentStructureNode(source *entity1.DocumentStructureNode) *model.DocumentStructureNode {
+	var pModelDocumentStructureNode *model.DocumentStructureNode
+	if source != nil {
+		var modelDocumentStructureNode model.DocumentStructureNode
+		modelDocumentStructureNode.ID = (*source).ID
+		modelDocumentStructureNode.DocumentId = (*source).DocumentId
+		modelDocumentStructureNode.ParseTaskId = (*source).ParseTaskId
+		modelDocumentStructureNode.NodeNo = (*source).NodeNo
+		modelDocumentStructureNode.NodeType = (*source).NodeType
+		modelDocumentStructureNode.ParentNodeId = (*source).ParentNodeId
+		modelDocumentStructureNode.PrevSiblingNodeId = (*source).PrevSiblingNodeId
+		modelDocumentStructureNode.NextSiblingNodeId = (*source).NextSiblingNodeId
+		modelDocumentStructureNode.Depth = (*source).Depth
+		modelDocumentStructureNode.NodeCode = (*source).NodeCode
+		modelDocumentStructureNode.Title = (*source).Title
+		modelDocumentStructureNode.AnchorText = (*source).AnchorText
+		modelDocumentStructureNode.CanonicalPath = (*source).CanonicalPath
+		modelDocumentStructureNode.SectionPath = (*source).SectionPath
+		modelDocumentStructureNode.ContentText = (*source).ContentText
+		modelDocumentStructureNode.ItemIndex = (*source).ItemIndex
+		pModelDocumentStructureNode = &modelDocumentStructureNode
+	}
+	return pModelDocumentStructureNode
 }
 func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *document.TaskLog {
 	var pDocumentTaskLog *document.TaskLog

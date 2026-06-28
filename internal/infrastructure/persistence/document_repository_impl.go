@@ -544,9 +544,10 @@ func (d *DocumentRepositoryImpl) InsertStructureNode(ctx context.Context, node *
 	panic("implement me")
 }
 
+// InsertStructureNodeBatch 批量插入结构节点
 func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error {
-	// TODO implement me
-	panic("implement me")
+	modelList := convert.ToDocumentStructureNodeModelList(nodes)
+	return d.db.WithContext(ctx).Create(&modelList).Error
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error {
@@ -559,8 +560,10 @@ func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, d
 }
 
 func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentStructureNode, error) {
-	// TODO implement me
-	panic("implement me")
+	var nodes []*entity.DocumentStructureNode
+	err := d.db.WithContext(ctx).Model(&model.DocumentStructureNode{}).
+		Where("document_id = ?", documentId).Order("id ASC").Find(&nodes).Error
+	return nodes, err
 }
 
 // ========== 属性相关 ==========

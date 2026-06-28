@@ -1,10 +1,8 @@
 package entity
 
-import "github.com/swiftbit/know-agent/common"
-
 // DocumentStructureNode 文档结构节点实体
 type DocumentStructureNode struct {
-	common.Model
+	ID                int64  `gorm:"column:id"`                   // 节点ID
 	DocumentId        int64  `gorm:"column:document_id"`          // 文档ID
 	ParseTaskId       int64  `gorm:"column:parse_task_id"`        // 解析任务ID
 	NodeNo            int    `gorm:"column:node_no"`              // 节点序号

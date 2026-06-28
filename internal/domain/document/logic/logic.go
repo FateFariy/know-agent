@@ -51,6 +51,18 @@ type AsyncProcessingLogic interface {
 	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) error
 }
 
+// StructureNodeLogic 结构节点业务逻辑接口
+type StructureNodeLogic interface {
+	// ReplaceDocumentNodes 替换文档结构节点：先按文档ID删除，再按候选节点批量插入
+	ReplaceDocumentNodes(ctx context.Context, documentId, parseTaskId int64, candidates []*vo.DocumentStructureNodeCandidate) ([]*entity.DocumentStructureNode, error)
+
+	// ListDocumentNodes 查询文档结构节点列表
+	ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.DocumentStructureNode, error)
+
+	// DeleteByDocumentId 按文档ID删除所有结构节点
+	DeleteByDocumentId(ctx context.Context, documentId int64) error
+}
+
 // StrategyLogic 策略业务逻辑接口
 type StrategyLogic interface {
 	// RecommendStrategy 推荐策略方案

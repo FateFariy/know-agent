@@ -47,6 +47,7 @@ type DocumentConverter interface {
 	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
 	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan
 	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model.DocumentStrategyStep
+	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model.DocumentStructureNode
 }
 
 // goverter:converter
