@@ -352,10 +352,7 @@ func (r *HierarchyResolver) buildHeadingAnchorText(signal *vo.DocumentStructureS
 	code := strutil.Trim(signal.NodeCode)
 	title := strutil.Trim(signal.Title)
 
-	if code == "" {
-		return title
-	}
-	if strings.HasPrefix(title, code) {
+	if code == "" || strings.HasPrefix(title, code) {
 		return title
 	}
 	return code + " " + title
