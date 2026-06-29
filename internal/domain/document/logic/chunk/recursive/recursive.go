@@ -100,13 +100,13 @@ func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
 	}
 
 	// 按段落切分
-	segmentList := chunk.SplitByRegex(text, chunk.ParagraphSplitRe())
+	segmentList := chunk.SplitByRegex(text, chunk.ParagraphSplitRe)
 	if len(segmentList) > 1 {
 		return s.mergeAndSplit(segmentList, maxChars, overlapChars)
 	}
 
 	// 按换行切分
-	segmentList = chunk.SplitByRegex(text, chunk.LineSplitRe())
+	segmentList = chunk.SplitByRegex(text, chunk.LineSplitRe)
 	if len(segmentList) > 1 {
 		return s.mergeAndSplit(segmentList, maxChars, overlapChars)
 	}

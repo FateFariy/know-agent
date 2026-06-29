@@ -10,7 +10,7 @@ type Input struct {
 	CanonicalPath string // 文本的标准路径，例如 "1.1.2.1"
 	ItemIndex     int    // 文本在来源列表中的索引，例如 0
 	Text          string // 文本内容
-	SourceType    int    // 来源类型，例如 1 表示结构节点，2 表示解析文本等
+	SourceType    int    // 来源类型
 }
 
 // Output 分块策略的输出对象，表示切分出来的一个文本块
@@ -19,14 +19,12 @@ type Output struct {
 	CanonicalPath string // 文本的标准路径，例如 "1.1.2.1"
 	ItemIndex     int    // 文本在来源列表中的索引，例如 0
 	Text          string // 切切分后的文本内容
-	SourceType    int    // 来源类型，例如 1 表示结构节点，2 表示解析文本等
+	SourceType    int    // 来源类型
 }
 
 // Strategy 分块策略接口
-// 每种具体的分块策略都实现该接口。策略本身不感知调用方的流水线类型，
-// 块大小/重叠等参数由调用方通过 Option 函数显式传入
 type Strategy interface {
-	// Name 策略名称，唯一标识策略，用于日志、注册、调试
+	// Name 策略名称，唯一标识策略
 	Name() string
 
 	// Chunk 将一段输入文本切分为多个文本块

@@ -56,7 +56,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 
 		if classification.IsHeading() {
 			// 刷出当前累积块
-			result = flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
+			result = s.flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
 			currentChunk = currentChunk[:0]
 
 			// 按层级弹出同级或更高层级的标题
@@ -64,7 +64,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 				headingStack = headingStack[:len(headingStack)-1]
 			}
 			headingStack = append(headingStack, classification.Title)
-			currentSectionPath = chunk.ComposeSectionPath(input.SectionPath, strings.Join(headingStack, " > "))
+			currentSectionPath = s.composeSectionPath(input.SectionPath, strings.Join(headingStack, " > "))
 
 			// 标题本身也加入当前块，避免空标题
 			currentChunk = append(currentChunk, []rune(strutil.Trim(line))...)
@@ -77,7 +77,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 	}
 
 	// 刷出最后一段
-	result = flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
+	result = s.flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
 	if len(result) == 0 {
 		// 未能识别结构，降级为单个整块
 		result = append(result, &chunk.Output{
@@ -92,7 +92,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 }
 
 // flushChunk 将累积的非空文本作为一个块加入结果
-func flushChunk(result []*chunk.Output, sourceType int, sectionPath string, currentChunk []rune) []*chunk.Output {
+func (s *Strategy) flushChunk(result []*chunk.Output, sourceType int, sectionPath string, currentChunk []rune) []*chunk.Output {
 	trimmed := strutil.Trim(string(currentChunk))
 	if trimmed == "" {
 		return result
@@ -102,4 +102,17 @@ func flushChunk(result []*chunk.Output, sourceType int, sectionPath string, curr
 		Text:        trimmed,
 		SourceType:  utils.Ternary(sourceType == 0, vo.ChunkSourceTypeOriginal, sourceType),
 	})
+}
+
+// composeSectionPath 拼接基础路径与当前层级路径，用 " > " 分隔
+func (s *Strategy) composeSectionPath(base, current string) string {
+	baseTrimmed := strutil.Trim(base)
+	currentTrimmed := strutil.Trim(current)
+	if baseTrimmed == "" {
+		return currentTrimmed
+	}
+	if currentTrimmed == "" {
+		return baseTrimmed
+	}
+	return baseTrimmed + " > " + currentTrimmed
 }
