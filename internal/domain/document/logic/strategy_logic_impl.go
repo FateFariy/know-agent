@@ -8,7 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -93,8 +95,7 @@ func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel *chatlogic.ObservedC
 	}
 }
 
-// RecommendStrategy 推荐策略方案
-// 根据文档分析结果推荐最优的父块和子块策略组合
+// RecommendStrategy 推荐策略方案，根据文档分析结果推荐最优的父块和子块策略组合
 func (s *StrategyLogicImpl) RecommendStrategy(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
 		return nil, nil
@@ -158,23 +159,18 @@ func (s *StrategyLogicImpl) RecommendStrategy(ctx context.Context, document *ent
 	}, nil
 }
 
-// NormalizeSteps 标准化策略步骤
-// 将用户提交的策略类型标准化为可执行的步骤列表
-func (s *StrategyLogicImpl) NormalizeSteps(ctx context.Context, basePlan *entity.DocumentStrategyPlan, baseSteps []*entity.DocumentStrategyStep,
-	requestParentStrategyTypes []int, requestChildStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error) {
+// NormalizeSteps 标准化策略步骤，将用户提交的策略类型标准化为可执行的步骤列表
+func (s *StrategyLogicImpl) NormalizeSteps(ctx context.Context, baseSteps []*entity.DocumentStrategyStep,
+	parentStrategyTypes []int, childStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error) {
 
-	// 标准化请求的策略类型
-	normalizedParentTypes := s.normalizePipelineTypes(requestParentStrategyTypes)
-	normalizedChildTypes := s.normalizePipelineTypes(requestChildStrategyTypes)
+	// 标准化策略类型
+	normalizedParentTypes := s.normalizePipelineTypes(parentStrategyTypes)
+	normalizedChildTypes := s.normalizePipelineTypes(childStrategyTypes)
 
 	// 构建基础步骤映射
-	baseStepMap := make(map[int]map[int]*entity.DocumentStrategyStep)
+	baseStepMap := make(map[string]map[int]*entity.DocumentStrategyStep)
 	for _, baseStep := range baseSteps {
-		pipelineType := baseStep.PipelineType
-		if pipelineType == "" {
-			pipelineType = vo.PipelineTypeChild
-		}
-
+		pipelineType := utils.BlankToDefault(baseStep.PipelineType, vo.PipelineTypeChild)
 		if _, exists := baseStepMap[pipelineType]; !exists {
 			baseStepMap[pipelineType] = make(map[int]*entity.DocumentStrategyStep)
 		}
@@ -205,19 +201,12 @@ func (s *StrategyLogicImpl) NormalizeSteps(ctx context.Context, basePlan *entity
 	return normalizedStepList, nil
 }
 
-// BuildParentBlocks 构建父子块结构
-// 根据策略方案执行父块和子块的切分，构建 Parent-Child 结构
-func (s *StrategyLogicImpl) BuildParentBlocks(ctx context.Context, document *entity.Document, plan *entity.DocumentStrategyPlan,
+// BuildParentBlocks 构建父子块结构，根据策略方案执行父块和子块的切分，构建 Parent-Child 结构
+func (s *StrategyLogicImpl) BuildParentBlocks(ctx context.Context, document *entity.Document,
 	steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error) {
-
-	if plan == nil || parsedText == "" {
-		return nil, newStrategyError("方案或解析文本不能为空")
-	}
-
 	// 按流水线类型排序步骤
 	parentSteps := s.sortPipelineSteps(steps, vo.PipelineTypeParent)
 	childSteps := s.sortPipelineSteps(steps, vo.PipelineTypeChild)
-
 	if len(parentSteps) == 0 {
 		return nil, errorx.ErrParentBlockMissing
 	}
@@ -225,17 +214,18 @@ func (s *StrategyLogicImpl) BuildParentBlocks(ctx context.Context, document *ent
 		return nil, errorx.ErrChildBlockMissing
 	}
 
-	// 从结构节点服务加载结构节点；document 为 nil 时回退为空列表
+	// 从结构节点服务加载结构节点
 	var structureNodes []*entity.DocumentStructureNode
-	if s.structureNode != nil && document != nil {
+	if document != nil {
 		nodes, err := s.structureNode.ListDocumentNodes(ctx, document.ID, document.LastParseTaskId)
-		if err == nil {
-			structureNodes = nodes
+		if err != nil {
+			return nil, err
 		}
+		structureNodes = nodes
 	}
 
 	// 构建父块种子列表
-	parentSeedList := s.buildParentSeedList(parsedText, parentSteps, structureNodes)
+	parentSeedList := s.buildParentSeedList(ctx, parsedText, parentSteps, structureNodes)
 
 	// 为每个父块种子生成子块
 	parentBlockList := make([]*vo.ParentBlockCandidate, 0)
@@ -245,23 +235,24 @@ func (s *StrategyLogicImpl) BuildParentBlocks(ctx context.Context, document *ent
 		}
 
 		// 构建子块种子列表
-		childSeedList := s.buildChildSeedList(parentSeed, childSteps, structureNodes)
+		childSeedList := s.buildChildSeedList(ctx, parentSeed, childSteps, structureNodes)
 		finalChildren := s.cleanupChunkList(childSeedList)
 
 		// 如果没有子块，使用父块本身作为子块
+		trim := strutil.Trim(parentSeed.Text)
 		if len(finalChildren) == 0 {
 			finalChildren = []*vo.ChunkCandidate{
-				s.cloneChunkCandidate(parentSeed, strutil.Trim(parentSeed.Text)),
+				s.cloneChunkCandidate(parentSeed, trim),
 			}
 		}
 
 		parentBlock := &vo.ParentBlockCandidate{
-			SectionPath: parentSeed.SectionPath,
-			NodeId:      parentSeed.StructureNodeId,
-			NodeType:    parentSeed.StructureNodeType,
-			Text:        strutil.Trim(parentSeed.Text),
-			SourceType:  parentSeed.SourceType,
-			ChildChunks: finalChildren,
+			SectionPath:       parentSeed.SectionPath,
+			StructureNodeId:   parentSeed.StructureNodeId,
+			StructureNodeType: parentSeed.StructureNodeType,
+			Text:              trim,
+			SourceType:        parentSeed.SourceType,
+			ChildChunks:       finalChildren,
 		}
 
 		parentBlockList = append(parentBlockList, parentBlock)
@@ -301,33 +292,22 @@ func (s *StrategyLogicImpl) shouldUseLlm(analysisResult *vo.DocumentAnalysisResu
 
 // buildDraftSteps 构建步骤草稿
 func (s *StrategyLogicImpl) buildDraftSteps(pipelineType string, strategyTypes []int, reasonMap map[int]string) []*vo.DocumentStrategyStepDraft {
-	draftList := make([]*vo.DocumentStrategyStepDraft, 0, len(strategyTypes))
-	for index, strategyType := range strategyTypes {
-		draftList = append(draftList, &vo.DocumentStrategyStepDraft{
+	return slice.Map(strategyTypes, func(index, strategyType int) *vo.DocumentStrategyStepDraft {
+		return &vo.DocumentStrategyStepDraft{
 			PipelineType:    pipelineType,
 			StrategyType:    strategyType,
 			StrategyRole:    s.resolveRole(index, strategyType),
 			SourceType:      vo.StrategySourceTypeSystemRecommend,
 			RecommendReason: utils.BlankToDefault(reasonMap[strategyType], "系统为当前流水线生成的推荐步骤。"),
-		})
-	}
-	return draftList
+		}
+	})
 }
 
 // normalizePipelineTypes 标准化流水线类型
-func (s *StrategyLogicImpl) normalizePipelineTypes(requestStrategyTypes []int) []int {
-	// 去重并保持顺序
-	typeSet := make(map[int]bool)
-	normalizedTypes := make([]int, 0)
-
-	for _, strategyType := range requestStrategyTypes {
-		if s.isValidStrategyType(strategyType) && !typeSet[strategyType] {
-			typeSet[strategyType] = true
-			normalizedTypes = append(normalizedTypes, strategyType)
-		}
-	}
-
-	return normalizedTypes
+func (s *StrategyLogicImpl) normalizePipelineTypes(strategyTypes []int) []int {
+	return stream.FromSlice(strategyTypes).
+		Filter(func(strategyType int) bool { return vo.StrategyTypeName(strategyType) != "" }).
+		Distinct().ToSlice()
 }
 
 // buildNormalizedSteps 构建标准化步骤
@@ -382,69 +362,22 @@ func (s *StrategyLogicImpl) resolveRole(index int, strategyType int) int {
 	return vo.StrategyRoleOptimize
 }
 
-// getStrategyTypeName 获取策略类型名称
-func (s *StrategyLogicImpl) getStrategyTypeName(strategyType int) string {
-	switch strategyType {
-	case vo.StrategyTypeStructure:
-		return "STRUCTURE"
-	case vo.StrategyTypeRecursive:
-		return "RECURSIVE"
-	case vo.StrategyTypeSemantic:
-		return "SEMANTIC"
-	case vo.StrategyTypeLLM:
-		return "LLM"
-	case vo.StrategyTypeMarkdown:
-		return "MARKDOWN"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-// isValidStrategyType 判断策略类型是否有效
-func (s *StrategyLogicImpl) isValidStrategyType(strategyType int) bool {
-	return strategyType >= vo.StrategyTypeStructure && strategyType <= vo.StrategyTypeLLM
-}
-
-// getDefaultReason 获取默认推荐理由
-func (s *StrategyLogicImpl) getDefaultReason(strategyType int) string {
-	switch strategyType {
-	case vo.StrategyTypeStructure:
-		return "基于文档结构的切块策略。"
-	case vo.StrategyTypeRecursive:
-		return "递归切块策略。"
-	case vo.StrategyTypeSemantic:
-		return "语义切块策略。"
-	case vo.StrategyTypeLLM:
-		return "大模型智能切块策略。"
-	default:
-		return "系统为当前流水线生成的推荐步骤。"
-	}
-}
-
 // ---------------- 种子构建 ----------------
 
 // buildParentSeedList 构建父块种子列表
-func (s *StrategyLogicImpl) buildParentSeedList(parsedText string, parentSteps []*entity.DocumentStrategyStep,
-	structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
-
+func (s *StrategyLogicImpl) buildParentSeedList(ctx context.Context, parsedText string, parentSteps []*entity.DocumentStrategyStep, structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
 	if s.containsStructureStep(parentSteps) && len(structureNodes) > 0 {
 		// 如果有结构步骤且存在结构节点，优先使用结构切块
 		structureSeeds := s.buildStructureParentSeeds(structureNodes)
-		if len(structureSeeds) == 0 {
-			// 结构种子为空，使用原始文本
-			originalSeed := &vo.ChunkCandidate{
-				Text:       parsedText,
-				SourceType: vo.ChunkSourceTypeOriginal,
+		if len(structureSeeds) != 0 {
+			// 移除结构步骤，继续执行其他策略
+			remainingSteps := s.stripStructureSteps(parentSteps)
+			if len(remainingSteps) == 0 {
+				return structureSeeds
 			}
-			return s.executePipeline(nil, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
-		}
 
-		remainingSteps := s.stripStructureSteps(parentSteps)
-		if len(remainingSteps) == 0 {
-			return structureSeeds
+			return s.executePipeline(ctx, structureSeeds, remainingSteps, vo.PipelineTypeParent)
 		}
-
-		return s.executePipeline(nil, structureSeeds, remainingSteps, vo.PipelineTypeParent)
 	}
 
 	// 没有结构步骤或结构节点，直接使用原始文本
@@ -452,28 +385,28 @@ func (s *StrategyLogicImpl) buildParentSeedList(parsedText string, parentSteps [
 		Text:       parsedText,
 		SourceType: vo.ChunkSourceTypeOriginal,
 	}
-	return s.executePipeline(nil, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
+	return s.executePipeline(ctx, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
 }
 
 // buildChildSeedList 构建子块种子列表
-func (s *StrategyLogicImpl) buildChildSeedList(parentSeed *vo.ChunkCandidate, childSteps []*entity.DocumentStrategyStep,
-	structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
-
+func (s *StrategyLogicImpl) buildChildSeedList(ctx context.Context, parentSeed *vo.ChunkCandidate, childSteps []*entity.DocumentStrategyStep, structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
 	if s.containsStructureStep(childSteps) && parentSeed.StructureNodeId != 0 && len(structureNodes) > 0 {
 		// 有结构步骤且父种子有节点ID，使用结构切块
 		structureSeeds := s.buildStructureChildSeeds(parentSeed, structureNodes)
-		remainingSteps := s.stripStructureSteps(childSteps)
 
+		// 移除结构步骤，继续执行其他策略
+		remainingSteps := s.stripStructureSteps(childSteps)
 		if len(remainingSteps) == 0 {
 			return structureSeeds
 		}
 
-		return s.executePipeline(nil, structureSeeds, remainingSteps, vo.PipelineTypeChild)
+		return s.executePipeline(ctx, structureSeeds, remainingSteps, vo.PipelineTypeChild)
 	}
 
 	// 直接克隆父种子
 	clonedSeed := s.cloneChunkCandidate(parentSeed, parentSeed.Text)
-	return s.executePipeline(nil, []*vo.ChunkCandidate{clonedSeed}, childSteps, vo.PipelineTypeChild)
+
+	return s.executePipeline(ctx, []*vo.ChunkCandidate{clonedSeed}, childSteps, vo.PipelineTypeChild)
 }
 
 // containsStructureStep 检查是否包含结构步骤
@@ -507,15 +440,7 @@ func (s *StrategyLogicImpl) buildStructureParentSeeds(structureNodes []*entity.D
 	seeds := make([]*vo.ChunkCandidate, 0, len(structureNodes))
 	for _, node := range structureNodes {
 		if node.NodeType == vo.NodeTypeSection && s.isContentBearingSection(node, parentHasChildSection[node.ID]) {
-			seeds = append(seeds, &vo.ChunkCandidate{
-				SectionPath:       node.SectionPath,
-				StructureNodeId:   node.ID,
-				StructureNodeType: node.NodeType,
-				CanonicalPath:     node.SectionPath,
-				ItemIndex:         node.ItemIndex,
-				Text:              node.ContentText,
-				SourceType:        vo.ChunkSourceTypeOriginal,
-			})
+			seeds = append(seeds, s.newChunkCandidate(node, vo.ChunkSourceTypeOriginal))
 		}
 	}
 
@@ -542,16 +467,7 @@ func (s *StrategyLogicImpl) buildStructureChildSeeds(parentSeed *vo.ChunkCandida
 
 		// 只处理 SECTION、STEP、LIST_ITEM 类型的节点
 		if child.NodeType == vo.NodeTypeSection || child.NodeType == vo.NodeTypeStep || child.NodeType == vo.NodeTypeListItem {
-			seeds = append(seeds, &vo.ChunkCandidate{
-				SectionPath:       child.SectionPath,
-				StructureNodeId:   child.ID,
-				StructureNodeType: child.NodeType,
-				CanonicalPath:     child.SectionPath,
-				ItemIndex:         child.ItemIndex,
-				Text:              child.ContentText,
-				SourceType:        vo.ChunkSourceTypeOriginal,
-			})
-
+			seeds = append(seeds, s.newChunkCandidate(child, vo.ChunkSourceTypeOriginal))
 		}
 	}
 
@@ -612,7 +528,7 @@ func (s *StrategyLogicImpl) cloneParentBlockCandidate(source *vo.ParentBlockCand
 		return &vo.ParentBlockCandidate{
 			Text:        text,
 			SourceType:  vo.ChunkSourceTypeOriginal,
-			ChildChunks: childChunks,
+			ChildChunks: append([]*vo.ChunkCandidate{}, childChunks...),
 		}
 	}
 	return &vo.ParentBlockCandidate{
@@ -623,7 +539,7 @@ func (s *StrategyLogicImpl) cloneParentBlockCandidate(source *vo.ParentBlockCand
 		ItemIndex:         source.ItemIndex,
 		Text:              text,
 		SourceType:        source.SourceType,
-		ChildChunks:       childChunks,
+		ChildChunks:       append([]*vo.ChunkCandidate{}, childChunks...),
 	}
 }
 
@@ -682,13 +598,34 @@ func (s *StrategyLogicImpl) executePipeline(ctx context.Context, inputSeeds []*v
 
 // cleanupChunkList 清理块列表
 func (s *StrategyLogicImpl) cleanupChunkList(chunks []*vo.ChunkCandidate) []*vo.ChunkCandidate {
-	result := make([]*vo.ChunkCandidate, 0)
+	result := make(map[string]*vo.ChunkCandidate)
 	for _, candidate := range chunks {
 		if candidate != nil && strutil.IsNotBlank(candidate.Text) {
-			result = append(result, candidate)
+			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
+			trim := strutil.Trim(candidate.Text)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
+			if _, ok := result[uniqueKey]; !ok {
+				result[uniqueKey] = s.cloneChunkCandidate(candidate, trim)
+			}
 		}
 	}
-	return result
+	return maputil.Values(result)
+}
+
+// cleanupParentBlockList 清理父块列表
+func (s *StrategyLogicImpl) cleanupParentBlockList(blocks []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
+	result := make(map[string]*vo.ParentBlockCandidate)
+	for _, block := range blocks {
+		if block != nil && strutil.IsNotBlank(block.Text) {
+			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)
+			trim := strutil.Trim(block.Text)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, block.ItemIndex, trim)
+			if _, ok := result[uniqueKey]; !ok {
+				result[uniqueKey] = s.cloneParentBlockCandidate(block, block.ChildChunks, trim)
+			}
+		}
+	}
+	return maputil.Values(result)
 }
 
 // ---------------- 结构切块 ----------------
@@ -948,6 +885,18 @@ func (s *StrategyLogicImpl) applyLlmChunking(ctx context.Context, sourceList []*
 		}
 	}
 	return resultList
+}
+
+func (s *StrategyLogicImpl) newChunkCandidate(node *entity.DocumentStructureNode, sourceType int) *vo.ChunkCandidate {
+	return &vo.ChunkCandidate{
+		SectionPath:       node.SectionPath,
+		StructureNodeId:   node.ID,
+		StructureNodeType: node.NodeType,
+		CanonicalPath:     node.CanonicalPath,
+		ItemIndex:         node.ItemIndex,
+		Text:              node.ContentText,
+		SourceType:        sourceType,
+	}
 }
 
 // // resolveMaxChars 根据流水线类型返回块大小
