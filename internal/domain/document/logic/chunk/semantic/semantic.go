@@ -88,7 +88,7 @@ func (s *Strategy) Name() string {
 }
 
 // Chunk 执行语义分块
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*chunk.Output, error) {
+func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
@@ -97,32 +97,16 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 
 	// 文本较短时保持原样，避免过碎
 	if utf8.RuneCountInString(input.Text) <= opt.minChars {
-		return []*chunk.Output{
-			{
-				SectionPath:   strutil.Trim(input.SectionPath),
-				CanonicalPath: strutil.Trim(input.CanonicalPath),
-				ItemIndex:     input.ItemIndex,
-				Text:          strutil.Trim(input.Text),
-				SourceType:    input.SourceType,
-			},
-		}, nil
+		return []*chunk.TextBlock{input}, nil
 	}
 
 	// 按句子分块
 	sentenceList := chunk.SplitSentences(input.Text)
 	if len(sentenceList) <= 1 {
-		return []*chunk.Output{
-			{
-				SectionPath:   strutil.Trim(input.SectionPath),
-				CanonicalPath: strutil.Trim(input.CanonicalPath),
-				ItemIndex:     input.ItemIndex,
-				Text:          strutil.Trim(input.Text),
-				SourceType:    input.SourceType,
-			},
-		}, nil
+		return []*chunk.TextBlock{input}, nil
 	}
 
-	resultList := make([]*chunk.Output, 0, len(sentenceList))
+	resultList := make([]*chunk.TextBlock, 0, len(sentenceList))
 	currentText := strings.Builder{}
 	for _, sentence := range sentenceList {
 		currentLen := utf8.RuneCountInString(currentText.String())
@@ -142,13 +126,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 		if currentLen > 0 && (exceedMaxChars || semanticBreak) {
 			trimmed := strutil.Trim(currentText.String())
 			if trimmed != "" {
-				resultList = append(resultList, &chunk.Output{
-					SectionPath:   strutil.Trim(input.SectionPath),
-					CanonicalPath: strutil.Trim(input.CanonicalPath),
-					ItemIndex:     input.ItemIndex,
-					Text:          trimmed,
-					SourceType:    input.SourceType,
-				})
+				resultList = append(resultList, input.CloneWithText(trimmed))
 			}
 			currentText.Reset()
 		}
@@ -158,13 +136,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 
 	// 输出最后一块
 	if remaining := strutil.Trim(currentText.String()); remaining != "" {
-		resultList = append(resultList, &chunk.Output{
-			SectionPath:   strutil.Trim(input.SectionPath),
-			CanonicalPath: strutil.Trim(input.CanonicalPath),
-			ItemIndex:     input.ItemIndex,
-			Text:          remaining,
-			SourceType:    input.SourceType,
-		})
+		resultList = append(resultList, input.CloneWithText(remaining))
 	}
 
 	return resultList, nil

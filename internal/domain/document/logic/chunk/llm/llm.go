@@ -66,7 +66,7 @@ func (s *Strategy) Name() string {
 }
 
 // Chunk 执行大模型智能分块
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*chunk.Output, error) {
+func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
@@ -74,7 +74,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 	opt := chunk.GetChunkImplSpecificOptions(s.opt, opts...)
 
 	sourceTextList := []string{strutil.Trim(input.Text)}
-	resultList := make([]*chunk.Output, 0, len(sourceTextList))
+	resultList := make([]*chunk.TextBlock, 0, len(sourceTextList))
 	for _, sourceText := range sourceTextList {
 		chunks, err := s.split(ctx, opt.llmSplitPrompt, sourceText)
 		if err != nil {
@@ -85,13 +85,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 			if trimmed == "" {
 				continue
 			}
-			resultList = append(resultList, &chunk.Output{
-				SectionPath:   strutil.Trim(input.SectionPath),
-				CanonicalPath: strutil.Trim(input.CanonicalPath),
-				ItemIndex:     input.ItemIndex,
-				Text:          trimmed,
-				SourceType:    input.SourceType,
-			})
+			resultList = append(resultList, input.CloneWithText(trimmed))
 		}
 	}
 	return resultList, nil

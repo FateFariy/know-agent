@@ -4,22 +4,23 @@ import (
 	"context"
 )
 
-// Input 分块策略的输入对象，封装单个文本片段及其来源信息
-type Input struct {
+// TextBlock 文本块通用实体
+type TextBlock struct {
 	SectionPath   string // 文本所属章节路径，例如 "1.1.2"
-	CanonicalPath string // 文本的标准路径，例如 "1.1.2.1"
-	ItemIndex     int    // 文本在来源列表中的索引，例如 0
-	Text          string // 文本内容
+	CanonicalPath string // 文本唯一标准层级路径，例如 "1.1.2.1"
+	ItemIndex     int    // 原始文档片段在来源列表中的下标索引
+	Text          string // 原始/切分后文本内容
 	SourceType    int    // 来源类型
 }
 
-// Output 分块策略的输出对象，表示切分出来的一个文本块
-type Output struct {
-	SectionPath   string // 文本所属章节路径，例如 "1.1.2"
-	CanonicalPath string // 文本的标准路径，例如 "1.1.2.1"
-	ItemIndex     int    // 文本在来源列表中的索引，例如 0
-	Text          string // 切切分后的文本内容
-	SourceType    int    // 来源类型
+func (t *TextBlock) CloneWithText(text string) *TextBlock {
+	return &TextBlock{
+		SectionPath:   t.SectionPath,
+		CanonicalPath: t.CanonicalPath,
+		ItemIndex:     t.ItemIndex,
+		Text:          text,
+		SourceType:    t.SourceType,
+	}
 }
 
 // Strategy 分块策略接口
@@ -28,7 +29,7 @@ type Strategy interface {
 	Name() string
 
 	// Chunk 将一段输入文本切分为多个文本块
-	Chunk(ctx context.Context, input *Input, opts ...Option) ([]*Output, error)
+	Chunk(ctx context.Context, input *TextBlock, opts ...Option) ([]*TextBlock, error)
 }
 
 // Option 配置策略的函数选项

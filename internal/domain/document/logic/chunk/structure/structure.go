@@ -40,15 +40,15 @@ func (s *Strategy) Name() string {
 }
 
 // Chunk 按标题结构切分文本
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*chunk.Output, error) {
+func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.IsBlank(input.Text) {
 		return nil, nil
 	}
 
-	result := make([]*chunk.Output, 0, 8)
+	result := make([]*chunk.TextBlock, 0, 8)
 	headingStack := make([]string, 0, 4)
 	currentSectionPath := strutil.Trim(input.SectionPath)
-	currentChunk := make([]rune, 0, 512)
+	currentChunk := strings.Builder{}
 
 	lines := strings.Split(input.Text, "\n")
 	for _, line := range lines {
@@ -57,7 +57,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 		if classification.IsHeading() {
 			// 刷出当前累积块
 			result = s.flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
-			currentChunk = currentChunk[:0]
+			currentChunk.Reset()
 
 			// 按层级弹出同级或更高层级的标题
 			for len(headingStack) >= classification.Level {
@@ -67,37 +67,29 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 			currentSectionPath = s.composeSectionPath(input.SectionPath, strings.Join(headingStack, " > "))
 
 			// 标题本身也加入当前块，避免空标题
-			currentChunk = append(currentChunk, []rune(strutil.Trim(line))...)
-			currentChunk = append(currentChunk, '\n')
+			currentChunk.WriteString(strutil.Trim(line))
+			currentChunk.WriteRune('\n')
 			continue
 		}
 
-		currentChunk = append(currentChunk, []rune(line)...)
-		currentChunk = append(currentChunk, '\n')
+		currentChunk.WriteString(line)
+		currentChunk.WriteRune('\n')
 	}
 
 	// 刷出最后一段
 	result = s.flushChunk(result, input.SourceType, currentSectionPath, currentChunk)
-	if len(result) == 0 {
-		// 未能识别结构，降级为单个整块
-		result = append(result, &chunk.Output{
-			SectionPath:   strutil.Trim(input.SectionPath),
-			CanonicalPath: strutil.Trim(input.CanonicalPath),
-			ItemIndex:     input.ItemIndex,
-			Text:          strutil.Trim(input.Text),
-			SourceType:    input.SourceType,
-		})
-	}
+
 	return result, nil
 }
 
 // flushChunk 将累积的非空文本作为一个块加入结果
-func (s *Strategy) flushChunk(result []*chunk.Output, sourceType int, sectionPath string, currentChunk []rune) []*chunk.Output {
-	trimmed := strutil.Trim(string(currentChunk))
+func (s *Strategy) flushChunk(result []*chunk.TextBlock, sourceType int, sectionPath string, currentChunk strings.Builder) []*chunk.TextBlock {
+	trimmed := strutil.Trim(currentChunk.String())
 	if trimmed == "" {
 		return result
 	}
-	return append(result, &chunk.Output{
+	currentChunk.Reset()
+	return append(result, &chunk.TextBlock{
 		SectionPath: sectionPath,
 		Text:        trimmed,
 		SourceType:  utils.Ternary(sourceType == 0, vo.ChunkSourceTypeOriginal, sourceType),

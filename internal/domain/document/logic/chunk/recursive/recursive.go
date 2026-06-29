@@ -63,7 +63,7 @@ func (s *Strategy) Name() string {
 }
 
 // Chunk 执行递归分块
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*chunk.Output, error) {
+func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
@@ -74,19 +74,13 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 	// 先按优先级切分为若干原始块
 	rawChunks := s.split(strutil.Trim(input.Text), opt.maxChars, opt.overlapChars)
 
-	result := make([]*chunk.Output, 0, len(rawChunks))
+	result := make([]*chunk.TextBlock, 0, len(rawChunks))
 	for _, text := range rawChunks {
 		trimmed := strutil.Trim(text)
 		if trimmed == "" {
 			continue
 		}
-		result = append(result, &chunk.Output{
-			SectionPath:   strutil.Trim(input.SectionPath),
-			CanonicalPath: strutil.Trim(input.CanonicalPath),
-			ItemIndex:     input.ItemIndex,
-			Text:          trimmed,
-			SourceType:    input.SourceType,
-		})
+		result = append(result, input.CloneWithText(trimmed))
 	}
 	return result, nil
 }
