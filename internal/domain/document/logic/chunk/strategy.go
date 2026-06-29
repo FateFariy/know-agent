@@ -33,23 +33,19 @@ type Strategy interface {
 	Chunk(ctx context.Context, input *Input, opts ...Option) ([]*Output, error)
 }
 
-// Option 用于配置策略的函数选项。
-// 各子包（recursive/semantic/llm/structure）通过 WrapChunkImplSpecificOptFn 构造
-// 提供独立的参数配置。
+// Option 配置策略的函数选项
 type Option struct {
 	implSpecificOptFn any
 }
 
-// WrapChunkImplSpecificOptFn 将一个策略专属的 option setter 函数封装为通用 Option。
-// 传入的闭包将在 GetChunkImplSpecificOptions 中被调用以填充对应策略的 options。
+// WrapChunkImplSpecificOptFn 将策略专属的 option 函数封装为通用 Option
 func WrapChunkImplSpecificOptFn[T any](optFn func(*T)) Option {
 	return Option{
 		implSpecificOptFn: optFn,
 	}
 }
 
-// GetChunkImplSpecificOptions 从一组通用 Option 中筛选出 T 类型的 setter，
-// 并应用到传入的 base 上。当 base 为 nil 时会新建一个 T。
+// GetChunkImplSpecificOptions 从 Option 列表中获取策略实现专有选项
 func GetChunkImplSpecificOptions[T any](base *T, opts ...Option) *T {
 	if base == nil {
 		base = new(T)

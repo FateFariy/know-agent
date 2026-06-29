@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"context"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -21,17 +22,23 @@ type options struct {
 	maxChars            int
 	minChars            int
 	similarityThreshold float64
+	similarity          Similarity
 }
 
-// Strategy 基于 Jaccard 相似度的语义分块策略
+// Strategy 语义分块策略
 type Strategy struct {
 	opt *options
 }
 
-// NewStrategy 创建语义分块策略实例
+// NewStrategy 创建语义分块策略实例，默认使用 JaccardSimilarity 实现相似度计算
 func NewStrategy(opts ...chunk.Option) *Strategy {
 	return &Strategy{
-		opt: chunk.GetChunkImplSpecificOptions[options](nil, opts...),
+		opt: chunk.GetChunkImplSpecificOptions(&options{
+			maxChars:            defaultMaxChars,
+			minChars:            defaultMinChars,
+			similarityThreshold: defaultSimilarityThreshold,
+			similarity:          &JaccardSimilarity{},
+		}, opts...),
 	}
 }
 
@@ -65,6 +72,16 @@ func WithSimilarityThreshold(threshold float64) chunk.Option {
 	})
 }
 
+// WithSimilarity 注入自定义的相似度计算实现，
+func WithSimilarity(sim Similarity) chunk.Option {
+	return chunk.WrapChunkImplSpecificOptFn(func(o *options) {
+		if sim == nil {
+			return
+		}
+		o.similarity = sim
+	})
+}
+
 // Name 返回策略名称
 func (s *Strategy) Name() string {
 	return Name
@@ -76,7 +93,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 		return nil, nil
 	}
 
-	opt := chunk.GetChunkImplSpecificOptions[options](s.opt, opts...)
+	opt := chunk.GetChunkImplSpecificOptions(s.opt, opts...)
 
 	// 文本较短时保持原样，避免过碎
 	if utf8.RuneCountInString(input.Text) <= opt.minChars {
@@ -91,6 +108,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 		}, nil
 	}
 
+	// 按句子分块
 	sentenceList := chunk.SplitSentences(input.Text)
 	if len(sentenceList) <= 1 {
 		return []*chunk.Output{
@@ -105,25 +123,24 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 	}
 
 	resultList := make([]*chunk.Output, 0, len(sentenceList))
-
-	currentChunk := make([]rune, 0, 1024)
-	currentTokenSet := make(map[string]bool, 64)
-
+	currentText := strings.Builder{}
 	for _, sentence := range sentenceList {
-		sentenceTokenSet := chunk.ExtractTokens(sentence)
-
-		currentLen := len(currentChunk)
+		currentLen := utf8.RuneCountInString(currentText.String())
 		sentenceLen := utf8.RuneCountInString(sentence)
 		exceedMaxChars := currentLen+sentenceLen > opt.maxChars
+		// 计算语义相似度
 		similarity := 1.0
-		if len(currentTokenSet) > 0 {
-			similarity = chunk.Jaccard(currentTokenSet, sentenceTokenSet)
+		if currentLen > 0 {
+			simValue, err := opt.similarity.Calculate(ctx, currentText.String(), sentence)
+			if err == nil {
+				similarity = simValue
+			}
 		}
 		semanticBreak := currentLen >= opt.minChars && similarity < opt.similarityThreshold
 
 		// 达到上限或语义断层则切出当前块
 		if currentLen > 0 && (exceedMaxChars || semanticBreak) {
-			trimmed := strutil.Trim(string(currentChunk))
+			trimmed := strutil.Trim(currentText.String())
 			if trimmed != "" {
 				resultList = append(resultList, &chunk.Output{
 					SectionPath:   strutil.Trim(input.SectionPath),
@@ -133,18 +150,14 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.
 					SourceType:    input.SourceType,
 				})
 			}
-			currentChunk = currentChunk[:0]
-			currentTokenSet = make(map[string]bool, 64)
+			currentText.Reset()
 		}
 
-		currentChunk = append(currentChunk, []rune(sentence)...)
-		for token := range sentenceTokenSet {
-			currentTokenSet[token] = true
-		}
+		currentText.WriteString(sentence)
 	}
 
 	// 输出最后一块
-	if remaining := strutil.Trim(string(currentChunk)); remaining != "" {
+	if remaining := strutil.Trim(currentText.String()); remaining != "" {
 		resultList = append(resultList, &chunk.Output{
 			SectionPath:   strutil.Trim(input.SectionPath),
 			CanonicalPath: strutil.Trim(input.CanonicalPath),
