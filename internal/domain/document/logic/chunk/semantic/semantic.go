@@ -116,9 +116,10 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 		similarity := 1.0
 		if currentLen > 0 {
 			simValue, err := opt.similarity.Calculate(ctx, currentText.String(), sentence)
-			if err == nil {
-				similarity = simValue
+			if err != nil {
+				return nil, err
 			}
+			similarity = simValue
 		}
 		semanticBreak := currentLen >= opt.minChars && similarity < opt.similarityThreshold
 

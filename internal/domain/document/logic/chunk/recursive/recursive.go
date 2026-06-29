@@ -94,6 +94,8 @@ func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
 		return []string{text}
 	}
 
+	overlapChars = min(overlapChars, max(0, maxChars-1))
+
 	// 按段落切分
 	segmentList := chunk.SplitByRegex(text, chunk.ParagraphSplitRe)
 	if len(segmentList) > 1 {
@@ -123,27 +125,25 @@ func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars in
 
 	for _, segment := range segmentList {
 		trimmed := strutil.Trim(segment)
-		if trimmed == "" {
-			continue
-		}
+		if trimmed != "" {
+			if utf8.RuneCountInString(trimmed) > maxChars {
+				// 当前片段过长：先刷出已累积的，然后递归该片段
+				if current.Len() > 0 {
+					rawResultList = append(rawResultList, strutil.Trim(current.String()))
+					current.Reset()
+				}
+				rawResultList = append(rawResultList, s.split(trimmed, maxChars, overlapChars)...)
+				continue
+			}
 
-		if utf8.RuneCountInString(trimmed) > maxChars {
-			// 当前片段过长：先刷出已累积的，然后递归该片段
-			if current.Len() > 0 {
+			// 先刷出，再开启新块
+			if utf8.RuneCountInString(current.String())+utf8.RuneCountInString(trimmed)+1 > maxChars {
 				rawResultList = append(rawResultList, strutil.Trim(current.String()))
 				current.Reset()
 			}
-			rawResultList = append(rawResultList, s.split(trimmed, maxChars, overlapChars)...)
-			continue
+			current.WriteString(trimmed)
+			current.WriteRune('\n')
 		}
-
-		// 先刷出，再开启新块
-		if utf8.RuneCountInString(current.String())+utf8.RuneCountInString(trimmed)+1 > maxChars {
-			rawResultList = append(rawResultList, strutil.Trim(current.String()))
-			current.Reset()
-		}
-		current.WriteString(trimmed)
-		current.WriteRune('\n')
 	}
 
 	if current.Len() > 0 {

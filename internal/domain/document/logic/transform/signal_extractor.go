@@ -16,7 +16,7 @@ import (
 
 var (
 	// inlineExplicitStepBoundaryPattern 显式步骤边界（支持中文数字与阿拉伯数字）
-	inlineExplicitStepBoundaryPattern = regexp.MustCompile(`(?=(?:第\s*[0-9一二三四五六七八九十百]+\s*步|步骤\s*[0-9一二三四五六七八九十百]+)\s*[:：、.])`)
+	inlineExplicitStepBoundaryPattern = regexp.MustCompile(`(?:第\s*[0-9一二三四五六七八九十百]+\s*步|步骤\s*[0-9一二三四五六七八九十百]+)\s*[:：、.]`)
 
 	// specialLinePattern 整行仅由分隔符构成，视为特殊结构（表格/列表装饰）
 	specialLinePattern = regexp.MustCompile(`^[:\-\\s|]+$`)

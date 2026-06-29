@@ -94,7 +94,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 // split 调用大模型，从返回文本中解析 JSON 数组
 func (s *Strategy) split(ctx context.Context, promptTempName, sourceText string) ([]string, error) {
 	// 渲染提示词
-	prompt, err := s.renderer.Render(promptTempName, map[string]any{"text": sourceText})
+	prompt, err := s.renderer.Render(promptTempName, map[string]any{"sourceText": sourceText})
 	if err != nil || strutil.Trim(prompt) == "" {
 		return nil, err
 	}

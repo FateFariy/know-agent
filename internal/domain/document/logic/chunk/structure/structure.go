@@ -50,8 +50,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 	currentSectionPath := strutil.Trim(input.SectionPath)
 	currentChunk := strings.Builder{}
 
-	lines := strings.Split(input.Text, "\n")
-	for _, line := range lines {
+	for _, line := range strings.Split(input.Text, "\n") {
 		classification := s.classifier.Classify(line)
 
 		if classification.IsHeading() {
