@@ -39,6 +39,16 @@ type options struct {
 	llmSplitPrompt string
 }
 
+// WithLlmSplitPrompt 设置LLM分块提示词
+func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
+	return chunk.WrapChunkImplSpecificOptFn(func(o *options) {
+		if llmSplitPrompt == "" {
+			llmSplitPrompt = documentLlmSplit
+		}
+		o.llmSplitPrompt = llmSplitPrompt
+	})
+}
+
 // NewStrategy 创建大模型智能分块策略
 func NewStrategy(model ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Strategy {
 	return &Strategy{

@@ -3,21 +3,22 @@ package logic
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
+	chunkllm "github.com/swiftbit/know-agent/internal/domain/document/logic/chunk/llm"
+	chunkrecursive "github.com/swiftbit/know-agent/internal/domain/document/logic/chunk/recursive"
+	chunksemantic "github.com/swiftbit/know-agent/internal/domain/document/logic/chunk/semantic"
+	chunkstructure "github.com/swiftbit/know-agent/internal/domain/document/logic/chunk/structure"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
@@ -32,22 +33,11 @@ const (
 	ParentSemanticMinChars  = 480  // 语义块最小字符数
 )
 
-var (
-	englishWordPattern = regexp.MustCompile("[A-Za-z0-9]{2,}") // 英文单词正则表达式
-	paragraphSplitRe   = regexp.MustCompile(`\n\s*\n`)         // 段落分隔符
-	lineSplitRe        = regexp.MustCompile(`\n`)              // 换行分隔符
-	sentenceSplitRe    = regexp.MustCompile(`[。！？!?;；.]`)      // 句子分隔符
-	chineseCharRe      = regexp.MustCompile(`[\u4e00-\u9fa5]`) // 中文字符正则
-)
-
 // StrategyLogicImpl 策略业务逻辑实现
-// 核心的分块策略由 chunk 包的 Registry 管理，支持动态注册和组合
 type StrategyLogicImpl struct {
-	chatModel        chatlogic.ObservedChatModelImpl[*schema.Message]
-	promptTemplate   chatlogic.PromptTemplateLogic
-	structureNode    StructureNodeLogic
-	strategyRegistry *chunk.Registry
-	support.DocumentLineClassifier
+	structureNode StructureNodeLogic
+	registry      map[int]chunk.Strategy
+	classifier    *support.DocumentLineClassifier
 	*strategyOption
 }
 
@@ -62,34 +52,34 @@ type strategyOption struct {
 	recommendLlmWhenLowQuality  bool
 }
 
-func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel chatlogic.ObservedChatModelImpl[*schema.Message],
+func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel *chatlogic.ObservedChatModelImpl[*schema.Message],
 	promptTemplate chatlogic.PromptTemplateLogic, structureNode StructureNodeLogic) StrategyLogic {
 
-	// 构建策略注册表：默认内置 结构/递归/语义 三种策略，大模型策略根据配置注入
-	registry := chunk.NewRegistry()
+	registry := make(map[int]chunk.Strategy)
+	// 结构分块
+	registry[vo.StrategyTypeStructure] = chunkstructure.NewStrategy()
 
-	// 覆盖默认的递归/语义策略，使其使用应用配置
-	registry.RegisterOverride(chunk.NewRecursiveStrategy(
-		chunk.WithRecursive(svcCtx.Config.Chunk.RecursiveMaxChars, svcCtx.Config.Chunk.RecursiveOverlapChars),
-	))
-	registry.RegisterOverride(chunk.NewSemanticStrategy(
-		chunk.WithSemantic(svcCtx.Config.Chunk.SemanticMinChars, svcCtx.Config.Chunk.SemanticMaxChars, svcCtx.Config.Chunk.SemanticSimilarityThreshold),
-	))
+	// 递归分块
+	registry[vo.StrategyTypeRecursive] = chunkrecursive.NewStrategy(
+		chunkrecursive.WithMaxChars(svcCtx.Config.Chunk.RecursiveMaxChars),
+		chunkrecursive.WithOverlapChars(svcCtx.Config.Chunk.RecursiveOverlapChars),
+	)
 
-	// 大模型策略需要业务层注入 chatModel 和 promptTemplate；注册失败静默降级为语义切块
-	llmModel := newLLMModelAdapter(&chatModel)
-	llmRenderer := newLLMRenderer(promptTemplate)
-	_ = registry.Register(chunk.NewLLMStrategy(
-		llmModel,
-		llmRenderer,
-		chunk.WithLLM(svcCtx.Config.Chunk.LlmEnabled, svcCtx.Config.Chunk.LlmMaxChars),
-	))
+	// 语义分块
+	registry[vo.StrategyTypeSemantic] = chunksemantic.NewStrategy(
+		chunksemantic.WithMinChars(svcCtx.Config.Chunk.SemanticMinChars),
+		chunksemantic.WithMaxChars(svcCtx.Config.Chunk.SemanticMaxChars),
+		chunksemantic.WithSimilarityThreshold(svcCtx.Config.Chunk.SemanticSimilarityThreshold),
+	)
+	// 大模型切块
+	registry[vo.StrategyTypeLLM] = chunkllm.NewStrategy(chatModel, promptTemplate,
+		chunkllm.WithLlmSplitPrompt(prompt.DocumentLlmSplit),
+	)
 
 	return &StrategyLogicImpl{
-		chatModel:        chatModel,
-		promptTemplate:   promptTemplate,
-		structureNode:    structureNode,
-		strategyRegistry: registry,
+		structureNode: structureNode,
+		registry:      registry,
+		classifier:    &support.DocumentLineClassifier{},
 		strategyOption: &strategyOption{
 			recursiveMaxChars:           svcCtx.Config.Chunk.RecursiveMaxChars,
 			recursiveOverlapChars:       svcCtx.Config.Chunk.RecursiveOverlapChars,
@@ -103,42 +93,11 @@ func NewStrategyLogic(svcCtx *svc.ServiceContext, chatModel chatlogic.ObservedCh
 	}
 }
 
-// Registry 返回底层的策略注册表，便于单元测试动态替换策略
-func (s *StrategyLogicImpl) Registry() *chunk.Registry {
-	return s.strategyRegistry
-}
-
-// llmModelAdapter 将业务层 chatModel 适配为 chunk 包的 LLMModel 接口
-type llmModelAdapter struct {
-	model *chatlogic.ObservedChatModelImpl[*schema.Message]
-}
-
-func newLLMModelAdapter(model *chatlogic.ObservedChatModelImpl[*schema.Message]) chunk.LLMModel {
-	return &llmModelAdapter{model: model}
-}
-
-func (a *llmModelAdapter) Generate(ctx context.Context, prompt string) (string, error) {
-	return a.model.Generate(ctx, "", prompt)
-}
-
-// llmRendererAdapter 将业务层 promptTemplate 适配为 chunk 包的 LLMPromptRenderer 接口
-type llmRendererAdapter struct {
-	template chatlogic.PromptTemplateLogic
-}
-
-func newLLMRenderer(template chatlogic.PromptTemplateLogic) chunk.LLMPromptRenderer {
-	return &llmRendererAdapter{template: template}
-}
-
-func (r *llmRendererAdapter) Render(ctx context.Context, sourceText string) (string, error) {
-	return r.template.Render(prompt.DocumentLlmSplit, map[string]any{"sourceText": sourceText})
-}
-
 // RecommendStrategy 推荐策略方案
 // 根据文档分析结果推荐最优的父块和子块策略组合
 func (s *StrategyLogicImpl) RecommendStrategy(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
-		return nil, newStrategyError("文档或分析结果不能为空")
+		return nil, nil
 	}
 
 	reasonList := make([]string, 0)
@@ -168,8 +127,8 @@ func (s *StrategyLogicImpl) RecommendStrategy(ctx context.Context, document *ent
 	childReasonMap := make(map[int]string)
 
 	if llmRecommended {
-		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeLlm)
-		childReasonMap[vo.StrategyTypeLlm] = "文档质量偏低或结构识别不稳定，子块先使用大模型智能切块增强复杂场景。"
+		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeLLM)
+		childReasonMap[vo.StrategyTypeLLM] = "文档质量偏低或结构识别不稳定，子块先使用大模型智能切块增强复杂场景。"
 		reasonList = append(reasonList, "子块流水线追加大模型智能切块，处理低质量或结构不稳定文本。")
 	} else if semanticRecommended {
 		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeSemantic)
@@ -189,7 +148,7 @@ func (s *StrategyLogicImpl) RecommendStrategy(ctx context.Context, document *ent
 	childSteps := s.buildDraftSteps(vo.PipelineTypeChild, childStrategyTypes, childReasonMap)
 
 	// 构建策略快照
-	strategySnapshot := s.buildCombinedStrategySnapshot(parentSteps, childSteps)
+	strategySnapshot := fmt.Sprintf("PARENT:%s;CHILD:%s", s.buildPipelineSnapshot(parentSteps), s.buildPipelineSnapshot(childSteps))
 
 	return &vo.DocumentStrategyPlanDraft{
 		ParentSteps:      parentSteps,
@@ -314,15 +273,9 @@ func (s *StrategyLogicImpl) BuildParentBlocks(ctx context.Context, document *ent
 // ---------------- 推荐判定 ----------------
 
 // shouldUseStructure 判断是否应该使用结构切块
-// 逻辑：适合的文件类型（PDF/DOC/DOCX/MD/HTML），并且结构等级达到中等或标题数量>=2
 func (s *StrategyLogicImpl) shouldUseStructure(document *entity.Document, analysisResult *vo.DocumentAnalysisResult) bool {
-	fileType := document.FileType
-	suitableType := fileType == vo.FileTypePDF ||
-		fileType == vo.FileTypeDOC ||
-		fileType == vo.FileTypeDOCX ||
-		fileType == vo.FileTypeMD ||
-		fileType == vo.FileTypeHTML
-	return suitableType && (analysisResult.StructureLevel >= vo.StructureLevelMedium || analysisResult.HeadingCount >= 2)
+	return vo.FileTypeName(document.FileType) != "" &&
+		(analysisResult.StructureLevel >= vo.StructureLevelMedium || analysisResult.HeadingCount >= 2)
 }
 
 // shouldUseRecursive 判断是否应该使用递归切块
@@ -404,21 +357,10 @@ func (s *StrategyLogicImpl) sortPipelineSteps(steps []*entity.DocumentStrategySt
 	return filtered
 }
 
-// buildCombinedStrategySnapshot 构建组合策略快照
-func (s *StrategyLogicImpl) buildCombinedStrategySnapshot(parentSteps []*vo.DocumentStrategyStepDraft, childSteps []*vo.DocumentStrategyStepDraft) string {
-	parentSnapshot := s.buildPipelineSnapshot(slice.Map(parentSteps, func(_ int, step *vo.DocumentStrategyStepDraft) int {
-		return step.StrategyType
-	}))
-	childSnapshot := s.buildPipelineSnapshot(slice.Map(childSteps, func(_ int, step *vo.DocumentStrategyStepDraft) int {
-		return step.StrategyType
-	}))
-	return "PARENT:" + parentSnapshot + ";CHILD:" + childSnapshot
-}
-
 // buildPipelineSnapshot 将策略类型列表拼接为字符串
-func (s *StrategyLogicImpl) buildPipelineSnapshot(strategyTypes []int) string {
-	strList := slice.Map(strategyTypes, func(_ int, t int) string {
-		return intToString(t)
+func (s *StrategyLogicImpl) buildPipelineSnapshot(steps []*vo.DocumentStrategyStepDraft) string {
+	strList := slice.Map(steps, func(_ int, step *vo.DocumentStrategyStepDraft) string {
+		return strconv.Itoa(step.StrategyType)
 	})
 	return strings.Join(strList, ",")
 }
@@ -460,7 +402,7 @@ func (s *StrategyLogicImpl) getStrategyTypeName(strategyType int) string {
 
 // isValidStrategyType 判断策略类型是否有效
 func (s *StrategyLogicImpl) isValidStrategyType(strategyType int) bool {
-	return strategyType >= vo.StrategyTypeStructure && strategyType <= vo.StrategyTypeMarkdown
+	return strategyType >= vo.StrategyTypeStructure && strategyType <= vo.StrategyTypeLLM
 }
 
 // getDefaultReason 获取默认推荐理由
@@ -474,8 +416,6 @@ func (s *StrategyLogicImpl) getDefaultReason(strategyType int) string {
 		return "语义切块策略。"
 	case vo.StrategyTypeLLM:
 		return "大模型智能切块策略。"
-	case vo.StrategyTypeMarkdown:
-		return "Markdown格式切块策略。"
 	default:
 		return "系统为当前流水线生成的推荐步骤。"
 	}
@@ -496,7 +436,7 @@ func (s *StrategyLogicImpl) buildParentSeedList(parsedText string, parentSteps [
 				Text:       parsedText,
 				SourceType: vo.ChunkSourceTypeOriginal,
 			}
-			return s.executePipeline([]*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
+			return s.executePipeline(nil, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
 		}
 
 		remainingSteps := s.stripStructureSteps(parentSteps)
@@ -504,7 +444,7 @@ func (s *StrategyLogicImpl) buildParentSeedList(parsedText string, parentSteps [
 			return structureSeeds
 		}
 
-		return s.executePipeline(structureSeeds, remainingSteps, vo.PipelineTypeParent)
+		return s.executePipeline(nil, structureSeeds, remainingSteps, vo.PipelineTypeParent)
 	}
 
 	// 没有结构步骤或结构节点，直接使用原始文本
@@ -512,7 +452,7 @@ func (s *StrategyLogicImpl) buildParentSeedList(parsedText string, parentSteps [
 		Text:       parsedText,
 		SourceType: vo.ChunkSourceTypeOriginal,
 	}
-	return s.executePipeline([]*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
+	return s.executePipeline(nil, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
 }
 
 // buildChildSeedList 构建子块种子列表
@@ -528,12 +468,12 @@ func (s *StrategyLogicImpl) buildChildSeedList(parentSeed *vo.ChunkCandidate, ch
 			return structureSeeds
 		}
 
-		return s.executePipeline(structureSeeds, remainingSteps, vo.PipelineTypeChild)
+		return s.executePipeline(nil, structureSeeds, remainingSteps, vo.PipelineTypeChild)
 	}
 
 	// 直接克隆父种子
 	clonedSeed := s.cloneChunkCandidate(parentSeed, parentSeed.Text)
-	return s.executePipeline([]*vo.ChunkCandidate{clonedSeed}, childSteps, vo.PipelineTypeChild)
+	return s.executePipeline(nil, []*vo.ChunkCandidate{clonedSeed}, childSteps, vo.PipelineTypeChild)
 }
 
 // containsStructureStep 检查是否包含结构步骤
@@ -689,47 +629,28 @@ func (s *StrategyLogicImpl) cloneParentBlockCandidate(source *vo.ParentBlockCand
 
 // ---------------- 流水线调度 ----------------
 
-// executePipeline 执行流水线
-// 按步骤顺序将种子列表传递给各切块策略，产生最终的块候选列表
-// 委托给 chunk.Registry 执行，实现策略模式 + 注册表的统一调度
-func (s *StrategyLogicImpl) executePipeline(inputSeeds []*vo.ChunkCandidate, steps []*entity.DocumentStrategyStep, pipelineType string) []*vo.ChunkCandidate {
+// executePipeline 执行流水线，按步骤顺序将种子列表传递给各切块策略，产生最终的块候选列表
+func (s *StrategyLogicImpl) executePipeline(ctx context.Context, inputSeeds []*vo.ChunkCandidate, steps []*entity.DocumentStrategyStep, _ string) []*vo.ChunkCandidate {
 	currentChunks := s.cleanupChunkList(inputSeeds)
-	if len(currentChunks) == 0 || s.strategyRegistry == nil {
+	if len(currentChunks) == 0 {
 		return currentChunks
-	}
-
-	// 映射到 chunk 包的 PipelineType
-	var targetPipeline chunk.PipelineType
-	switch pipelineType {
-	case vo.PipelineTypeParent:
-		targetPipeline = chunk.PipelineTypeParent
-	default:
-		targetPipeline = chunk.PipelineTypeChild
 	}
 
 	// 按步骤顺序调用 Registry 中的策略
 	for _, step := range steps {
-		strategyType := step.StrategyType
-		if !s.isValidStrategyType(strategyType) {
+		strategy, ok := s.registry[step.StrategyType]
+		if !ok {
 			continue
 		}
-
-		strategyName := s.getStrategyTypeName(strategyType)
-		if !s.strategyRegistry.Has(strategyName) {
-			continue
-		}
-
 		// 将当前块候选转换为 chunk.Input
 		outputList := make([]*chunk.Output, 0, len(currentChunks))
+		var outs []*chunk.Output
+		var err error
 		for _, c := range currentChunks {
 			if c == nil || strutil.IsBlank(c.Text) {
 				continue
 			}
-			outs, err := s.strategyRegistry.Run(context.Background(), strategyName, &chunk.Input{
-				Text:        strings.TrimSpace(c.Text),
-				SectionPath: c.SectionPath,
-				SourceType:  c.SourceType,
-			}, targetPipeline)
+
 			if err != nil {
 				// 单个策略失败不中断，降级为保持原样
 				outputList = append(outputList, &chunk.Output{
@@ -759,10 +680,21 @@ func (s *StrategyLogicImpl) executePipeline(inputSeeds []*vo.ChunkCandidate, ste
 	return s.cleanupChunkList(currentChunks)
 }
 
+// cleanupChunkList 清理块列表
+func (s *StrategyLogicImpl) cleanupChunkList(chunks []*vo.ChunkCandidate) []*vo.ChunkCandidate {
+	result := make([]*vo.ChunkCandidate, 0)
+	for _, candidate := range chunks {
+		if candidate != nil && strutil.IsNotBlank(candidate.Text) {
+			result = append(result, candidate)
+		}
+	}
+	return result
+}
+
 // ---------------- 结构切块 ----------------
 
 // applyStructureChunking 对候选列表应用结构切块（按标题行分段）
-func (s *StrategyLogicImpl) applyStructureChunking(sourceList []*vo.ChunkCandidate, pipelineType string) []*vo.ChunkCandidate {
+func (s *StrategyLogicImpl) applyStructureChunking(input *chunk.Input, pipelineType string) []*vo.ChunkCandidate {
 	resultList := make([]*vo.ChunkCandidate, 0)
 	for _, candidate := range sourceList {
 		if candidate == nil || strutil.IsBlank(candidate.Text) {
@@ -872,151 +804,6 @@ func (s *StrategyLogicImpl) applyRecursiveChunking(sourceList []*vo.ChunkCandida
 	return resultList
 }
 
-// recursiveSplit 递归切分文本：段落→行→句子→固定窗口，按优先级尝试
-func (s *StrategyLogicImpl) recursiveSplit(text string, maxChars, overlapChars int) []string {
-	trimmed := strutil.Trim(text)
-	if trimmed == "" {
-		return []string{}
-	}
-	if utf8.RuneCountInString(trimmed) <= maxChars {
-		return []string{trimmed}
-	}
-
-	// 1) 按段落切分
-	paragraphList := s.splitByRegex(trimmed, paragraphSplitRe)
-	if len(paragraphList) > 1 {
-		return s.mergeAndSplit(paragraphList, maxChars, overlapChars)
-	}
-
-	// 2) 按换行切分
-	lineList := s.splitByRegex(trimmed, lineSplitRe)
-	if len(lineList) > 1 {
-		return s.mergeAndSplit(lineList, maxChars, overlapChars)
-	}
-
-	// 3) 按句子切分
-	sentenceList := s.splitSentences(trimmed)
-	if len(sentenceList) > 1 {
-		return s.mergeAndSplit(sentenceList, maxChars, overlapChars)
-	}
-
-	// 4) 固定窗口切分
-	return s.fixedWindowSplit(trimmed, maxChars, overlapChars)
-}
-
-// mergeAndSplit 将片段依次累加直到超出 maxChars 后切出，最后整体应用重叠
-func (s *StrategyLogicImpl) mergeAndSplit(segmentList []string, maxChars, overlapChars int) []string {
-	rawResultList := make([]string, 0)
-	current := strings.Builder{}
-
-	for _, segment := range segmentList {
-		trimmed := strutil.Trim(segment)
-		if trimmed == "" {
-			continue
-		}
-
-		// 单个片段过大：先把累积的刷出，再对该片段递归切分
-		if utf8.RuneCountInString(trimmed) > maxChars {
-			if current.Len() > 0 {
-				rawResultList = append(rawResultList, strutil.Trim(current.String()))
-				current.Reset()
-			}
-			rawResultList = append(rawResultList, s.recursiveSplit(trimmed, maxChars, overlapChars)...)
-			continue
-		}
-
-		// 累积超出：刷出当前
-		if utf8.RuneCountInString(current.String())+utf8.RuneCountInString(trimmed)+1 > maxChars {
-			rawResultList = append(rawResultList, strutil.Trim(current.String()))
-			current.Reset()
-		}
-		current.WriteString(trimmed)
-		current.WriteByte('\n')
-	}
-
-	if current.Len() > 0 {
-		rawResultList = append(rawResultList, strutil.Trim(current.String()))
-	}
-	return s.applyOverlap(rawResultList, maxChars, overlapChars)
-}
-
-// applyOverlap 为块列表追加重叠前缀：取前一块尾部作为下一块的前缀上下文
-func (s *StrategyLogicImpl) applyOverlap(rawChunkList []string, maxChars, overlapChars int) []string {
-	if len(rawChunkList) == 0 || overlapChars <= 0 {
-		return rawChunkList
-	}
-
-	overlappedChunkList := make([]string, 0, len(rawChunkList))
-	for index, current := range rawChunkList {
-		currentTrimmed := strutil.Trim(current)
-		if currentTrimmed == "" {
-			continue
-		}
-		if index == 0 {
-			overlappedChunkList = append(overlappedChunkList, currentTrimmed)
-			continue
-		}
-
-		previous := strutil.Trim(rawChunkList[index-1])
-		overlapPrefix := s.buildOverlapPrefix(previous, currentTrimmed, maxChars, overlapChars)
-		if overlapPrefix != "" {
-			overlappedChunkList = append(overlappedChunkList, overlapPrefix+"\n"+currentTrimmed)
-		} else {
-			overlappedChunkList = append(overlappedChunkList, currentTrimmed)
-		}
-	}
-	return overlappedChunkList
-}
-
-// buildOverlapPrefix 取 previous 尾部作为重叠前缀，长度受 maxChars-current 余量约束
-func (s *StrategyLogicImpl) buildOverlapPrefix(previous, current string, maxChars, overlapChars int) string {
-	previous = strutil.Trim(previous)
-	current = strutil.Trim(current)
-	if previous == "" || current == "" {
-		return ""
-	}
-
-	allowedChars := min(overlapChars, max(0, maxChars-utf8.RuneCountInString(current)-1))
-	if allowedChars <= 0 {
-		return ""
-	}
-
-	prevRunes := []rune(previous)
-	startIdx := len(prevRunes) - allowedChars
-	if startIdx < 0 {
-		startIdx = 0
-	}
-	return strutil.Trim(string(prevRunes[startIdx:]))
-}
-
-// fixedWindowSplit 使用固定窗口+步进对长文本进行兜底切分
-func (s *StrategyLogicImpl) fixedWindowSplit(text string, maxChars, overlapChars int) []string {
-	runes := []rune(strutil.Trim(text))
-	total := len(runes)
-	if total == 0 {
-		return []string{}
-	}
-	if total <= maxChars {
-		return []string{string(runes)}
-	}
-
-	result := make([]string, 0)
-	step := max(1, maxChars-overlapChars)
-	start := 0
-	for start < total {
-		end := start + maxChars
-		if end > total {
-			end = total
-		}
-		result = append(result, strutil.Trim(string(runes[start:end])))
-		if end >= total {
-			break
-		}
-		start += step
-	}
-	return result
-}
-
 // resolveRecursiveMaxChars 解析递归切块最大字符数（父块使用较大常量兜底）
 func (s *StrategyLogicImpl) resolveRecursiveMaxChars(pipelineType string) int {
 	if pipelineType == vo.PipelineTypeParent {
@@ -1034,49 +821,6 @@ func (s *StrategyLogicImpl) resolveRecursiveOverlap(maxChars int, pipelineType s
 		return 0
 	}
 	return min(s.recursiveOverlapChars, max(0, maxChars-1))
-}
-
-// splitByRegex 按正则切分并去除空白片段
-func (s *StrategyLogicImpl) splitByRegex(text string, re *regexp.Regexp) []string {
-	raw := re.Split(text, -1)
-	result := make([]string, 0, len(raw))
-	for _, part := range raw {
-		trimmed := strutil.Trim(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
-}
-
-// splitSentences 按句末标点切分文本，并保留标点符号
-func (s *StrategyLogicImpl) splitSentences(text string) []string {
-	// 找到所有句末标点索引
-	indices := sentenceSplitRe.FindAllStringIndex(text, -1)
-	if len(indices) == 0 {
-		trimmed := strutil.Trim(text)
-		if trimmed == "" {
-			return []string{}
-		}
-		return []string{trimmed}
-	}
-	result := make([]string, 0, len(indices)+1)
-	prev := 0
-	for _, idxPair := range indices {
-		end := idxPair[1]
-		segment := strutil.Trim(text[prev:end])
-		if segment != "" {
-			result = append(result, segment)
-		}
-		prev = end
-	}
-	if prev < len(text) {
-		tail := strutil.Trim(text[prev:])
-		if tail != "" {
-			result = append(result, tail)
-		}
-	}
-	return result
 }
 
 // ---------------- 语义切块 ----------------
@@ -1146,45 +890,6 @@ func (s *StrategyLogicImpl) semanticSplit(candidate *vo.ChunkCandidate, pipeline
 	return resultList
 }
 
-// extractTokens 提取文本的词元集合：英文单词 + 单个中文字符
-func (s *StrategyLogicImpl) extractTokens(text string) map[string]bool {
-	tokenSet := make(map[string]bool)
-	// 英文单词逐个作为词元
-	lower := strings.ToLower(text)
-	matches := englishWordPattern.FindAllString(lower, -1)
-	for _, m := range matches {
-		tokenSet[m] = true
-	}
-	// 中文字符逐个作为词元
-	for _, r := range text {
-		if r >= 0x4e00 && r <= 0x9fa5 {
-			tokenSet[string(r)] = true
-		}
-	}
-	return tokenSet
-}
-
-// jaccard 计算两个集合的 Jaccard 相似度
-func (s *StrategyLogicImpl) jaccard(left, right map[string]bool) float64 {
-	if len(left) == 0 || len(right) == 0 {
-		return 0
-	}
-	unionSize := len(left)
-	intersectionSize := 0
-	for token := range right {
-		if left[token] {
-			intersectionSize++
-		} else {
-			unionSize++
-		}
-	}
-	if unionSize == 0 {
-		return 0
-	}
-
-	return float64(intersectionSize) / float64(unionSize)
-}
-
 // resolveSemanticMaxChars 解析语义切块最大字符数（父块使用较大常量兜底）
 func (s *StrategyLogicImpl) resolveSemanticMaxChars(pipelineType string) int {
 	if pipelineType == vo.PipelineTypeParent {
@@ -1226,7 +931,11 @@ func (s *StrategyLogicImpl) applyLlmChunking(ctx context.Context, sourceList []*
 		}
 
 		for _, sourceText := range sourceTextList {
-			llmChunks := s.llmSplit(ctx, sourceText)
+			llmChunks, err := s.registry[chunkllm.Name].Chunk(ctx)
+			if err != nil {
+				Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
+				return nil
+			}
 			if len(llmChunks) == 0 {
 				// 大模型失败，回退语义切分
 				fallback := s.semanticSplit(s.cloneChunkCandidate(candidate, sourceText), pipelineType)
@@ -1241,190 +950,102 @@ func (s *StrategyLogicImpl) applyLlmChunking(ctx context.Context, sourceList []*
 	return resultList
 }
 
-// llmSplit 调用大模型提示模板切分文本，并从返回内容中解析 JSON 数组作为切块结果
-func (s *StrategyLogicImpl) llmSplit(ctx context.Context, sourceText string) []string {
-	userPrompt, err := s.promptTemplate.Render(prompt.DocumentLlmSplit, map[string]any{
-		"sourceText": sourceText,
-	})
-	if err != nil {
-		Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
-		return nil
-	}
+// // resolveMaxChars 根据流水线类型返回块大小
+// func (r *RecursiveStrategy) resolveMaxChars(pipelineType PipelineType) int {
+// 	if pipelineType == PipelineTypeParent {
+// 		return parentBlockMaxChars
+// 	}
+// 	return r.base.recursiveMaxChars
+// }
+//
+// // resolveOverlapChars 根据流水线类型返回重叠字符数
+// func (r *RecursiveStrategy) resolveOverlapChars(maxChars int, pipelineType PipelineType) int {
+// 	if pipelineType == PipelineTypeParent {
+// 		return min(parentBlockOverlapChars, max(0, maxChars-1))
+// 	}
+// 	if r.base.recursiveOverlapChars <= 0 {
+// 		return 0
+// 	}
+// 	return min(r.base.recursiveOverlapChars, max(0, maxChars-1))
+// }
 
-	content, err := s.chatModel.Generate(ctx, "", userPrompt)
-	if err != nil {
-		Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
-		return nil
-	}
-
-	jsonArray := s.extractJsonArray(content)
-	if strutil.IsBlank(jsonArray) {
-		return nil
-	}
-	// 简单按字符串方式解析 JSON 数组，避免额外依赖
-	elements := s.parseStringJsonArray(jsonArray)
-	filtered := make([]string, 0, len(elements))
-	for _, e := range elements {
-		trimmed := strutil.Trim(e)
-		if trimmed != "" {
-			filtered = append(filtered, trimmed)
-		}
-	}
-	return filtered
-}
-
-// extractJsonArray 从文本中抽取首个完整 [ ... ] JSON 数组
-func (s *StrategyLogicImpl) extractJsonArray(content string) string {
-	start := strings.Index(content, "[")
-	end := strings.LastIndex(content, "]")
-	if start < 0 || end <= start {
-		return ""
-	}
-	return content[start : end+1]
-}
-
-// parseStringJsonArray 简易解析 JSON 字符串数组（仅处理双引号字符串元素，无需引入额外依赖）
-func (s *StrategyLogicImpl) parseStringJsonArray(content string) []string {
-	trimmed := strutil.Trim(content)
-	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
-		return []string{}
-	}
-	inner := strutil.Trim(trimmed[1 : len(trimmed)-1])
-	if inner == "" {
-		return []string{}
-	}
-
-	elements := make([]string, 0)
-	runes := []rune(inner)
-	n := len(runes)
-	i := 0
-	for i < n {
-		// 跳过空白和逗号
-		for i < n && (runes[i] == ',' || runes[i] == ' ' || runes[i] == '\t' || runes[i] == '\r' || runes[i] == '\n') {
-			i++
-		}
-		if i >= n {
-			break
-		}
-		// 期望字符串起始
-		if runes[i] != '"' {
-			// 跳过非字符串元素直到下一个逗号
-			for i < n && runes[i] != ',' {
-				i++
-			}
-			continue
-		}
-		i++ // 跳过 "
-		sb := strings.Builder{}
-		for i < n {
-			r := runes[i]
-			if r == '\\' && i+1 < n {
-				next := runes[i+1]
-				switch next {
-				case '"':
-					sb.WriteByte('"')
-				case '\\':
-					sb.WriteByte('\\')
-				case '/':
-					sb.WriteByte('/')
-				case 'n':
-					sb.WriteByte('\n')
-				case 't':
-					sb.WriteByte('\t')
-				case 'r':
-					sb.WriteByte('\r')
-				default:
-					sb.WriteRune(r)
-					sb.WriteRune(next)
-				}
-				i += 2
-				continue
-			}
-			if r == '"' {
-				i++
-				break
-			}
-			sb.WriteRune(r)
-			i++
-		}
-		elements = append(elements, sb.String())
-	}
-	return elements
-}
-
-// resolveLlmMaxChars 解析大模型切块最大字符数（父块使用较大常量兜底）
-func (s *StrategyLogicImpl) resolveLlmMaxChars(pipelineType string) int {
-	if pipelineType == vo.PipelineTypeParent {
-		return max(s.llmMaxChars, ParentBlockMaxChars)
-	}
-	return s.llmMaxChars
-}
-
-// ---------------- 列表清理/去重 ----------------
-
-// cleanupChunkList 去除空/重复块候选，以 章节路径+条目索引+文本 作为唯一键
-func (s *StrategyLogicImpl) cleanupChunkList(chunks []*vo.ChunkCandidate) []*vo.ChunkCandidate {
-	uniqueMap := make(map[string]*vo.ChunkCandidate)
-	for _, chunk := range chunks {
-		if strutil.IsBlank(chunk.Text) {
-			continue
-		}
-		normalizedText := strutil.Trim(chunk.Text)
-		uniqueKey := fmt.Sprintf("%s||%d||%s", utils.BlankToDefault(chunk.CanonicalPath, chunk.SectionPath), chunk.ItemIndex, normalizedText)
-		if _, exists := uniqueMap[uniqueKey]; !exists {
-			uniqueMap[uniqueKey] = s.cloneChunkCandidate(chunk, normalizedText)
-		}
-	}
-	return maputil.Values(uniqueMap)
-}
-
-// cleanupParentBlockList 去除空/重复父块候选
-func (s *StrategyLogicImpl) cleanupParentBlockList(blocks []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
-	uniqueMap := make(map[string]*vo.ParentBlockCandidate)
-	for _, block := range blocks {
-		if strutil.IsBlank(block.Text) {
-			continue
-		}
-		normalizedText := strutil.Trim(block.Text)
-		uniqueKey := fmt.Sprintf("%s||%d||%s", utils.BlankToDefault(block.CanonicalPath, block.SectionPath), block.ItemIndex, normalizedText)
-		if _, exists := uniqueMap[uniqueKey]; !exists {
-			childChunks := append([]*vo.ChunkCandidate{}, block.ChildChunks...)
-			uniqueMap[uniqueKey] = s.cloneParentBlockCandidate(block, childChunks, normalizedText)
-		}
-	}
-	return maputil.Values(uniqueMap)
-}
-
-// ---------------- 小工具 ----------------
-
-// intToString 将整数转为字符串（自实现，避免引入 strconv 外部调用）
-func intToString(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	var buf [20]byte
-	pos := len(buf)
-	for v > 0 {
-		pos--
-		buf[pos] = byte('0' + v%10)
-		v /= 10
-	}
-	if neg {
-		pos--
-		buf[pos] = '-'
-	}
-	return string(buf[pos:])
-}
-
-// newStrategyError 构造策略业务错误
-func newStrategyError(msg string) error {
-	return common.NewBizError(20005, msg)
-}
-
-func (s *StrategyLogicImpl) Warnf(format string, args ...any) {
-	logx.Alert(fmt.Sprintf(format, args...))
-}
+// func (s *Strategy) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*chunk.Output, error) {
+// 	// 未启用或未配置大模型：直接降级为语义分块
+// 	if !s.opt.enabled || s.model == nil {
+// 		fallback := chunkSemantic.NewStrategy(
+// 			chunkSemantic.WithMinChars(240),
+// 			chunkSemantic.WithMaxChars(700),
+// 			chunkSemantic.WithSimilarityThreshold(0.18),
+// 		)
+// 		return fallback.Chunk(ctx, input)
+// 	}
+//
+// 	if input == nil || strings.TrimSpace(input.Text) == "" {
+// 		return nil, nil
+// 	}
+// 	opt := chunk.GetChunkImplSpecificOptions(s.opt, opts...)
+//
+// 	// 对超长文本先做递归分块，再逐个调用大模型
+// 	var sourceTextList []string
+// 	if utf8.RuneCountInString(input.Text) > opt.maxChars {
+// 		recursiveStrategy := chunkRecursive.NewStrategy(
+// 			chunkRecursive.WithMaxChars(opt.maxChars),
+// 			chunkRecursive.WithOverlapChars(0),
+// 		)
+// 		rawChunks, err := recursiveStrategy.Chunk(ctx, input)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		sourceTextList = make([]string, 0, len(rawChunks))
+// 		for _, c := range rawChunks {
+// 			if c == nil {
+// 				continue
+// 			}
+// 			if t := strings.TrimSpace(c.Text); t != "" {
+// 				sourceTextList = append(sourceTextList, t)
+// 			}
+// 		}
+// 	} else {
+// 		sourceTextList = []string{strings.TrimSpace(input.Text)}
+// 	}
+//
+// 	resultList := make([]*chunk.Output, 0, len(sourceTextList))
+// 	for _, sourceText := range sourceTextList {
+// 		chunks := s.split(ctx, sourceText)
+// 		// 大模型调用失败：降级为语义分块
+// 		if len(chunks) == 0 {
+// 			fallback := chunkSemantic.NewStrategy(
+// 				chunkSemantic.WithMinChars(240),
+// 				chunkSemantic.WithMaxChars(700),
+// 				chunkSemantic.WithSimilarityThreshold(0.18),
+// 			)
+// 			fallbackInput := &chunk.Input{
+// 				SectionPath:   input.SectionPath,
+// 				CanonicalPath: input.CanonicalPath,
+// 				ItemIndex:     input.ItemIndex,
+// 				Text:          sourceText,
+// 				SourceType:    input.SourceType,
+// 			}
+// 			fallbackChunks, err := fallback.Chunk(ctx, fallbackInput)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 			resultList = append(resultList, fallbackChunks...)
+// 			continue
+// 		}
+// 		for _, chunkText := range chunks {
+// 			trimmed := strings.TrimSpace(chunkText)
+// 			if trimmed == "" {
+// 				continue
+// 			}
+// 			resultList = append(resultList, &chunk.Output{
+// 				SectionPath:   strings.TrimSpace(input.SectionPath),
+// 				CanonicalPath: strings.TrimSpace(input.CanonicalPath),
+// 				ItemIndex:     input.ItemIndex,
+// 				Text:          trimmed,
+// 				SourceType:    input.SourceType,
+// 			})
+// 		}
+// 	}
+// 	return resultList, nil
+// }

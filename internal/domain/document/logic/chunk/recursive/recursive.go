@@ -2,6 +2,7 @@ package recursive
 
 import (
 	"context"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -124,7 +125,7 @@ func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
 // mergeAndSplit 将片段依次累加，超出 maxChars 时刷出一个块，然后继续
 func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars int) []string {
 	rawResultList := make([]string, 0, len(segmentList))
-	current := make([]rune, 0, 512)
+	current := strings.Builder{}
 
 	for _, segment := range segmentList {
 		trimmed := strutil.Trim(segment)
@@ -134,28 +135,25 @@ func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars in
 
 		if utf8.RuneCountInString(trimmed) > maxChars {
 			// 当前片段过长：先刷出已累积的，然后递归该片段
-			if len(current) > 0 {
-				rawResultList = append(rawResultList, strutil.Trim(string(current)))
-				current = current[:0]
+			if current.Len() > 0 {
+				rawResultList = append(rawResultList, strutil.Trim(current.String()))
+				current.Reset()
 			}
 			rawResultList = append(rawResultList, s.split(trimmed, maxChars, overlapChars)...)
 			continue
 		}
 
 		// 先刷出，再开启新块
-		if len(current)+utf8.RuneCountInString(trimmed)+1 > maxChars {
-			rawResultList = append(rawResultList, strutil.Trim(string(current)))
-			current = current[:0]
+		if utf8.RuneCountInString(current.String())+utf8.RuneCountInString(trimmed)+1 > maxChars {
+			rawResultList = append(rawResultList, strutil.Trim(current.String()))
+			current.Reset()
 		}
-
-		if len(current) > 0 {
-			current = append(current, '\n')
-		}
-		current = append(current, []rune(trimmed)...)
+		current.WriteString(trimmed)
+		current.WriteRune('\n')
 	}
 
-	if len(current) > 0 {
-		rawResultList = append(rawResultList, strutil.Trim(string(current)))
+	if current.Len() > 0 {
+		rawResultList = append(rawResultList, strutil.Trim(current.String()))
 	}
 
 	// 为块列表增加重叠前缀
@@ -217,9 +215,6 @@ func (s *Strategy) fixedWindowSplit(text string, maxChars, overlapChars int) []s
 	total := utf8.RuneCountInString(trim)
 	if total == 0 {
 		return nil
-	}
-	if total <= maxChars {
-		return []string{trim}
 	}
 
 	runes := []rune(trim)
