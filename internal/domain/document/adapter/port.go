@@ -3,18 +3,21 @@ package adapter
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 type DocumentPort struct {
 	Storage
 	MessageProducer
+	VectorDB
 }
 
-func NewDocumentPort(storage Storage, messageProducer MessageProducer) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorDB) *DocumentPort {
 	return &DocumentPort{
 		Storage:         storage,
 		MessageProducer: messageProducer,
+		VectorDB:        vectorDB,
 	}
 }
 
@@ -40,5 +43,9 @@ type MessageProducer interface {
 }
 
 type VectorDB interface {
-	DeleteDocumentById(ctx context.Context, documentId int64) error
+	// Vectorize 向量化块
+	Vectorize(ctx context.Context, chunks []*entity.DocumentChunk) error
+
+	// DeleteVectorByDocumentId 根据文档ID删除向量
+	DeleteVectorByDocumentId(ctx context.Context, documentId int64) error
 }

@@ -63,46 +63,34 @@ func TaskStatusName(ts TaskStatus) string {
 type TaskStage = int
 
 const (
-	TaskStageFileUpload TaskStage = iota + 1
-	TaskStageParse
-	TaskStageStrategyRecommend
-	TaskStageStrategyConfirm
-	TaskStageChunkExecute
-	TaskStageChunkPostProcess
-	TaskStageVectorBuild
-	TaskStageVectorize
-	TaskStageStoreComplete
-	TaskStageStrategyRoute
-	TaskStageContentParse
-	TaskStageComplete
+	TaskStageFileUpload       TaskStage = iota + 1 // 文件上传
+	TaskStageContentParse                          // 内容解析
+	TaskStageStrategyRoute                         // 策略路由
+	TaskStageStrategyConfirm                       // 策略确认
+	TaskStageChunkExecute                          // 切块执行
+	TaskStageChunkPostProcess                      // 切块后处理
+	TaskStageVectorize                             // 向量化
+	TaskStageStoreComplete                         // 存储完成
 )
 
 func TaskStageName(ts TaskStage) string {
 	switch ts {
 	case TaskStageFileUpload:
 		return "文件上传"
-	case TaskStageParse:
-		return "解析"
-	case TaskStageStrategyRecommend:
-		return "策略推荐"
+	case TaskStageContentParse:
+		return "内容解析"
 	case TaskStageStrategyConfirm:
 		return "策略确认"
 	case TaskStageChunkExecute:
 		return "切块执行"
 	case TaskStageChunkPostProcess:
 		return "切块后处理"
-	case TaskStageVectorBuild:
-		return "向量构建"
 	case TaskStageVectorize:
 		return "向量化"
 	case TaskStageStoreComplete:
 		return "存储完成"
 	case TaskStageStrategyRoute:
 		return "策略路由"
-	case TaskStageContentParse:
-		return "内容解析"
-	case TaskStageComplete:
-		return "完成"
 	default:
 		return ""
 	}

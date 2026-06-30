@@ -43,8 +43,8 @@ type DocumentRepository interface {
 	// InsertTask 插入任务
 	InsertTask(ctx context.Context, task *entity.DocumentTask) error
 
-	// UpdateTask 更新任务
-	UpdateTask(ctx context.Context, task *entity.DocumentTask) error
+	// UpdateTaskById 根据任务ID更新任务
+	UpdateTaskById(ctx context.Context, task *entity.DocumentTask) error
 
 	// DeleteTaskByDocumentId 根据文档ID删除任务
 	DeleteTaskByDocumentId(ctx context.Context, documentId int64) error

@@ -255,17 +255,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuilding}); err != nil {
 			return err
 		}
-		// 更新任务状态为"运行中"
-		updateTask := &entity.DocumentTask{
-			ID:           taskId,
-			TaskStatus:   vo.TaskStatusRunning,
-			CurrentStage: vo.TaskStageChunkExecute,
-			StartTime:    time.Now(),
-		}
-		if err := d.repo.UpdateTask(txCtx, updateTask); err != nil {
-			return err
-		}
-		// 标记执行状态为"运行中"
+		// 标记步骤执行状态为"运行中"
 		if err := d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuting); err != nil {
 			return err
 		}
@@ -281,7 +271,17 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 			Content:      "开始执行切块流水线",
 			DetailJson:   string(chunkStartDetail),
 		}
-		return d.repo.InsertTaskLog(txCtx, startLog)
+		if err := d.repo.InsertTaskLog(txCtx, startLog); err != nil {
+			return err
+		}
+		// 更新任务阶段为"执行分块"
+		updateTask := &entity.DocumentTask{
+			ID:           taskId,
+			TaskStatus:   vo.TaskStatusRunning,
+			CurrentStage: vo.TaskStageChunkExecute,
+			StartTime:    time.Now(),
+		}
+		return d.repo.UpdateTaskById(txCtx, updateTask)
 	}
 	if err = d.repo.Do(ctx, startFn); err != nil {
 		panic(err)
@@ -304,15 +304,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
 			return err
 		}
-		// 更新任务状态为"切块后处理"
-		updateTask := &entity.DocumentTask{
-			ID:           taskId,
-			CurrentStage: vo.TaskStageChunkPostProcess,
-		}
-		if err := d.repo.UpdateTask(txCtx, updateTask); err != nil {
-			return err
-		}
-		// 记录"切块流水线执行完成"日志
+		// 记录"切块执行完成"日志
 		chunkEndDetail, _ := json.Marshal(map[string]any{"parentCount": len(candidates), "childCount": d.countChildCandidates(candidates)})
 		completeLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
@@ -321,10 +313,14 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 			EventType:    vo.TaskEventComplete,
 			LogLevel:     vo.LogLevelInfo,
 			OperatorType: vo.OperatorTypeSystem,
-			Content:      "切块流水线执行完成",
+			Content:      "切块执行完成",
 			DetailJson:   string(chunkEndDetail),
 		}
-		return d.repo.InsertTaskLog(txCtx, completeLog)
+		if err := d.repo.InsertTaskLog(txCtx, completeLog); err != nil {
+			return err
+		}
+		// 更新任务阶段为"切块后处理"
+		return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageChunkPostProcess})
 	}
 	if err = d.repo.Do(ctx, completeFn); err != nil {
 		panic(err)
@@ -334,36 +330,79 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	parentBlockList, chunkList := d.buildParentChildEntities(documentId, taskId, planId, finalCandidates)
 
 	// 批量落库
-	for _, parentBlock := range parentBlockList {
-		if err = d.repo.InsertParentBlocks(ctx, parentBlock); err != nil {
+	postFn := func(txCtx context.Context) error {
+		if err := d.repo.InsertParentBlockBatch(txCtx, parentBlockList); err != nil {
 			Warnf("插入父块失败: documentId=%d, err=%v", documentId, err)
+			return err
 		}
-	}
-	for _, chunk := range chunkList {
-		if err = d.repo.InsertChunk(ctx, chunk); err != nil {
+		if err := d.repo.InsertChunkBatch(txCtx, chunkList); err != nil {
 			Warnf("插入块失败: documentId=%d, err=%v", documentId, err)
+			return err
 		}
+		// 记录"切块后处理完成"日志
+		chunkPostDetail, _ := json.Marshal(map[string]any{"parentCount": len(finalCandidates), "childCount": d.countChildCandidates(finalCandidates)})
+		completeLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageChunkPostProcess,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "切块后处理完成",
+			DetailJson:   string(chunkPostDetail),
+		}
+		if err := d.repo.InsertTaskLog(txCtx, completeLog); err != nil {
+			return err
+		}
+		return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageVectorize})
+	}
+	if err = d.repo.Do(ctx, postFn); err != nil {
+		panic(err)
 	}
 
-	d.saveTaskLog(ctx, taskId, documentId, vo.TaskStageChunkPostProcess, vo.TaskEventComplete, vo.LogLevelInfo,
-		0, "", "切块后处理完成", map[string]any{
-			"parentCount": len(parentBlockList),
-			"childCount":  len(chunkList),
+	fn := func(txCtx context.Context) error {
+		// 记录"开始执行向量化"日志
+		vectorDetail, _ := json.Marshal(map[string]any{
+			"chunkCount":          len(chunkList),
+			"embeddingBatchSize":  embeddingBatch,
+			"embeddingBatchCount": (len(chunkList) + embeddingBatch - 1) / embeddingBatch,
+			"vectorStoreType":     vo.VectorStoreTypeMilvus,
+			"parentCount":         len(parentBlockList),
 		})
-
-	// ---------- 7. 向量化阶段（当前为占位实现：仅更新向量状态） ----------
-	task.CurrentStage = vo.TaskStageVectorize
-	if err = d.repo.UpdateTask(ctx, task); err != nil {
-		Warnf("更新任务阶段失败: taskId=%d, err=%v", taskId, err)
+		completeLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageVectorize,
+			EventType:    vo.TaskEventStart,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "开始执行向量化",
+			DetailJson:   string(vectorDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, completeLog)
 	}
 
-	d.saveTaskLog(ctx, taskId, documentId, vo.TaskStageVectorize, vo.TaskEventStart, vo.LogLevelInfo,
-		0, "", "开始执行向量化", map[string]any{
-			"chunkCount":         len(chunkList),
-			"embeddingBatchSize": embeddingBatch,
-			"vectorStoreType":    defaultLogLevel,
-			"parentCount":        len(parentBlockList),
+	fn := func(txCtx context.Context) error {
+		// 记录"向量化完成"日志
+		vectorDetail, _ := json.Marshal(map[string]any{
+			"chunkCount":          len(chunkList),
+			"embeddingBatchSize":  embeddingBatch,
+			"embeddingBatchCount": (len(chunkList) + embeddingBatch - 1) / embeddingBatch,
+			"vectorStoreType":     vo.VectorStoreTypeMilvus,
+			"parentCount":         len(parentBlockList),
 		})
+		completeLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageVectorize,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "向量化完成",
+			DetailJson:   string(vectorDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, completeLog)
+	}
 
 	for _, chunk := range chunkList {
 		chunk.VectorStatus = vo.VectorStatusBuildSuccess
@@ -386,7 +425,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 
 	// ---------- 8. 存储完成/更新方案与文档索引状态 ----------
 	task.CurrentStage = vo.TaskStageStoreComplete
-	if err = d.repo.UpdateTask(ctx, task); err != nil {
+	if err = d.repo.UpdateTaskById(ctx, task); err != nil {
 		Warnf("更新任务阶段失败: taskId=%d, err=%v", taskId, err)
 	}
 
@@ -673,7 +712,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 
 // failTask 标记任务失败
 func (d *AsyncProcessingLogicImpl) failTask(txCtx context.Context, task *entity.DocumentTask, errorMsg string) error {
-	return d.repo.UpdateTask(txCtx, &entity.DocumentTask{
+	return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 		ID:           task.ID,
 		TaskStatus:   vo.TaskStatusFailed,
 		CurrentStage: task.CurrentStage,
