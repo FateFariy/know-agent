@@ -16,7 +16,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
@@ -61,7 +60,7 @@ func NewAsyncProcessingLogic(repo adapter.DocumentRepository, port *adapter.Docu
 //  5. 基于解析结果调用策略服务生成推荐切块方案
 //  6. 把推荐方案和步骤写入数据库，同步更新文档的解析状态/策略状态/统计信息
 //  7. 以成功或失败状态收尾任务，并记录任务日志
-func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) error {
+func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
 	// 加载文档与任务
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
@@ -93,11 +92,9 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 			StartTime:    startTime,
 		}
 		if err = d.repo.UpdateTaskById(txCtx, documentTask); err != nil {
-			Warnf("更新任务失败: taskId=%d, err=%v", taskId, err)
 			return err
 		}
 		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, ParseStatus: vo.ParseStatusParsing}); err != nil {
-			Warnf("更新文档失败: documentId=%d, err=%v", documentId, err)
 			return err
 		}
 		detail, _ := json.Marshal(map[string]any{"objectName": document.ObjectName})
@@ -113,6 +110,9 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		}
 		return d.repo.InsertTaskLog(txCtx, startLog)
 	}
+	if err = d.repo.Do(ctx, fn); err != nil {
+		panic(err)
+	}
 
 	// 下载原始文件并解析
 	fileBytes, err := d.port.DownloadObject(ctx, document.ObjectName)
@@ -120,6 +120,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		panic(err)
 	}
 
+	// todo 待完善
 	parsedText, err := d.parse(ctx, fileBytes, vo.FileTypeName(document.FileType))
 	if err != nil {
 		panic(err)
@@ -135,16 +136,14 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	nodeCandidates := d.buildStructureNodeCandidates(parsedText)
 	_, err = d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, nodeCandidates)
 	if err != nil {
-		// 结构节点失败不阻塞主流程，降级为忽略结构线索
-		Warnf("替换文档结构节点失败: documentId=%d, err=%v", documentId, err)
+		panic(err)
 	}
 	structureNodes, _ := d.structureNode.ListDocumentNodes(ctx, documentId, taskId)
 
 	// 构建文档分析结果并生成策略推荐
 	analysisResult := &vo.DocumentAnalysisResult{
 		ParsedText:          parsedText,
-		CharCount:           len(parsedText),
-		TokenCount:          len(parsedText) / tokenRatio,
+		CharCount:           utf8.RuneCountInString(parsedText),
 		StructureLevel:      vo.StructureLevelLow,
 		ContentQualityLevel: vo.ContentQualityLevelMedium,
 		ParagraphCount:      countParagraphs(parsedText),
@@ -153,33 +152,31 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 
 	planDraft, err := d.strategyLogic.RecommendStrategy(ctx, document, analysisResult)
 	if err != nil {
-		Warnf("策略推荐失败: documentId=%d, err=%v", documentId, err)
-		d.handleParseFailure(ctx, document, task, err.Error())
-		return err
+		panic(err)
 	}
 
 	// 持久化方案和步骤
 	planId, err := d.persistRecommendation(ctx, document, task, planDraft)
 	if err != nil {
-		Warnf("持久化推荐方案失败: documentId=%d, err=%v", documentId, err)
-		d.handleParseFailure(ctx, document, task, err.Error())
-		return err
+		panic(err)
 	}
 
 	// 写回文档统计 + 标记解析成功
-	document.ParseStatus = vo.ParseStatusParseSuccess
-	document.StrategyStatus = vo.StrategyStatusRecommended
-	document.CharCount = analysisResult.CharCount
-	document.TokenCount = analysisResult.TokenCount
-	document.StructureLevel = analysisResult.StructureLevel
-	document.ContentQualityLevel = analysisResult.ContentQualityLevel
-	document.ParseTextPath = parseTextPath
-	document.ParseErrorMsg = ""
-	document.CurrentPlanId = planId
-	document.LastParseTaskId = taskId
-	document.StructureNodeCount = len(structureNodes)
-
-	if err = d.repo.UpdateDocument(ctx, document); err != nil {
+	e := &entity.Document{
+		ID:                  documentId,
+		ParseStatus:         vo.ParseStatusParseSuccess,
+		StrategyStatus:      vo.StrategyStatusRecommended,
+		CharCount:           analysisResult.CharCount,
+		TokenCount:          analysisResult.TokenCount,
+		StructureLevel:      analysisResult.StructureLevel,
+		ContentQualityLevel: analysisResult.ContentQualityLevel,
+		ParseTextPath:       parseTextPath,
+		ParseErrorMsg:       utils.Pointer(""),
+		CurrentPlanId:       planId,
+		LastParseTaskId:     taskId,
+		StructureNodeCount:  len(structureNodes),
+	}
+	if err = d.repo.UpdateDocument(ctx, e); err != nil {
 		Warnf("更新文档信息失败: documentId=%d, err=%v", documentId, err)
 		return err
 	}
@@ -480,14 +477,13 @@ func (d *AsyncProcessingLogicImpl) parse(ctx context.Context, bytes []byte, file
 }
 
 // persistRecommendation 保存策略推荐结果（方案 + 步骤 + 任务日志），返回方案 ID
-func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
-	document *entity.Document, task *entity.DocumentTask,
-	planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
+func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, document *entity.Document,
+	task *entity.DocumentTask, planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
 
 	planId := utils.GetSnowflakeNextID()
 	latestVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
 	if err != nil {
-		latestVersion = 0
+		return 0, err
 	}
 
 	plan := &entity.DocumentStrategyPlan{
@@ -500,13 +496,14 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 		StrategySnapshot: planDraft.StrategySnapshot,
 		RecommendReason:  planDraft.RecommendReason,
 	}
-	if err := d.repo.InsertPlan(ctx, plan); err != nil {
+	if err = d.repo.InsertPlan(ctx, plan); err != nil {
 		return 0, err
 	}
 
 	insertSteps := func(drafts []*vo.DocumentStrategyStepDraft, pipelineType string) {
+		steps := make([]*entity.DocumentStrategyStep, len(drafts))
 		for i, draft := range drafts {
-			step := &entity.DocumentStrategyStep{
+			steps = append(steps, &entity.DocumentStrategyStep{
 				ID:              utils.GetSnowflakeNextID(),
 				PlanId:          planId,
 				DocumentId:      document.ID,
@@ -517,10 +514,10 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 				SourceType:      draft.SourceType,
 				ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
 				RecommendReason: draft.RecommendReason,
-			}
-			if err := d.repo.InsertStep(ctx, step); err != nil {
-				Warnf("插入步骤失败: planId=%d, pipelineType=%s, err=%v", planId, pipelineType, err)
-			}
+			})
+		}
+		if err = d.repo.InsertStepBatch(ctx, steps); err != nil {
+			Warnf("插入步骤失败: planId=%d, pipelineType=%s, err=%v", planId, pipelineType, err)
 		}
 	}
 
@@ -529,8 +526,8 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 
 	// 推进任务阶段到"策略路由"
 	task.CurrentStage = vo.TaskStageStrategyRoute
-	if err := d.repo.UpdateTaskById(ctx, task); err != nil {
-		Warnf("更新任务阶段失败: taskId=%d, err=%v", task.ID, err)
+	if err = d.repo.UpdateTaskById(ctx, task); err != nil {
+		return 0, err
 	}
 
 	return planId, nil
@@ -620,39 +617,37 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 }
 
 // handleParseFailure "解析路由"失败时的收尾流程：标记文档解析失败 + 任务失败 + 失败日志
-func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, document *entity.Document,
-	task *entity.DocumentTask, errorMsg string) {
-
-	document.ParseStatus = vo.ParseStatusParseFailed
-	document.ParseErrorMsg = errorMsg
-	if err := d.repo.UpdateDocument(ctx, document); err != nil {
-		Warnf("更新文档解析失败状态失败: documentId=%d, err=%v", document.ID, err)
+func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
+	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
+	fn := func(txCtx context.Context) error {
+		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: errorMsg}); err != nil {
+			return err
+		}
+		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: vo.TaskStageContentParse}); err != nil {
+			return err
+		}
+		if err := d.failTask(txCtx, task, errorMsg); err != nil {
+			return err
+		}
+		failDetail, _ := json.Marshal(map[string]any{"error": errorMsg})
+		failLog := &entity.DocumentTaskLog{
+			TaskId:       task.ID,
+			DocumentId:   task.DocumentId,
+			StageType:    vo.TaskStageContentParse,
+			EventType:    vo.TaskEventFailed,
+			LogLevel:     vo.LogLevelError,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "文档解析失败",
+			DetailJson:   string(failDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
-
-	task.TaskStatus = vo.TaskStatusFailed
-	task.CurrentStage = vo.TaskStageContentParse
-
-	failDetail, _ := json.Marshal(map[string]any{"error": errorMsg})
-	failLog := &entity.DocumentTaskLog{
-		TaskId:       task.ID,
-		DocumentId:   task.DocumentId,
-		StageType:    vo.TaskStageContentParse,
-		EventType:    vo.TaskEventFailed,
-		LogLevel:     vo.LogLevelError,
-		OperatorType: vo.OperatorTypeSystem,
-		Content:      "任务执行失败",
-		DetailJson:   string(failDetail),
-	}
-	if err := d.repo.UpdateDocumentAggregate(ctx, &aggregate.Document{
-		Document: document,
-		Task:     task,
-		TaskLog:  failLog,
-	}); err != nil {
-		Warnf("保存解析失败日志失败: taskId=%d, err=%v", task.ID, err)
+	if err := d.repo.Do(ctx, fn); err != nil {
+		Warnf("解析失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
 
-// handleIndexBuildFailure "索引构建"失败时的收尾流程
+// handleIndexBuildFailure "索引构建"失败时的收尾流程：标记文档索引失败 + 索引任务失败 + 索引失败日志
 func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, plan *entity.DocumentStrategyPlan, errorMsg string) {
 	logx.Error("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
 	fn := func(txCtx context.Context) error {
@@ -683,7 +678,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
 	if err := d.repo.Do(ctx, fn); err != nil {
-		Warnf("保存索引构建失败日志失败: taskId=%d, err=%v", task.ID, err)
+		Warnf("索引构建失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
 

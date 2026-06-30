@@ -16,7 +16,7 @@ type DocumentStrategyPlan struct {
 	PlanVersion      int                       `gorm:"column:plan_version"`      // 方案版本
 	PlanSource       int                       `gorm:"column:plan_source"`       // 方案来源
 	PlanStatus       int                       `gorm:"column:plan_status"`       // 方案状态
-	StrategyCount    int                       `gorm:"column:strategy_count"`    // 策略数量
+	StrategyCount    int                       `gorm:"column:strategy_count"`    // 策略步骤数量
 	StrategySnapshot string                    `gorm:"column:strategy_snapshot"` // 策略快照
 	RecommendReason  string                    `gorm:"column:recommend_reason"`  // 推荐理由
 	AdjustNote       string                    `gorm:"column:adjust_note"`       // 调整备注
@@ -64,7 +64,7 @@ func (d *DocumentStrategyStep) FillEnumNames() {
 	d.StrategyTypeName = vo.StrategyTypeName(d.StrategyType)
 	d.StrategyRoleName = vo.StrategyRoleName(d.StrategyRole)
 	d.SourceTypeName = vo.StrategySourceTypeName(d.SourceType)
-	d.ExecuteStatusName = vo.ExecuteStatusName(d.ExecuteStatus)
+	d.ExecuteStatusName = vo.StrategyStatusName(d.ExecuteStatus)
 }
 
 type DocumentStrategyPipeline struct {

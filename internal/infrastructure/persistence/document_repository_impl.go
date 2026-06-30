@@ -385,9 +385,8 @@ func (d *DocumentRepositoryImpl) UpdatePlanStatus(ctx context.Context, planId in
 
 // ========== 步骤相关 ==========
 
-func (d *DocumentRepositoryImpl) InsertStep(ctx context.Context, step *entity.DocumentStrategyStep) error {
-	// TODO implement me
-	panic("implement me")
+func (d *DocumentRepositoryImpl) InsertStepBatch(ctx context.Context, steps []*entity.DocumentStrategyStep) error {
+	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentStrategyStepModelList(steps), 100).Error
 }
 
 // DeleteStepByDocumentId  根据文档ID删除步骤

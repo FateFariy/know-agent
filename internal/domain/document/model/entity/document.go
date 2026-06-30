@@ -25,7 +25,7 @@ type Document struct {
 	StructureLevel       int       `gorm:"column:structure_level"`       // 结构化等级
 	ContentQualityLevel  int       `gorm:"column:content_quality_level"` // 内容质量等级
 	ParseTextPath        string    `gorm:"column:parse_text_path"`       // 解析文本路径
-	ParseErrorMsg        string    `gorm:"column:parse_error_msg"`       // 解析错误信息
+	ParseErrorMsg        *string   `gorm:"column:parse_error_msg"`       // 解析错误信息
 	KnowledgeScopeCode   string    `gorm:"column:knowledge_scope_code"`  // 知识范围编码
 	KnowledgeScopeName   string    `gorm:"column:knowledge_scope_name"`  // 知识范围名称
 	BusinessCategory     string    `gorm:"column:business_category"`     // 业务分类

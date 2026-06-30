@@ -243,7 +243,9 @@ func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 		documentDocumentListItem.StrategyStatusName = (*source).StrategyStatusName
 		documentDocumentListItem.IndexStatus = (*source).IndexStatus
 		documentDocumentListItem.IndexStatusName = (*source).IndexStatusName
-		documentDocumentListItem.ParseErrorMsg = (*source).ParseErrorMsg
+		if (*source).ParseErrorMsg != nil {
+			documentDocumentListItem.ParseErrorMsg = *(*source).ParseErrorMsg
+		}
 		documentDocumentListItem.KnowledgeScopeCode = (*source).KnowledgeScopeCode
 		documentDocumentListItem.KnowledgeScopeName = (*source).KnowledgeScopeName
 		documentDocumentListItem.BusinessCategory = (*source).BusinessCategory
@@ -396,6 +398,16 @@ func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.Do
 	}
 	return pModelDocumentStrategyStep
 }
+func ToDocumentStrategyStepModelList(source []*entity1.DocumentStrategyStep) []*model.DocumentStrategyStep {
+	var pModelDocumentStrategyStepList []*model.DocumentStrategyStep
+	if source != nil {
+		pModelDocumentStrategyStepList = make([]*model.DocumentStrategyStep, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentStrategyStepList[i] = ToDocumentStrategyStepModel(source[i])
+		}
+	}
+	return pModelDocumentStrategyStepList
+}
 func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) []*model.DocumentStructureNode {
 	var pModelDocumentStructureNodeList []*model.DocumentStructureNode
 	if source != nil {
@@ -473,7 +485,9 @@ func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPl
 		documentQueryStrategyPlanResp.StrategyStatusName = (*source).StrategyStatusName
 		documentQueryStrategyPlanResp.IndexStatus = (*source).IndexStatus
 		documentQueryStrategyPlanResp.IndexStatusName = (*source).IndexStatusName
-		documentQueryStrategyPlanResp.ParseErrorMsg = (*source).ParseErrorMsg
+		if (*source).ParseErrorMsg != nil {
+			documentQueryStrategyPlanResp.ParseErrorMsg = *(*source).ParseErrorMsg
+		}
 		documentQueryStrategyPlanResp.PlanReady = (*source).PlanReady
 		pDocumentQueryStrategyPlanResp = &documentQueryStrategyPlanResp
 	}
@@ -494,8 +508,12 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 		documentQueryTaskLogsResp.StartTime = TimeToString((*source).StartTime)
 		documentQueryTaskLogsResp.FinishTime = TimeToString((*source).FinishTime)
 		documentQueryTaskLogsResp.CostMillis = (*source).CostMillis
-		documentQueryTaskLogsResp.ErrorCode = (*source).ErrorCode
-		documentQueryTaskLogsResp.ErrorMsg = (*source).ErrorMsg
+		if (*source).ErrorCode != nil {
+			documentQueryTaskLogsResp.ErrorCode = *(*source).ErrorCode
+		}
+		if (*source).ErrorMsg != nil {
+			documentQueryTaskLogsResp.ErrorMsg = *(*source).ErrorMsg
+		}
 		if (*source).Logs != nil {
 			documentQueryTaskLogsResp.Logs = make([]*document.TaskLog, len((*source).Logs))
 			for i := 0; i < len((*source).Logs); i++ {

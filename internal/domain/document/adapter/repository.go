@@ -94,8 +94,8 @@ type DocumentRepository interface {
 
 	// ========== 步骤相关 ==========
 
-	// InsertStep 插入步骤
-	InsertStep(ctx context.Context, step *entity.DocumentStrategyStep) error
+	// InsertStepBatch 批量插入步骤
+	InsertStepBatch(ctx context.Context, steps []*entity.DocumentStrategyStep) error
 
 	// DeleteStepByDocumentId 根据文档ID删除步骤
 	DeleteStepByDocumentId(ctx context.Context, documentId int64) error
