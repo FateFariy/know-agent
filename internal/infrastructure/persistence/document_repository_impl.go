@@ -411,26 +411,24 @@ func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, pla
 	return steps, nil
 }
 
+// UpdateStepExecuteStatus 根据方案/策略ID更新步骤执行状态
 func (d *DocumentRepositoryImpl) UpdateStepExecuteStatus(ctx context.Context, planId int64, status int) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Update("execute_status", status).Error
 }
 
 // ========== 块相关 ==========
 
 func (d *DocumentRepositoryImpl) InsertChunk(ctx context.Context, chunk *entity.DocumentChunk) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Create(convert.ToDocumentChunkModel(chunk)).Error
 }
 
 func (d *DocumentRepositoryImpl) InsertChunkBatch(ctx context.Context, chunks []*entity.DocumentChunk) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentChunkModelList(chunks), 100).Error
 }
 
-func (d *DocumentRepositoryImpl) UpdateChunk(ctx context.Context, chunk *entity.DocumentChunk) error {
-	// TODO implement me
-	panic("implement me")
+// UpdateChunkByTaskId 根据任务ID更新块
+func (d *DocumentRepositoryImpl) UpdateChunkByTaskId(ctx context.Context, chunk *entity.DocumentChunk) error {
+	return d.dbWithContext(ctx).Where("task_id = ?", chunk.TaskId).Updates(convert.ToDocumentChunkModel(chunk)).Error
 }
 
 // DeleteChunkByDocumentId 根据文档ID删除块
@@ -480,13 +478,11 @@ func (d *DocumentRepositoryImpl) SelectChunkListByParentBlockId(ctx context.Cont
 // ========== 父块相关 ==========
 
 func (d *DocumentRepositoryImpl) InsertParentBlock(ctx context.Context, block *entity.DocumentParentBlock) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Create(convert.ToDocumentParentBlockModel(block)).Error
 }
 
 func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentBlock) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentParentBlockModelList(blocks), 100).Error
 }
 
 // DeleteParentBlockByDocumentId 根据文档ID删除父块

@@ -215,6 +215,16 @@ func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
 	}
 	return pModelDocumentChunk
 }
+func ToDocumentChunkModelList(source []*entity1.DocumentChunk) []*model.DocumentChunk {
+	var pModelDocumentChunkList []*model.DocumentChunk
+	if source != nil {
+		pModelDocumentChunkList = make([]*model.DocumentChunk, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentChunkList[i] = ToDocumentChunkModel(source[i])
+		}
+	}
+	return pModelDocumentChunkList
+}
 func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
@@ -295,6 +305,41 @@ func ToDocumentModel(source *entity1.Document) *model.Document {
 		pModelDocument = &modelDocument
 	}
 	return pModelDocument
+}
+func ToDocumentParentBlockModel(source *entity1.DocumentParentBlock) *model.DocumentParentBlock {
+	var pModelDocumentParentBlock *model.DocumentParentBlock
+	if source != nil {
+		var modelDocumentParentBlock model.DocumentParentBlock
+		modelDocumentParentBlock.ID = (*source).ID
+		modelDocumentParentBlock.DocumentId = (*source).DocumentId
+		modelDocumentParentBlock.TaskId = (*source).TaskId
+		modelDocumentParentBlock.PlanId = (*source).PlanId
+		modelDocumentParentBlock.ParentNo = (*source).ParentNo
+		modelDocumentParentBlock.SourceType = (*source).SourceType
+		modelDocumentParentBlock.SectionPath = (*source).SectionPath
+		modelDocumentParentBlock.StructureNodeId = (*source).StructureNodeId
+		modelDocumentParentBlock.StructureNodeType = (*source).StructureNodeType
+		modelDocumentParentBlock.CanonicalPath = (*source).CanonicalPath
+		modelDocumentParentBlock.ItemIndex = (*source).ItemIndex
+		modelDocumentParentBlock.ParentText = (*source).ParentText
+		modelDocumentParentBlock.CharCount = (*source).CharCount
+		modelDocumentParentBlock.TokenCount = (*source).TokenCount
+		modelDocumentParentBlock.ChildCount = (*source).ChildCount
+		modelDocumentParentBlock.StartChunkNo = (*source).StartChunkNo
+		modelDocumentParentBlock.EndChunkNo = (*source).EndChunkNo
+		pModelDocumentParentBlock = &modelDocumentParentBlock
+	}
+	return pModelDocumentParentBlock
+}
+func ToDocumentParentBlockModelList(source []*entity1.DocumentParentBlock) []*model.DocumentParentBlock {
+	var pModelDocumentParentBlockList []*model.DocumentParentBlock
+	if source != nil {
+		pModelDocumentParentBlockList = make([]*model.DocumentParentBlock, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentParentBlockList[i] = ToDocumentParentBlockModel(source[i])
+		}
+	}
+	return pModelDocumentParentBlockList
 }
 func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.DocumentStrategyPlan {
 	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan

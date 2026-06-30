@@ -335,7 +335,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 
 	// 批量落库
 	for _, parentBlock := range parentBlockList {
-		if err = d.repo.InsertParentBlock(ctx, parentBlock); err != nil {
+		if err = d.repo.InsertParentBlocks(ctx, parentBlock); err != nil {
 			Warnf("插入父块失败: documentId=%d, err=%v", documentId, err)
 		}
 	}
