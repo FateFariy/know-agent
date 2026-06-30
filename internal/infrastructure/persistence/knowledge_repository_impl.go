@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cloudwego/eino/components/retriever"
-	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
@@ -15,15 +14,15 @@ import (
 )
 
 type KnowledgeRepositoryImpl struct {
-	db        *gorm.DB
 	retriever *retriever.Retriever
+	*transactionManager
 }
 
 var _ adapter.KnowledgeRepository = (*KnowledgeRepositoryImpl)(nil)
 
 func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl {
 	return &KnowledgeRepositoryImpl{
-		db: svcCtx.Db,
+		transactionManager: &transactionManager{db: svcCtx.Db},
 	}
 }
 
@@ -35,7 +34,7 @@ func (k *KnowledgeRepositoryImpl) SelectAllDocuments(ctx context.Context) ([]*vo
 // SelectDocumentsByIDs 根据ID列表查询文档
 func (k *KnowledgeRepositoryImpl) SelectDocumentsByIDs(ctx context.Context, documentIDs []int64) ([]*vo.KnowledgeDocument, error) {
 	var documents []*vo.KnowledgeDocument
-	query := k.db.WithContext(ctx).Model(&model.Document{})
+	query := k.dbWithContext(ctx).Model(&model.Document{})
 	if len(documentIDs) > 0 {
 		query = query.Where("id in ?", documentIDs)
 	}
@@ -61,7 +60,7 @@ func (k *KnowledgeRepositoryImpl) SelectParentBlocks(ctx context.Context, parent
 		return nil, nil
 	}
 	var parentBlocks []*entity.DocumentParentBlock
-	if err := k.db.WithContext(ctx).Model(&model.DocumentParentBlock{}).
+	if err := k.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).
 		Where("id in ?", parentBlockIDs).
 		Order("parent_no ASC").
 		Find(&parentBlocks).Error; err != nil {

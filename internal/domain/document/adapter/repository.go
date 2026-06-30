@@ -9,6 +9,9 @@ import (
 
 // DocumentRepository 文档数据访问接口
 type DocumentRepository interface {
+	// Do 运行一个事务
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
+
 	// ========== 文档聚合根相关 ==========
 
 	// InsertDocumentAggregate 插入文档聚合根

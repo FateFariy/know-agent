@@ -29,20 +29,20 @@ const (
 )
 
 type DocumentRepositoryImpl struct {
-	db      *gorm.DB
 	rdb     *redis.Client
 	vdb     adapter.VectorDB
 	storage adapter.Storage
+	*transactionManager
 }
 
 var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
 func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorDB) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
-		db:      svcCtx.Db,
-		rdb:     svcCtx.Rdb,
-		storage: storage,
-		vdb:     vdb,
+		transactionManager: &transactionManager{defaultDB: svcCtx.Db},
+		rdb:                svcCtx.Rdb,
+		storage:            storage,
+		vdb:                vdb,
 	}
 }
 
@@ -50,7 +50,7 @@ func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, 
 
 // InsertDocumentAggregate 插入文档聚合根
 func (d *DocumentRepositoryImpl) InsertDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(convert.ToDocumentModel(agg.Document)).Error; err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (d *DocumentRepositoryImpl) InsertDocumentAggregate(ctx context.Context, ag
 
 // UpdateDocumentAggregate 更新文档聚合根
 func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, aggregate *aggregate.Document) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Updates(convert.ToDocumentModel(aggregate.Document)).Error; err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, ag
 
 // InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
 func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Updates(convert.ToDocumentModel(agg.Document)).Error; err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Con
 // SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
 // 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志
 func (d *DocumentRepositoryImpl) SaveConfirmStrategyAggregate(ctx context.Context, agg *aggregate.ConfirmStrategy) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 更新文档状态（CurrentPlanId和StrategyStatus）
 		if err := tx.Model(&model.Document{}).Where("id = ?", agg.Document.ID).
 			Updates(map[string]any{
@@ -180,7 +180,7 @@ func (d *DocumentRepositoryImpl) SaveConfirmStrategyAggregate(ctx context.Contex
 // DeleteDocumentRelatedDataById 删除文档关联数据
 func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error) {
 	var documentName string
-	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		document, err := d.SelectDocumentById(ctx, documentId)
 		if err != nil {
 			return err
@@ -240,7 +240,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 // SelectDocumentPage 获取文档分页列表
 func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
 	var documents []*entity.Document
-	query := d.db.WithContext(ctx).Model(&model.Document{}).Scopes(utils.Paginate(pageNo, pageSize))
+	query := d.dbWithContext(ctx).Model(&model.Document{}).Scopes(utils.Paginate(pageNo, pageSize))
 	if keyword != "" {
 		query = query.Where("document_name LIKE %?% or original_file_name LIKE %?%", keyword, keyword)
 	}
@@ -251,7 +251,7 @@ func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo,
 // SelectDocumentById 获取文档
 func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documentId int64) (*entity.Document, error) {
 	document := &entity.Document{ID: documentId}
-	if err := d.db.WithContext(ctx).Model(&model.Document{}).First(document).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.Document{}).First(document).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrDocumentNotFound.Format(documentId)
 		}
@@ -267,7 +267,7 @@ func (d *DocumentRepositoryImpl) UpdateDocument(ctx context.Context, document *e
 
 // DeleteDocumentById  根据ID删除文档
 func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("id = ?", documentId).Delete(&model.Document{}).Error
+	return d.dbWithContext(ctx).Where("id = ?", documentId).Delete(&model.Document{}).Error
 }
 
 // ========== 任务相关 ==========
@@ -285,13 +285,13 @@ func (d *DocumentRepositoryImpl) UpdateTask(ctx context.Context, task *entity.Do
 
 // DeleteTaskByDocumentId  根据文档ID删除任务
 func (d *DocumentRepositoryImpl) DeleteTaskByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTask{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTask{}).Error
 }
 
 // SelectTaskById 根据任务ID获取任务
 func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error) {
 	task := &entity.DocumentTask{ID: taskId}
-	if err := d.db.WithContext(ctx).Model(&model.DocumentTask{}).First(task).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.DocumentTask{}).First(task).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrTaskNotFound.Format(taskId)
 		}
@@ -303,7 +303,7 @@ func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int6
 // SelectLatestTask 根据文档ID获取最新任务
 func (d *DocumentRepositoryImpl) SelectLatestTask(ctx context.Context, documentId int64, taskTypes ...int) (*entity.DocumentTask, error) {
 	task := &entity.DocumentTask{}
-	query := d.db.WithContext(ctx).Model(&model.DocumentTask{}).Where("document_id = ?", documentId).Order("id DESC")
+	query := d.dbWithContext(ctx).Model(&model.DocumentTask{}).Where("document_id = ?", documentId).Order("id DESC")
 	if len(taskTypes) > 0 {
 		query = query.Where("task_type IN ?", taskTypes)
 	}
@@ -316,7 +316,7 @@ func (d *DocumentRepositoryImpl) SelectLatestTask(ctx context.Context, documentI
 // SelectTaskListByDocumentIds 获取任务列表
 func (d *DocumentRepositoryImpl) SelectTaskListByDocumentIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentTask, error) {
 	var tasks []*entity.DocumentTask
-	res := d.db.WithContext(ctx).Model(&model.DocumentTask{}).Where("document_id IN ?", documentIds).Order("id DESC").Find(&tasks)
+	res := d.dbWithContext(ctx).Model(&model.DocumentTask{}).Where("document_id IN ?", documentIds).Order("id DESC").Find(&tasks)
 	return tasks, res.Error
 }
 
@@ -324,7 +324,7 @@ func (d *DocumentRepositoryImpl) SelectTaskListByDocumentIds(ctx context.Context
 func (d *DocumentRepositoryImpl) CountActiveTask(ctx context.Context, documentId int64, taskType int, taskStatus ...int) (int64, error) {
 	var count int64
 	var err error
-	query := d.db.WithContext(ctx).Model(&model.DocumentTask{}).Where("document_id = ?", documentId)
+	query := d.dbWithContext(ctx).Model(&model.DocumentTask{}).Where("document_id = ?", documentId)
 	if taskType != 0 {
 		query.Where("task_type = ?", taskType)
 	}
@@ -343,14 +343,14 @@ func (d *DocumentRepositoryImpl) InsertTaskLog(ctx context.Context, log *entity.
 
 // DeleteTaskLogByDocumentId  根据文档ID删除任务日志
 func (d *DocumentRepositoryImpl) DeleteTaskLogByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTaskLog{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentTaskLog{}).Error
 }
 
 // SelectTaskLogPage 根据任务ID查询任务日志分页列表
 func (d *DocumentRepositoryImpl) SelectTaskLogPage(ctx context.Context, taskId int64, pageNo, pageSize int) ([]*entity.DocumentTaskLog, int64, error) {
 	var logs []*entity.DocumentTaskLog
 	var total int64
-	query := d.db.WithContext(ctx).Model(&model.DocumentTaskLog{}).Where("task_id = ?", taskId)
+	query := d.dbWithContext(ctx).Model(&model.DocumentTaskLog{}).Where("task_id = ?", taskId)
 	if err := query.Scopes(utils.Paginate(pageNo, pageSize)).Order("create_time ASC, id ASC").Find(&logs).Error; err != nil {
 		return nil, 0, err
 	}
@@ -374,13 +374,13 @@ func (d *DocumentRepositoryImpl) UpdatePlan(ctx context.Context, plan *entity.Do
 
 // DeletePlanByDocumentId  根据文档ID删除方案/策略
 func (d *DocumentRepositoryImpl) DeletePlanByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyPlan{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyPlan{}).Error
 }
 
 // SelectPlanById 根据方案/策略ID获取方案/策略
 func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int64) (*entity.DocumentStrategyPlan, error) {
 	plan := &entity.DocumentStrategyPlan{ID: planId}
-	if err := d.db.WithContext(ctx).Model(&model.DocumentStrategyPlan{}).First(plan).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.DocumentStrategyPlan{}).First(plan).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrStrategyPlanNotFound.Format(planId)
 		}
@@ -392,7 +392,7 @@ func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int6
 // SelectLatestPlanVersion 根据文档ID获取最新方案/策略版本
 func (d *DocumentRepositoryImpl) SelectLatestPlanVersion(ctx context.Context, documentId int64) (int, error) {
 	plan := &model.DocumentStrategyPlan{DocumentId: documentId}
-	err := d.db.WithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error
+	err := d.dbWithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error
 	return plan.PlanVersion, err
 }
 
@@ -410,13 +410,13 @@ func (d *DocumentRepositoryImpl) InsertStep(ctx context.Context, step *entity.Do
 
 // DeleteStepByDocumentId  根据文档ID删除步骤
 func (d *DocumentRepositoryImpl) DeleteStepByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyStep{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStrategyStep{}).Error
 }
 
 // SelectStepListByPlanId  根据方案/策略ID查询步骤列表
 func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error) {
 	var steps []*entity.DocumentStrategyStep
-	if err := d.db.WithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps).Error; err != nil {
 		return nil, err
 	}
 	slices.SortFunc(steps, func(a, b *entity.DocumentStrategyStep) int {
@@ -454,14 +454,14 @@ func (d *DocumentRepositoryImpl) UpdateChunk(ctx context.Context, chunk *entity.
 
 // DeleteChunkByDocumentId 根据文档ID删除块
 func (d *DocumentRepositoryImpl) DeleteChunkByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentChunk{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentChunk{}).Error
 }
 
 // SelectChunkPage 根据文档ID查询块分页列表
 func (d *DocumentRepositoryImpl) SelectChunkPage(ctx context.Context, documentId, taskId int64, pageNo, pageSize int) ([]*entity.DocumentChunk, int64, error) {
 	var chunks []*entity.DocumentChunk
 	var total int64
-	query := d.db.WithContext(ctx).Model(&model.DocumentChunk{}).Where("document_id = ? AND task_id = ?", documentId, taskId)
+	query := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).Where("document_id = ? AND task_id = ?", documentId, taskId)
 	if err := query.Scopes(utils.Paginate(pageNo, pageSize)).Order("id ASC").Find(&chunks).Error; err != nil {
 		return nil, 0, err
 	}
@@ -474,7 +474,7 @@ func (d *DocumentRepositoryImpl) SelectChunkPage(ctx context.Context, documentId
 // SelectChunkById 根据块ID查询块详情
 func (d *DocumentRepositoryImpl) SelectChunkById(ctx context.Context, chunkId, documentId, taskId int64) (*entity.DocumentChunk, error) {
 	chunk := &entity.DocumentChunk{}
-	if err := d.db.WithContext(ctx).Model(&model.DocumentChunk{}).
+	if err := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).
 		Where("id = ? AND document_id = ? AND task_id = ?", chunkId, documentId, taskId).
 		First(chunk).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -488,7 +488,7 @@ func (d *DocumentRepositoryImpl) SelectChunkById(ctx context.Context, chunkId, d
 // SelectChunkListByParentBlockId 根据父块ID查询块列表
 func (d *DocumentRepositoryImpl) SelectChunkListByParentBlockId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error) {
 	var chunks []*entity.DocumentChunk
-	if err := d.db.WithContext(ctx).Model(&model.DocumentChunk{}).
+	if err := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).
 		Where("document_id = ? AND task_id = ? AND parent_block_id = ?", documentId, taskId, parentBlockId).
 		Order("chunk_no ASC").Find(&chunks).Error; err != nil {
 		return nil, err
@@ -510,7 +510,7 @@ func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blo
 
 // DeleteParentBlockByDocumentId 根据文档ID删除父块
 func (d *DocumentRepositoryImpl) DeleteParentBlockByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentBlock{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentBlock{}).Error
 }
 
 // SelectParentBlockListByIds 根据父块ID列表查询父块列表
@@ -519,7 +519,7 @@ func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context,
 		return nil, nil
 	}
 	var blocks []*entity.DocumentParentBlock
-	if err := d.db.WithContext(ctx).Model(&model.DocumentParentBlock{}).Where("id IN ?", ids).Find(&blocks).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).Where("id IN ?", ids).Find(&blocks).Error; err != nil {
 		return nil, err
 	}
 	return blocks, nil
@@ -528,7 +528,7 @@ func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context,
 // SelectParentBlockById 根据父块ID查询父块详情
 func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentBlock, error) {
 	parentBlock := &entity.DocumentParentBlock{}
-	if err := d.db.WithContext(ctx).Model(&model.DocumentParentBlock{}).Where("id = ? AND document_id = ? AND task_id = ?", blockId, documentId, taskId).First(parentBlock).Error; err != nil {
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).Where("id = ? AND document_id = ? AND task_id = ?", blockId, documentId, taskId).First(parentBlock).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.NewBizError(errorx.ErrDocumentNotFound.Code, "父块详情不存在")
 		}
@@ -547,11 +547,11 @@ func (d *DocumentRepositoryImpl) InsertStructureNode(ctx context.Context, node *
 // InsertStructureNodeBatch 批量插入结构节点
 func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error {
 	modelList := convert.ToDocumentStructureNodeModelList(nodes)
-	return d.db.WithContext(ctx).Create(&modelList).Error
+	return d.dbWithContext(ctx).Create(&modelList).Error
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStructureNode{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStructureNode{}).Error
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, documentId int64, nodeIds []int64) error {
@@ -561,7 +561,7 @@ func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, d
 
 func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentStructureNode, error) {
 	var nodes []*entity.DocumentStructureNode
-	err := d.db.WithContext(ctx).Model(&model.DocumentStructureNode{}).
+	err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
 		Where("document_id = ?", documentId).Order("id ASC").Find(&nodes).Error
 	return nodes, err
 }
@@ -576,12 +576,12 @@ func (d *DocumentRepositoryImpl) InsertProfile(ctx context.Context, profile *ent
 
 // DeleteProfileByDocumentId 根据文档ID删除文档属性
 func (d *DocumentRepositoryImpl) DeleteProfileByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentProfile{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentProfile{}).Error
 }
 
 // ========== 话题关联相关 ==========
 
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 func (d *DocumentRepositoryImpl) DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error {
-	return d.db.WithContext(ctx).Where("document_id = ?", documentId).Delete(&model.TopicDocumentRelation{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.TopicDocumentRelation{}).Error
 }
