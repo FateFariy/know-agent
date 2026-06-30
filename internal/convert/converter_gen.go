@@ -189,6 +189,32 @@ func ToDocumentChunkItemList(source []*entity1.DocumentChunk) []*document.Docume
 	}
 	return pDocumentDocumentChunkItemList
 }
+func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
+	var pModelDocumentChunk *model.DocumentChunk
+	if source != nil {
+		var modelDocumentChunk model.DocumentChunk
+		modelDocumentChunk.ID = (*source).ID
+		modelDocumentChunk.DocumentId = (*source).DocumentId
+		modelDocumentChunk.TaskId = (*source).TaskId
+		modelDocumentChunk.PlanId = (*source).PlanId
+		modelDocumentChunk.ParentBlockId = (*source).ParentBlockId
+		modelDocumentChunk.ChunkNo = (*source).ChunkNo
+		modelDocumentChunk.SourceType = (*source).SourceType
+		modelDocumentChunk.SectionPath = (*source).SectionPath
+		modelDocumentChunk.StructureNodeId = (*source).StructureNodeId
+		modelDocumentChunk.StructureNodeType = (*source).StructureNodeType
+		modelDocumentChunk.CanonicalPath = (*source).CanonicalPath
+		modelDocumentChunk.ItemIndex = (*source).ItemIndex
+		modelDocumentChunk.ChunkText = (*source).ChunkText
+		modelDocumentChunk.CharCount = (*source).CharCount
+		modelDocumentChunk.TokenCount = (*source).TokenCount
+		modelDocumentChunk.VectorStatus = (*source).VectorStatus
+		modelDocumentChunk.VectorStoreType = (*source).VectorStoreType
+		modelDocumentChunk.VectorId = (*source).VectorId
+		pModelDocumentChunk = &modelDocumentChunk
+	}
+	return pModelDocumentChunk
+}
 func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {

@@ -48,6 +48,7 @@ type DocumentConverter interface {
 	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan
 	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model.DocumentStrategyStep
 	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model.DocumentStructureNode
+	ToDocumentChunkModel(src *den.DocumentChunk) *model.DocumentChunk
 }
 
 // goverter:converter

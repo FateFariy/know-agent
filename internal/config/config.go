@@ -13,6 +13,7 @@ type Config struct {
 	MQ               MQConf
 	StructureParsing StructureParsingConf
 	Embedding        EmbeddingConf
+	Chunk            ChunkConf
 	Milvus           MilvusConf
 	Chat             ChatConf
 	ChatModel        map[string]*LLMConf
@@ -67,6 +68,18 @@ type StructureParsingConf struct {
 	MaxPlainHeadingChars       int     `json:",optional,default=32"`   // 纯文本标题判定的最大字符数阈值，默认 32
 	AmbiguityConfidenceFloor   float64 `json:",optional,default=0.45"` // 歧义置信度下限，低于该值判定为明确非标题，默认 0.45
 	AmbiguityConfidenceCeil    float64 `json:",optional,default=0.80"` // 歧义置信度上限，高于该值判定为明确标题，默认 0.80
+}
+
+// ChunkConf 文档分块配置
+type ChunkConf struct {
+	RecursiveMaxChars           int     `json:",optional,default=800"`   // 递归分块的最大字符数，默认800
+	RecursiveOverlapChars       int     `json:",optional,default=120"`   // 递归分块的重叠字符数，默认120
+	SemanticMaxChars            int     `json:",optional,default=700"`   // 语义分块的最大字符数，默认700
+	SemanticMinChars            int     `json:",optional,default=240"`   // 语义分块的最小字符数，默认240
+	SemanticSimilarityThreshold float64 `json:",optional,default=0.18"`  // 语义相似度阈值，默认0.18
+	LlmEnabled                  bool    `json:",optional,default=false"` // 是否启用大模型分块，默认false
+	LlmMaxChars                 int     `json:",optional,default=3500"`  // 大模型分块的最大字符数，默认3500
+	RecommendLlmWhenLowQuality  bool    `json:",optional,default=true"`  // 低质量时是否推荐使用大模型分块，默认true
 }
 
 // EmbeddingConf 嵌入配置

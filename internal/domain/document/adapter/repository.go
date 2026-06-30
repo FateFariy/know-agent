@@ -114,8 +114,8 @@ type DocumentRepository interface {
 	// InsertChunkBatch 批量插入块
 	InsertChunkBatch(ctx context.Context, chunks []*entity.DocumentChunk) error
 
-	// UpdateChunk 更新块
-	UpdateChunk(ctx context.Context, chunk *entity.DocumentChunk) error
+	// UpdateChunkByTaskId 根据任务ID更新块
+	UpdateChunkByTaskId(ctx context.Context, chunk *entity.DocumentChunk) error
 
 	// DeleteChunkByDocumentId 根据文档ID删除块
 	DeleteChunkByDocumentId(ctx context.Context, documentId int64) error
