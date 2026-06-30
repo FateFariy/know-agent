@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -22,8 +23,11 @@ import (
 )
 
 const (
-	embeddingBatch  = 100 // 默认向量化批大小
-	defaultLogLevel = "PG_VECTOR"
+	embeddingBatch = 100 // 默认向量化批大小
+)
+
+var (
+	englishPattern = regexp.MustCompile(`[A-Za-z]`) // 匹配英文字母
 )
 
 // AsyncProcessingLogicImpl 异步处理业务逻辑实现
@@ -628,7 +632,6 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 					CharCount:         utf8.RuneCountInString(child.Text),
 					TokenCount:        d.estimateTokenCount(child.Text),
 					VectorStatus:      vo.VectorStatusWaitVector,
-					VectorStoreType:   vo.VectorStoreTypeMilvus,
 				})
 				parentBlock.ChildCount++
 			}
@@ -754,24 +757,19 @@ func (d *AsyncProcessingLogicImpl) cleanupParentCandidates(candidates []*vo.Pare
 
 // estimateTokenCount 估算文本 Token 数量
 func (d *AsyncProcessingLogicImpl) estimateTokenCount(text string) int {
-	var chineseCount int
-	var englishCount int
+	englishCount, chineseCount := 0, 0
+
+	// 统计英文单词数量
+	for _, word := range strings.Fields(text) {
+		if englishPattern.MatchString(word) {
+			englishCount++
+		}
+	}
 
 	// 统计中文字符数量
 	for _, r := range text {
 		if unicode.Is(unicode.Han, r) {
 			chineseCount++
-		}
-	}
-
-	// 统计英文单词数量：按空白分割，单词包含至少一个英文字母则计数+1
-	words := strings.Fields(text)
-	for _, word := range words {
-		for _, r := range word {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-				englishCount++
-				break
-			}
 		}
 	}
 

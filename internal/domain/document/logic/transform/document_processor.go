@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -13,16 +15,12 @@ import (
 )
 
 var (
-	englishPattern = regexp.MustCompile(`[A-Za-z]`)
-	headingPattern = regexp.MustCompile(`^#{1,6}\s+.+`)
-	// 匹配制表符、垂直制表符、换页符等空白字符（但不包括空格、换行）
-	controlSpaceRegex = regexp.MustCompile(`[\t\x0B\f]+`)
-	// 匹配连续3个或更多换行符
-	multiNewlineRegex = regexp.MustCompile(`\n{3,}`)
-	// 匹配连续2个或更多空格
-	multiSpaceRegex = regexp.MustCompile(` {2,}`)
-
-	paragraphSplitRegex = regexp.MustCompile(`\n\s*\n`)
+	englishPattern      = regexp.MustCompile(`[A-Za-z]`)     // 匹配英文字母
+	headingPattern      = regexp.MustCompile(`^#{1,6}\s+.+`) // 匹配标题行
+	controlSpaceRegex   = regexp.MustCompile(`[\t\x0B\f]+`)  // 匹配制表符、垂直制表符、换页符等空白字符（但不包括空格、换行）
+	multiNewlineRegex   = regexp.MustCompile(`\n{3,}`)       // 匹配连续3个或更多换行符
+	multiSpaceRegex     = regexp.MustCompile(` {2,}`)        // 匹配连续2个或更多空格
+	paragraphSplitRegex = regexp.MustCompile(`\n\s*\n`)      // 匹配多个换行符
 )
 
 type DocumentProcessor struct {
@@ -49,6 +47,13 @@ func NewDocumentProcessor(registry parse.Registry) *DocumentProcessor {
 // Transform 处理文档并返回分析结果
 // 包括文本提取、清理、结构分析和质量评估，用于后续切块决策
 func (p *DocumentProcessor) Transform(ctx context.Context, parsedText string, opts ...TransformerOption) (any, error) {
+	opt := GetTransformerImplSpecificOptions(&processorOption{}, opts...)
+	// 解析文本
+	parser := p.registry.Get(opt.fileType)
+	parsedText, err := parser.Parse(ctx, []byte(parsedText))
+	if err != nil {
+		return nil, err
+	}
 	// 清理文本（去除多余空格、格式化等）
 	cleanedText := p.cleanupText(parsedText)
 
@@ -142,22 +147,26 @@ func (p *DocumentProcessor) extractParagraphs(text string) []string {
 
 // estimateTokenCount 估计token数量
 func (p *DocumentProcessor) estimateTokenCount(text string) int {
-	englishWordCount, chineseCharCount := 0, 0
+	englishCount, chineseCount := 0, 0
 
+	// 统计英文单词数量
 	for _, word := range strings.Fields(text) {
 		if englishPattern.MatchString(word) {
-			englishWordCount++
+			englishCount++
 		}
 	}
 
+	// 统计中文字符数量
 	for _, r := range text {
-		if r >= '\u4e00' && r <= '\u9fa5' {
-			chineseCharCount++
+		if unicode.Is(unicode.Han, r) {
+			chineseCount++
 		}
 	}
 
-	nonChineseLength := len(text) - chineseCharCount
-	return englishWordCount + chineseCharCount + max(1, nonChineseLength/4)
+	// 非中英文字符按 4 字符折算 1 Token
+	baseToken := max(1, (utf8.RuneCountInString(text)-chineseCount-englishCount)/4)
+
+	return chineseCount + englishCount + baseToken
 }
 
 // evaluateStructureLevel 评估文档结构等级
@@ -176,7 +185,7 @@ func (p *DocumentProcessor) evaluateStructureLevel(headingCount, paragraphCount 
 
 // evaluateContentQuality 评估文档内容质量等级
 func (p *DocumentProcessor) evaluateContentQuality(text string) int {
-	charCount := len(text)
+	charCount := utf8.RuneCountInString(text)
 	if strutil.IsBlank(text) || charCount < 20 {
 		return vo.ContentQualityLevelLow
 	}

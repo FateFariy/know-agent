@@ -2,6 +2,7 @@ package parse
 
 import (
 	"context"
+	"strings"
 )
 
 type Parser interface {
@@ -33,7 +34,7 @@ func (r *Registry) Register(parser Parser) {
 }
 
 func (r *Registry) Get(fileType string) Parser {
-	parser, ok := r.parsers[fileType]
+	parser, ok := r.parsers[strings.ToLower(fileType)]
 	if !ok {
 		return r.fallbackParser
 	}

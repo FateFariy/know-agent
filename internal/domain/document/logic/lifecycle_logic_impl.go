@@ -33,7 +33,7 @@ type LifecycleLogicImpl struct {
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewDocumentLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
 		port:       port,
 		repo:       repo,
