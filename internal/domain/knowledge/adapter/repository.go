@@ -9,6 +9,9 @@ import (
 )
 
 type KnowledgeRepository interface {
+	// Do 运行一个事务
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
+
 	// SelectAllDocuments 查询所有文档
 	SelectAllDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 

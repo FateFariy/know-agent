@@ -11,13 +11,15 @@ type DocumentPort struct {
 	Storage
 	MessageProducer
 	VectorDB
+	KeywordSearch
 }
 
-func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorDB) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorDB, keywordSearch KeywordSearch) *DocumentPort {
 	return &DocumentPort{
 		Storage:         storage,
 		MessageProducer: messageProducer,
 		VectorDB:        vectorDB,
+		KeywordSearch:   keywordSearch,
 	}
 }
 
@@ -51,6 +53,12 @@ type VectorDB interface {
 }
 
 type KeywordSearch interface {
+	// IndexChunks 索引块
+	IndexChunks(ctx context.Context, chunks []*entity.DocumentChunk) error
+
 	// SearchByKeywords 关键字搜索
 	SearchByKeywords(ctx context.Context, keywords []string, limit int) ([]*entity.DocumentChunk, error)
+
+	// DeleteIndexByDocumentId 根据文档ID删除索引
+	DeleteIndexByDocumentId(ctx context.Context, documentId int64) error
 }

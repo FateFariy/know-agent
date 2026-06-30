@@ -210,7 +210,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 
 // HandleIndexBuild 执行索引构建主流程：切块流水线 → 父子块落库 → 向量化 → 状态收尾
 func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) (err error) {
-	// 步骤1：加载任务相关实体，失败直接返回，交由调度层观察
+	// 加载任务相关实体，失败直接返回，交由调度层观察
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
 		Warnf("查询索引任务失败, taskId=%d, err=%v", taskId, err)
@@ -242,7 +242,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		}
 	}()
 
-	// 阶段2：事务性推进任务状态到"切块执行中"
+	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
 		// 文档状态
 		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuilding}); err != nil {
@@ -279,19 +279,19 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		panic(err)
 	}
 
-	// 阶段3：下载解析文本（已在解析路由阶段上传）
+	// 下载解析文本（已在解析路由阶段上传）
 	parsedText, err := d.port.DownloadText(ctx, document.ParseTextPath)
 	if err != nil {
 		panic(err)
 	}
 
-	// 阶段4：按步骤执行切块流水线，产出父-子块候选
+	// 按步骤执行切块流水线，产出父-子块候选
 	parentCandidates, err := d.strategyLogic.BuildParentBlocks(ctx, document, pipelineSteps, parsedText)
 	if err != nil {
 		panic(err)
 	}
 
-	// 阶段5：事务性标记切块完成 + 推进到切块后处理阶段
+	// 事务性标记切块完成 + 推进到切块后处理阶段
 	markChunkCompleteTx := func(txCtx context.Context) error {
 		// 策略步骤状态 -> 执行成功
 		if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
@@ -321,11 +321,11 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		panic(err)
 	}
 
-	// 阶段6：清理候选并构造持久化实体（父块 + 子块）
+	// 清理候选并构造持久化实体（父块 + 子块）
 	finalCandidates := d.cleanupParentCandidates(parentCandidates)
 	parentBlocks, childChunks := d.buildParentChildEntities(documentId, taskId, planId, finalCandidates)
 
-	// 阶段7：事务性批量落库 + 推进到向量化阶段
+	// 事务性批量落库 + 推进到向量化阶段
 	persistBlocksTx := func(txCtx context.Context) error {
 		// 批量写入父块
 		if err = d.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
@@ -362,7 +362,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		panic(err)
 	}
 
-	// 阶段8：记录"开始执行向量化"日志（单独事务，便于追踪状态）
+	// 记录"开始执行向量化"日志（单独事务，便于追踪状态）
 	vectorSize := len(childChunks)
 	vectorBatch := (vectorSize + embeddingBatch - 1) / embeddingBatch
 
@@ -390,17 +390,22 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		panic(err)
 	}
 
-	// 阶段9：批量向量化（外部向量化服务），随后回写向量状态
+	// 批量向量化
 	if err = d.port.Vectorize(ctx, childChunks); err != nil {
 		panic(err)
 	}
+	// 批量关键词索引
+	if err = d.port.IndexChunks(ctx, childChunks); err != nil {
+		panic(err)
+	}
+	// 回写向量状态
 	for _, chunk := range childChunks {
 		if err = d.repo.UpdateChunkByTaskId(ctx, chunk); err != nil {
 			panic(err)
 		}
 	}
 
-	// 阶段10：记录"向量化完成"日志
+	// 记录"向量化完成"日志
 	markVectorCompleteTx := func(txCtx context.Context) error {
 		vectorEndDetail, _ := json.Marshal(map[string]any{
 			"chunkCount":          vectorSize,
@@ -425,7 +430,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		panic(err)
 	}
 
-	// 阶段11：事务性最终状态更新（任务/方案/文档），并写入索引构建完成日志
+	// 事务性最终状态更新（任务/方案/文档），并写入索引构建完成日志
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
 		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageStoreComplete}); err != nil {
@@ -443,7 +448,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		if err = d.finishTaskSuccess(txCtx, task, vo.TaskStageStoreComplete, startTime); err != nil {
 			panic(err)
 		}
-
+		// 索引构建完成日志
 		buildCompleteDetail, _ := json.Marshal(map[string]any{
 			"parentBlockCount": len(parentBlocks),
 			"chunkCount":       len(childChunks),
@@ -476,7 +481,6 @@ func (d *AsyncProcessingLogicImpl) parse(ctx context.Context, bytes []byte, file
 
 // persistRecommendation 保存策略推荐结果（方案 + 步骤 + 任务日志），返回方案 ID
 func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
-
 	document *entity.Document, task *entity.DocumentTask,
 	planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
 
@@ -511,7 +515,7 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 				StrategyType:    draft.StrategyType,
 				StrategyRole:    draft.StrategyRole,
 				SourceType:      draft.SourceType,
-				ExecuteStatus:   vo.ExecuteStatusWaitExecute,
+				ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
 				RecommendReason: draft.RecommendReason,
 			}
 			if err := d.repo.InsertStep(ctx, step); err != nil {
@@ -525,7 +529,7 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 
 	// 推进任务阶段到"策略路由"
 	task.CurrentStage = vo.TaskStageStrategyRoute
-	if err := d.repo.UpdateTask(ctx, task); err != nil {
+	if err := d.repo.UpdateTaskById(ctx, task); err != nil {
 		Warnf("更新任务阶段失败: taskId=%d, err=%v", task.ID, err)
 	}
 
@@ -535,7 +539,6 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context,
 // buildStructureNodeCandidates 基于解析文本构建结构节点候选
 // 当前使用极简实现：对"标题化"文本行进行切分，交由结构节点服务处理。
 // 更精确的结构解析由上层 parse 注册表提供，这里仅兜底。
-
 func (d *AsyncProcessingLogicImpl) buildStructureNodeCandidates(parsedText string) []*vo.DocumentStructureNodeCandidate {
 	if strings.TrimSpace(parsedText) == "" {
 		return nil
