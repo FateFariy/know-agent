@@ -14,7 +14,7 @@ type DocumentChunk struct {
 	StructureNodeId    int64  `gorm:"column:structure_node_id"`   // 结构节点ID
 	StructureNodeType  int    `gorm:"column:structure_node_type"` // 结构节点类型
 	CanonicalPath      string `gorm:"column:canonical_path"`      // 规范路径
-	ItemIndex          int64  `gorm:"column:item_index"`          // 项索引
+	ItemIndex          int    `gorm:"column:item_index"`          // 项索引
 	ChunkText          string `gorm:"column:chunk_text"`          // 块文本
 	CharCount          int    `gorm:"column:char_count"`          // 字符数
 	TokenCount         int    `gorm:"column:token_count"`         // token数

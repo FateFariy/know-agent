@@ -51,6 +51,6 @@ func FileTypeName(fileType FileType) string {
 	case FileTypeHTML:
 		return "HTML"
 	default:
-		return "未知"
+		return ""
 	}
 }

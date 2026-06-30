@@ -33,7 +33,6 @@ const (
 	StrategyTypeRecursive                         // 递归切块
 	StrategyTypeSemantic                          // 语义切块
 	StrategyTypeLLM                               // 大模型智能切块
-	StrategyTypeMarkdown                          // Markdown切块
 )
 
 func StrategyTypeName(st StrategyType) string {
@@ -46,8 +45,6 @@ func StrategyTypeName(st StrategyType) string {
 		return "语义切块"
 	case StrategyTypeLLM:
 		return "大模型智能切块"
-	case StrategyTypeMarkdown:
-		return "Markdown切块"
 	default:
 		return ""
 	}
