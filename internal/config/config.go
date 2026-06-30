@@ -38,9 +38,11 @@ type Neo4jConf struct {
 }
 
 type MilvusConf struct {
-	Addr     string `json:",omitempty,default=127.0.0.1:19530"`
-	Username string `json:",omitempty,optional"`
-	Password string `json:",omitempty,optional"`
+	Addr       string `json:",omitempty,default=127.0.0.1:19530"`
+	Username   string `json:",omitempty,optional"`
+	Password   string `json:",omitempty,optional"`
+	Collection string
+	MetricType string `json:",omitempty,default=COSINE"`
 }
 
 type MQConf struct {

@@ -2,19 +2,19 @@ package vector
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/indexer/milvus2"
+	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -22,17 +22,25 @@ import (
 )
 
 type MilvusVector struct {
-	indexer indexer.Indexer
-	model   string
+	indexer    indexer.Indexer
+	model      string
+	client     *milvusclient.Client
+	collection string
 }
 
 var _ adapter.VectorDB = (*MilvusVector)(nil)
 
 func NewMilvusVector(svcCtx *svc.ServiceContext) adapter.VectorDB {
 	ctx := context.Background()
+	client, err := milvusclient.New(ctx, &milvusclient.ClientConfig{Address: svcCtx.Config.Milvus.Addr})
+	if err != nil {
+		panic(err)
+	}
 	return &MilvusVector{
-		indexer: newIndexer(svcCtx, ctx, newEmbedding(svcCtx, ctx)),
-		model:   svcCtx.Config.Embedding.Model,
+		indexer:    newIndexer(svcCtx, ctx, svcCtx.Emb),
+		model:      svcCtx.Config.Embedding.Model,
+		client:     client,
+		collection: svcCtx.Config.Milvus.Collection,
 	}
 }
 
@@ -50,9 +58,11 @@ func (m *MilvusVector) Vectorize(ctx context.Context, chunks []*entity.DocumentC
 	return nil
 }
 
+// DeleteVectorByDocumentId 根据文档ID删除向量
 func (m *MilvusVector) DeleteVectorByDocumentId(ctx context.Context, documentId int64) error {
-	// TODO implement me
-	panic("implement me")
+	expr := fmt.Sprintf("metadata['documentId'] == %d", documentId)
+	_, err := m.client.Delete(ctx, milvusclient.NewDeleteOption(m.collection).WithExpr(expr))
+	return err
 }
 
 // markSuccess 批量标记分片向量生成成功
@@ -100,22 +110,8 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 	return result
 }
 
-// 创建 embedding 模型
-func newEmbedding(svcCtx *svc.ServiceContext, ctx context.Context) *ark.Embedder {
-	emb, err := ark.NewEmbedder(ctx, &ark.EmbeddingConfig{
-		APIKey:     svcCtx.Config.Embedding.APIKey,
-		Model:      svcCtx.Config.Embedding.Model,
-		APIType:    toAPIType(svcCtx.Config.Embedding.APIType),
-		Dimensions: &svcCtx.Config.Embedding.Dimensions,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return emb
-}
-
 // 创建索引器
-func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb *ark.Embedder) *milvus2.Indexer {
+func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) *milvus2.Indexer {
 	vecIndexer, err := milvus2.NewIndexer(ctx, &milvus2.IndexerConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
@@ -132,11 +128,4 @@ func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb *ark.Embedd
 		panic(err)
 	}
 	return vecIndexer
-}
-
-func toAPIType(apiType string) *ark.APIType {
-	if strings.Contains(apiType, string(ark.APITypeMultiModal)) {
-		return utils.Pointer(ark.APITypeMultiModal)
-	}
-	return utils.Pointer(ark.APITypeText)
 }

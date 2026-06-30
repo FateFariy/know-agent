@@ -1,6 +1,11 @@
 package svc
 
 import (
+	"context"
+	"strings"
+
+	"github.com/cloudwego/eino-ext/components/embedding/ark"
+	"github.com/cloudwego/eino/components/embedding"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
@@ -11,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 )
 
@@ -25,6 +31,7 @@ type ServiceContext struct {
 	Db       *gorm.DB
 	Rdb      *redis.Client
 	RedSync  *redsync.Redsync
+	Emb      embedding.Embedder
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -36,6 +43,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		Db:       common.NewDb(c),
 		Minio:    NewMinioClient(c),
 		RedSync:  NewRedSync(redisClient),
+		Emb:      NewArkEmbedding(c),
 	}
 }
 
@@ -58,4 +66,22 @@ func NewMinioClient(c config.Config) *minio.Client {
 func NewRedSync(client *redis.Client) *redsync.Redsync {
 	pool := goredis.NewPool(client)
 	return redsync.New(pool)
+}
+
+// NewArkEmbedding 创建 ark embedding 模型
+func NewArkEmbedding(c config.Config) embedding.Embedder {
+	apiType := ark.APITypeText
+	if strings.Contains(c.Embedding.APIType, string(ark.APITypeMultiModal)) {
+		apiType = ark.APITypeMultiModal
+	}
+	emb, err := ark.NewEmbedder(context.TODO(), &ark.EmbeddingConfig{
+		APIKey:     c.Embedding.APIKey,
+		Model:      c.Embedding.Model,
+		APIType:    utils.Pointer(apiType),
+		Dimensions: &c.Embedding.Dimensions,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return emb
 }

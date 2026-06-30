@@ -29,7 +29,7 @@ go.work.sum
 
 # OS files
 .DS_Store
-Thumbs.db
+Thumbs.dbWithContext
 
 # Configuration files with secrets
 *.yaml.bak
@@ -51,6 +51,6 @@ bin/
 build/
 
 # Database files (if using local DB)
-*.db
+*.dbWithContext
 *.sqlite
 *.sqlite3
