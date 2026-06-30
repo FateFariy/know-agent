@@ -19,7 +19,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
 const (
@@ -40,17 +39,19 @@ type AsyncProcessingLogicImpl struct {
 	registry      parse.Registry
 	strategyLogic StrategyLogic
 	structureNode StructureNodeLogic
+	textPreProc   TextPreProcessLogic
 }
 
 // NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
-func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort,
-	registry parse.Registry, strategyLogic StrategyLogic, structureNode StructureNodeLogic) *AsyncProcessingLogicImpl {
+func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry parse.Registry,
+	strategyLogic StrategyLogic, structureNode StructureNodeLogic, textPreProc TextPreProcessLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
 		repo:          repo,
 		port:          port,
 		registry:      registry,
 		strategyLogic: strategyLogic,
 		structureNode: structureNode,
+		textPreProc:   textPreProc,
 	}
 }
 
@@ -125,37 +126,29 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	if err != nil {
 		panic(err)
 	}
-
-	// todo: 待完善
-	// 根据文件类型调用解析器提取纯文本
-	parsedText, err := d.parse(ctx, rawFileBytes, vo.FileTypeName(document.FileType))
+	// 调用文本预处理逻辑
+	analysisResult, err := d.textPreProc.PreProcess(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
 	if err != nil {
 		panic(err)
 	}
 
 	// 上传解析后的纯文本到对象存储，供"索引构建阶段"直接下载复用
-	parsedTextPath, err := d.port.UploadParsedText(ctx, documentId, parsedText)
+	parsedTextPath, err := d.port.UploadParsedText(ctx, documentId, analysisResult.ParsedText)
 	if err != nil {
 		panic(err)
 	}
 
 	// 基于解析文本构建并写入文档结构节点（供结构切块策略使用）
-	structureNodeCandidates := d.buildStructureNodeCandidates(parsedText)
-	_, err = d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, structureNodeCandidates)
+	structureNodes, err := d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
 	if err != nil {
 		panic(err)
 	}
-	structureNodes, _ := d.structureNode.ListDocumentNodes(ctx, documentId, taskId)
 
-	// 构造"文档分析结果"作为策略推荐输入
-	analysisResult := &vo.DocumentAnalysisResult{
-		ParsedText:          parsedText,
-		CharCount:           utf8.RuneCountInString(parsedText),
-		StructureLevel:      vo.StructureLevelLow,
-		ContentQualityLevel: vo.ContentQualityLevelMedium,
-		ParagraphCount:      countParagraphs(parsedText),
-		StructureNodes:      structureNodes,
+	if err = d.syncNavigationArtifacts(ctx, documentId, taskId, structureNodes); err != nil {
+		panic(err)
 	}
+
+	// todo documentProfileService.generateProfile(documentId, analysisResult, structureNodes);
 
 	// 写入"文档解析完成"日志（附带字符数/段落/结构节点数量等统计信息）
 	parseFinishDetail, _ := json.Marshal(map[string]any{
@@ -508,25 +501,23 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	return nil
 }
 
-// parse 根据文件类型查找解析器并解析原始字节内容为纯文本
-func (d *AsyncProcessingLogicImpl) parse(ctx context.Context, bytes []byte, fileType string) (string, error) {
-	if parser := d.registry.Get(fileType); parser != nil {
-		return parser.Parse(ctx, bytes)
-	}
-	return "", errorx.ErrUnsupportedFileType
+// todo 待实现
+func (d *AsyncProcessingLogicImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.DocumentStructureNode) error {
+	return nil
 }
 
-// persistRecommendation 保存策略推荐结果（方案 + 步骤 + 任务日志），返回方案 ID
+// persistRecommendation 持久化策略推荐结果：写入方案 + 批量写入父/子流水线步骤 + 推进任务阶段
 func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, document *entity.Document,
 	task *entity.DocumentTask, planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
-
+	// 分配计划 ID 并读取当前最新版本号（用于版本自增）
 	planId := utils.GetSnowflakeNextID()
 	latestVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
 	if err != nil {
 		return 0, err
 	}
 
-	plan := &entity.DocumentStrategyPlan{
+	// 构造并插入计划主体
+	strategyPlan := &entity.DocumentStrategyPlan{
 		ID:               planId,
 		DocumentId:       document.ID,
 		PlanVersion:      latestVersion + 1,
@@ -536,19 +527,20 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, do
 		StrategySnapshot: planDraft.StrategySnapshot,
 		RecommendReason:  planDraft.RecommendReason,
 	}
-	if err = d.repo.InsertPlan(ctx, plan); err != nil {
+	if err = d.repo.InsertPlan(ctx, strategyPlan); err != nil {
 		return 0, err
 	}
 
-	insertSteps := func(drafts []*vo.DocumentStrategyStepDraft, pipelineType string) {
-		steps := make([]*entity.DocumentStrategyStep, len(drafts))
-		for i, draft := range drafts {
+	// 按流水线类型将草稿步骤批量转成实体并落库
+	insertPipelineSteps := func(drafts []*vo.DocumentStrategyStepDraft, pipelineType string) {
+		steps := make([]*entity.DocumentStrategyStep, 0, len(drafts))
+		for orderIdx, draft := range drafts {
 			steps = append(steps, &entity.DocumentStrategyStep{
 				ID:              utils.GetSnowflakeNextID(),
 				PlanId:          planId,
 				DocumentId:      document.ID,
 				PipelineType:    pipelineType,
-				StepNo:          i + 1,
+				StepNo:          orderIdx + 1,
 				StrategyType:    draft.StrategyType,
 				StrategyRole:    draft.StrategyRole,
 				SourceType:      draft.SourceType,
@@ -561,8 +553,9 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, do
 		}
 	}
 
-	insertSteps(planDraft.ParentSteps, vo.PipelineTypeParent)
-	insertSteps(planDraft.ChildSteps, vo.PipelineTypeChild)
+	// 顺序写入父块与子块流水线步骤
+	insertPipelineSteps(planDraft.ParentSteps, vo.PipelineTypeParent)
+	insertPipelineSteps(planDraft.ChildSteps, vo.PipelineTypeChild)
 
 	// 推进任务阶段到"策略路由"
 	task.CurrentStage = vo.TaskStageStrategyRoute
@@ -573,25 +566,18 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, do
 	return planId, nil
 }
 
-// buildStructureNodeCandidates 基于解析文本构建结构节点候选
-// 当前使用极简实现：对"标题化"文本行进行切分，交由结构节点服务处理。
-// 更精确的结构解析由上层 parse 注册表提供，这里仅兜底。
-func (d *AsyncProcessingLogicImpl) buildStructureNodeCandidates(parsedText string) []*vo.DocumentStructureNodeCandidate {
-	if strings.TrimSpace(parsedText) == "" {
-		return nil
-	}
-	// 暂时不强制做结构化拆分——由切块阶段在 Strategy 内部自行决定结构，
-	// 上游"推荐策略"会在缺少结构节点时自动降级为递归/语义切块。
-	return nil
-}
-
-// buildParentChildEntities 将父块候选 + 子块候选转换为可落库的实体列表
+// buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
+// 关键信息：
+//   - 每个父块维护 StartChunkNo / EndChunkNo（用于快速定位其覆盖的子块区间）
+//   - 子块的 ChunkNo 在函数内全局递增
+//   - 任何父块至少会得到 1 个兜底子块（由上层 BuildParentBlocks 保证）
 func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, planId int64,
 	candidates []*vo.ParentBlockCandidate) ([]*entity.DocumentParentBlock, []*entity.DocumentChunk) {
 
 	parentBlocks := make([]*entity.DocumentParentBlock, 0, len(candidates))
 	chunks := make([]*entity.DocumentChunk, 0)
 
+	// 全局子块编号：从 1 开始，遇到有效子块时递增并写入 ChunkNo
 	globalChunkNo := 1
 	for parentIdx, candidate := range candidates {
 		parentBlock := &entity.DocumentParentBlock{
@@ -612,6 +598,7 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 			StartChunkNo:      globalChunkNo,
 		}
 
+		// 遍历 ChildChunks：非空文本的子块才会被写入
 		for _, child := range candidate.ChildChunks {
 			if child != nil && strutil.IsNotBlank(child.Text) {
 				globalChunkNo++
@@ -636,13 +623,14 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 				parentBlock.ChildCount++
 			}
 		}
+		// 更新当前父块的末尾 ChunkNo
 		parentBlock.EndChunkNo = globalChunkNo - 1
 		parentBlocks = append(parentBlocks, parentBlock)
 	}
 	return parentBlocks, chunks
 }
 
-// finishTaskSuccess 标记任务执行完成并记录结束日志
+// finishTaskSuccess 将任务标记为成功状态并写入耗时信息（毫秒），清空错误字段
 func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *entity.DocumentTask, currentStage int, startTime time.Time) error {
 	return d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 		ID:           task.ID,
@@ -655,19 +643,27 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 	})
 }
 
-// handleParseFailure "解析路由"失败时的收尾流程：标记文档解析失败 + 任务失败 + 失败日志
+// handleParseFailure 异步任务"解析路由"阶段失败时的统一收尾流程：先记录错误日志，再在事务内将文档状态、任务状态、失败详情与失败日志一次落库。
 func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
 	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
-	fn := func(txCtx context.Context) error {
-		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg)}); err != nil {
+	parseFailTx := func(txCtx context.Context) error {
+		// 文档：标记为解析失败，并保留失败原因
+		if err := d.repo.UpdateDocument(txCtx, &entity.Document{
+			ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg),
+		}); err != nil {
 			return err
 		}
-		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: vo.TaskStageContentParse}); err != nil {
+		// 任务：标记为失败并停留在 CONTENT_PARSE
+		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: vo.TaskStageContentParse,
+		}); err != nil {
 			return err
 		}
+		// 通用失败收尾（写入耗时/错误码/错误消息）
 		if err := d.failTask(txCtx, task, errorMsg); err != nil {
 			return err
 		}
+		// 写入失败事件日志
 		failDetail, _ := json.Marshal(map[string]any{"error": errorMsg})
 		failLog := &entity.DocumentTaskLog{
 			TaskId:       task.ID,
@@ -681,28 +677,37 @@ func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, docum
 		}
 		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
-	if err := d.repo.Do(ctx, fn); err != nil {
+	if err := d.repo.Do(ctx, parseFailTx); err != nil {
 		Warnf("解析失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
 
-// handleIndexBuildFailure "索引构建"失败时的收尾流程：标记文档索引失败 + 索引任务失败 + 索引失败日志
+// handleIndexBuildFailure "索引构建"失败时的统一收尾：事务性地将文档 IndexStatus、chunk 向量状态、step 执行状态、任务失败信息与日志一次落库。
 func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, plan *entity.DocumentStrategyPlan, errorMsg string) {
-	logx.Error("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
-	fn := func(txCtx context.Context) error {
+	logx.Errorf("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
+	indexBuildFailTx := func(txCtx context.Context) error {
+		// 文档：索引构建失败
 		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
 			return err
 		}
-		chunk := &entity.DocumentChunk{TaskId: task.ID, VectorStatus: vo.VectorStatusVectorFailed, VectorStoreType: vo.VectorStoreTypeMilvus}
-		if err := d.repo.UpdateChunkByTaskId(txCtx, chunk); err != nil {
+		// chunk：按任务 ID 批量将向量状态置为失败（Milvus 为默认向量库类型）
+		failedChunkMarker := &entity.DocumentChunk{
+			TaskId:          task.ID,
+			VectorStatus:    vo.VectorStatusVectorFailed,
+			VectorStoreType: vo.VectorStoreTypeMilvus,
+		}
+		if err := d.repo.UpdateChunkByTaskId(txCtx, failedChunkMarker); err != nil {
 			return err
 		}
+		// 标记当前计划所有步骤为失败
 		if err := d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
+		// 通用任务失败收尾（耗时/错误码等）
 		if err := d.failTask(txCtx, task, errorMsg); err != nil {
 			return err
 		}
+		// 写入"索引构建失败"日志
 		failDetail, _ := json.Marshal(map[string]any{"error": errorMsg})
 		failLog := &entity.DocumentTaskLog{
 			TaskId:       task.ID,
@@ -716,7 +721,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 		}
 		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
-	if err := d.repo.Do(ctx, fn); err != nil {
+	if err := d.repo.Do(ctx, indexBuildFailTx); err != nil {
 		Warnf("索引构建失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
@@ -779,30 +784,7 @@ func (d *AsyncProcessingLogicImpl) estimateTokenCount(text string) int {
 	return chineseCount + englishCount + baseToken
 }
 
-//
-// // countParagraphs 按空行粗略估算段落数（用于"内容质量"判断的辅助信号）
-// func countParagraphs(text string) int {
-// 	if strings.TrimSpace(text) == "" {
-// 		return 0
-// 	}
-// 	lines := strings.Split(text, "\n")
-// 	count := 0
-// 	inParagraph := false
-// 	for _, line := range lines {
-// 		trimmed := strings.TrimSpace(line)
-// 		if trimmed == "" {
-// 			inParagraph = false
-// 			continue
-// 		}
-// 		if !inParagraph {
-// 			count++
-// 			inParagraph = true
-// 		}
-// 	}
-// 	return count
-// }
-
-// // Warnf 统一的告警日志入口
+// Warnf 统一的告警日志入口
 // func Warnf(format string, args ...any) {
 // 	logx.Alert(fmt.Sprintf(format, args...))
 // }

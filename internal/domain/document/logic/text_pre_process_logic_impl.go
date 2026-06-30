@@ -42,11 +42,12 @@ func NewTextPreProcessLogicImpl(registry parse.Registry, signalExtractor *transf
 		ambiguityResolver: ambiguityResolver,
 		hierarchyResolver: hierarchyResolver,
 		treeValidator:     treeValidator,
+		classifier:        &support.DocumentLineClassifier{},
 	}
 }
 
-// PreProcessDocument 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *TextPreProcessLogicImpl) PreProcessDocument(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error) {
+// PreProcess 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
+func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error) {
 	// 解析文本
 	parser := p.registry.Get(fileType)
 	parsedText, err := parser.Parse(ctx, []byte(parsedText))
@@ -86,6 +87,7 @@ func (p *TextPreProcessLogicImpl) PreProcessDocument(ctx context.Context, docume
 		HeadingCount:        headingCount,
 		ParagraphCount:      len(paragraphList),
 		MaxParagraphLength:  len(maxParagraph),
+		StructureNodes:      structureNodes,
 	}, nil
 }
 

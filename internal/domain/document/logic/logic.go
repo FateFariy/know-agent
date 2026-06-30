@@ -81,5 +81,5 @@ type StrategyLogic interface {
 // TextPreProcessLogic 文本预处理业务逻辑接口
 type TextPreProcessLogic interface {
 	// PreProcess 文本预处理
-	PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) error
+	PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error)
 }
