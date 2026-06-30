@@ -261,8 +261,9 @@ func (d *DocumentRepositoryImpl) InsertTask(ctx context.Context, task *entity.Do
 	return d.dbWithContext(ctx).Create(convert.ToDocumentTaskModel(task)).Error
 }
 
-func (d *DocumentRepositoryImpl) UpdateTask(ctx context.Context, task *entity.DocumentTask) error {
-	return d.dbWithContext(ctx).Updates(convert.ToDocumentTaskModel(task)).Error
+// UpdateTaskById 根据任务ID更新任务
+func (d *DocumentRepositoryImpl) UpdateTaskById(ctx context.Context, task *entity.DocumentTask) error {
+	return d.dbWithContext(ctx).Where("id = ?", task.ID).Updates(convert.ToDocumentTaskModel(task)).Error
 }
 
 // DeleteTaskByDocumentId  根据文档ID删除任务

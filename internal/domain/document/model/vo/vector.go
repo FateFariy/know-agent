@@ -8,7 +8,6 @@ const (
 	VectorStatusVectorizing                           // 向量化中
 	VectorStatusVectorSuccess                         // 向量化成功
 	VectorStatusVectorFailed                          // 向量化失败
-
 )
 
 func VectorStatusName(vs VectorStatus) string {

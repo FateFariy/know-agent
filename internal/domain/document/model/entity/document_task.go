@@ -22,8 +22,8 @@ type DocumentTask struct {
 	StartTime        time.Time          `gorm:"column:start_time"`        // 开始时间
 	FinishTime       time.Time          `gorm:"column:finish_time"`       // 完成时间
 	CostMillis       int64              `gorm:"column:cost_millis"`       // 耗时(毫秒)
-	ErrorCode        string             `gorm:"column:error_code"`        // 错误码
-	ErrorMsg         string             `gorm:"column:error_msg"`         // 错误信息
+	ErrorCode        *string            `gorm:"column:error_code"`        // 错误码
+	ErrorMsg         *string            `gorm:"column:error_msg"`         // 错误信息
 	ExtJson          string             `gorm:"column:ext_json"`          // 扩展JSON
 	TaskTypeName     string             `gorm:"-"`                        // 任务类型名称
 	TaskStatusName   string             `gorm:"-"`                        // 任务状态名称

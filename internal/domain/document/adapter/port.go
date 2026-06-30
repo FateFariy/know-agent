@@ -49,3 +49,8 @@ type VectorDB interface {
 	// DeleteVectorByDocumentId 根据文档ID删除向量
 	DeleteVectorByDocumentId(ctx context.Context, documentId int64) error
 }
+
+type KeywordSearch interface {
+	// SearchByKeywords 关键字搜索
+	SearchByKeywords(ctx context.Context, keywords []string, limit int) ([]*entity.DocumentChunk, error)
+}

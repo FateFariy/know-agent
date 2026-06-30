@@ -4,9 +4,7 @@ package vo
 type PlanStatus = int
 
 const (
-	PlanStatusUnknown PlanStatus = iota
-	PlanStatusRecommended
-	PlanStatusConfirmed
+	PlanStatusConfirmed PlanStatus = iota + 1
 	PlanStatusDiscarded
 	PlanStatusWaitConfirm // 待确认
 	PlanStatusExecuted    // 已执行
@@ -14,8 +12,6 @@ const (
 
 func PlanStatusName(status PlanStatus) string {
 	switch status {
-	case PlanStatusRecommended:
-		return "已推荐"
 	case PlanStatusConfirmed:
 		return "已确认"
 	case PlanStatusDiscarded:
@@ -25,6 +21,6 @@ func PlanStatusName(status PlanStatus) string {
 	case PlanStatusExecuted:
 		return "已执行"
 	default:
-		return "未知"
+		return ""
 	}
 }
