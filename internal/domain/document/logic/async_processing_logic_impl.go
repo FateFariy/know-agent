@@ -61,20 +61,20 @@ func NewAsyncProcessingLogic(repo adapter.DocumentRepository, port *adapter.Docu
 //  6. 把推荐方案和步骤写入数据库，同步更新文档的解析状态/策略状态/统计信息
 //  7. 以成功或失败状态收尾任务，并记录任务日志
 func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
-	// 加载文档与任务
+	// 加载文档与任务实体
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
 		Warnf("查询解析文档失败: documentId=%d, err=%v", documentId, err)
 		return err
 	}
 
-	// 加载任务
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
 		Warnf("查询解析任务失败: taskId=%d, err=%v", taskId, err)
 		return err
 	}
 
+	// 记录开始时间并注册 panic recover → 失败时统一调用 handleParseFailure
 	startTime := time.Now()
 	defer func() {
 		if v := recover(); v != nil {
@@ -84,20 +84,22 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		}
 	}()
 
-	fn := func(txCtx context.Context) error {
-		documentTask := &entity.DocumentTask{
+	// 事务性标记任务运行中 + 文档解析中，并写入"开始解析"日志
+	markParseStartTx := func(txCtx context.Context) error {
+		runningTask := &entity.DocumentTask{
 			ID:           taskId,
 			TaskStatus:   vo.TaskStatusRunning,
 			CurrentStage: vo.TaskStageContentParse,
 			StartTime:    startTime,
 		}
-		if err = d.repo.UpdateTaskById(txCtx, documentTask); err != nil {
+		if err = d.repo.UpdateTaskById(txCtx, runningTask); err != nil {
 			return err
 		}
 		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, ParseStatus: vo.ParseStatusParsing}); err != nil {
 			return err
 		}
-		detail, _ := json.Marshal(map[string]any{"objectName": document.ObjectName})
+		// 写入"开始解析文档"日志，附带对象存储 key
+		startDetail, _ := json.Marshal(map[string]any{"objectName": document.ObjectName})
 		startLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
@@ -106,41 +108,42 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 			LogLevel:     vo.LogLevelInfo,
 			OperatorType: vo.OperatorTypeSystem,
 			Content:      "开始解析文档内容",
-			DetailJson:   string(detail),
+			DetailJson:   string(startDetail),
 		}
 		return d.repo.InsertTaskLog(txCtx, startLog)
 	}
-	if err = d.repo.Do(ctx, fn); err != nil {
+	if err = d.repo.Do(ctx, markParseStartTx); err != nil {
 		panic(err)
 	}
 
-	// 下载原始文件并解析
-	fileBytes, err := d.port.DownloadObject(ctx, document.ObjectName)
+	// 从对象存储下载原始文件字节
+	rawFileBytes, err := d.port.DownloadObject(ctx, document.ObjectName)
 	if err != nil {
 		panic(err)
 	}
 
-	// todo 待完善
-	parsedText, err := d.parse(ctx, fileBytes, vo.FileTypeName(document.FileType))
+	// todo: 待完善
+	// 根据文件类型调用解析器提取纯文本
+	parsedText, err := d.parse(ctx, rawFileBytes, vo.FileTypeName(document.FileType))
 	if err != nil {
 		panic(err)
 	}
 
-	// 上传解析文本（供索引构建阶段直接下载）
-	parseTextPath, err := d.port.UploadParsedText(ctx, documentId, parsedText)
+	// 上传解析后的纯文本到对象存储，供"索引构建阶段"直接下载复用
+	parsedTextPath, err := d.port.UploadParsedText(ctx, documentId, parsedText)
 	if err != nil {
 		panic(err)
 	}
 
-	// 结构节点与文档属性（当前阶段不依赖，先跳过图谱画像）
-	nodeCandidates := d.buildStructureNodeCandidates(parsedText)
-	_, err = d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, nodeCandidates)
+	// 基于解析文本构建并写入文档结构节点（供结构切块策略使用）
+	structureNodeCandidates := d.buildStructureNodeCandidates(parsedText)
+	_, err = d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, structureNodeCandidates)
 	if err != nil {
 		panic(err)
 	}
 	structureNodes, _ := d.structureNode.ListDocumentNodes(ctx, documentId, taskId)
 
-	// 构建文档分析结果并生成策略推荐
+	// 构造"文档分析结果"作为策略推荐输入
 	analysisResult := &vo.DocumentAnalysisResult{
 		ParsedText:          parsedText,
 		CharCount:           utf8.RuneCountInString(parsedText),
@@ -150,58 +153,91 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		StructureNodes:      structureNodes,
 	}
 
-	planDraft, err := d.strategyLogic.RecommendStrategy(ctx, document, analysisResult)
+	// 写入"文档解析完成"日志（附带字符数/段落/结构节点数量等统计信息）
+	parseFinishDetail, _ := json.Marshal(map[string]any{
+		"charCount":           analysisResult.CharCount,
+		"tokenCount":          analysisResult.TokenCount,
+		"structureLevel":      analysisResult.StructureLevel,
+		"contentQualityLevel": analysisResult.ContentQualityLevel,
+		"structureNodeCount":  len(structureNodes),
+		"paragraphCount":      analysisResult.ParagraphCount,
+	})
+	parseFinishLog := &entity.DocumentTaskLog{
+		TaskId:       taskId,
+		DocumentId:   documentId,
+		StageType:    vo.TaskStageContentParse,
+		EventType:    vo.TaskEventComplete,
+		LogLevel:     vo.LogLevelInfo,
+		OperatorType: vo.OperatorTypeSystem,
+		Content:      "文档解析完成",
+		DetailJson:   string(parseFinishDetail),
+	}
+	if err = d.repo.InsertTaskLog(ctx, parseFinishLog); err != nil {
+		panic(err)
+	}
+
+	// 调用策略服务生成推荐切块方案草稿
+	strategyPlanDraft, err := d.strategyLogic.RecommendStrategy(ctx, document, analysisResult)
 	if err != nil {
 		panic(err)
 	}
 
-	// 持久化方案和步骤
-	planId, err := d.persistRecommendation(ctx, document, task, planDraft)
-	if err != nil {
+	// 事务性持久化策略方案 → 回写文档统计/状态 → 收尾任务 → 写入"生成推荐策略"日志
+	persistStrategyTx := func(txCtx context.Context) error {
+		// 持久化方案和步骤（写入 document_plan 与 document_strategy_step）
+		var planId int64
+		planId, err = d.persistRecommendation(txCtx, document, task, strategyPlanDraft)
+		if err != nil {
+			return err
+		}
+
+		// 写回文档统计 + 标记解析成功/策略已推荐
+		updatedDoc := &entity.Document{
+			ID:                  documentId,
+			ParseStatus:         vo.ParseStatusParseSuccess,
+			StrategyStatus:      vo.StrategyStatusRecommended,
+			CharCount:           analysisResult.CharCount,
+			TokenCount:          analysisResult.TokenCount,
+			StructureLevel:      analysisResult.StructureLevel,
+			ContentQualityLevel: analysisResult.ContentQualityLevel,
+			ParseTextPath:       parsedTextPath,
+			ParseErrorMsg:       utils.Pointer(""),
+			CurrentPlanId:       planId,
+			LastParseTaskId:     taskId,
+			StructureNodeCount:  len(structureNodes),
+		}
+		if err = d.repo.UpdateDocument(txCtx, updatedDoc); err != nil {
+			return err
+		}
+		// 标记任务成功完成并收尾（写入耗时等）
+		if err = d.finishTaskSuccess(txCtx, task, vo.TaskStageStrategyRoute, startTime); err != nil {
+			return err
+		}
+
+		// 记录"系统已生成推荐策略"日志
+		recommendDetail, _ := json.Marshal(map[string]any{
+			"planId":             planId,
+			"strategySnapshot":   strategyPlanDraft.StrategySnapshot,
+			"parentStepCount":    len(strategyPlanDraft.ParentSteps),
+			"childStepCount":     len(strategyPlanDraft.ChildSteps),
+			"structureNodeCount": len(structureNodes),
+			"recommendReason":    strategyPlanDraft.RecommendReason,
+		})
+		recommendLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageContentParse,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "系统已生成推荐策略",
+			DetailJson:   string(recommendDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, recommendLog)
+	}
+	if err = d.repo.Do(ctx, persistStrategyTx); err != nil {
 		panic(err)
 	}
-
-	// 写回文档统计 + 标记解析成功
-	e := &entity.Document{
-		ID:                  documentId,
-		ParseStatus:         vo.ParseStatusParseSuccess,
-		StrategyStatus:      vo.StrategyStatusRecommended,
-		CharCount:           analysisResult.CharCount,
-		TokenCount:          analysisResult.TokenCount,
-		StructureLevel:      analysisResult.StructureLevel,
-		ContentQualityLevel: analysisResult.ContentQualityLevel,
-		ParseTextPath:       parseTextPath,
-		ParseErrorMsg:       utils.Pointer(""),
-		CurrentPlanId:       planId,
-		LastParseTaskId:     taskId,
-		StructureNodeCount:  len(structureNodes),
-	}
-	if err = d.repo.UpdateDocument(ctx, e); err != nil {
-		Warnf("更新文档信息失败: documentId=%d, err=%v", documentId, err)
-		return err
-	}
-
-	// 记录"文档解析完成" / "策略推荐完成"日志
-	d.saveTaskLog(ctx, taskId, documentId, vo.TaskStageContentParse, vo.TaskEventComplete, vo.LogLevelInfo,
-		0, "", "文档解析完成", map[string]any{
-			"charCount":           analysisResult.CharCount,
-			"tokenCount":          analysisResult.TokenCount,
-			"structureLevel":      analysisResult.StructureLevel,
-			"contentQualityLevel": analysisResult.ContentQualityLevel,
-			"structureNodeCount":  len(structureNodes),
-			"paragraphCount":      analysisResult.ParagraphCount,
-		})
-
-	d.saveTaskLog(ctx, taskId, documentId, vo.TaskStageStrategyRoute, vo.TaskEventRecommendStrategy, vo.LogLevelInfo,
-		0, "", "系统已生成推荐策略", map[string]any{
-			"planId":           planId,
-			"strategySnapshot": planDraft.StrategySnapshot,
-			"parentStepCount":  len(planDraft.ParentSteps),
-			"childStepCount":   len(planDraft.ChildSteps),
-		})
-
-	// 收尾
-	d.finishTaskSuccess(ctx, task, vo.TaskStageStrategyRoute, startTime)
 	return nil
 }
 
@@ -620,7 +656,7 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
 	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
 	fn := func(txCtx context.Context) error {
-		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: errorMsg}); err != nil {
+		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg)}); err != nil {
 			return err
 		}
 		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: vo.TaskStageContentParse}); err != nil {
