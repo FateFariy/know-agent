@@ -4,6 +4,7 @@ import (
 	"context"
 	"mime/multipart"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -75,4 +76,10 @@ type StrategyLogic interface {
 	// BuildParentBlocks 构建父子块结构
 	BuildParentBlocks(ctx context.Context, document *entity.Document,
 		steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error)
+}
+
+// TextPreProcessLogic 文本预处理业务逻辑接口
+type TextPreProcessLogic interface {
+	// PreProcess 文本预处理
+	PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) error
 }

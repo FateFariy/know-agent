@@ -42,8 +42,8 @@ type AsyncProcessingLogicImpl struct {
 	structureNode StructureNodeLogic
 }
 
-// NewAsyncProcessingLogic 构造异步处理逻辑实例
-func NewAsyncProcessingLogic(repo adapter.DocumentRepository, port *adapter.DocumentPort,
+// NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
+func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort,
 	registry parse.Registry, strategyLogic StrategyLogic, structureNode StructureNodeLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
 		repo:          repo,
