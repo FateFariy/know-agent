@@ -39,7 +39,7 @@ var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
 func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorDB) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
-		transactionManager: &transactionManager{defaultDB: svcCtx.Db},
+		transactionManager: &transactionManager{db: svcCtx.Db},
 		rdb:                svcCtx.Rdb,
 		storage:            storage,
 		vdb:                vdb,
@@ -65,31 +65,15 @@ func (d *DocumentRepositoryImpl) InsertDocumentAggregate(ctx context.Context, ag
 }
 
 // UpdateDocumentAggregate 更新文档聚合根
-func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, aggregate *aggregate.Document) error {
-	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Updates(convert.ToDocumentModel(aggregate.Document)).Error; err != nil {
-			return err
-		}
-		if err := tx.Updates(convert.ToDocumentTaskModel(aggregate.Task)).Error; err != nil {
-			return err
-		}
-		if err := tx.Updates(convert.ToDocumentTaskLogModel(aggregate.TaskLog)).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
-func (d *DocumentRepositoryImpl) InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
+func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
 	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Updates(convert.ToDocumentModel(agg.Document)).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(convert.ToDocumentTaskModel(agg.Task)).Error; err != nil {
+		if err := tx.Updates(convert.ToDocumentTaskModel(agg.Task)).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(convert.ToDocumentTaskLogModel(agg.TaskLog)).Error; err != nil {
+		if err := tx.Updates(convert.ToDocumentTaskLogModel(agg.TaskLog)).Error; err != nil {
 			return err
 		}
 		return nil
@@ -260,9 +244,9 @@ func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documen
 	return document, nil
 }
 
+// UpdateDocument 更新文档
 func (d *DocumentRepositoryImpl) UpdateDocument(ctx context.Context, document *entity.Document) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Updates(convert.ToDocumentModel(document)).Error
 }
 
 // DeleteDocumentById  根据ID删除文档
@@ -274,13 +258,11 @@ func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documen
 
 // InsertTask 插入任务
 func (d *DocumentRepositoryImpl) InsertTask(ctx context.Context, task *entity.DocumentTask) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Create(convert.ToDocumentTaskModel(task)).Error
 }
 
 func (d *DocumentRepositoryImpl) UpdateTask(ctx context.Context, task *entity.DocumentTask) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Updates(convert.ToDocumentTaskModel(task)).Error
 }
 
 // DeleteTaskByDocumentId  根据文档ID删除任务
@@ -337,8 +319,7 @@ func (d *DocumentRepositoryImpl) CountActiveTask(ctx context.Context, documentId
 // ========== 任务日志相关 ==========
 
 func (d *DocumentRepositoryImpl) InsertTaskLog(ctx context.Context, log *entity.DocumentTaskLog) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Create(convert.ToDocumentTaskLogModel(log)).Error
 }
 
 // DeleteTaskLogByDocumentId  根据文档ID删除任务日志

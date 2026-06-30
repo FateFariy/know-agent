@@ -9,8 +9,8 @@ import (
 
 // DocumentRepository 文档数据访问接口
 type DocumentRepository interface {
-	// Do 运行一个事务
-	Do(ctx context.Context, fn func(ctx context.Context) error) error
+	// Do 运行一个事务性操作
+	Do(ctx context.Context, fn func(txCtx context.Context) error) error
 
 	// ========== 文档聚合根相关 ==========
 
@@ -18,10 +18,7 @@ type DocumentRepository interface {
 	InsertDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
 
 	// UpdateDocumentAggregate 更新文档聚合根
-	UpdateDocumentAggregate(ctx context.Context, aggregate *aggregate.Document) error
-
-	// InsertOrUpdateDocumentAggregate 插入或更新文档聚合根
-	InsertOrUpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
+	UpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
 
 	// SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
 	// 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志

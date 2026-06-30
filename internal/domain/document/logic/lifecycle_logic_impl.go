@@ -465,11 +465,8 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		return nil, err
 	}
 
-	// 更新文档状态为"构建中"
-	document.IndexStatus = vo.IndexStatusBuilding
-
 	// 创建索引构建任务实体
-	taskId := utils.GetSnowflakeNextID() // 生成全局唯一任务ID
+	taskId := utils.GetSnowflakeNextID()
 	task := &entity.DocumentTask{
 		ID:               taskId,
 		DocumentId:       documentId,
@@ -486,7 +483,6 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		"planId":           planId,
 		"strategySnapshot": plan.StrategySnapshot,
 	})
-
 	// 创建任务日志实体
 	taskLog := &entity.DocumentTaskLog{
 		TaskId:       taskId,
@@ -499,13 +495,18 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		DetailJson:   string(detail),
 	}
 
-	// 聚合文档、任务、日志，执行原子性保存
-	agg := &aggregate.Document{
-		Document: document,
-		Task:     task,
-		TaskLog:  taskLog,
+	// 事务性操作：更新文档状态、插入任务、插入任务日志
+	fn := func(txCtx context.Context) error {
+		// 更新文档状态为"构建中"
+		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuilding}); err != nil {
+			return err
+		}
+		if err := d.repo.InsertTask(txCtx, task); err != nil {
+			return err
+		}
+		return d.repo.InsertTaskLog(txCtx, taskLog)
 	}
-	if err = d.repo.InsertOrUpdateDocumentAggregate(ctx, agg); err != nil {
+	if err = d.repo.Do(ctx, fn); err != nil {
 		return nil, err
 	}
 

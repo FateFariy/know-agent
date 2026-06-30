@@ -15,7 +15,7 @@ type transactionManager struct {
 }
 
 // Do 开启事务并执行 fn, 将事务 DB 注入 context
-func (t *transactionManager) Do(ctx context.Context, fn func(ctx context.Context) error) error {
+func (t *transactionManager) Do(ctx context.Context, fn func(txCtx context.Context) error) error {
 	return t.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txCtx := context.WithValue(ctx, transactionCtxKey, tx)
 		return fn(txCtx)
