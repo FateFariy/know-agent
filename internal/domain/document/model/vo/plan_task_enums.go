@@ -1,6 +1,59 @@
 package vo
 
+// ============================================================
+// PlanSource 方案来源
+// ============================================================
+
+type PlanSource = int
+
+const (
+	PlanSourceSystemRecommend PlanSource = iota + 1
+	PlanSourceUserAdjust
+)
+
+func PlanSourceName(source PlanSource) string {
+	switch source {
+	case PlanSourceSystemRecommend:
+		return "系统推荐"
+	case PlanSourceUserAdjust:
+		return "用户调整"
+	default:
+		return ""
+	}
+}
+
+// ============================================================
+// PlanStatus 方案状态
+// ============================================================
+
+type PlanStatus = int
+
+const (
+	PlanStatusConfirmed PlanStatus = iota + 1
+	PlanStatusDiscarded
+	PlanStatusWaitConfirm // 待确认
+	PlanStatusExecuted    // 已执行
+)
+
+func PlanStatusName(status PlanStatus) string {
+	switch status {
+	case PlanStatusConfirmed:
+		return "已确认"
+	case PlanStatusDiscarded:
+		return "已废弃"
+	case PlanStatusWaitConfirm:
+		return "待确认"
+	case PlanStatusExecuted:
+		return "已执行"
+	default:
+		return ""
+	}
+}
+
+// ============================================================
 // TaskEventType 任务事件类型
+// ============================================================
+
 type TaskEventType = int
 
 const (
@@ -31,7 +84,10 @@ func TaskEventTypeName(et TaskEventType) string {
 	}
 }
 
+// ============================================================
 // TaskStatus 任务状态
+// ============================================================
+
 type TaskStatus = int
 
 const (
@@ -59,7 +115,10 @@ func TaskStatusName(ts TaskStatus) string {
 	}
 }
 
+// ============================================================
 // TaskStage 任务阶段
+// ============================================================
+
 type TaskStage = int
 
 const (
@@ -96,7 +155,10 @@ func TaskStageName(ts TaskStage) string {
 	}
 }
 
+// ============================================================
 // TaskType 任务类型
+// ============================================================
+
 type TaskType = int
 
 const (

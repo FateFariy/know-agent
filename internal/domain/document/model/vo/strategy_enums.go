@@ -1,6 +1,9 @@
 package vo
 
+// ============================================================
 // StrategyStatus 策略状态
+// ============================================================
+
 type StrategyStatus = int
 
 const (
@@ -25,7 +28,10 @@ func StrategyStatusName(status StrategyStatus) string {
 	}
 }
 
+// ============================================================
 // StrategyType 策略类型
+// ============================================================
+
 type StrategyType = int
 
 const (
@@ -49,6 +55,10 @@ func StrategyTypeName(st StrategyType) string {
 		return ""
 	}
 }
+
+// ============================================================
+// StrategyExecuteStatus 策略执行状态
+// ============================================================
 
 type StrategyExecuteStatus = int
 
@@ -77,6 +87,10 @@ func StrategyExecuteStatusName(status StrategyExecuteStatus) string {
 	}
 }
 
+// ============================================================
+// StrategyPipelineType 策略流水线类型
+// ============================================================
+
 type StrategyPipelineType = string
 
 const (
@@ -94,6 +108,10 @@ func StrategyPipelineTypeName(pipelineType StrategyPipelineType) string {
 		return ""
 	}
 }
+
+// ============================================================
+// StrategyRole 策略角色
+// ============================================================
 
 type StrategyRole = int
 
@@ -118,6 +136,10 @@ func StrategyRoleName(role StrategyRole) string {
 		return ""
 	}
 }
+
+// ============================================================
+// StrategySourceType 策略来源类型
+// ============================================================
 
 type StrategySourceType = int
 
