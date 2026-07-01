@@ -59,7 +59,7 @@ func (c *RagRetrievalContext) AddRetrievalNotef(format string, args ...any) {
 
 // AddUsedChannel 添加已使用的渠道
 func (c *RagRetrievalContext) AddUsedChannel(channel string) {
-	if c.UsedChannels.IndexOf(channel) == -1 {
+	if !c.UsedChannels.Contain(channel) {
 		c.UsedChannels.Add(channel)
 	}
 }
