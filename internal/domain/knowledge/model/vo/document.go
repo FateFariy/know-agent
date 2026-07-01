@@ -6,6 +6,7 @@ const (
 	MetaChannel             = "channel"
 	MetaScore               = "score"
 	MetaRRFScore            = "rrfScore"
+	MetaRerankScore         = "rerankScore"
 	MetaDocumentID          = "documentId"
 	MetaDocumentName        = "documentName"
 	MetaTaskID              = "taskId"
@@ -26,7 +27,6 @@ const (
 	MetaURL                 = "url"
 	MetaToolName            = "toolName"
 	MetaOriginalSnippet     = "originalSnippet"
-	MetaRerankScore         = "rerankScore"
 	MetaRerankModel         = "rerankModel"
 	MetaRerankQuery         = "rerankQuery"
 	MetaRerankDurationMs    = "rerankDurationMs"
@@ -37,6 +37,6 @@ const (
 type Document struct {
 	ID      string         `json:"id"`      // 文档ID
 	Content string         `json:"content"` // 文档内容
-	Meta    map[string]any `json:"meta"`    // 元数据
 	Score   float64        `json:"score"`   // 相似度分数
+	Meta    map[string]any `json:"meta"`    // 元数据
 }

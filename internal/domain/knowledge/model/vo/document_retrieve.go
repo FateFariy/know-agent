@@ -16,6 +16,8 @@ import (
 var (
 	yearPattern    = regexp.MustCompile(`\b(20\d{2})\b`)
 	sectionPattern = regexp.MustCompile(`(第\s*[一二三四五六七八九十百0-9]+\s*[章节条部分])|(附录\s*[A-Za-z一二三四五六七八九十0-9]+)`)
+	separators     = regexp.MustCompile(`[\s、，,；:：（）()\-的和及与或]+`)
+	spacePattern   = regexp.MustCompile(`\s+`)
 
 	DocumentNameHints = []string{
 		"部署手册", "配置手册", "操作手册", "用户手册", "快速开始", "接入指南", "FAQ", "常见问题",
@@ -104,7 +106,7 @@ func NewDocumentRetrieve(subQuestion string, plan *vo.ConversationExecutionPlan,
 	return documentRetrieve
 }
 
-func (d *DocumentRetrieve) ResolvedDocumentIDs() []int64 {
+func (d *DocumentRetrieve) ResolvedDocumentIds() []int64 {
 	if len(d.DocumentIds) > 0 {
 		return d.DocumentIds
 	}
@@ -114,7 +116,7 @@ func (d *DocumentRetrieve) ResolvedDocumentIDs() []int64 {
 	return []int64{}
 }
 
-func (d *DocumentRetrieve) ResolvedTaskIDs() []int64 {
+func (d *DocumentRetrieve) ResolvedTaskIds() []int64 {
 	if len(d.TaskIds) > 0 {
 		return d.TaskIds
 	}
@@ -185,7 +187,6 @@ func buildFilters(question string) *DocumentRetrieveFilters {
 
 	// 提取章节路径提示（如"第一章"、"附录A"），并去除空格
 	sectionPathHints := sectionPattern.FindAllString(question, -1)
-	spacePattern := regexp.MustCompile(`\s+`)
 	sectionPathHints = stream.FromSlice(sectionPathHints).
 		Map(func(item string) string { return spacePattern.ReplaceAllString(item, "") }).
 		Filter(func(item string) bool { return item != "" }).ToSlice()
@@ -219,7 +220,6 @@ func extractMeaningfulTerms(question string) []string {
 	if strutil.IsBlank(question) {
 		return nil
 	}
-	separators := regexp.MustCompile(`[\s、，,；:：（）()\-的和及与或]+`)
 	segments := separators.Split(question, -1)
 	return stream.FromSlice(segments).
 		Map(func(s string) string { return strutil.Trim(s) }).

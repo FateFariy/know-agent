@@ -7,10 +7,11 @@ import (
 	kl "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
+	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// KeywordRetrievalChannel 关键词检索通道（对应 Java KeywordRetrievalChannel）
+// KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
 	documentKnowledgeLogic kl.DocumentKnowledgeLogic
 	keywordTopK            int
@@ -28,7 +29,7 @@ func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, documentKnowledgeLog
 
 // ChannelName 返回通道名称
 func (c *KeywordRetrievalChannel) ChannelName() string {
-	return "keyword"
+	return vo.RetrievalChannelKeyword
 }
 
 // Supports 判断是否支持该执行计划

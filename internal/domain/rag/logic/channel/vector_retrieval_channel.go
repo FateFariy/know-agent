@@ -11,6 +11,7 @@ import (
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
+	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -34,7 +35,7 @@ func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, repo adapter.RagRepos
 
 // ChannelName 返回通道名称
 func (c *VectorRetrievalChannel) ChannelName() string {
-	return "vector"
+	return vo.RetrievalChannelVector
 }
 
 // Supports 判断是否支持该执行计划

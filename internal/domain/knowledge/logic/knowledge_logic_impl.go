@@ -31,7 +31,7 @@ const (
 
 var (
 	alnumTokenPattern   = regexp.MustCompile(`[a-z0-9._-]{2,}`)
-	chineseTokenPattern = regexp.MustCompile(`[\p{Han}]{2,}`)
+	chineseTokenPattern = regexp.MustCompile(`\p{Han}{2,}`)
 	chineseNoisePhrases = []string{
 		"请问", "帮我", "一下子", "一下", "如何", "怎么", "什么", "哪个", "这个", "那个", "是否", "关于", "可以", "需要", "想问", "看看",
 	}
@@ -59,8 +59,8 @@ func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve 
 		return nil, nil
 	}
 
-	documentIDs := retrieve.ResolvedDocumentIDs()
-	taskIDs := retrieve.ResolvedTaskIDs()
+	documentIDs := retrieve.ResolvedDocumentIds()
+	taskIDs := retrieve.ResolvedTaskIds()
 	knowledgeMap, err := s.getDocumentsMap(ctx, documentIDs)
 	if err != nil {
 		return nil, err
@@ -81,8 +81,8 @@ func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve
 		return nil, nil
 	}
 
-	documentIDs := retrieve.ResolvedDocumentIDs()
-	taskIDs := retrieve.ResolvedTaskIDs()
+	documentIDs := retrieve.ResolvedDocumentIds()
+	taskIDs := retrieve.ResolvedTaskIds()
 	descriptorMap, err := s.getDocumentsMap(ctx, documentIDs)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (s *DocumentKnowledgeLogicImpl) validSearchable(retrieve *vo.DocumentRetrie
 	if retrieve == nil || strutil.IsBlank(retrieve.Question) || strutil.IsBlank(retrieve.RetrievalQuery) {
 		return false
 	}
-	return len(retrieve.ResolvedDocumentIDs()) > 0 && len(retrieve.ResolvedTaskIDs()) > 0
+	return len(retrieve.ResolvedDocumentIds()) > 0 && len(retrieve.ResolvedTaskIds()) > 0
 }
 
 func (s *DocumentKnowledgeLogicImpl) getDocumentsMap(ctx context.Context, documentIDs []int64) (map[int64]*vo.KnowledgeDocument, error) {
