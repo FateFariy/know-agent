@@ -37,6 +37,7 @@ const (
 type DocumentChunk struct {
 	ID                  string  `json:"id"`                  // 块ID
 	Score               float64 `json:"score"`               // 相似度分数
+	Content             string  `json:"content"`             // 文本内容
 	SourceType          string  `json:"sourceType"`          // 文档来源类型
 	Channel             string  `json:"channel"`             // 文档来源渠道
 	RRFScore            float64 `json:"rrfScore"`            // RRF分数

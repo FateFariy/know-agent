@@ -15,10 +15,10 @@ type ConversationExecutionPlan struct {
 	RetrievalSubQuestions        []string
 	HistorySummary               string
 	LongTermSummary              string
-	HistoryPlanningContext       HistoryPlanningContext
+	HistoryPlanningContext       *HistoryPlanningContext
 	RecentHistoryTranscript      string
-	AnswerRecentTranscript       string
-	AnswerHistoryContext         *AnswerHistoryContext
+	RecentQuestionTranscript     string
+	QuestionHistoryContext       *QuestionHistoryContext
 	NavigationDecision           *DocumentNavigationDecision
 	HistoryCompressionApplied    bool
 	HistoryCoveredExchangeId     *int64
@@ -28,9 +28,9 @@ type ConversationExecutionPlan struct {
 	CurrentDateText              string
 	RequiresFreshSearch          bool
 	RequiresCurrentDateAnchoring bool
-	SelectedDocumentId           *int64
+	SelectedDocumentId           int64
 	SelectedDocumentName         string
-	SelectedTaskId               *int64
+	SelectedTaskId               int64
 	RetrievalDocumentIds         []int64
 	RetrievalTaskIds             []int64
 	ClarificationReply           string

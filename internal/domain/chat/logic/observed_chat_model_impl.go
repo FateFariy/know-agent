@@ -44,7 +44,21 @@ func NewObservedChatModelImpl[M adk.MessageType](svcCtx *svc.ServiceContext, cha
 }
 
 // Generate 同步调用模型，返回文本响应
-func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (string, error) {
+func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
+	// 调用底层模型执行生成
+	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
+	if err != nil {
+		return "", err
+	}
+
+	// 从响应中提取文本内容
+	responseText := extractResponseText(response)
+
+	return responseText, nil
+}
+
+// GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
+func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (string, error) {
 	startTime := time.Now()
 
 	// 记录当前阶段的调用选项日志
@@ -73,8 +87,8 @@ func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, stage, systemPr
 	return responseText, nil
 }
 
-// Stream 流式调用模型，返回响应通道和错误
-func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
+// StreamWithTrace 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
+func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
 	startTime := time.Now()
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
@@ -143,18 +157,25 @@ func (o *ObservedChatModelImpl[M]) Stream(ctx context.Context, stage, systemProm
 
 // buildPrompt 构建提示词
 func (o *ObservedChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
+	if userPrompt == "" {
+		panic("userPrompt is empty")
+	}
 	var zero M
 	switch any(zero).(type) {
 	case *schema.AgenticMessage:
 		messages := []*schema.AgenticMessage{
-			schema.SystemAgenticMessage(systemPrompt),
 			schema.UserAgenticMessage(userPrompt),
+		}
+		if systemPrompt != "" {
+			messages = append(messages, schema.SystemAgenticMessage(systemPrompt))
 		}
 		return any(messages).([]M)
 	default:
 		messages := []*schema.Message{
-			schema.SystemMessage(systemPrompt),
 			schema.UserMessage(userPrompt),
+		}
+		if systemPrompt != "" {
+			messages = append(messages, schema.SystemMessage(systemPrompt))
 		}
 		return any(messages).([]M)
 	}

@@ -2,34 +2,27 @@ package channel
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/zeromicro/go-zero/core/logx"
-
+	"github.com/swiftbit/know-agent/common/utils"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	kl "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
 	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	repo                   adapter.RagRepository
-	documentKnowledgeLogic kl.DocumentKnowledgeLogic
-	vectorTopK             int
+	repo     adapter.RagRepository
+	vectorDB adapter.VectorDB
 }
 
-var _ logic.RetrievalChannel = (*VectorRetrievalChannel)(nil)
+var _ RetrievalChannel = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
-func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, repo adapter.RagRepository, documentKnowledgeLogic kl.DocumentKnowledgeLogic) *VectorRetrievalChannel {
+func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, repo adapter.RagRepository, vectorDB adapter.VectorDB) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
-		repo:                   repo,
-		documentKnowledgeLogic: documentKnowledgeLogic,
-		vectorTopK:             svcCtx.Config.Chat.Rag.VectorTopK,
+		repo:     repo,
+		vectorDB: vectorDB,
 	}
 }
 
@@ -44,21 +37,40 @@ func (c *VectorRetrievalChannel) Supports(plan *cvo.ConversationExecutionPlan) b
 }
 
 // Retrieve 执行向量检索
-func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, subQuestion string, plan *cvo.ConversationExecutionPlan) (*logic.RetrievalChannelResult, error) {
-	documentRetrieve := klvo.NewDocumentRetrieve(subQuestion, plan, c.vectorTopK)
+// 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）
+func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
+	if !query.ValidSearchable() {
+		return nil, nil
+	}
 
-	docs, err := c.documentKnowledgeLogic.VectorSearch(ctx, documentRetrieve)
+	knowledgeMap, err := c.getDocumentsMap(ctx, query.DocumentIds)
 	if err != nil {
-		Warnf("向量检索失败: subQuestion='%s', error=%v", subQuestion, err)
 		return nil, err
 	}
 
-	return &logic.RetrievalChannelResult{
+	docs, err := c.vectorDB.SearchByVector(ctx, query)
+	if err != nil {
+		Warnf("向量检索失败: question='%s', error=%v", query.Question, err)
+		return nil, err
+	}
+	for _, document := range docs {
+		document.FillKnowledge(knowledgeMap[document.DocumentId])
+	}
+
+	return &vo.RetrievalChannelResult{
 		ChannelName: c.ChannelName(),
 		Documents:   docs,
 	}, nil
 }
 
-func Warnf(format string, v ...any) {
-	logx.Alert(fmt.Sprintf(format, v...))
+// getDocumentsMap 获取文档描述符到 documentId 的映射
+func (c *VectorRetrievalChannel) getDocumentsMap(ctx context.Context, documentIds []int64) (map[int64]*vo.KnowledgeDocument, error) {
+	documents, err := c.repo.SelectRetrievableDocuments(ctx, documentIds...)
+	if err != nil {
+		return nil, err
+	}
+	descriptorMap := utils.SliceToMapBy(documents, func(t *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
+		return t.DocumentId, t
+	})
+	return descriptorMap, nil
 }

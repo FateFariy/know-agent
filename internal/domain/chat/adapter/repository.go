@@ -9,6 +9,9 @@ import (
 
 // ChatRepository 聊天仓储接口
 type ChatRepository interface {
+	// Do 运行一个事务
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
+
 	// StartExchange 创建对话记录
 	StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error)
 

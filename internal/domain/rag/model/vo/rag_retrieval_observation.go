@@ -4,8 +4,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/convertor"
-
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 // ChannelExecutionView 渠道执行观测视图
@@ -26,7 +24,7 @@ type ChannelExecutionView struct {
 }
 
 // SetScores 设置分数统计
-func (v *ChannelExecutionView) SetScores(docs []*klvo.DocumentChunk) {
+func (v *ChannelExecutionView) SetScores(docs []*DocumentChunk) {
 	if len(docs) == 0 {
 		return
 	}
@@ -68,7 +66,7 @@ type RetrievalResultView struct {
 }
 
 // SetDocumentInfo 设置文档基本信息
-func (v *RetrievalResultView) SetDocumentInfo(doc *klvo.DocumentChunk) {
+func (v *RetrievalResultView) SetDocumentInfo(doc *DocumentChunk) {
 	if doc == nil {
 		return
 	}

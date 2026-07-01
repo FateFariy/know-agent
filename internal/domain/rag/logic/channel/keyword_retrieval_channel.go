@@ -3,27 +3,26 @@ package channel
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	kl "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/rag/logic"
+	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
-	documentKnowledgeLogic kl.DocumentKnowledgeLogic
-	keywordTopK            int
+	repo      adapter.RagRepository
+	keywordDB adapter.KeywordDB
 }
 
-var _ logic.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
+var _ RetrievalChannel = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, documentKnowledgeLogic kl.DocumentKnowledgeLogic) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, repo adapter.RagRepository, keywordDB adapter.KeywordDB) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
-		documentKnowledgeLogic: documentKnowledgeLogic,
-		keywordTopK:            svcCtx.Config.Chat.Rag.KeywordTopK,
+		repo:      repo,
+		keywordDB: keywordDB,
 	}
 }
 
@@ -38,17 +37,39 @@ func (c *KeywordRetrievalChannel) Supports(plan *cvo.ConversationExecutionPlan) 
 }
 
 // Retrieve 执行关键词检索
-func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, subQuestion string, plan *cvo.ConversationExecutionPlan) (*logic.RetrievalChannelResult, error) {
-	documentRetrieve := klvo.NewDocumentRetrieve(subQuestion, plan, c.keywordTopK)
+func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
+	if !query.ValidSearchable() {
+		return nil, nil
+	}
 
-	docs, err := c.documentKnowledgeLogic.KeywordSearch(ctx, documentRetrieve)
+	docs, err := c.keywordDB.SearchByKeyword(ctx, query)
 	if err != nil {
-		Warnf("关键词检索失败: subQuestion='%s', error=%v", subQuestion, err)
+		Warnf("关键词检索失败: question='%s', error=%v", query.Question, err)
+		return nil, err
+	}
+	knowledgeMap, err := c.getDocumentsMap(ctx, query.DocumentIds)
+	if err != nil {
 		return nil, err
 	}
 
-	return &logic.RetrievalChannelResult{
+	for _, document := range docs {
+		document.FillKnowledge(knowledgeMap[document.DocumentId])
+	}
+
+	return &vo.RetrievalChannelResult{
 		ChannelName: c.ChannelName(),
 		Documents:   docs,
 	}, nil
+}
+
+// getDocumentsMap 获取文档描述符到 documentId 的映射
+func (c *KeywordRetrievalChannel) getDocumentsMap(ctx context.Context, documentIds []int64) (map[int64]*vo.KnowledgeDocument, error) {
+	documents, err := c.repo.SelectRetrievableDocuments(ctx, documentIds...)
+	if err != nil {
+		return nil, err
+	}
+	descriptorMap := utils.SliceToMapBy(documents, func(t *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
+		return t.DocumentId, t
+	})
+	return descriptorMap, nil
 }

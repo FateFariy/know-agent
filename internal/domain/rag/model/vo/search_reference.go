@@ -7,7 +7,6 @@ import (
 	"github.com/duke-git/lancet/v2/convertor"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 type SearchReference struct {
@@ -36,7 +35,7 @@ type SearchReference struct {
 	KnowledgeScopeName string  // 知识范围名称
 }
 
-func NewSearchReference(chunk *klvo.DocumentChunk, subQuestionIndex int, referenceNumber int, subQuestion string) *SearchReference {
+func NewSearchReference(chunk *DocumentChunk, subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {
 	if chunk == nil {
 		return &SearchReference{}
 	}

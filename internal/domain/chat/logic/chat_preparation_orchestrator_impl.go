@@ -19,7 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	klvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 var (
@@ -343,7 +343,7 @@ func (o *ChatPreparationOrchestratorImpl) basePlan(question string, chatMode vo.
 		HistoryPlanningContext:       historyPlanningContext,
 		RecentHistoryTranscript:      memoryContext.RecentTranscript,
 		AnswerRecentTranscript:       memoryContext.RecentTranscript,
-		AnswerHistoryContext:         answerHistoryContext,
+		QuestionHistoryContext:       answerHistoryContext,
 		HistoryCompressionApplied:    memoryContext.CompressionApplied,
 		HistoryCoveredExchangeId:     &memoryContext.CoveredExchangeId,
 		HistoryCoveredExchangeCount:  &memoryContext.CoveredExchangeCount,
@@ -712,7 +712,7 @@ func (o *ChatPreparationOrchestratorImpl) extractFallbackTerms(question, rewrite
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (o *ChatPreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.KnowledgeDocumentDescriptor, queryTerms []string) float64 {
+func (o *ChatPreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.KnowledgeDocument, queryTerms []string) float64 {
 	content := strings.Join([]string{
 		descriptor.DocumentName,
 		descriptor.KnowledgeScopeCode,

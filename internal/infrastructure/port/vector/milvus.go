@@ -24,7 +24,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	kadapter "github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	rvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -78,7 +77,7 @@ func (m *MilvusVector) DeleteVectorByDocumentId(ctx context.Context, documentId 
 }
 
 // SearchByVector 根据向量搜索
-func (m *MilvusVector) SearchByVector(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *klvo.DocumentRetrieveFilters) ([]*klvo.DocumentChunk, error) {
+func (m *MilvusVector) SearchByVector(ctx context.Context, query string, documentIds, taskIds []int64, topK int, filters *rvo.DocumentRetrieveFilters) ([]*rvo.DocumentChunk, error) {
 	// todo 过滤条件
 	filterExpr := ""
 	retrievedDocs, err := m.retriever.Retrieve(ctx, query, retriever.WithTopK(topK), retrievermilvus.WithFilter(filterExpr))
@@ -88,7 +87,7 @@ func (m *MilvusVector) SearchByVector(ctx context.Context, query string, documen
 	return m.toKnowledgeDocuments(retrievedDocs), nil
 }
 
-func (m *MilvusVector) SearchByKeyword(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *klvo.DocumentRetrieveFilters) ([]*klvo.DocumentChunk, error) {
+func (m *MilvusVector) SearchByKeyword(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *rvo.DocumentRetrieveFilters) ([]*rvo.DocumentChunk, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -139,24 +138,25 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 }
 
 // toKnowledgeDocuments 将 Milvus 检索结果（schema.Document）转成统一的 klvo.DocumentChunk 列表
-func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*klvo.DocumentChunk {
-	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *klvo.DocumentChunk {
+func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*rvo.DocumentChunk {
+	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *rvo.DocumentChunk {
 		meta := doc.MetaData
-		return &klvo.DocumentChunk{
+		return &rvo.DocumentChunk{
 			ID:                doc.ID,
+			Content:           doc.Content,
 			OriginalSnippet:   doc.Content,
 			SourceType:        "DOCUMENT",
 			Channel:           rvo.RetrievalChannelVector,
 			Score:             doc.Score(),
-			TaskId:            metaToInt(meta[klvo.MetaTaskID]),
-			DocumentId:        metaToInt(meta[klvo.MetaDocumentID]),
-			ChunkNo:           int(metaToInt(meta[klvo.MetaChunkNo])),
-			ParentBlockId:     metaToInt(meta[klvo.MetaParentBlockID]),
-			SectionPath:       convertor.ToString(meta[klvo.MetaSectionPath]),
-			StructureNodeId:   metaToInt(meta[klvo.MetaStructureNodeID]),
-			StructureNodeType: int(metaToInt(meta[klvo.MetaStructureNodeType])),
-			CanonicalPath:     convertor.ToString(meta[klvo.MetaCanonicalPath]),
-			ItemIndex:         int(metaToInt(meta[klvo.MetaItemIndex])),
+			TaskId:            metaToInt(meta[rvo.MetaTaskID]),
+			DocumentId:        metaToInt(meta[rvo.MetaDocumentID]),
+			ChunkNo:           int(metaToInt(meta[rvo.MetaChunkNo])),
+			ParentBlockId:     metaToInt(meta[rvo.MetaParentBlockID]),
+			SectionPath:       convertor.ToString(meta[rvo.MetaSectionPath]),
+			StructureNodeId:   metaToInt(meta[rvo.MetaStructureNodeID]),
+			StructureNodeType: int(metaToInt(meta[rvo.MetaStructureNodeType])),
+			CanonicalPath:     convertor.ToString(meta[rvo.MetaCanonicalPath]),
+			ItemIndex:         int(metaToInt(meta[rvo.MetaItemIndex])),
 		}
 	})
 }

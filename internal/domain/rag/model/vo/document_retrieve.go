@@ -86,7 +86,7 @@ func NewDocumentRetrieve(subQuestion string, plan *vo.ConversationExecutionPlan,
 		DocumentIds:       plan.RetrievalDocumentIds,
 		TaskIds:           plan.RetrievalTaskIds,
 		Filters:           filters,
-		TopK:              topK,
+		TopK:              normalizeTopK(topK),
 		QueryContextHints: queryContextHints,
 	}
 
@@ -106,24 +106,9 @@ func NewDocumentRetrieve(subQuestion string, plan *vo.ConversationExecutionPlan,
 	return documentRetrieve
 }
 
-func (d *DocumentRetrieve) ResolvedDocumentIds() []int64 {
-	if len(d.DocumentIds) > 0 {
-		return d.DocumentIds
-	}
-	if d.DocumentId != 0 {
-		return []int64{d.DocumentId}
-	}
-	return nil
-}
-
-func (d *DocumentRetrieve) ResolvedTaskIds() []int64 {
-	if len(d.TaskIds) > 0 {
-		return d.TaskIds
-	}
-	if d.TaskId != 0 {
-		return []int64{d.TaskId}
-	}
-	return nil
+func (d *DocumentRetrieve) ValidSearchable() bool {
+	return len(d.DocumentIds) > 0 && len(d.TaskIds) > 0 &&
+		strutil.IsNotBlank(d.Question) && strutil.IsNotBlank(d.RetrievalQuery)
 }
 
 // buildQueryAugmentation 构建查询增强，将导航决策提示、历史规划上下文提示与原问题合并，生成更完整的检索查询
@@ -236,4 +221,11 @@ func distinctTrimLimit(items []string, limit int) []string {
 		Map(func(s string) string { return strutil.Trim(s) }).
 		Filter(func(s string) bool { return s != "" }).
 		Distinct().Limit(limit).ToSlice()
+}
+
+func normalizeTopK(topK int) int {
+	if topK <= 0 {
+		return 10
+	}
+	return min(topK, 50)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
-type KnowledgeRepository interface {
+type RagRepository interface {
 	// Do 运行一个事务
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
 

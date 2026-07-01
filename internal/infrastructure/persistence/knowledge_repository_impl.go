@@ -10,7 +10,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -43,8 +43,8 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 }
 
 // SelectRetrievableDocuments 查询可检索的文档
-func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIDs ...int64) ([]*vo.KnowledgeDocument, error) {
-	var documents []*vo.KnowledgeDocument
+func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIDs ...int64) ([]*vo2.KnowledgeDocument, error) {
+	var documents []*vo2.KnowledgeDocument
 	query := k.dbWithContext(ctx).Model(&model.Document{}).
 		Where("index_status = ? AND last_index_task_id IS NOT NULL", dvo.IndexStatusBuildSuccess)
 
@@ -63,7 +63,7 @@ func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context
 //  2. 调用 Milvus SDK 在对应 collection 上做 ANN 搜索，过滤 document_id / task_id / section_path 等；
 //  3. 取 topK 结果，根据主键 chunk id 回表补齐 section_path / canonical_path 等字段；
 //  4. 组装为 EmbeddingChunk 返回。
-func (k *KnowledgeRepositoryImpl) SearchByVector(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
+func (k *KnowledgeRepositoryImpl) SearchByVector(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
 	// TODO: 接入 Milvus 客户端（如 github.com/milvus-io/milvus/client/v2）
 	// 示例流程：
 	//   1. embedding := embeddingModel.Embed(query)
@@ -79,7 +79,7 @@ func (k *KnowledgeRepositoryImpl) SearchByVector(ctx context.Context, query stri
 
 // SearchByKeyword 关键词检索（按子串打分 + topK 排序）
 // 当前以“SQL + 简单关键词权重”的形式实现；生产环境建议替换为 BM25/外部索引。
-func (k *KnowledgeRepositoryImpl) SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
+func (k *KnowledgeRepositoryImpl) SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
 	if len(documentIDs) == 0 || len(taskIDs) == 0 || strutil.IsBlank(query) {
 		return nil, nil
 	}
