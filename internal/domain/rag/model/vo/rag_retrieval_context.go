@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
-
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // RagRetrievalContext RAG 检索上下文
@@ -14,7 +12,7 @@ type RagRetrievalContext struct {
 	SubQuestionEvidenceList []*SubQuestionEvidence        `json:"subQuestionEvidenceList"`
 	RetrievalNotes          *list.CopyOnWriteList[string] `json:"retrievalNotes"`
 	UsedChannels            *list.CopyOnWriteList[string] `json:"usedChannels"`
-	FlattenedReferences     []*vo.SearchReference         `json:"flattenedReferences"`
+	FlattenedReferences     []*SearchReference            `json:"flattenedReferences"`
 }
 
 func NewRagRetrievalContext(retrievalQuestion string) *RagRetrievalContext {
@@ -39,11 +37,11 @@ func (c *RagRetrievalContext) IsEmpty() bool {
 }
 
 // FlattenReferences 合并所有子问题的引用
-func (c *RagRetrievalContext) FlattenReferences() []*vo.SearchReference {
+func (c *RagRetrievalContext) FlattenReferences() []*SearchReference {
 	if c.FlattenedReferences != nil {
 		return c.FlattenedReferences
 	}
-	var refs []*vo.SearchReference
+	var refs []*SearchReference
 	for _, sq := range c.SubQuestionEvidenceList {
 		refs = append(refs, sq.References...)
 	}

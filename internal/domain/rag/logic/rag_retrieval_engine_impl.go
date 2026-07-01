@@ -61,9 +61,7 @@ func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.Conversatio
 	}
 
 	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan, tracer)
-	acceptedCount := stream.FromSlice(evidenceList).
-		Filter(func(item *vo.SubQuestionEvidence) bool { return item != nil && len(item.Documents) > 0 }).
-		Count()
+	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.Documents) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
 		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.RetrievalNotes)
@@ -85,8 +83,13 @@ func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ra
 	// todo 线程池改造
 	for i, sq := range subQuestions {
 		go func(subQuestionIndex int, subQuestion string) {
-			channelResults := e.retrieveChannelParallel(timeoutCtx, ragCtx, subQuestionIndex, subQuestion, plan)
-
+			channelResults, err := e.retrieveChannelParallel(timeoutCtx, ragCtx, subQuestionIndex, subQuestion, plan)
+			if err != nil {
+				Warnf("子问题检索失败: subQuestionIndex=%d, subQuestion='%v", subQuestionIndex, err)
+				ragCtx.AddRetrievalNotef("子问题%d检索失败或超时，已自动忽略。", subQuestionIndex)
+				resultChan <- &vo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
+				return
+			}
 			if len(channelResults) == 0 {
 				ragCtx.AddRetrievalNotef("子问题%d没有可用的检索通道。", subQuestionIndex)
 				resultChan <- &vo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
@@ -108,8 +111,8 @@ func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ra
 				}
 			}
 
-			documents := e.fuseByRRF(filteredResults)
-			parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(timeoutCtx, documents, e.parentEvidenceMaxChars)
+			fusedDocs := e.fuseByRRF(filteredResults)
+			parentSearchDocs, err := e.documentKnowledgeLogic.ElevateToParentBlocks(timeoutCtx, fusedDocs, e.parentEvidenceMaxChars)
 			if err != nil {
 				Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				return
@@ -123,47 +126,56 @@ func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ra
 			ragCtx.AddRetrievalNotef(fmt.Sprintf("子问题%d检索完成：%s，final=%d",
 				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments)))
 
-			fusedCount := len(documents)
-			parentCount := len(parentSearchDocs)
-			rerankedCount := len(rerankedCandidates)
-
 			// 记录观测数据
 			if tracer != nil {
-				e.recordChannelObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces)
-				e.recordRetrievalResultObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, documents, rerankedCandidates, finalDocuments)
+				if err = e.recordChannelObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
+					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+				}
+				if err = e.recordRetrievalResultObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
+					Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+				}
 			}
 
 			resultChan <- &vo.SubQuestionEvidence{
 				SubQuestionIndex:       subQuestionIndex,
 				SubQuestion:            subQuestion,
 				Documents:              finalDocuments,
-				References:             nil,
 				ChannelTraces:          channelTraces,
-				FusedCandidateCount:    fusedCount,
-				ParentCandidateCount:   parentCount,
-				RerankedCandidateCount: rerankedCount,
+				FusedCandidateCount:    len(fusedDocs),
+				ParentCandidateCount:   len(parentSearchDocs),
+				RerankedCandidateCount: len(rerankedCandidates),
 			}
 		}(i+1, sq)
 	}
 
 	// 收集所有子问题的结果
 	evidenceList := make([]*vo.SubQuestionEvidence, 0, len(subQuestions))
-	for i := 0; i < len(subQuestions); i++ {
-		evidenceList = append(evidenceList, <-resultChan)
+	for {
+		select {
+		case result := <-resultChan:
+			evidenceList = append(evidenceList, result)
+			if len(evidenceList) == len(subQuestions) {
+				return evidenceList
+			}
+		case <-timeoutCtx.Done():
+			return evidenceList
+		}
 	}
-	return evidenceList
-
 }
 
 // retrieveChannelParallel 并行检索单个子问题的所有通道
 // 使用goroutine并发执行各通道检索，通过超时控制防止阻塞，失败自动降级返回空结果
-func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int, subQuestion string, plan *cvo.ConversationExecutionPlan) []*RetrievalChannelResult {
+func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int,
+	subQuestion string, plan *cvo.ConversationExecutionPlan) ([]*RetrievalChannelResult, error) {
 	// 创建带超时的上下文，超时时间为通道超时配置
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.channelTimeout)
 	defer cancel()
 
 	// 过滤仅执行支持当前计划的通道
 	channels := slice.Filter(e.channels, func(_ int, item RetrievalChannel) bool { return item.Supports(plan) })
+	if len(channels) == 0 {
+		return nil, nil
+	}
 
 	// 创建结果通道，缓冲大小为通道数量，避免goroutine阻塞
 	resultCh := make(chan *RetrievalChannelResult, len(channels))
@@ -190,10 +202,10 @@ func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx
 		case result := <-resultCh:
 			channelResults = append(channelResults, result)
 			if len(channelResults) == len(channels) {
-				return channelResults
+				return channelResults, nil
 			}
 		case <-timeoutCtx.Done():
-			return channelResults
+			return channelResults, context.DeadlineExceeded
 		}
 	}
 }
@@ -294,6 +306,7 @@ func (e *RagRetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candida
 	return result
 }
 
+// assignReferenceIds 为检索证据分配引用ID
 func (e *RagRetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
 	referenceNumber := 1
 	assignedIDs := make(map[string]string)
@@ -301,8 +314,8 @@ func (e *RagRetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEv
 	for _, evidence := range evidenceList {
 		references := make([]*vo.SearchReference, 0, len(evidence.Documents))
 		for _, doc := range evidence.Documents {
-			ref := SearchReferenceMapper(doc, evidence.SubQuestionIndex, evidence.SubQuestion, 0)
-			uniqueKey := UniqueKey(ref)
+			ref := vo.NewSearchReference(doc, evidence.SubQuestionIndex, 0, evidence.SubQuestion)
+			uniqueKey := ref.UniqueKey()
 
 			assignedID, ok := assignedIDs[uniqueKey]
 			if !ok {
@@ -410,7 +423,7 @@ func (e *RagRetrievalEngine) recordChannelObservations(tracer *cvo.ConversationT
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
 func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
-	rawResults, filteredResults []*RetrievalChannelResult, mergedCandidates, rerankedCandidates, finalDocuments []*klvo.Document) error {
+	rawResults, filteredResults []*RetrievalChannelResult, finalDocuments []*klvo.Document) error {
 	if len(rawResults) == 0 {
 		return nil
 	}
@@ -418,25 +431,18 @@ func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.Conve
 	// 构建最终文档ID到排名的映射
 	finalRankMap := make(map[string]int)
 	for i, doc := range finalDocuments {
-		if doc.ID != "" {
-			finalRankMap[doc.ID] = i + 1
-		}
+		finalRankMap[doc.ID] = i + 1
 	}
 
 	// 构建通过闸门的文档ID集合
-	gatePassedSet := make(map[string]bool)
+	gatePassedSet := make(map[string]map[string]bool)
 	for _, fr := range filteredResults {
-		if fr.Documents != nil {
-			for _, doc := range fr.Documents {
-				if doc.ID != "" {
-					gatePassedSet[doc.ID] = true
-				}
-			}
+		for _, doc := range fr.Documents {
+			gatePassedSet[fr.ChannelName][doc.ID] = true
 		}
 	}
 
 	results := make([]*vo.RetrievalResultView, 0)
-
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
 		for i, doc := range rawResult.Documents {
@@ -447,59 +453,36 @@ func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.Conve
 				SubQuestion:      subQuestion,
 				ChannelType:      channelName,
 				ChannelRank:      i + 1,
+				GatePassed:       gatePassedSet[channelName][doc.ID],
 			}
 
 			view.SetDocumentInfo(doc)
 
-			// 设置原始分数
-			view.OriginalScore = doc.Score
-
-			// 从Meta中提取RRF分数和重排序分数
-			if doc.Meta != nil {
-				if val, ok := doc.Meta[klvo.MetaRRFScore]; ok {
-					if score, ok := val.(float64); ok {
-						view.RrfScore = score
-					}
-				}
-				if val, ok := doc.Meta["rerankScore"]; ok {
-					if score, ok := val.(float64); ok {
-						view.RerankScore = score
-					}
-				}
-			}
-
-			// 判断是否通过闸门
-			if doc.ID != "" {
-				view.GatePassed = gatePassedSet[doc.ID]
-			}
-
 			// 判断是否被选中
-			if doc.ID != "" {
-				if rank, ok := finalRankMap[doc.ID]; ok {
-					view.Selected = true
-					view.FinalRank = rank
-					view.SelectionReason = "已选入最终 Prompt"
-				} else if !view.GatePassed {
-					// 未通过闸门
-					if "vector" == channelName {
-						view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
-							view.OriginalScore, e.minVectorSimilarity)
-					} else if "keyword" == channelName {
-						view.SelectionReason = fmt.Sprintf("关键词闸门过滤：分数 %.4f 低于相对阈值（floor=%.2f）",
-							view.OriginalScore, e.keywordRelativeScoreFloor)
-					} else {
-						view.SelectionReason = fmt.Sprintf("闸门过滤：分数 %.4f", view.OriginalScore)
-					}
+			if rank, ok := finalRankMap[doc.ID]; ok {
+				view.Selected = true
+				view.FinalRank = rank
+				view.SelectionReason = "已选入最终 Prompt"
+			} else if !view.GatePassed {
+				// 未通过闸门
+				if vo.RetrievalChannelVector == channelName {
+					view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
+						view.OriginalScore, e.minVectorSimilarity)
+				} else if vo.RetrievalChannelKeyword == channelName {
+					view.SelectionReason = fmt.Sprintf("关键词闸门过滤：分数 %.4f 低于相对阈值（floor=%.2f）",
+						view.OriginalScore, e.keywordRelativeScoreFloor)
 				} else {
-					// 超出finalTopK限制
-					view.SelectionReason = fmt.Sprintf("超出 finalTopK 限制（topK=%d）", e.finalTopK)
+					view.SelectionReason = fmt.Sprintf("闸门过滤：分数 %.4f", view.OriginalScore)
 				}
+			} else {
+				// 超出finalTopK限制
+				view.SelectionReason = fmt.Sprintf("超出 finalTopK 限制（topK=%d）", e.finalTopK)
 			}
-
 			results = append(results, view)
 		}
 	}
 
+	// todo 待完善最终保存
 	tracer.RecordRetrievalResults(results)
 	return nil
 }
