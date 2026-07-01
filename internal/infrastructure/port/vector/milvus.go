@@ -7,9 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino-ext/components/indexer/milvus2"
+	indexmilvus "github.com/cloudwego/eino-ext/components/indexer/milvus2"
+	retrievermilvus "github.com/cloudwego/eino-ext/components/retriever/milvus2"
+	"github.com/cloudwego/eino-ext/components/retriever/milvus2/search_mode"
 	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
+	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
@@ -23,6 +26,7 @@ import (
 
 type MilvusVector struct {
 	indexer    indexer.Indexer
+	retriever  retriever.Retriever
 	model      string
 	client     *milvusclient.Client
 	collection string
@@ -38,6 +42,7 @@ func NewMilvusVector(svcCtx *svc.ServiceContext) adapter.VectorDB {
 	}
 	return &MilvusVector{
 		indexer:    newIndexer(svcCtx, ctx, svcCtx.Emb),
+		retriever:  newRetriever(svcCtx, ctx, svcCtx.Emb),
 		model:      svcCtx.Config.Embedding.Model,
 		client:     client,
 		collection: svcCtx.Config.Milvus.Collection,
@@ -111,16 +116,16 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 }
 
 // 创建索引器
-func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) *milvus2.Indexer {
-	vecIndexer, err := milvus2.NewIndexer(ctx, &milvus2.IndexerConfig{
+func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) indexer.Indexer {
+	vecIndexer, err := indexmilvus.NewIndexer(ctx, &indexmilvus.IndexerConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
 		},
 		Collection: svcCtx.Config.Milvus.Collection,
-		Vector: &milvus2.VectorConfig{
+		Vector: &indexmilvus.VectorConfig{
 			Dimension:    int64(svcCtx.Config.Embedding.Dimensions),
-			MetricType:   milvus2.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType)),
-			IndexBuilder: milvus2.NewHNSWIndexBuilder().WithM(16).WithEfConstruction(200),
+			MetricType:   indexmilvus.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType)),
+			IndexBuilder: indexmilvus.NewHNSWIndexBuilder().WithM(16).WithEfConstruction(200),
 		},
 		Embedding: emb,
 	})
@@ -128,4 +133,22 @@ func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.E
 		panic(err)
 	}
 	return vecIndexer
+}
+
+// 创建向量检索器
+func newRetriever(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) retriever.Retriever {
+	metricType := retrievermilvus.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType))
+	vecRetriever, err := retrievermilvus.NewRetriever(ctx, &retrievermilvus.RetrieverConfig{
+		ClientConfig: &milvusclient.ClientConfig{
+			Address: svcCtx.Config.Milvus.Addr,
+		},
+		Collection: svcCtx.Config.Milvus.Collection,
+		TopK:       10,
+		SearchMode: search_mode.NewApproximate(metricType),
+		Embedding:  emb,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return vecRetriever
 }

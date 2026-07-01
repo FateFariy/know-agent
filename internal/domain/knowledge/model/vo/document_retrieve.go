@@ -113,7 +113,7 @@ func (d *DocumentRetrieve) ResolvedDocumentIds() []int64 {
 	if d.DocumentId != 0 {
 		return []int64{d.DocumentId}
 	}
-	return []int64{}
+	return nil
 }
 
 func (d *DocumentRetrieve) ResolvedTaskIds() []int64 {
@@ -123,7 +123,7 @@ func (d *DocumentRetrieve) ResolvedTaskIds() []int64 {
 	if d.TaskId != 0 {
 		return []int64{d.TaskId}
 	}
-	return []int64{}
+	return nil
 }
 
 // buildQueryAugmentation 构建查询增强，将导航决策提示、历史规划上下文提示与原问题合并，生成更完整的检索查询
