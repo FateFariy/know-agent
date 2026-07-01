@@ -37,14 +37,14 @@ type AsyncProcessingLogicImpl struct {
 	repo          adapter.DocumentRepository
 	port          *adapter.DocumentPort
 	registry      parse.Registry
-	strategyLogic StrategyLogic
+	strategyLogic ChunkStrategyLogic
 	structureNode StructureNodeLogic
 	textPreProc   TextPreProcessLogic
 }
 
 // NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
 func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry parse.Registry,
-	strategyLogic StrategyLogic, structureNode StructureNodeLogic, textPreProc TextPreProcessLogic) *AsyncProcessingLogicImpl {
+	strategyLogic ChunkStrategyLogic, structureNode StructureNodeLogic, textPreProc TextPreProcessLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
 		repo:          repo,
 		port:          port,

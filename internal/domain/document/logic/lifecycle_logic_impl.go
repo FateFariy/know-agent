@@ -25,20 +25,22 @@ import (
 )
 
 type LifecycleLogicImpl struct {
-	port       *adapter.DocumentPort
-	repo       adapter.DocumentRepository
-	parseTopic string
-	indexTopic string
+	port          *adapter.DocumentPort
+	repo          adapter.DocumentRepository
+	chunkStrategy ChunkStrategyLogic
+	parseTopic    string
+	indexTopic    string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository) *LifecycleLogicImpl {
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, chunkStrategy ChunkStrategyLogic) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
-		port:       port,
-		repo:       repo,
-		parseTopic: svcCtx.Config.MQ.ParseTopic,
-		indexTopic: svcCtx.Config.MQ.IndexTopic,
+		port:          port,
+		repo:          repo,
+		chunkStrategy: chunkStrategy,
+		parseTopic:    svcCtx.Config.MQ.ParseTopic,
+		indexTopic:    svcCtx.Config.MQ.IndexTopic,
 	}
 }
 
@@ -279,9 +281,11 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	parentTypeList := extractStrategyTypes(cmd.ParentSteps)
 	childTypeList := extractStrategyTypes(cmd.ChildSteps)
 
-	// TODO: 实现策略标准化
-	// normalizedStepList := d.strategyService.NormalizeSteps(basePlan, baseStepList, parentTypeList, childTypeList, cmd.DocumentId)
-	normalizedStepList := baseStepList
+	// 标准化策略步骤
+	normalizedStepList, err := d.chunkStrategy.NormalizeSteps(ctx, baseStepList, parentTypeList, childTypeList, cmd.DocumentId)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// 校验策略步骤不能为空
 	if len(normalizedStepList) == 0 {
