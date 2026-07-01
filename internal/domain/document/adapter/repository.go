@@ -3,7 +3,6 @@ package adapter
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
 
@@ -12,22 +11,10 @@ type DocumentRepository interface {
 	// Do 运行一个事务性操作
 	Do(ctx context.Context, fn func(txCtx context.Context) error) error
 
-	// ========== 文档聚合根相关 ==========
-
-	// InsertDocumentAggregate 插入文档聚合根
-	InsertDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
-
-	// UpdateDocumentAggregate 更新文档聚合根
-	UpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error
-
-	// SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
-	// 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志
-	SaveConfirmStrategyAggregate(ctx context.Context, agg *aggregate.ConfirmStrategy) error
-
-	// DeleteDocumentRelatedDataById 删除文档关联数据
-	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
-
 	// ========== 文档相关 ==========
+
+	// InsertDocument 插入文档
+	InsertDocument(ctx context.Context, document *entity.Document) error
 
 	// SelectDocumentPage 分页查询文档
 	SelectDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error)
@@ -35,8 +22,11 @@ type DocumentRepository interface {
 	// SelectDocumentById 根据ID查询文档
 	SelectDocumentById(ctx context.Context, documentId int64) (*entity.Document, error)
 
-	// UpdateDocument 更新文档
-	UpdateDocument(ctx context.Context, document *entity.Document) error
+	// UpdateDocumentById 根据ID更新文档
+	UpdateDocumentById(ctx context.Context, document *entity.Document) error
+
+	// DeleteDocumentRelatedDataById 删除文档关联数据
+	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
 
 	// ========== 任务相关 ==========
 
@@ -77,8 +67,8 @@ type DocumentRepository interface {
 	// InsertPlan 插入方案
 	InsertPlan(ctx context.Context, plan *entity.DocumentStrategyPlan) error
 
-	// UpdatePlan 更新方案
-	UpdatePlan(ctx context.Context, plan *entity.DocumentStrategyPlan) error
+	// UpdatePlanById 根据ID更新方案
+	UpdatePlanById(ctx context.Context, plan *entity.DocumentStrategyPlan) error
 
 	// DeletePlanByDocumentId 根据文档ID删除方案
 	DeletePlanByDocumentId(ctx context.Context, documentId int64) error
@@ -88,9 +78,6 @@ type DocumentRepository interface {
 
 	// SelectLatestPlanVersion 查询最新方案版本
 	SelectLatestPlanVersion(ctx context.Context, documentId int64) (int, error)
-
-	// UpdatePlanStatus 更新方案状态
-	UpdatePlanStatus(ctx context.Context, planId int64, status int) error
 
 	// ========== 步骤相关 ==========
 
@@ -147,9 +134,6 @@ type DocumentRepository interface {
 	SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentBlock, error)
 
 	// ========== 结构节点相关 ==========
-
-	// InsertStructureNode 插入结构节点
-	InsertStructureNode(ctx context.Context, node *entity.DocumentStructureNode) error
 
 	// InsertStructureNodeBatch 批量插入结构节点
 	InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error

@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/duke-git/lancet/v2/slice"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
@@ -14,18 +13,10 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"github.com/swiftbit/know-agent/internal/svc"
-)
-
-const (
-	ticketUserList      = "ticket_user_list:%d"
-	userLogin           = "user_login:%d:%s"
-	loginMobileErrorKey = "login:mobile:error:%s"
-	loginEmailErrorKey  = "login:email:error:%s"
 )
 
 type DocumentRepositoryImpl struct {
@@ -46,121 +37,6 @@ func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, 
 	}
 }
 
-// ========== 文档聚合根相关 ==========
-
-// InsertDocumentAggregate 插入文档聚合根
-func (d *DocumentRepositoryImpl) InsertDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
-	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(convert.ToDocumentModel(agg.Document)).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(convert.ToDocumentTaskModel(agg.Task)).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(convert.ToDocumentTaskLogModel(agg.TaskLog)).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// UpdateDocumentAggregate 更新文档聚合根
-func (d *DocumentRepositoryImpl) UpdateDocumentAggregate(ctx context.Context, agg *aggregate.Document) error {
-	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Updates(convert.ToDocumentModel(agg.Document)).Error; err != nil {
-			return err
-		}
-		if err := tx.Updates(convert.ToDocumentTaskModel(agg.Task)).Error; err != nil {
-			return err
-		}
-		if err := tx.Updates(convert.ToDocumentTaskLogModel(agg.TaskLog)).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// SaveConfirmStrategyAggregate 保存确认策略聚合根（事务性操作）
-// 包括：更新文档状态、更新任务阶段、废弃旧方案、创建新方案、插入步骤、记录日志
-func (d *DocumentRepositoryImpl) SaveConfirmStrategyAggregate(ctx context.Context, agg *aggregate.ConfirmStrategy) error {
-	return d.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 更新文档状态（CurrentPlanId和StrategyStatus）
-		if err := tx.Model(&model.Document{}).Where("id = ?", agg.Document.ID).
-			Updates(map[string]any{
-				"current_plan_id": agg.Document.CurrentPlanId,
-				"strategy_status": agg.Document.StrategyStatus,
-			}).Error; err != nil {
-			return err
-		}
-
-		// 更新任务阶段（如果任务存在）
-		if agg.Task != nil {
-			if err := tx.Model(&model.DocumentTask{}).Where("id = ?", agg.Task.ID).
-				Updates(map[string]any{
-					"current_stage": agg.Task.CurrentStage,
-				}).Error; err != nil {
-				return err
-			}
-		}
-
-		// 根据是否变更处理方案
-		if agg.IsChanged {
-			// 策略发生变更：废弃旧方案
-			if err := tx.Model(&model.DocumentStrategyPlan{}).Where("id = ?", agg.OldStrategyPlan.ID).
-				Updates(map[string]any{
-					"plan_status": agg.OldStrategyPlan.PlanStatus,
-				}).Error; err != nil {
-				return err
-			}
-
-			// 创建新方案
-			if err := tx.Create(convert.ToDocumentStrategyPlanModel(agg.NewStrategyPlan)).Error; err != nil {
-				return err
-			}
-
-			// 插入新方案的步骤
-			if len(agg.Steps) > 0 {
-				stepModels := slice.Map(agg.Steps, func(i int, step *entity.DocumentStrategyStep) *model.DocumentStrategyStep {
-					return convert.ToDocumentStrategyStepModel(step)
-				})
-				if err := tx.CreateInBatches(stepModels, 100).Error; err != nil {
-					return err
-				}
-			}
-
-			// 记录调整日志（如果存在）
-			if agg.AdjustLog != nil {
-				agg.AdjustLog.ID = utils.GetSnowflakeNextID()
-				if err := tx.Create(convert.ToDocumentTaskLogModel(agg.AdjustLog)).Error; err != nil {
-					return err
-				}
-			}
-		} else {
-			// 策略未变更：更新基础方案状态
-			if err := tx.Model(&model.DocumentStrategyPlan{}).Where("id = ?", agg.NewStrategyPlan.ID).
-				Updates(map[string]any{
-					"plan_status":     agg.NewStrategyPlan.PlanStatus,
-					"plan_source":     agg.NewStrategyPlan.PlanSource,
-					"adjust_note":     agg.NewStrategyPlan.AdjustNote,
-					"confirm_user_id": agg.NewStrategyPlan.ConfirmUserId,
-					"confirm_time":    agg.NewStrategyPlan.ConfirmTime,
-				}).Error; err != nil {
-				return err
-			}
-		}
-
-		// 记录确认日志（如果存在）
-		if agg.ConfirmLog != nil {
-			agg.ConfirmLog.ID = utils.GetSnowflakeNextID()
-			if err := tx.Create(convert.ToDocumentTaskLogModel(agg.ConfirmLog)).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
 // DeleteDocumentRelatedDataById 删除文档关联数据
 func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error) {
 	var documentName string
@@ -177,7 +53,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 		}
 
 		// 删除向量索引
-		if err = d.vdb.DeleteDocumentById(ctx, documentId); err != nil {
+		if err = d.vdb.DeleteVectorByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
 
@@ -221,6 +97,11 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 
 // ========== 文档相关 ==========
 
+// InsertDocument 插入文档
+func (d *DocumentRepositoryImpl) InsertDocument(ctx context.Context, document *entity.Document) error {
+	return d.dbWithContext(ctx).Create(convert.ToDocumentModel(document)).Error
+}
+
 // SelectDocumentPage 获取文档分页列表
 func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error) {
 	var documents []*entity.Document
@@ -244,9 +125,9 @@ func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documen
 	return document, nil
 }
 
-// UpdateDocument 更新文档
-func (d *DocumentRepositoryImpl) UpdateDocument(ctx context.Context, document *entity.Document) error {
-	return d.dbWithContext(ctx).Updates(convert.ToDocumentModel(document)).Error
+// UpdateDocumentById 根据ID更新文档
+func (d *DocumentRepositoryImpl) UpdateDocumentById(ctx context.Context, document *entity.Document) error {
+	return d.dbWithContext(ctx).Where("id = ?", document.ID).Updates(convert.ToDocumentModel(document)).Error
 }
 
 // DeleteDocumentById  根据ID删除文档
@@ -344,14 +225,14 @@ func (d *DocumentRepositoryImpl) SelectTaskLogPage(ctx context.Context, taskId i
 
 // ========== 方案/策略相关 ==========
 
+// InsertPlan 插入方案/策略
 func (d *DocumentRepositoryImpl) InsertPlan(ctx context.Context, plan *entity.DocumentStrategyPlan) error {
-	// TODO implement me
-	panic("implement me")
+	return d.dbWithContext(ctx).Create(convert.ToDocumentStrategyPlanModel(plan)).Error
 }
 
-func (d *DocumentRepositoryImpl) UpdatePlan(ctx context.Context, plan *entity.DocumentStrategyPlan) error {
-	// TODO implement me
-	panic("implement me")
+// UpdatePlanById 根据方案/策略ID更新方案/策略
+func (d *DocumentRepositoryImpl) UpdatePlanById(ctx context.Context, plan *entity.DocumentStrategyPlan) error {
+	return d.dbWithContext(ctx).Where("id = ?", plan.ID).Updates(convert.ToDocumentStrategyPlanModel(plan)).Error
 }
 
 // DeletePlanByDocumentId  根据文档ID删除方案/策略
@@ -376,11 +257,6 @@ func (d *DocumentRepositoryImpl) SelectLatestPlanVersion(ctx context.Context, do
 	plan := &model.DocumentStrategyPlan{DocumentId: documentId}
 	err := d.dbWithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error
 	return plan.PlanVersion, err
-}
-
-func (d *DocumentRepositoryImpl) UpdatePlanStatus(ctx context.Context, planId int64, status int) error {
-	// TODO implement me
-	panic("implement me")
 }
 
 // ========== 步骤相关 ==========
@@ -515,11 +391,6 @@ func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, bloc
 }
 
 // ========== 结构节点相关 ==========
-
-func (d *DocumentRepositoryImpl) InsertStructureNode(ctx context.Context, node *entity.DocumentStructureNode) error {
-	// TODO implement me
-	panic("implement me")
-}
 
 // InsertStructureNodeBatch 批量插入结构节点
 func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error {

@@ -14,12 +14,11 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-
-	"github.com/swiftbit/know-agent/common/utils"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -121,13 +120,17 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 		DetailJson:   string(detail),
 	}
 
-	// 聚合文档、任务、任务日志并持久化
-	agg := &aggregate.Document{
-		Document: document,
-		Task:     task,
-		TaskLog:  taskLog,
+	// 事务性插入文档、任务、任务日志
+	insertTx := func(txCtx context.Context) error {
+		if err = d.repo.InsertDocument(txCtx, document); err != nil {
+			return err
+		}
+		if err = d.repo.InsertTask(txCtx, task); err != nil {
+			return err
+		}
+		return d.repo.InsertTaskLog(txCtx, taskLog)
 	}
-	if err = d.repo.InsertDocumentAggregate(ctx, agg); err != nil {
+	if err = d.repo.Do(ctx, insertTx); err != nil {
 		return nil, err
 	}
 
@@ -317,123 +320,140 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		return nil, nil, err
 	}
 
-	// 构建确认策略聚合根
-	agg := &aggregate.ConfirmStrategy{
-		Document:        document,
-		Task:            latestParseTask,
-		OldStrategyPlan: basePlan,
-		IsChanged:       changed,
-	}
+	var newPlan *entity.DocumentStrategyPlan
+	confirmTx := func(txCtx context.Context) error {
+		// 根据是否变更处理方案
+		if changed {
+			// 策略发生变更：废弃旧方案
+			if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: basePlan.ID, PlanStatus: vo.PlanStatusDiscarded}); err != nil {
+				return err
+			}
 
-	// 更新文档状态
-	document.StrategyStatus = vo.StrategyStatusConfirmed
+			// 查询最新方案版本号
+			latestPlanVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
+			if err != nil {
+				return err
+			}
 
-	// 更新任务阶段
-	if latestParseTask != nil {
-		latestParseTask.CurrentStage = vo.TaskStageStrategyConfirm
-	}
+			// 创建新方案
+			newPlan = &entity.DocumentStrategyPlan{
+				ID:              utils.GetSnowflakeNextID(),
+				DocumentId:      document.ID,
+				PlanVersion:     latestPlanVersion + 1,
+				PlanSource:      vo.PlanSourceUserAdjust,
+				PlanStatus:      vo.PlanStatusConfirmed,
+				StrategyCount:   len(normalizedStepList),
+				RecommendReason: basePlan.RecommendReason,
+				AdjustNote:      cmd.AdjustNote,
+				ConfirmUserId:   cmd.OperatorId,
+				ConfirmTime:     time.Now(),
+			}
+			newPlan.FillAndProcessPipeline(normalizedStepList)
+			newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
 
-	// 根据是否变更构建不同的聚合内容
-	if changed {
-		// 策略发生变更：废弃旧方案，创建新方案
-		basePlan.PlanStatus = vo.PlanStatusDiscarded
+			// 更新文档的当前方案ID为新方案
+			document.CurrentPlanId = newPlan.ID
 
-		// 查询最新方案版本号
-		latestPlanVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
-		if err != nil {
-			return nil, nil, err
-		}
+			// 创建新方案
+			if err = d.repo.InsertPlan(txCtx, newPlan); err != nil {
+				return err
+			}
 
-		// 创建新方案
-		newPlan := &entity.DocumentStrategyPlan{
-			ID:              utils.GetSnowflakeNextID(),
-			DocumentId:      document.ID,
-			PlanVersion:     latestPlanVersion + 1,
-			PlanSource:      vo.PlanSourceUserAdjust,
-			PlanStatus:      vo.PlanStatusConfirmed,
-			StrategyCount:   len(normalizedStepList),
-			RecommendReason: basePlan.RecommendReason,
-			AdjustNote:      cmd.AdjustNote,
-			ConfirmUserId:   cmd.OperatorId,
-			ConfirmTime:     time.Now(),
-		}
-		newPlan.FillAndProcessPipeline(normalizedStepList)
-		newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
+			// 为步骤分配ID和方案ID
+			for _, step := range normalizedStepList {
+				step.ID = utils.GetSnowflakeNextID()
+				step.PlanId = newPlan.ID
+			}
 
-		// 为步骤分配ID和方案ID
-		for _, step := range normalizedStepList {
-			step.ID = utils.GetSnowflakeNextID()
-			step.PlanId = newPlan.ID
-		}
+			// 插入新方案的步骤
+			if err = d.repo.InsertStepBatch(txCtx, normalizedStepList); err != nil {
+				return err
+			}
 
-		// 更新文档的当前方案ID为新方案
-		document.CurrentPlanId = newPlan.ID
-
-		// 构建调整日志
-		if latestParseTask != nil {
-			detailJson, _ := json.Marshal(map[string]any{
-				"parentStrategyTypes": normalizedParentTypeList,
-				"childStrategyTypes":  normalizedChildTypeList,
-				"adjustNote":          cmd.AdjustNote,
-			})
-			agg.AdjustLog = &entity.DocumentTaskLog{
-				TaskId:       latestParseTask.ID,
-				DocumentId:   document.ID,
-				StageType:    vo.TaskStageStrategyConfirm,
-				EventType:    vo.TaskEventUserAdjust,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
-				OperatorId:   cmd.OperatorId,
-				Content:      "用户调整了系统推荐策略。",
-				DetailJson:   string(detailJson),
+			// 构建调整日志
+			if latestParseTask != nil {
+				detailJson, _ := json.Marshal(map[string]any{
+					"parentStrategyTypes": normalizedParentTypeList,
+					"childStrategyTypes":  normalizedChildTypeList,
+					"adjustNote":          cmd.AdjustNote,
+				})
+				adjustLog := &entity.DocumentTaskLog{
+					ID:           utils.GetSnowflakeNextID(),
+					TaskId:       latestParseTask.ID,
+					DocumentId:   document.ID,
+					StageType:    vo.TaskStageStrategyConfirm,
+					EventType:    vo.TaskEventUserAdjust,
+					LogLevel:     vo.LogLevelInfo,
+					OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+					OperatorId:   cmd.OperatorId,
+					Content:      "用户调整了系统推荐策略。",
+					DetailJson:   string(detailJson),
+				}
+				// 记录调整日志
+				if err = d.repo.InsertTaskLog(txCtx, adjustLog); err != nil {
+					return err
+				}
+			}
+		} else {
+			// 策略未变更：更新基础方案状态
+			if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{
+				ID:            basePlan.ID,
+				PlanStatus:    vo.PlanStatusConfirmed,
+				PlanSource:    utils.Ternary(basePlan.PlanSource == 0, vo.PlanSourceSystemRecommend, basePlan.PlanSource),
+				AdjustNote:    cmd.AdjustNote,
+				ConfirmUserId: cmd.OperatorId,
+				ConfirmTime:   time.Now(),
+			}); err != nil {
+				return err
 			}
 		}
 
-		// 设置聚合根的新方案和步骤
-		agg.NewStrategyPlan = newPlan
-		agg.Steps = normalizedStepList
-	} else {
-		// 策略未变更：直接确认基础方案
-		basePlan.PlanStatus = vo.PlanStatusConfirmed
-		basePlan.PlanSource = utils.Ternary(basePlan.PlanSource == 0, vo.PlanSourceSystemRecommend, basePlan.PlanSource)
-		basePlan.AdjustNote = cmd.AdjustNote
-		basePlan.ConfirmUserId = cmd.OperatorId
-		basePlan.ConfirmTime = time.Now()
+		// 更新文档状态
+		document.StrategyStatus = vo.StrategyStatusConfirmed
+		document.FillEnumNames()
 
-		// 设置聚合根的新方案为更新后的基础方案
-		agg.NewStrategyPlan = basePlan
-	}
-
-	// 构建确认日志
-	if latestParseTask != nil {
-		detailJson, _ := json.Marshal(map[string]any{
-			"planId":              agg.NewStrategyPlan.ID,
-			"parentStrategyTypes": normalizedParentTypeList,
-			"childStrategyTypes":  normalizedChildTypeList,
-		})
-		agg.ConfirmLog = &entity.DocumentTaskLog{
-			TaskId:       latestParseTask.ID,
-			DocumentId:   document.ID,
-			StageType:    vo.TaskStageStrategyConfirm,
-			EventType:    vo.TaskEventUserConfirm,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
-			OperatorId:   cmd.OperatorId,
-			Content:      "用户确认了最终策略方案。",
-			DetailJson:   string(detailJson),
+		if latestParseTask != nil {
+			// 创建确认日志
+			detailJson, _ := json.Marshal(map[string]any{
+				"planId":              document.CurrentPlanId,
+				"parentStrategyTypes": normalizedParentTypeList,
+				"childStrategyTypes":  normalizedChildTypeList,
+			})
+			confirmLog := &entity.DocumentTaskLog{
+				ID:           utils.GetSnowflakeNextID(),
+				TaskId:       latestParseTask.ID,
+				DocumentId:   document.ID,
+				StageType:    vo.TaskStageStrategyConfirm,
+				EventType:    vo.TaskEventUserConfirm,
+				LogLevel:     vo.LogLevelInfo,
+				OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+				OperatorId:   cmd.OperatorId,
+				Content:      "用户确认了最终策略方案。",
+				DetailJson:   string(detailJson),
+			}
+			if err = d.repo.InsertTaskLog(txCtx, confirmLog); err != nil {
+				return err
+			}
+			// 更新任务阶段
+			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: latestParseTask.ID, CurrentStage: vo.TaskStageStrategyConfirm}); err != nil {
+				return err
+			}
 		}
+
+		// 更新文档状态
+		return d.repo.UpdateDocumentById(txCtx, &entity.Document{
+			ID:             document.ID,
+			StrategyStatus: document.StrategyStatus,
+			CurrentPlanId:  document.CurrentPlanId,
+		})
 	}
 
-	// 更新文档状态
-	document.StrategyStatus = vo.StrategyStatusConfirmed
-	document.FillEnumNames()
-
-	// 由基础设施层统一事务性保存聚合根
-	if err = d.repo.SaveConfirmStrategyAggregate(ctx, agg); err != nil {
+	// 确认策略
+	if err = d.repo.Do(ctx, confirmTx); err != nil {
 		return nil, nil, err
 	}
 
-	return agg.NewStrategyPlan, document, nil
+	return newPlan, document, nil
 }
 
 // BuildIndex 构建文档索引
@@ -502,7 +522,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	// 事务性操作：更新文档状态、插入任务、插入任务日志
 	fn := func(txCtx context.Context) error {
 		// 更新文档状态为"构建中"
-		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuilding}); err != nil {
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuilding}); err != nil {
 			return err
 		}
 		if err := d.repo.InsertTask(txCtx, task); err != nil {

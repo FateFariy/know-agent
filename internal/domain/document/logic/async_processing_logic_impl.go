@@ -100,7 +100,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		if err = d.repo.UpdateTaskById(txCtx, runningTask); err != nil {
 			return err
 		}
-		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, ParseStatus: vo.ParseStatusParsing}); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, ParseStatus: vo.ParseStatusParsing}); err != nil {
 			return err
 		}
 		// 写入"开始解析文档"日志，附带对象存储 key
@@ -203,7 +203,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 			LastParseTaskId:     taskId,
 			StructureNodeCount:  len(structureNodes),
 		}
-		if err = d.repo.UpdateDocument(txCtx, updatedDoc); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, updatedDoc); err != nil {
 			return err
 		}
 		// 标记任务成功完成并收尾（写入耗时等）
@@ -275,7 +275,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
 		// 文档状态
-		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuilding}); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuilding}); err != nil {
 			return err
 		}
 		// 策略步骤标记执行中
@@ -467,11 +467,11 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 			return err
 		}
 		// 方案状态标记为已执行
-		if err = d.repo.UpdatePlanStatus(txCtx, planId, vo.PlanStatusExecuted); err != nil {
+		if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: planId, PlanStatus: vo.PlanStatusExecuted}); err != nil {
 			return err
 		}
 		// 文档索引状态更新为构建成功
-		if err = d.repo.UpdateDocument(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuildSuccess, LastIndexTaskId: taskId}); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuildSuccess, LastIndexTaskId: taskId}); err != nil {
 			return err
 		}
 		// 写入成功耗时/统计日志
@@ -648,7 +648,7 @@ func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, docum
 	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
 	parseFailTx := func(txCtx context.Context) error {
 		// 文档：标记为解析失败，并保留失败原因
-		if err := d.repo.UpdateDocument(txCtx, &entity.Document{
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{
 			ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg),
 		}); err != nil {
 			return err
@@ -687,7 +687,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 	logx.Errorf("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
 	indexBuildFailTx := func(txCtx context.Context) error {
 		// 文档：索引构建失败
-		if err := d.repo.UpdateDocument(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
 			return err
 		}
 		// chunk：按任务 ID 批量将向量状态置为失败（Milvus 为默认向量库类型）
