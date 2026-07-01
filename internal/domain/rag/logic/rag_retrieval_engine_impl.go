@@ -216,17 +216,17 @@ func (e *RagRetrievalEngine) applyEvidenceGate(result *RetrievalChannelResult) *
 		return result
 	}
 
-	var documents []*klvo.Document
+	var documents []*klvo.DocumentChunk
 	switch result.ChannelName {
 	case vo.RetrievalChannelVector:
 		// 向量通道：使用绝对相似度阈值过滤
-		documents = slice.Filter(result.Documents, func(index int, doc *klvo.Document) bool {
+		documents = slice.Filter(result.Documents, func(index int, doc *klvo.DocumentChunk) bool {
 			return doc.Score >= e.minVectorSimilarity
 		})
 	case vo.RetrievalChannelKeyword:
 		// 关键词通道：使用相对分数阈值过滤（相对于最高分）
-		maxScore := slices.MaxFunc(result.Documents, func(doc1, doc2 *klvo.Document) int { return int(doc1.Score - doc2.Score) }).Score
-		documents = slice.Filter(result.Documents, func(index int, doc *klvo.Document) bool {
+		maxScore := slices.MaxFunc(result.Documents, func(doc1, doc2 *klvo.DocumentChunk) int { return int(doc1.Score - doc2.Score) }).Score
+		documents = slice.Filter(result.Documents, func(index int, doc *klvo.DocumentChunk) bool {
 			return doc.Score >= (e.keywordRelativeScoreFloor * maxScore)
 		})
 	default:
@@ -240,14 +240,14 @@ func (e *RagRetrievalEngine) applyEvidenceGate(result *RetrievalChannelResult) *
 }
 
 type candidateHolder struct {
-	document *klvo.Document
+	document *klvo.DocumentChunk
 	score    float64
 	channels map[string]struct{}
 }
 
 // fuseByRRF 融合多个通道的候选结果（基于RRF算法）
 // RRF(Reciprocal Rank Fusion)通过合并各通道的排名信息，计算综合分数，实现多通道结果融合
-func (e *RagRetrievalEngine) fuseByRRF(channelResults []*RetrievalChannelResult) []*klvo.Document {
+func (e *RagRetrievalEngine) fuseByRRF(channelResults []*RetrievalChannelResult) []*klvo.DocumentChunk {
 	var holders []*candidateHolder
 
 	// 遍历所有通道结果，累积计算RRF分数
@@ -256,7 +256,7 @@ func (e *RagRetrievalEngine) fuseByRRF(channelResults []*RetrievalChannelResult)
 	}
 
 	// 按RRF分数降序排序，取前N个文档
-	result := make([]*klvo.Document, 0, len(holders))
+	result := make([]*klvo.DocumentChunk, 0, len(holders))
 	stream.FromSlice(holders).
 		Sorted(func(a, b *candidateHolder) bool { return a.score > b.score }).
 		Limit(e.candidateTopK).
@@ -292,7 +292,7 @@ func (e *RagRetrievalEngine) accumulateRRF(channelResult *RetrievalChannelResult
 	return maputil.Values(holders)
 }
 
-func (e *RagRetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*klvo.Document, subQuestion string) []*klvo.Document {
+func (e *RagRetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*klvo.DocumentChunk, subQuestion string) []*klvo.DocumentChunk {
 	if !e.rerankEnabled || len(candidates) == 0 || e.rerankPostProcessor == nil {
 		return candidates
 	}
@@ -423,7 +423,7 @@ func (e *RagRetrievalEngine) recordChannelObservations(tracer *cvo.ConversationT
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
 func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
-	rawResults, filteredResults []*RetrievalChannelResult, finalDocuments []*klvo.Document) error {
+	rawResults, filteredResults []*RetrievalChannelResult, finalDocuments []*klvo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
 	}

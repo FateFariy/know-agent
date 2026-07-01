@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
+
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/data"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -40,10 +41,6 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 		transactionManager: &transactionManager{db: svcCtx.Db},
 	}
 }
-
-// =====================================================
-// 公共查询 API
-// =====================================================
 
 // SelectRetrievableDocuments 查询可检索的文档
 func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIDs ...int64) ([]*vo.KnowledgeDocument, error) {
@@ -164,15 +161,6 @@ func (k *KnowledgeRepositoryImpl) SelectParentBlocks(ctx context.Context, parent
 	return parentBlocks, nil
 }
 
-// =====================================================
-// 内部：关键词分数与辅助工具
-// =====================================================
-
-type keywordScoreChunk struct {
-	chunk *data.EmbeddingChunk
-	score float64
-}
-
 func computeKeywordScore(terms []string, chunkText, sectionPath string) float64 {
 	if len(terms) == 0 {
 		return 0
@@ -192,15 +180,6 @@ func computeKeywordScore(terms []string, chunkText, sectionPath string) float64 
 	return score
 }
 
-func sortKeywordChunksDesc(items []keywordScoreChunk) {
-	// 简单的冒泡/插入排序即可（通常 topK<=50，chunk 数也不会特别大）
-	for i := 1; i < len(items); i++ {
-		for j := i; j > 0 && items[j].score > items[j-1].score; j-- {
-			items[j], items[j-1] = items[j-1], items[j]
-		}
-	}
-}
-
 func buildLikeOrExpr(field string, patterns []string) string {
 	// 例如：(LOWER(section_path) LIKE '%a%' OR LOWER(section_path) LIKE '%b%')
 	if len(patterns) == 0 {
@@ -218,10 +197,6 @@ func buildLikeOrExpr(field string, patterns []string) string {
 	}
 	return "(" + strings.Join(parts, " OR ") + ")"
 }
-
-// =====================================================
-// 关键词提取（与 logic 层一致的最小实现，避免跨层依赖）
-// =====================================================
 
 const maxKeywordTerms = 8
 

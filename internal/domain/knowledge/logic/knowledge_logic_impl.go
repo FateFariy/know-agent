@@ -3,29 +3,23 @@ package logic
 import (
 	"context"
 	"fmt"
-	"maps"
-	"math"
 	"regexp"
 	"slices"
-	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
-	"github.com/duke-git/lancet/v2/convertor"
-	"github.com/duke-git/lancet/v2/slice"
-	"github.com/duke-git/lancet/v2/stream"
+	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/data"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
-// ====== 常量与正则（与 Java DocumentKnowledgeServiceImpl 对齐） ======
 const (
-	BusinessStatusYes       = 1
 	IndexStatusBuildSuccess = 2
 	MaxKeywordTerms         = 8
 )
@@ -43,16 +37,16 @@ var (
 // DocumentKnowledgeLogicImpl 文档知识服务实现
 type DocumentKnowledgeLogicImpl struct {
 	repo adapter.KnowledgeRepository
+	port *adapter.KnowledgePort
 }
 
 // NewDocumentKnowledgeService 构造函数
-func NewDocumentKnowledgeService(repo adapter.KnowledgeRepository) *DocumentKnowledgeLogicImpl {
-	return &DocumentKnowledgeLogicImpl{repo: repo}
+func NewDocumentKnowledgeService(repo adapter.KnowledgeRepository, port *adapter.KnowledgePort) *DocumentKnowledgeLogicImpl {
+	return &DocumentKnowledgeLogicImpl{
+		repo: repo,
+		port: port,
+	}
 }
-
-// =====================================================
-// 公开 API
-// =====================================================
 
 // ListRetrievableDocuments 列出可检索的文档
 func (s *DocumentKnowledgeLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error) {
@@ -60,83 +54,87 @@ func (s *DocumentKnowledgeLogicImpl) ListRetrievableDocuments(ctx context.Contex
 }
 
 // VectorSearch 向量检索（Milvus 后端 + 过滤器）
-// 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）→ 组装 vo.Document
-func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.Document, error) {
+// 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）→ 组装 vo.DocumentChunk
+func (s *DocumentKnowledgeLogicImpl) VectorSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	if !s.validSearchable(retrieve) {
 		return nil, nil
 	}
 
 	documentIDs := retrieve.ResolvedDocumentIds()
 	taskIDs := retrieve.ResolvedTaskIds()
-	descriptorMap, err := s.getDocumentsMap(ctx, documentIDs)
+	knowledgeMap, err := s.getDocumentsMap(ctx, documentIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	chunks, err := s.repo.SearchByVector(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, s.resolveTopK(retrieve.TopK), retrieve.Filters)
+	documents, err := s.port.SearchByVector(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, resolveTopK(retrieve.TopK), retrieve.Filters)
 	if err != nil {
 		logx.Errorf("VectorSearch failed: query=%s, err=%v", retrieve.RetrievalQuery, err)
 		return nil, err
 	}
+	for _, document := range documents {
+		document.FillKnowledge(knowledgeMap[document.DocumentId])
+	}
 
-	return s.buildSearchDocuments(chunks, descriptorMap, "vector"), nil
+	return documents, nil
 }
 
 // KeywordSearch 关键词检索
 // 流程：参数校验 → 提取关键词项 → 调用仓储（SQL 或外部索引）→ 按分数降序组装结果
-func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.Document, error) {
+func (s *DocumentKnowledgeLogicImpl) KeywordSearch(ctx context.Context, retrieve *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	if !s.validSearchable(retrieve) {
 		return nil, nil
 	}
 
 	documentIDs := retrieve.ResolvedDocumentIds()
 	taskIDs := retrieve.ResolvedTaskIds()
-	descriptorMap, err := s.getDocumentsMap(ctx, documentIDs)
+	knowledgeMap, err := s.getDocumentsMap(ctx, documentIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	chunks, err := s.repo.SearchByKeyword(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, s.resolveTopK(retrieve.TopK), retrieve.Filters)
+	documents, err := s.port.SearchByKeyword(ctx, retrieve.RetrievalQuery, documentIDs, taskIDs, resolveTopK(retrieve.TopK), retrieve.Filters)
 	if err != nil {
 		logx.Errorf("KeywordSearch failed: query=%s, err=%v", retrieve.RetrievalQuery, err)
 		return nil, err
 	}
 
-	return s.buildSearchDocuments(chunks, descriptorMap, "keyword"), nil
+	for _, document := range documents {
+		document.FillKnowledge(knowledgeMap[document.DocumentId])
+	}
+
+	return documents, nil
 }
 
 // ElevateToParentBlocks 将子文档提升到父块级别，聚合出更完整的证据
 // 流程：按 parentBlockId 分组 → 查询父块 → 聚合分数/通道 → 按分数排序
-func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.Document, maxChars int) ([]*vo.Document, error) {
+func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
 	if len(childDocuments) == 0 {
 		return nil, nil
 	}
 
-	// 步骤 1：按 parentBlockId 分组，并收集无法被归类的 childDocument 作为 fallback
-	childGroupsByParent := make(map[int64][]*vo.Document, len(childDocuments))
-	fallbackDocuments := make([]*vo.Document, 0, len(childDocuments))
-	parentBlockIDs := make([]int64, 0, len(childDocuments))
+	// 按 parentBlockId 分组，并收集无法被归类的 childDocument 作为 fallback
+	childGroupsByParent := make(map[int64][]*vo.DocumentChunk, len(childDocuments))
+	fallbackDocuments := make([]*vo.DocumentChunk, 0, len(childDocuments))
+	parentBlockIds := make([]int64, 0, len(childDocuments))
 	for _, childDocument := range childDocuments {
-		if childDocument == nil {
-			continue
-		}
-		parentBlockID, err := convertor.ToInt(childDocument.Meta[vo.MetaParentBlockID])
-		if err != nil || parentBlockID == 0 {
+		parentBlockId := childDocument.ParentBlockId
+		if parentBlockId == 0 {
 			fallbackDocuments = append(fallbackDocuments, childDocument)
 			continue
 		}
-		if _, exists := childGroupsByParent[parentBlockID]; !exists {
-			parentBlockIDs = append(parentBlockIDs, parentBlockID)
+		childGroupsByParent[parentBlockId] = append(childGroupsByParent[parentBlockId], childDocument)
+		if _, exists := childGroupsByParent[parentBlockId]; exists {
+			parentBlockIds = append(parentBlockIds, parentBlockId)
 		}
-		childGroupsByParent[parentBlockID] = append(childGroupsByParent[parentBlockID], childDocument)
 	}
 
 	if len(childGroupsByParent) == 0 {
 		return fallbackDocuments, nil
 	}
 
-	// 步骤 2：查询父块
-	parentBlocks, err := s.repo.SelectParentBlocks(ctx, parentBlockIDs)
+	// 查询父块
+	parentBlocks, err := s.repo.SelectParentBlocks(ctx, parentBlockIds)
 	if err != nil {
 		return nil, err
 	}
@@ -144,10 +142,10 @@ func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, 
 		return item.ID, item
 	})
 
-	// 步骤 3：构建父级证据文档，或当父块未找到时直接保留子文档
-	elevatedDocuments := make([]*vo.Document, 0, len(childGroupsByParent)+len(fallbackDocuments))
-	for parentID, children := range childGroupsByParent {
-		parentBlock, ok := parentBlockMap[parentID]
+	// 构建父级证据文档，或当父块未找到时直接保留子文档
+	elevatedDocuments := make([]*vo.DocumentChunk, 0, len(childGroupsByParent)+len(fallbackDocuments))
+	for parentId, children := range childGroupsByParent {
+		parentBlock, ok := parentBlockMap[parentId]
 		if !ok {
 			elevatedDocuments = append(elevatedDocuments, children...)
 			continue
@@ -156,17 +154,18 @@ func (s *DocumentKnowledgeLogicImpl) ElevateToParentBlocks(ctx context.Context, 
 	}
 	elevatedDocuments = append(elevatedDocuments, fallbackDocuments...)
 
-	// 步骤 4：排序（分数降序 → 父块编号升序 → chunkNo 升序）
-	sort.Slice(elevatedDocuments, func(i, j int) bool {
-		return s.compareEvidenceDocument(elevatedDocuments[i], elevatedDocuments[j]) < 0
+	// 排序（分数降序 → 父块编号升序 → chunkNo 升序）
+	slices.SortFunc(elevatedDocuments, func(a, b *vo.DocumentChunk) int {
+		if a.Score != b.Score {
+			return int(b.Score - a.Score)
+		} else if a.ParentBlockNo != b.ParentBlockNo {
+			return a.ParentBlockNo - b.ParentBlockNo
+		}
+		return a.ChunkNo - b.ChunkNo
 	})
 
 	return elevatedDocuments, nil
 }
-
-// =====================================================
-// 内部辅助：校验与映射
-// =====================================================
 
 func (s *DocumentKnowledgeLogicImpl) validSearchable(retrieve *vo.DocumentRetrieve) bool {
 	if retrieve == nil || strutil.IsBlank(retrieve.Question) || strutil.IsBlank(retrieve.RetrievalQuery) {
@@ -181,175 +180,71 @@ func (s *DocumentKnowledgeLogicImpl) getDocumentsMap(ctx context.Context, docume
 	if err != nil {
 		return nil, err
 	}
-	descriptorMap := make(map[int64]*vo.KnowledgeDocument, len(documents))
-	for _, doc := range documents {
-		if doc == nil {
-			continue
-		}
-		descriptorMap[doc.DocumentId] = doc
-	}
+	descriptorMap := utils.SliceToMapBy(documents, func(t *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
+		return t.DocumentId, t
+	})
 	return descriptorMap, nil
 }
 
-// =====================================================
-// 内部辅助：构建 vo.Document
-// =====================================================
-
-// buildSearchDocuments 将 EmbeddingChunk 切片转换为 vo.Document 切片
-func (s *DocumentKnowledgeLogicImpl) buildSearchDocuments(chunks []*data.EmbeddingChunk, descriptorMap map[int64]*vo.KnowledgeDocument, channel string) []*vo.Document {
-	result := make([]*vo.Document, 0, len(chunks))
-	for _, chunk := range chunks {
-		descriptor := descriptorMap[chunk.DocumentId]
-		result = append(result, s.buildRetrievedDocument(chunk, descriptor, channel))
-	}
-	return result
-}
-
-// buildRetrievedDocument 构建单条 vo.Document（对应 Java 的 buildRetrievedDocument）
-func (s *DocumentKnowledgeLogicImpl) buildRetrievedDocument(chunk *data.EmbeddingChunk, descriptor *vo.KnowledgeDocument, channel string) *vo.Document {
-	if chunk == nil {
-		return nil
-	}
-
-	meta := make(map[string]any, 16)
-
-	meta[vo.MetaSourceType] = "DOCUMENT"
-	meta[vo.MetaChannel] = channel
-	meta[vo.MetaScore] = 0.0
-	meta[vo.MetaChunkID] = chunk.ID
-	meta[vo.MetaDocumentID] = chunk.DocumentId
-	meta[vo.MetaTaskID] = chunk.TaskId
-	meta[vo.MetaParentBlockID] = chunk.ParentBlockId
-	meta[vo.MetaChunkNo] = chunk.ChunkNo
-	meta[vo.MetaSectionPath] = safeText(chunk.SectionPath)
-	if chunk.StructureNodeId != 0 {
-		meta[vo.MetaStructureNodeID] = chunk.StructureNodeId
-	}
-	if chunk.StructureNodeType != 0 {
-		meta[vo.MetaStructureNodeType] = chunk.StructureNodeType
-	}
-	meta[vo.MetaCanonicalPath] = safeText(chunk.CanonicalPath)
-	if chunk.ItemIndex != 0 {
-		meta[vo.MetaItemIndex] = chunk.ItemIndex
-	}
-	meta[vo.MetaOriginalSnippet] = chunk.ChunkText
-
-	if descriptor != nil {
-		meta[vo.MetaDocumentName] = safeText(descriptor.DocumentName)
-		meta[vo.MetaKnowledgeScopeCode] = safeText(descriptor.KnowledgeScopeCode)
-		meta[vo.MetaKnowledgeScopeName] = safeText(descriptor.KnowledgeScopeName)
-		meta[vo.MetaBusinessCategory] = safeText(descriptor.BusinessCategory)
-		meta[vo.MetaDocumentTags] = safeText(descriptor.DocumentTags)
-	}
-
-	return &vo.Document{
-		ID:      fmt.Sprintf("%d", chunk.ID),
-		Content: chunk.ChunkText,
-		Meta:    meta,
-		Score:   0.0,
-	}
-}
-
-// =====================================================
-// 内部辅助：父级证据构建
-// =====================================================
-
-// buildParentEvidenceDocument 构建父级证据文档（聚合 score/channel）
-func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.Document, maxChars int) *vo.Document {
+// buildParentEvidenceDocument 构建父级证据文档
+func (s *DocumentKnowledgeLogicImpl) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
 	if parentBlock == nil || len(childDocuments) == 0 {
 		return nil
 	}
 
 	// 选出 score 最高的子文档，作为元数据的基础
-	bestChild := slices.MaxFunc(childDocuments, func(a, b *vo.Document) int {
-		scoreA := resolveScoreOrZero(a)
-		scoreB := resolveScoreOrZero(b)
-		if math.Abs(scoreA-scoreB) < 1e-9 {
-			return 0
+	bestChild := childDocuments[0]
+	for i := 1; i < len(childDocuments); i++ {
+		if bestChild.Score < childDocuments[i].Score {
+			bestChild = childDocuments[i]
 		}
-		if scoreA > scoreB {
-			return 1
-		}
-		return -1
-	})
+	}
 
+	channelMap := make(map[string]struct{})
+	for _, childDocument := range childDocuments {
+		channelMap[childDocument.Channel] = struct{}{}
+	}
+	channels := maputil.Keys(channelMap)
+
+	// 计算父级证据分数
 	supportCount := max(0, len(childDocuments)-1)
-	channels := s.extractChannels(childDocuments)
 	supportWeight := min(0.36, float64(supportCount)*0.12)
 	multiChannelWeight := utils.Ternary(len(channels) > 1, 0.10, 0.0)
-	parentScore := resolveScoreOrZero(bestChild) * (1.0 + supportWeight + multiChannelWeight)
+	parentScore := bestChild.Score * (1.0 + supportWeight + multiChannelWeight)
 
-	// 复制 bestChild 的元数据，再覆盖父块专属字段
-	meta := make(map[string]any, len(bestChild.Meta)+8)
-	maps.Copy(meta, bestChild.Meta)
-
-	meta[vo.MetaParentBlockID] = parentBlock.ID
-	meta[vo.MetaParentBlockNo] = parentBlock.ParentNo
-	meta[vo.MetaSectionPath] = safeText(parentBlock.SectionPath)
-	if parentBlock.StructureNodeId != 0 {
-		meta[vo.MetaStructureNodeID] = parentBlock.StructureNodeId
+	return &vo.DocumentChunk{
+		ID:                fmt.Sprintf("parent-%d", parentBlock.ID),
+		ParentBlockId:     parentBlock.ID,
+		ParentBlockNo:     parentBlock.ParentNo,
+		SectionPath:       parentBlock.SectionPath,
+		StructureNodeId:   parentBlock.StructureNodeId,
+		StructureNodeType: parentBlock.StructureNodeType,
+		CanonicalPath:     parentBlock.CanonicalPath,
+		ItemIndex:         parentBlock.ItemIndex,
+		OriginalSnippet:   parentBlock.ParentText,
+		Score:             parentScore,
+		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
 	}
-	if parentBlock.StructureNodeType != 0 {
-		meta[vo.MetaStructureNodeType] = parentBlock.StructureNodeType
-	}
-	meta[vo.MetaCanonicalPath] = safeText(parentBlock.CanonicalPath)
-	if parentBlock.ItemIndex != 0 {
-		meta[vo.MetaItemIndex] = parentBlock.ItemIndex
-	}
-	meta[vo.MetaScore] = parentScore
-	meta[vo.MetaOriginalSnippet] = safeText(parentBlock.ParentText)
-
-	if len(channels) > 1 {
-		meta[vo.MetaChannel] = "hybrid"
-	} else if len(channels) == 1 {
-		meta[vo.MetaChannel] = channels[0]
-	} else {
-		meta[vo.MetaChannel] = "vector"
-	}
-
-	return &vo.Document{
-		ID:      fmt.Sprintf("parent-%d", parentBlock.ID),
-		Content: s.renderParentEvidenceText(parentBlock, childDocuments, maxChars),
-		Meta:    meta,
-		Score:   parentScore,
-	}
-}
-
-// extractChannels 提取子文档的渠道集合（去重、非空）
-func (s *DocumentKnowledgeLogicImpl) extractChannels(childDocuments []*vo.Document) []string {
-	channels := slice.Map(childDocuments, func(_ int, item *vo.Document) string {
-		if item == nil || item.Meta == nil {
-			return ""
-		}
-		return asText(item.Meta[vo.MetaChannel])
-	})
-	return stream.FromSlice(channels).
-		Filter(func(item string) bool { return item != "" }).
-		Distinct().ToSlice()
 }
 
 // renderParentEvidenceText 渲染父级证据文本：[父块内容] + [命中子片段]
-func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.Document, maxChars int) string {
-	parentText := strutil.Trim(safeText(parentBlock.ParentText))
+func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
+	parentText := strutil.Trim(parentBlock.ParentText)
 
 	// 当父块无内容时，使用首条子文档的内容作为回退
 	if strutil.IsBlank(parentText) {
-		if len(childDocuments) > 0 && childDocuments[0] != nil {
-			return childDocuments[0].Content
-		}
-		return ""
+		return utils.Ternary(len(childDocuments) > 0, childDocuments[0].OriginalSnippet, "")
 	}
 
 	var childSummaryBuilder strings.Builder
 	for i, childDocument := range childDocuments {
-		if childDocument == nil {
-			continue
-		}
 		if i > 0 {
 			childSummaryBuilder.WriteByte('\n')
 		}
-		chunkNo, _ := convertor.ToInt(childDocument.Meta[vo.MetaChunkNo])
-		childSummaryBuilder.WriteString(fmt.Sprintf("- child#%d：%s", chunkNo, trimText(safeText(childDocument.Content), 140)))
+		childSummaryBuilder.WriteString("- child#")
+		childSummaryBuilder.WriteString(strconv.Itoa(childDocument.ChunkNo))
+		childSummaryBuilder.WriteString("：")
+		childSummaryBuilder.WriteString(trimText(childDocument.OriginalSnippet, 140))
 	}
 
 	var composed string
@@ -361,32 +256,6 @@ func (s *DocumentKnowledgeLogicImpl) renderParentEvidenceText(parentBlock *entit
 
 	return trimText(composed, max(maxChars, 1))
 }
-
-// compareEvidenceDocument 比较两条证据文档（分数降序 → parentNo 升序 → chunkNo 升序）
-func (s *DocumentKnowledgeLogicImpl) compareEvidenceDocument(left, right *vo.Document) int {
-	leftScore := resolveScoreOrZero(left)
-	rightScore := resolveScoreOrZero(right)
-	if diff := rightScore - leftScore; math.Abs(diff) > 1e-9 {
-		if diff > 0 {
-			return -1
-		}
-		return 1
-	}
-
-	leftParentNo := asIntegerOrZero(safeMetaValue(left, vo.MetaParentBlockNo))
-	rightParentNo := asIntegerOrZero(safeMetaValue(right, vo.MetaParentBlockNo))
-	if leftParentNo != rightParentNo {
-		return int(leftParentNo - rightParentNo)
-	}
-
-	leftChunkNo := asIntegerOrZero(safeMetaValue(left, vo.MetaChunkNo))
-	rightChunkNo := asIntegerOrZero(safeMetaValue(right, vo.MetaChunkNo))
-	return int(leftChunkNo - rightChunkNo)
-}
-
-// =====================================================
-// 关键词提取（对应 Java extractKeywordTerms / splitChineseSegments / addChineseSegmentTerms 等）
-// =====================================================
 
 // ExtractKeywordTerms 从查询句中提取最多 MaxKeywordTerms 个关键词项
 func (s *DocumentKnowledgeLogicImpl) ExtractKeywordTerms(question string) []string {
@@ -532,10 +401,6 @@ func removeChineseNoisePhrases(text string) string {
 	return strutil.Trim(normalized)
 }
 
-// =====================================================
-// 关键词权重（与 Java keywordWeight / sectionKeywordWeight 对齐）
-// =====================================================
-
 // KeywordWeight 关键词命中在 chunk_text 时的基础权重（索引越靠前权重越高）
 func KeywordWeight(index int) int {
 	return max(1, 6-index)
@@ -546,10 +411,6 @@ func SectionKeywordWeight(index int) int {
 	return KeywordWeight(index) + 2
 }
 
-// =====================================================
-// 小型工具函数
-// =====================================================
-
 func resolveTopK(topK int) int {
 	if topK <= 0 {
 		return 10
@@ -558,82 +419,9 @@ func resolveTopK(topK int) int {
 }
 
 func trimText(text string, maxChars int) string {
-	if len(text) <= maxChars {
+	charLen := utf8.RuneCountInString(text)
+	if charLen <= maxChars-1 {
 		return text
 	}
-	maxChars = max(maxChars, 1)
-	if maxChars-1 >= len(text) {
-		return text
-	}
-	return text[:maxChars-1] + "…"
-}
-
-func safeText(text string) string {
-	return text
-}
-
-func asText(value any) string {
-	if value == nil {
-		return ""
-	}
-	switch v := value.(type) {
-	case string:
-		return v
-	case fmt.Stringer:
-		return v.String()
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-func asIntegerOrZero(value any) int64 {
-	if value == nil {
-		return 0
-	}
-	switch v := value.(type) {
-	case int:
-		return int64(v)
-	case int32:
-		return int64(v)
-	case int64:
-		return v
-	case float64:
-		return int64(v)
-	case float32:
-		return int64(v)
-	default:
-		n, err := convertor.ToInt(value)
-		if err != nil {
-			return 0
-		}
-		return n
-	}
-}
-
-func resolveScoreOrZero(doc *vo.Document) float64 {
-	if doc == nil {
-		return 0
-	}
-	if doc.Meta != nil {
-		if v, ok := doc.Meta[vo.MetaScore]; ok {
-			switch n := v.(type) {
-			case float64:
-				return n
-			case float32:
-				return float64(n)
-			case int:
-				return float64(n)
-			case int64:
-				return float64(n)
-			}
-		}
-	}
-	return doc.Score
-}
-
-func safeMetaValue(doc *vo.Document, key string) any {
-	if doc == nil || doc.Meta == nil {
-		return nil
-	}
-	return doc.Meta[key]
+	return text[:max(maxChars-1, 0)] + "…"
 }

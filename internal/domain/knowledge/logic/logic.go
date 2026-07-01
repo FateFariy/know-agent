@@ -12,11 +12,11 @@ type DocumentKnowledgeLogic interface {
 	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 
 	// VectorSearch 向量检索
-	VectorSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.Document, error)
+	VectorSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 
 	// KeywordSearch 关键词检索
-	KeywordSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.Document, error)
+	KeywordSearch(ctx context.Context, request *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 
 	// ElevateToParentBlocks 将子文档提升到父块级别
-	ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.Document, maxChars int) ([]*vo.Document, error)
+	ElevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error)
 }

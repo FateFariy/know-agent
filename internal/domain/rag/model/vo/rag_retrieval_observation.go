@@ -26,7 +26,7 @@ type ChannelExecutionView struct {
 }
 
 // SetScores 设置分数统计
-func (v *ChannelExecutionView) SetScores(docs []*klvo.Document) {
+func (v *ChannelExecutionView) SetScores(docs []*klvo.DocumentChunk) {
 	if len(docs) == 0 {
 		return
 	}
@@ -68,32 +68,28 @@ type RetrievalResultView struct {
 }
 
 // SetDocumentInfo 设置文档基本信息
-func (v *RetrievalResultView) SetDocumentInfo(doc *klvo.Document) {
+func (v *RetrievalResultView) SetDocumentInfo(doc *klvo.DocumentChunk) {
 	if doc == nil {
 		return
 	}
 
-	// 从Meta中提取信息
-	if doc.Meta != nil {
-		v.RrfScore, _ = convertor.ToFloat(doc.Meta[klvo.MetaRRFScore])
-		v.RerankScore, _ = convertor.ToFloat(doc.Meta[klvo.MetaRerankScore])
-		v.DocumentId, _ = convertor.ToInt(doc.Meta[klvo.MetaDocumentID])
-		v.DocumentName = convertor.ToString(doc.Meta[klvo.MetaDocumentName])
-		v.ChunkId, _ = convertor.ToInt(doc.Meta[klvo.MetaChunkID])
-		toInt, _ := convertor.ToInt(doc.Meta[klvo.MetaChunkNo])
-		v.ChunkNo = int(toInt)
-		v.SectionPath = convertor.ToString(doc.Meta[klvo.MetaSectionPath])
-	}
+	v.RrfScore = doc.RRFScore
+	v.RerankScore = doc.RerankScore
+	v.DocumentId = doc.DocumentId
+	v.DocumentName = doc.DocumentName
+	v.ChunkId, _ = convertor.ToInt(doc.ID)
+	v.ChunkNo = doc.ChunkNo
+	v.SectionPath = doc.SectionPath
 
 	// 设置原始分数
 	v.OriginalScore = doc.Score
 
 	// 设置文本预览
-	v.ChunkCharCount = utf8.RuneCountInString(doc.Content)
-	if utf8.RuneCountInString(doc.Content) > 500 {
-		v.ChunkTextPreview = string([]rune(doc.Content)[:500]) + "..."
+	v.ChunkCharCount = utf8.RuneCountInString(doc.OriginalSnippet)
+	if utf8.RuneCountInString(doc.OriginalSnippet) > 500 {
+		v.ChunkTextPreview = string([]rune(doc.OriginalSnippet)[:500]) + "..."
 	} else {
-		v.ChunkTextPreview = doc.Content
+		v.ChunkTextPreview = doc.OriginalSnippet
 	}
 }
 

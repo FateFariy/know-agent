@@ -14,13 +14,18 @@ import (
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	dadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	kadapter "github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	rvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -32,9 +37,10 @@ type MilvusVector struct {
 	collection string
 }
 
-var _ adapter.VectorDB = (*MilvusVector)(nil)
+var _ dadapter.VectorDB = (*MilvusVector)(nil)
+var _ kadapter.VectorDB = (*MilvusVector)(nil)
 
-func NewMilvusVector(svcCtx *svc.ServiceContext) adapter.VectorDB {
+func NewMilvusVector(svcCtx *svc.ServiceContext) dadapter.VectorDB {
 	ctx := context.Background()
 	client, err := milvusclient.New(ctx, &milvusclient.ClientConfig{Address: svcCtx.Config.Milvus.Addr})
 	if err != nil {
@@ -49,6 +55,7 @@ func NewMilvusVector(svcCtx *svc.ServiceContext) adapter.VectorDB {
 	}
 }
 
+// Vectorize 生成向量
 func (m *MilvusVector) Vectorize(ctx context.Context, chunks []*entity.DocumentChunk) error {
 	docs := m.toDocument(chunks)
 	if len(docs) == 0 {
@@ -70,13 +77,29 @@ func (m *MilvusVector) DeleteVectorByDocumentId(ctx context.Context, documentId 
 	return err
 }
 
+// SearchByVector 根据向量搜索
+func (m *MilvusVector) SearchByVector(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *klvo.DocumentRetrieveFilters) ([]*klvo.DocumentChunk, error) {
+	// todo 过滤条件
+	filterExpr := ""
+	retrievedDocs, err := m.retriever.Retrieve(ctx, query, retriever.WithTopK(topK), retrievermilvus.WithFilter(filterExpr))
+	if err != nil {
+		return nil, err
+	}
+	return m.toKnowledgeDocuments(retrievedDocs), nil
+}
+
+func (m *MilvusVector) SearchByKeyword(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *klvo.DocumentRetrieveFilters) ([]*klvo.DocumentChunk, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
 // markSuccess 批量标记分片向量生成成功
 func (m *MilvusVector) markSuccess(chunks []*entity.DocumentChunk) {
 	for _, chunk := range chunks {
 		if chunk != nil && strutil.IsNotBlank(chunk.ChunkText) {
 			chunk.VectorId = strconv.FormatInt(chunk.ID, 10)
-			chunk.VectorStoreType = vo.VectorStoreTypeMilvus
-			chunk.VectorStatus = vo.VectorStatusVectorSuccess
+			chunk.VectorStoreType = dvo.VectorStoreTypeMilvus
+			chunk.VectorStatus = dvo.VectorStatusVectorSuccess
 		}
 	}
 }
@@ -115,6 +138,29 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 	return result
 }
 
+// toKnowledgeDocuments 将 Milvus 检索结果（schema.Document）转成统一的 klvo.DocumentChunk 列表
+func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*klvo.DocumentChunk {
+	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *klvo.DocumentChunk {
+		meta := doc.MetaData
+		return &klvo.DocumentChunk{
+			ID:                doc.ID,
+			OriginalSnippet:   doc.Content,
+			SourceType:        "DOCUMENT",
+			Channel:           rvo.RetrievalChannelVector,
+			Score:             doc.Score(),
+			TaskId:            metaToInt(meta[klvo.MetaTaskID]),
+			DocumentId:        metaToInt(meta[klvo.MetaDocumentID]),
+			ChunkNo:           int(metaToInt(meta[klvo.MetaChunkNo])),
+			ParentBlockId:     metaToInt(meta[klvo.MetaParentBlockID]),
+			SectionPath:       convertor.ToString(meta[klvo.MetaSectionPath]),
+			StructureNodeId:   metaToInt(meta[klvo.MetaStructureNodeID]),
+			StructureNodeType: int(metaToInt(meta[klvo.MetaStructureNodeType])),
+			CanonicalPath:     convertor.ToString(meta[klvo.MetaCanonicalPath]),
+			ItemIndex:         int(metaToInt(meta[klvo.MetaItemIndex])),
+		}
+	})
+}
+
 // 创建索引器
 func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) indexer.Indexer {
 	vecIndexer, err := indexmilvus.NewIndexer(ctx, &indexmilvus.IndexerConfig{
@@ -151,4 +197,9 @@ func newRetriever(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding
 		panic(err)
 	}
 	return vecRetriever
+}
+
+func metaToInt(v any) int64 {
+	value, _ := convertor.ToInt(v)
+	return value
 }

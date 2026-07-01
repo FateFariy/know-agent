@@ -9,7 +9,7 @@ type SubQuestionEvidence struct {
 	SubQuestionIndex       int                        `json:"subQuestionIndex"`       // 子问题索引
 	SubQuestion            string                     `json:"subQuestion"`            // 子问题
 	References             []*SearchReference         `json:"references"`             // 检索参考
-	Documents              []*klvo.Document           `json:"documents"`              // 文档
+	Documents              []*klvo.DocumentChunk      `json:"documents"`              // 文档
 	ChannelTraces          []*SubQuestionChannelTrace `json:"channelTraces"`          // 渠道追踪
 	FusedCandidateCount    int                        `json:"fusedCandidateCount"`    // 混合候选数量
 	ParentCandidateCount   int                        `json:"parentCandidateCount"`   // 父候选数量
