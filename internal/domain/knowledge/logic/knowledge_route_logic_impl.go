@@ -3,28 +3,27 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
+	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 // 路由状态常量
 const (
-	RouteStatusSuccess       = "SUCCESS"
-	RouteStatusLowConfidence = "LOW_CONFIDENCE"
-	RouteStatusFailed        = "FAILED"
-	routeEmbeddingBatchSize  = 10
+	routeEmbeddingBatchSize = 10
 )
 
 // 默认路由模式（用于跟踪）
@@ -83,7 +82,7 @@ func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
 // Route 根据问题执行知识路由，返回范围/主题/文档候选列表与置信度
 func (s *KnowledgeRouteLogicImpl) Route(ctx context.Context, question, rewriteQuestion string) (*vo.KnowledgeRouteDecision, error) {
 	queryCtx := s.buildQueryContext(ctx, question, rewriteQuestion)
-	decision := &vo.KnowledgeRouteDecision{RouteStatus: RouteStatusFailed}
+	decision := &vo.KnowledgeRouteDecision{RouteStatus: vo.RouteStatusFailed}
 	if len(queryCtx.QueryTerms) == 0 {
 		decision.Reason = "问题为空或无法提取有效关键词"
 		return decision, nil
@@ -100,46 +99,44 @@ func (s *KnowledgeRouteLogicImpl) Route(ctx context.Context, question, rewriteQu
 
 	switch {
 	case len(documentCandidates) == 0:
-		decision.RouteStatus = RouteStatusFailed
+		decision.RouteStatus = vo.RouteStatusFailed
 	case decision.Confidence < 0.55:
-		decision.RouteStatus = RouteStatusLowConfidence
+		decision.RouteStatus = vo.RouteStatusLowConfidence
 	default:
-		decision.RouteStatus = RouteStatusSuccess
+		decision.RouteStatus = vo.RouteStatusSuccess
 	}
 	decision.Reason = s.resolveDecisionReason(documentCandidates, decision.Confidence)
 
-	logx.Infof("知识范围路由完成: question='%s', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f",
-		strutil.Trim(question), len(scopeCandidates), len(topicCandidates), len(documentCandidates))
+	logx.Infof("知识范围路由完成: question='%s', rewriteQuestion='%s', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f,topDocument='%s",
+		strutil.Trim(question), strutil.Trim(rewriteQuestion), len(scopeCandidates), len(topicCandidates), len(documentCandidates), decision.Confidence, documentCandidates[0].DocumentName)
 	return decision, nil
 }
 
 // RecordShadowRoute 记录影子路由结果（后台写入不影响主流程）
-func (s *KnowledgeRouteLogicImpl) RecordShadowRoute(ctx context.Context, conversationId, exchangeId string, documentId int64, question, rewriteQuestion string) error {
+func (s *KnowledgeRouteLogicImpl) RecordShadowRoute(ctx context.Context, exchangeId int64, conversationId string, documentId int64, question, rewriteQuestion string) error {
 	decision, err := s.Route(ctx, question, rewriteQuestion)
 	if err != nil {
 		Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", conversationId, err)
 		return err
 	}
-	trace := s.buildTrace(conversationId, exchangeId, question, rewriteQuestion, routeModeShadow, decision)
+	trace := s.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeShadow, decision)
 	trace.SelectedDocumentId = documentId
-	trace.HitSelectedDocument = s.resolveHitSelectedDocument(documentId, decision)
-	if err := s.repo.SaveKnowledgeRouteTrace(ctx, trace); err != nil {
-		Warnf("记录知识路由[shadow]失败: conversationId=%s, err=%v", conversationId, err)
+	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(documentId)
+	if err = s.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
+		Warnf("记录知识路由[shadow]失败: conversationId=%s, exchangeId=%d, err=%v", conversationId, exchangeId, err)
 		return err
 	}
 	return nil
 }
 
 // RecordAutoRoute 记录自动路由结果
-func (s *KnowledgeRouteLogicImpl) RecordAutoRoute(ctx context.Context, conversationId, exchangeId string, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error {
-	trace := s.buildTrace(conversationId, exchangeId, question, rewriteQuestion, routeModeAuto, decision)
-	if len(decision.Documents) > 0 && decision.Documents[0].DocumentId != "" {
-		if id, parseErr := strconv.ParseInt(decision.Documents[0].DocumentId, 10, 64); parseErr == nil {
-			trace.SelectedDocumentId = id
-		}
+func (s *KnowledgeRouteLogicImpl) RecordAutoRoute(ctx context.Context, exchangeId int64, conversationId, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error {
+	trace := s.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeAuto, decision)
+	if len(decision.Documents) > 0 {
+		trace.SelectedDocumentId = decision.Documents[0].DocumentId
 	}
-	trace.HitSelectedDocument = s.resolveHitSelectedDocument(trace.SelectedDocumentId, decision)
-	if err := s.repo.SaveKnowledgeRouteTrace(ctx, trace); err != nil {
+	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(trace.SelectedDocumentId)
+	if err := s.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
 		Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", conversationId, err)
 		return err
 	}
@@ -157,10 +154,6 @@ type routeQueryContext struct {
 	RoutingText      string
 	QueryTerms       []string
 	QueryEmbedding   []float64
-}
-
-func (q *routeQueryContext) semanticEnabled() bool {
-	return len(q.QueryEmbedding) > 0
 }
 
 // buildQueryContext 组装路由上下文：拼接检索文本 + 分词 + 可选生成向量
@@ -349,15 +342,12 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 		if i < len(semanticScores) {
 			semantic = semanticScores[i]
 		}
-		lexical := 0.0
-		if v, ok := lexicalScores[node.TopicCode]; ok {
-			lexical = v
-		}
+		lexical := lexicalScores[node.TopicCode]
 		score := s.semanticMainScore(semantic) + s.lexicalAssistScore(lexical) + s.keywordEntityMatchScore(q.QueryTerms, routeTexts[i])
 		if _, preferred := preferredScopes[node.ScopeCode]; preferred {
 			score += 8
 		}
-		if score > 0 || q.semanticEnabled() {
+		if score > 0 || len(q.QueryEmbedding) > 0 {
 			candidates = append(candidates, &vo.TopicRouteCandidate{
 				TopicCode: node.TopicCode,
 				TopicName: node.TopicName,
@@ -369,10 +359,8 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	limit := 8
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
+	candidates = candidates[:max(8, len(candidates))]
+
 	return candidates
 }
 
@@ -389,52 +377,40 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 	}
 	scopeByDoc := make(map[int64]string, len(docs))
 	for _, d := range docs {
-		if d == nil {
-			continue
-		}
 		scopeByDoc[d.DocumentId] = strutil.Trim(d.KnowledgeScopeCode)
 	}
 
 	best := make(map[string]*vo.TopicRouteCandidate)
 	for _, profile := range profiles {
-		if profile == nil {
-			continue
-		}
 		for _, topic := range parseJsonStringArray(profile.CoreTopics) {
 			topic = strutil.Trim(topic)
-			if len(topic) < 2 {
+			if utf8.RuneCountInString(topic) < 2 {
 				continue
 			}
 			routeText := s.joinNonBlank(topic, profile.DocumentSummary, profile.ExampleQuestions)
 			keywordScore := s.keywordEntityMatchScore(q.QueryTerms, routeText)
 			semanticScore := s.singleSemanticScore(ctx, q, routeText)
 			scopeCode := scopeByDoc[profile.DocumentId]
-			total := keywordScore + s.semanticMainScore(semanticScore)
+			finalScore := keywordScore + s.semanticMainScore(semanticScore)
 			if _, preferred := preferredScopes[scopeCode]; preferred {
-				total += 6
+				finalScore += 6
 			}
-			if existing, ok := best[topic]; ok && existing.Score >= total {
-				continue
-			}
-			best[topic] = &vo.TopicRouteCandidate{
-				TopicCode: normalizeCode(topic),
-				TopicName: topic,
-				ScopeCode: scopeCode,
-				Score:     total,
-				Reason:    s.buildReason(q.QueryTerms, routeText, semanticScore),
+			if existing := best[topic]; existing.Score < finalScore {
+				best[topic] = &vo.TopicRouteCandidate{
+					TopicCode: normalizeCode(topic),
+					TopicName: topic,
+					ScopeCode: scopeCode,
+					Score:     finalScore,
+					Reason:    s.buildReason(q.QueryTerms, routeText, semanticScore),
+				}
 			}
 		}
 	}
 
-	candidates := make([]*vo.TopicRouteCandidate, 0, len(best))
-	for _, c := range best {
-		candidates = append(candidates, c)
-	}
+	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	limit := 8
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
+	candidates = candidates[:max(8, len(candidates))]
+
 	return candidates
 }
 
@@ -452,11 +428,8 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	if err != nil {
 		Warnf("查询文档画像失败: %v", err)
 	}
-	profileByDoc := make(map[int64]*vo.KnowledgeDocumentProfile, len(profiles))
+	profileByDoc := make(map[int64]*entity.KnowledgeDocumentProfile, len(profiles))
 	for _, p := range profiles {
-		if p == nil {
-			continue
-		}
 		profileByDoc[p.DocumentId] = p
 	}
 
@@ -464,13 +437,10 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	if err != nil {
 		Warnf("查询 topic-document 关系失败: %v", err)
 	}
-	relationByTopic := make(map[string]map[int64]*vo.KnowledgeTopicDocumentRelation, len(relations))
+	relationByTopic := make(map[string]map[int64]*entity.KnowledgeTopicDocumentRelation, len(relations))
 	for _, rel := range relations {
-		if rel == nil {
-			continue
-		}
 		if _, ok := relationByTopic[rel.TopicCode]; !ok {
-			relationByTopic[rel.TopicCode] = make(map[int64]*vo.KnowledgeTopicDocumentRelation)
+			relationByTopic[rel.TopicCode] = make(map[int64]*entity.KnowledgeTopicDocumentRelation)
 		}
 		relationByTopic[rel.TopicCode][rel.DocumentId] = rel
 	}
@@ -495,9 +465,6 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	// 打分
 	matched := make([]*vo.DocumentRouteCandidate, 0, len(documents))
 	for i, doc := range documents {
-		if doc == nil {
-			continue
-		}
 		routeText := routeTexts[i]
 		semantic := 0.0
 		if i < len(semanticScores) {
@@ -515,43 +482,33 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 			}
 		}
 
-		if score <= 0 && !q.semanticEnabled() {
-			matched = append(matched, &vo.DocumentRouteCandidate{
-				DocumentId:         strconv.FormatInt(doc.DocumentId, 10),
-				DocumentName:       doc.DocumentName,
-				LastIndexTaskId:    strconv.FormatInt(doc.LastIndexTaskId, 10),
-				KnowledgeScopeCode: strutil.Trim(doc.KnowledgeScopeCode),
-				KnowledgeScopeName: strutil.Trim(doc.KnowledgeScopeName),
-				BusinessCategory:   strutil.Trim(doc.BusinessCategory),
-				DocumentTags:       strutil.Trim(doc.DocumentTags),
-				Score:              0,
-				Reason:             "未命中路由关键词",
-			})
-			continue
-		}
-		matched = append(matched, &vo.DocumentRouteCandidate{
-			DocumentId:         strconv.FormatInt(doc.DocumentId, 10),
+		elems := &vo.DocumentRouteCandidate{
+			DocumentId:         doc.DocumentId,
 			DocumentName:       doc.DocumentName,
-			LastIndexTaskId:    strconv.FormatInt(doc.LastIndexTaskId, 10),
+			LastIndexTaskId:    doc.LastIndexTaskId,
 			KnowledgeScopeCode: strutil.Trim(doc.KnowledgeScopeCode),
 			KnowledgeScopeName: strutil.Trim(doc.KnowledgeScopeName),
 			BusinessCategory:   strutil.Trim(doc.BusinessCategory),
 			DocumentTags:       strutil.Trim(doc.DocumentTags),
-			Score:              score,
-			Reason:             s.buildReason(q.QueryTerms, routeText, semantic),
-		})
+			Reason:             "未命中路由关键词",
+		}
+		if score <= 0 && len(q.QueryEmbedding) == 0 {
+			matched = append(matched, elems)
+			continue
+		}
+		elems.Score = score
+		elems.Reason = s.buildReason(q.QueryTerms, routeText, semantic)
+		matched = append(matched, elems)
 	}
 
 	sort.Slice(matched, func(i, j int) bool { return matched[i].Score > matched[j].Score })
-	limit := 5
-	if len(matched) > limit {
-		matched = matched[:limit]
-	}
+	matched = matched[:max(5, len(matched))]
+
 	return matched
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
-func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *vo.KnowledgeDocument, profile *vo.KnowledgeDocumentProfile) string {
+func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *vo.KnowledgeDocument, profile *entity.KnowledgeDocumentProfile) string {
 	if profile == nil {
 		return s.joinNonBlank(doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}
@@ -624,9 +581,6 @@ func (s *KnowledgeRouteLogicImpl) searchDocumentLexicalScores(ctx context.Contex
 	}
 	result := make(map[int64]float64, len(hits))
 	for _, hit := range hits {
-		if hit == nil || hit.DocumentId <= 0 {
-			continue
-		}
 		result[hit.DocumentId] = hit.Score
 	}
 	return result
@@ -750,7 +704,7 @@ func (s *KnowledgeRouteLogicImpl) resolveConfidence(documents []*vo.DocumentRout
 	if len(documents) > 1 {
 		top2 = documents[1].Score
 	}
-	return top1 / math.Max(10, top1+top2+5)
+	return top1 / max(10, top1+top2+5)
 }
 
 // resolveDecisionReason 根据候选与置信度生成决策原因
@@ -758,22 +712,16 @@ func (s *KnowledgeRouteLogicImpl) resolveDecisionReason(documents []*vo.Document
 	if len(documents) == 0 {
 		return "没有找到可用候选文档"
 	}
-	topReason := strutil.Trim(documents[0].Reason)
-	if confidence < 0.55 {
-		return firstNonBlank(topReason, "低置信度，已进入保守扩范围候选")
+	top := documents[0]
+	if confidence >= 0.80 {
+		return fmt.Sprintf("高置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
+	} else if confidence >= 0.55 {
+		return fmt.Sprintf("中等置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
 	}
-	return topReason
+	return fmt.Sprintf("低置信度，前 %d 个候选得分接近，建议澄清", min(3, len(documents)))
 }
 
-// firstNonBlank 返回第一个非空字符串；全部为空则回退到 defaultValue
-func firstNonBlank(primary, defaultValue string) string {
-	if strutil.IsNotBlank(primary) {
-		return strutil.Trim(primary)
-	}
-	return strutil.Trim(defaultValue)
-}
-
-// parseJsonStringArray 处理画像字段中的字符串数组：支持 ["a","b"] 或 a,b 或 a|b
+// parseJsonStringArray 处理画像字段中的字符串数组：支持 ["a","b"]
 func parseJsonStringArray(raw string) []string {
 	cleaned := strutil.Trim(raw)
 	if strutil.IsBlank(cleaned) || cleaned == "[]" {
@@ -785,25 +733,12 @@ func parseJsonStringArray(raw string) []string {
 		if err := json.Unmarshal([]byte(cleaned), &items); err == nil {
 			return items
 		}
-		// 回退到手工解析
-		inner := strings.TrimPrefix(strings.TrimSuffix(cleaned, "]"), "[")
-		items = splitAndTrim(inner, ",")
-		return items
 	}
-	// 退化为按 , | 空白分割
-	return splitAndTrim(cleaned, ",")
-}
-
-func splitAndTrim(s, sep string) []string {
-	parts := strings.Split(s, sep)
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		trimmed := strings.Trim(strings.TrimSpace(strutil.Trim(p)), "\"")
-		if strutil.IsNotBlank(trimmed) {
-			out = append(out, trimmed)
-		}
-	}
-	return out
+	// 回退到手工解析
+	inner := strings.TrimPrefix(strings.TrimSuffix(cleaned, "]"), "[")
+	return stream.FromSlice(strings.Split(inner, ",")).
+		Map(func(item string) string { return strutil.Trim(strutil.Trim(item), "\"") }).
+		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).ToSlice()
 }
 
 // =====================================================
@@ -811,117 +746,32 @@ func splitAndTrim(s, sep string) []string {
 // =====================================================
 
 // buildTrace 组装路由跟踪结构（不含选中文档与命中标记，由各路由模式补充）
-func (s *KnowledgeRouteLogicImpl) buildTrace(conversationId, exchangeId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *vo.KnowledgeRouteTrace {
-	trace := &vo.KnowledgeRouteTrace{
+func (s *KnowledgeRouteLogicImpl) buildTrace(exchangeId int64, conversationId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
+	trace := &entity.KnowledgeRouteTrace{
 		ConversationId:  conversationId,
 		ExchangeId:      exchangeId,
 		Question:        strutil.Trim(question),
 		RewriteQuestion: strutil.Trim(rewriteQuestion),
 		Mode:            mode,
-		Status:          1,
 	}
 	if decision == nil {
-		trace.RouteStatus = RouteStatusFailed
+		trace.RouteStatus = vo.RouteStatusCode(vo.RouteStatusFailed)
 		return trace
 	}
 	trace.Confidence = decision.Confidence
-	trace.RouteStatus = decision.RouteStatus
+	trace.RouteStatus = vo.RouteStatusCode(decision.RouteStatus)
 	trace.ErrorMsg = strutil.Trim(decision.Reason)
-	trace.TopScopesJson = toCompactJSON(decision.Scopes, maxItems(5))
-	trace.TopTopicsJson = toCompactJSON(decision.Topics, maxItems(5))
-	trace.TopDocumentsJson = toCompactJSON(decision.Documents, maxItems(5))
+	trace.TopScopesJson = toCompactJSON(decision.Scopes)
+	trace.TopTopicsJson = toCompactJSON(decision.Topics)
+	trace.TopDocumentsJson = toCompactJSON(decision.Documents)
 	return trace
 }
 
-// resolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三
-func (s *KnowledgeRouteLogicImpl) resolveHitSelectedDocument(selectedDocumentId int64, decision *vo.KnowledgeRouteDecision) *int {
-	if selectedDocumentId == 0 || decision == nil || len(decision.Documents) == 0 {
-		return nil
-	}
-	hit := 0
-	for idx, doc := range decision.Documents {
-		if idx >= 3 {
-			break
-		}
-		id, err := strconv.ParseInt(doc.DocumentId, 10, 64)
-		if err == nil && id == selectedDocumentId {
-			hit = 1
-			break
-		}
-	}
-	return &hit
-}
-
-// maxItems 返回限制数量（不修改结果只用于序列化）
-func maxItems(n int) int { return n }
-
-// toCompactJSON 将任意切片序列化为紧凑 JSON；超过 limit 则截断
-func toCompactJSON(v any, limit int) string {
-	if v == nil {
-		return "[]"
-	}
-	// 简单起见：我们仅对几种候选类型进行序列化
-	var items []map[string]any
-	switch list := v.(type) {
-	case []*vo.ScopeRouteCandidate:
-		for i, it := range list {
-			if i >= limit {
-				break
-			}
-			if it == nil {
-				continue
-			}
-			items = append(items, map[string]any{
-				"scopeCode": it.ScopeCode,
-				"scopeName": it.ScopeName,
-				"score":     round4(it.Score),
-				"reason":    strutil.Trim(it.Reason),
-			})
-		}
-	case []*vo.TopicRouteCandidate:
-		for i, it := range list {
-			if i >= limit {
-				break
-			}
-			if it == nil {
-				continue
-			}
-			items = append(items, map[string]any{
-				"topicCode": it.TopicCode,
-				"topicName": it.TopicName,
-				"scopeCode": it.ScopeCode,
-				"score":     round4(it.Score),
-				"reason":    strutil.Trim(it.Reason),
-			})
-		}
-	case []*vo.DocumentRouteCandidate:
-		for i, it := range list {
-			if i >= limit {
-				break
-			}
-			if it == nil {
-				continue
-			}
-			items = append(items, map[string]any{
-				"documentId":      it.DocumentId,
-				"documentName":    strutil.Trim(it.DocumentName),
-				"lastIndexTaskId": it.LastIndexTaskId,
-				"score":           round4(it.Score),
-				"reason":          strutil.Trim(it.Reason),
-			})
-		}
-	}
-	if len(items) == 0 {
-		return "[]"
-	}
-	data, err := json.Marshal(items)
-	if err != nil {
+// toCompactJSON 将任意切片序列化为紧凑 JSON
+func toCompactJSON(v any) string {
+	data, err := json.Marshal(v)
+	if err != nil || len(data) == 0 || string(data) == "null" {
 		return "[]"
 	}
 	return string(data)
-}
-
-// round4 保留四位小数（与 Java BigDecimal#setScale(4, HALF_UP) 对齐）
-func round4(v float64) float64 {
-	return math.Round(v*10000) / 10000
 }

@@ -3,7 +3,6 @@ package channel
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/common/utils"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
@@ -12,8 +11,8 @@ import (
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	repo     adapter.RagRepository
 	vectorDB adapter.VectorDB
+	baseRetrievalChannel
 }
 
 var _ RetrievalChannel = (*VectorRetrievalChannel)(nil)
@@ -21,8 +20,8 @@ var _ RetrievalChannel = (*VectorRetrievalChannel)(nil)
 // NewVectorRetrievalChannel 创建向量检索通道
 func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, repo adapter.RagRepository, vectorDB adapter.VectorDB) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
-		repo:     repo,
-		vectorDB: vectorDB,
+		baseRetrievalChannel: baseRetrievalChannel{repo: repo},
+		vectorDB:             vectorDB,
 	}
 }
 
@@ -61,16 +60,4 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, query *vo.Documen
 		ChannelName: c.ChannelName(),
 		Documents:   docs,
 	}, nil
-}
-
-// getDocumentsMap 获取文档描述符到 documentId 的映射
-func (c *VectorRetrievalChannel) getDocumentsMap(ctx context.Context, documentIds []int64) (map[int64]*vo.KnowledgeDocument, error) {
-	documents, err := c.repo.SelectRetrievableDocuments(ctx, documentIds...)
-	if err != nil {
-		return nil, err
-	}
-	descriptorMap := utils.SliceToMapBy(documents, func(t *vo.KnowledgeDocument) (int64, *vo.KnowledgeDocument) {
-		return t.DocumentId, t
-	})
-	return descriptorMap, nil
 }

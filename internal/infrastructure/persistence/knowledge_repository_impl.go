@@ -7,10 +7,11 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/convert"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -43,13 +44,13 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 }
 
 // SelectRetrievableDocuments 查询可检索的文档
-func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIDs ...int64) ([]*vo2.KnowledgeDocument, error) {
-	var documents []*vo2.KnowledgeDocument
+func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
+	var documents []*vo.KnowledgeDocument
 	query := k.dbWithContext(ctx).Model(&model.Document{}).
 		Where("index_status = ? AND last_index_task_id IS NOT NULL", dvo.IndexStatusBuildSuccess)
 
-	if len(documentIDs) > 0 {
-		query = query.Where("id IN ?", documentIDs)
+	if len(documentIds) > 0 {
+		query = query.Where("id IN ?", documentIds)
 	}
 	if err := query.Order("update_time DESC, id DESC").Find(&documents).Error; err != nil {
 		return nil, err
@@ -57,94 +58,112 @@ func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context
 	return documents, nil
 }
 
-// SearchByVector 向量检索（Milvus 接入点）
-// 当前以“Milvus 调用占位 + 结果回表补齐结构字段”的形式提供骨架：
-//  1. 通过 Embedding 模型将 query 转为 float32 向量；
-//  2. 调用 Milvus SDK 在对应 collection 上做 ANN 搜索，过滤 document_id / task_id / section_path 等；
-//  3. 取 topK 结果，根据主键 chunk id 回表补齐 section_path / canonical_path 等字段；
-//  4. 组装为 EmbeddingChunk 返回。
-func (k *KnowledgeRepositoryImpl) SearchByVector(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
-	// TODO: 接入 Milvus 客户端（如 github.com/milvus-io/milvus/client/v2）
-	// 示例流程：
-	//   1. embedding := embeddingModel.Embed(query)
-	//   2. milvus.Search(ctx, "document_embeddings", embedding, filter_expr, topK)
-	//   3. 将返回的 IDs 回表补齐 chunk_text / parent_block_id 等字段
-	_ = ctx
-	_ = documentIDs
-	_ = taskIDs
-	_ = topK
-	_ = filters
-	return nil, nil
-}
-
-// SearchByKeyword 关键词检索（按子串打分 + topK 排序）
-// 当前以“SQL + 简单关键词权重”的形式实现；生产环境建议替换为 BM25/外部索引。
-func (k *KnowledgeRepositoryImpl) SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
-	if len(documentIDs) == 0 || len(taskIDs) == 0 || strutil.IsBlank(query) {
-		return nil, nil
-	}
-
-	// 步骤 1：查询候选 chunk（仅返回必要字段）
-	var candidateChunks []*data.EmbeddingChunk
-	builder := k.dbWithContext(ctx).Model(&model.EmbeddingChunk{}).
-		Where("status = ?", 1).
-		Where("document_id IN ?", documentIDs).
-		Where("task_id IN ?", taskIDs)
-
-	// 步骤 2：应用结构/路径过滤器
-	if filters != nil {
-		if len(filters.SectionPathHints) > 0 {
-			builder = builder.Where(buildLikeOrExpr("section_path", filters.SectionPathHints))
-		}
-		if len(filters.StructureNodeIdHints) > 0 {
-			builder = builder.Where("structure_node_id IN ?", filters.StructureNodeIdHints)
-		}
-		if len(filters.CanonicalPathHints) > 0 {
-			builder = builder.Where(buildLikeOrExpr("canonical_path", filters.CanonicalPathHints))
-		}
-		if len(filters.ItemIndexHints) > 0 {
-			builder = builder.Where("item_index IN ?", filters.ItemIndexHints)
-		}
-	}
-
-	if err := builder.Find(&candidateChunks).Error; err != nil {
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
+	var nodes []*entity.KnowledgeScopeNode
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Find(&nodes).Error; err != nil {
 		return nil, err
 	}
-	if len(candidateChunks) == 0 {
-		return nil, nil
-	}
-
-	// 步骤 3：关键词分数计算（与 Java keywordWeight + sectionKeywordWeight 对齐）
-	terms := extractKeywordTerms(query)
-	if len(terms) == 0 {
-		return nil, nil
-	}
-
-	scoreChunks := make([]keywordScoreChunk, 0, len(candidateChunks))
-	for _, chunk := range candidateChunks {
-		if chunk == nil {
-			continue
-		}
-		score := computeKeywordScore(terms, chunk.ChunkText, chunk.SectionPath)
-		if score <= 0 {
-			continue
-		}
-		scoreChunks = append(scoreChunks, keywordScoreChunk{chunk: chunk, score: score})
-	}
-
-	// 步骤 4：按分数降序取 topK
-	sortKeywordChunksDesc(scoreChunks)
-	limit := topK
-	if limit <= 0 || limit > len(scoreChunks) {
-		limit = len(scoreChunks)
-	}
-
-	result := make([]*data.EmbeddingChunk, 0, limit)
-	for i := 0; i < limit; i++ {
-		result = append(result, scoreChunks[i].chunk)
-	}
-	return result, nil
+	return nodes, nil
 }
+
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
+	var nodes []*entity.KnowledgeTopicNode
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error) {
+	var profiles []*entity.KnowledgeDocumentProfile
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).
+		Where("profile_status = ?", 2).
+		Find(&profiles).Error; err != nil {
+		return nil, err
+	}
+	return profiles, nil
+}
+
+func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error) {
+	var relations []*entity.KnowledgeTopicDocumentRelation
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Find(&relations).Error; err != nil {
+		return nil, err
+	}
+	return relations, nil
+}
+
+func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error {
+	return k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{}).Create(convert.ToKnowledgeRouteTraceModel(trace)).Error
+}
+
+// // SearchByKeyword 关键词检索（按子串打分 + topK 排序）
+// // 当前以“SQL + 简单关键词权重”的形式实现；生产环境建议替换为 BM25/外部索引。
+// func (k *KnowledgeRepositoryImpl) SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
+// 	if len(documentIDs) == 0 || len(taskIDs) == 0 || strutil.IsBlank(query) {
+// 		return nil, nil
+// 	}
+//
+// 	// 步骤 1：查询候选 chunk（仅返回必要字段）
+// 	var candidateChunks []*data.EmbeddingChunk
+// 	builder := k.dbWithContext(ctx).Model(&model.EmbeddingChunk{}).
+// 		Where("status = ?", 1).
+// 		Where("document_id IN ?", documentIDs).
+// 		Where("task_id IN ?", taskIDs)
+//
+// 	// 步骤 2：应用结构/路径过滤器
+// 	if filters != nil {
+// 		if len(filters.SectionPathHints) > 0 {
+// 			builder = builder.Where(buildLikeOrExpr("section_path", filters.SectionPathHints))
+// 		}
+// 		if len(filters.StructureNodeIdHints) > 0 {
+// 			builder = builder.Where("structure_node_id IN ?", filters.StructureNodeIdHints)
+// 		}
+// 		if len(filters.CanonicalPathHints) > 0 {
+// 			builder = builder.Where(buildLikeOrExpr("canonical_path", filters.CanonicalPathHints))
+// 		}
+// 		if len(filters.ItemIndexHints) > 0 {
+// 			builder = builder.Where("item_index IN ?", filters.ItemIndexHints)
+// 		}
+// 	}
+//
+// 	if err := builder.Find(&candidateChunks).Error; err != nil {
+// 		return nil, err
+// 	}
+// 	if len(candidateChunks) == 0 {
+// 		return nil, nil
+// 	}
+//
+// 	// 步骤 3：关键词分数计算（与 Java keywordWeight + sectionKeywordWeight 对齐）
+// 	terms := extractKeywordTerms(query)
+// 	if len(terms) == 0 {
+// 		return nil, nil
+// 	}
+//
+// 	scoreChunks := make([]keywordScoreChunk, 0, len(candidateChunks))
+// 	for _, chunk := range candidateChunks {
+// 		if chunk == nil {
+// 			continue
+// 		}
+// 		score := computeKeywordScore(terms, chunk.ChunkText, chunk.SectionPath)
+// 		if score <= 0 {
+// 			continue
+// 		}
+// 		scoreChunks = append(scoreChunks, keywordScoreChunk{chunk: chunk, score: score})
+// 	}
+//
+// 	// 步骤 4：按分数降序取 topK
+// 	sortKeywordChunksDesc(scoreChunks)
+// 	limit := topK
+// 	if limit <= 0 || limit > len(scoreChunks) {
+// 		limit = len(scoreChunks)
+// 	}
+//
+// 	result := make([]*data.EmbeddingChunk, 0, limit)
+// 	for i := 0; i < limit; i++ {
+// 		result = append(result, scoreChunks[i].chunk)
+// 	}
+// 	return result, nil
+// }
 
 // SelectParentBlocks 根据 ID 列表查询父级块
 func (k *KnowledgeRepositoryImpl) SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error) {

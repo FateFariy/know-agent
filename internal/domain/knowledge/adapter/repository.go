@@ -3,7 +3,7 @@ package adapter
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -16,20 +16,20 @@ type KnowledgeRepository interface {
 	SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
 
 	// SelectParentBlocks 根据 ID 列表查询父级块
-	SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error)
+	// SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error)
 
 	// SelectKnowledgeScopeNodes 获取有效的知识范围节点
 	SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error)
 
 	// SelectKnowledgeTopicNodes 获取有效的主题节点
-	SelectKnowledgeTopicNodes(ctx context.Context) ([]*vo.KnowledgeTopicNode, error)
+	SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error)
 
 	// SelectDocumentProfiles 获取构建成功（profileStatus=2）的文档画像
-	SelectDocumentProfiles(ctx context.Context) ([]*vo.KnowledgeDocumentProfile, error)
+	SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error)
 
 	// SelectTopicDocumentRelations 获取主题-文档映射关系
-	SelectTopicDocumentRelations(ctx context.Context) ([]*vo.KnowledgeTopicDocumentRelation, error)
+	SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error)
 
-	// SaveKnowledgeRouteTrace 写入一条路由跟踪记录
-	SaveKnowledgeRouteTrace(ctx context.Context, trace *vo.KnowledgeRouteTrace) error
+	// InsertKnowledgeRouteTrace 写入一条路由跟踪记录
+	InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error
 }
