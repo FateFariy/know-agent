@@ -96,7 +96,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	// 组装长期摘要和上下文元数据
 	if summaryState != nil {
 		memoryCtx.LongTermSummary = strutil.Trim(summaryState.SummaryText)
-		memoryCtx.AssembledHistory = joinNonBlank(memoryCtx.LongTermSummary, memoryCtx.RecentTranscript, "\n\n")
+		memoryCtx.AssembledHistory = utils.JoinNonBlank(memoryCtx.LongTermSummary, memoryCtx.RecentTranscript, "\n\n")
 		memoryCtx.CompressionApplied = memoryCtx.LongTermSummary != ""
 		memoryCtx.CoveredExchangeId = summaryState.CoveredExchangeId
 		memoryCtx.CoveredExchangeCount = summaryState.CoveredExchangeCount
@@ -246,17 +246,17 @@ func (s *SummaryCompressionStrategy) renderCompressionTranscript(batch []*entity
 	for _, exchange := range batch {
 		if strutil.IsNotBlank(exchange.Question) {
 			builder.WriteString("用户：")
-			builder.WriteString(s.clipText(exchange.Question, maxQuestionLength))
+			builder.WriteString(utils.ClipTail(exchange.Question, maxQuestionLength))
 			builder.WriteString("\n")
 		}
 		if strutil.IsNotBlank(exchange.Answer) {
 			builder.WriteString("助手：")
-			builder.WriteString(s.clipText(exchange.Answer, maxAnswerLength))
+			builder.WriteString(utils.ClipTail(exchange.Answer, maxAnswerLength))
 			builder.WriteString("\n")
 		}
 		if exchange.TurnStatus == vo.ChatTurnStatusStopped && strutil.IsNotBlank(exchange.ErrorMessage) {
 			builder.WriteString("补充说明：本轮被停止，说明=")
-			builder.WriteString(s.clipText(exchange.ErrorMessage, maxItemLength))
+			builder.WriteString(utils.ClipTail(exchange.ErrorMessage, maxItemLength))
 			builder.WriteString("\n")
 		}
 	}
@@ -289,7 +289,7 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 	}
 
 	// 调用LLM生成合并后的摘要
-	content, err := s.chatModel.Generate(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
+	content, err := s.chatModel.GenerateWithTrace(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, tracer)
 	newSummary := s.deserializeSummary(content)
 	if newSummary == nil {
 		return nil, err
@@ -307,13 +307,13 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.Conversati
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要文本（用分号连接旧摘要和批次高亮）
-	newSummary.Summary = joinNonBlank(newSummary.Summary, batchHighlight, ";")
-	newSummary.Summary = s.clipText(newSummary.Summary, s.historySummary.SummaryMaxChars)
+	newSummary.Summary = utils.JoinNonBlank(newSummary.Summary, batchHighlight, ";")
+	newSummary.Summary = utils.ClipTail(newSummary.Summary, s.historySummary.SummaryMaxChars)
 
 	// 设置会话目标（若尚未设置，则取最后一条问题作为目标）
 	lastQuestion := batch[len(batch)-1].Question
 	if strutil.IsBlank(newSummary.ConversationGoal) && strutil.IsNotBlank(lastQuestion) {
-		newSummary.ConversationGoal = s.clipText(lastQuestion, maxGoalLength)
+		newSummary.ConversationGoal = utils.ClipTail(lastQuestion, maxGoalLength)
 	}
 
 	// 累积待处理问题（保留旧问题，追加批次中的新问题）
@@ -321,7 +321,7 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.Conversati
 	pendingQuestions = append(pendingQuestions, oldSummary.PendingQuestions...)
 	for _, exchange := range batch {
 		if strutil.IsNotBlank(exchange.Question) {
-			pendingQuestions = append(pendingQuestions, s.clipText(exchange.Question, maxItemLength))
+			pendingQuestions = append(pendingQuestions, utils.ClipTail(exchange.Question, maxItemLength))
 		}
 	}
 	newSummary.PendingQuestions = s.deduplicateAndLimit(pendingQuestions)
@@ -427,10 +427,10 @@ func (s *SummaryCompressionStrategy) renderFallbackBatchHighlight(batch []*entit
 	var highlights []string
 	for _, exchange := range batch {
 		if strutil.IsNotBlank(exchange.Question) {
-			highlights = append(highlights, "用户关注："+s.clipText(exchange.Question, maxItemLength))
+			highlights = append(highlights, "用户关注："+utils.ClipTail(exchange.Question, maxItemLength))
 		}
 		if strutil.IsNotBlank(exchange.Answer) {
-			highlights = append(highlights, "已有结论："+s.clipText(exchange.Answer, maxItemLength))
+			highlights = append(highlights, "已有结论："+utils.ClipTail(exchange.Answer, maxItemLength))
 		}
 		if len(highlights) >= 4 {
 			break
@@ -450,7 +450,7 @@ func (s *SummaryCompressionStrategy) extractRetrievalHints(question string) []st
 	for _, match := range matches {
 		hint := strutil.Trim(match)
 		if len(hint) >= 2 && !isNoiseHint(hint) {
-			hints = append(hints, s.clipText(hint, maxItemLength))
+			hints = append(hints, utils.ClipTail(hint, maxItemLength))
 		}
 		if len(hints) >= maxSectionItems {
 			break
@@ -474,7 +474,7 @@ func (s *SummaryCompressionStrategy) buildLongTermSummaryText(payload *entity.Co
 	s.appendBulletSection(&builder, "待跟进问题", normalized.PendingQuestions)
 	s.appendBulletSection(&builder, "检索提示", normalized.RetrievalHints)
 
-	return s.clipText(strutil.Trim(builder.String()), 1024)
+	return utils.ClipTail(strutil.Trim(builder.String()), 1024)
 }
 
 // appendSection 添加段落
@@ -524,9 +524,9 @@ func (s *SummaryCompressionStrategy) deserializeSummary(raw string) *entity.Conv
 
 // normalizeSummary 规范化摘要
 func (s *SummaryCompressionStrategy) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
-	summary := s.clipText(strutil.Trim(payload.Summary), s.historySummary.SummaryMaxChars)
+	summary := utils.ClipTail(strutil.Trim(payload.Summary), s.historySummary.SummaryMaxChars)
 	summaryEntity := &entity.ConversationSummary{
-		ConversationGoal: s.clipText(strutil.Trim(payload.ConversationGoal), maxGoalLength),
+		ConversationGoal: utils.ClipTail(strutil.Trim(payload.ConversationGoal), maxGoalLength),
 		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
 		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
 		ResolvedPoints:   s.deduplicateAndLimit(payload.ResolvedPoints),
@@ -541,7 +541,7 @@ func (s *SummaryCompressionStrategy) normalizeSummary(payload *entity.Conversati
 func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *entity.ConversationSummary) string {
 	var parts []string
 	if strutil.IsNotBlank(payload.ConversationGoal) {
-		parts = append(parts, "目标："+s.clipText(payload.ConversationGoal, maxItemLength))
+		parts = append(parts, "目标："+utils.ClipTail(payload.ConversationGoal, maxItemLength))
 	}
 	if len(payload.StableFacts) > 0 {
 		parts = append(parts, "事实："+strings.Join(payload.StableFacts, "；"))
@@ -549,28 +549,15 @@ func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *enti
 	if len(payload.PendingQuestions) > 0 {
 		parts = append(parts, "待跟进："+strings.Join(payload.PendingQuestions, "；"))
 	}
-	return s.clipText(strings.Join(parts, "；"), s.historySummary.SummaryMaxChars)
+	return utils.ClipTail(strings.Join(parts, "；"), s.historySummary.SummaryMaxChars)
 }
 
 // deduplicateAndLimit 去重并限制数量
 func (s *SummaryCompressionStrategy) deduplicateAndLimit(values []string) []string {
 	return stream.FromSlice(values).
-		Map(func(item string) string { return s.clipText(strutil.Trim(item), maxItemLength) }).
+		Map(func(item string) string { return utils.ClipTail(strutil.Trim(item), maxItemLength) }).
 		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).
 		Distinct().Limit(maxSectionItems).ToSlice()
-}
-
-// joinNonBlank 连接非空字符串
-func joinNonBlank(left, right, delimiter string) string {
-	left = strutil.Trim(left)
-	right = strutil.Trim(right)
-	if strutil.IsBlank(left) {
-		return right
-	}
-	if strutil.IsBlank(right) {
-		return left
-	}
-	return left + delimiter + right
 }
 
 // isNoiseHint 判断是否为噪音提示

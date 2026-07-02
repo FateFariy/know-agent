@@ -6,6 +6,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -16,8 +17,8 @@ var followUpHints = []string{
 
 var followUpPattern = regexp.MustCompile(`.*第\s*[0-9一二三四五六七八九十百]+\s*(条|点|项).*`)
 
-// Assemble 组装问题历史上下文, 仅当问题为续问类型（如"为什么"、"还有呢"等）且存在历史上下文时，才组装最近对话
-func Assemble(question, recentQuestionTranscript string, questionHistoryMaxChars int) *vo.QuestionHistoryContext {
+// BuildQuestionHistoryContext 组装问题历史上下文, 仅当问题为续问类型（如"为什么"、"还有呢"等）且存在历史上下文时，才组装最近对话
+func BuildQuestionHistoryContext(question, recentQuestionTranscript string, questionHistoryMaxChars int) *vo.QuestionHistoryContext {
 	// 提取最近用户问题（过滤掉助手回答，只保留"用户："开头的行）
 	recentUserContext := extractRecentUserQuestions(recentQuestionTranscript)
 
@@ -93,26 +94,13 @@ func looksLikeFollowUpQuestion(question string) bool {
 func renderRecentContext(recentUserContext string, budget int) string {
 	title := "对话承接上下文（仅用于理解指代，不作为事实证据）：\n"
 	if budget <= len(title) {
-		return clipTail(recentUserContext, budget)
+		return utils.ClipTail(recentUserContext, budget)
 	}
 
-	body := clipTail(recentUserContext, budget-len(title))
+	body := utils.ClipTail(recentUserContext, budget-len(title))
 	if body == "" {
 		return ""
 	}
 
 	return title + body
-}
-
-// 裁剪文本，保留末尾部分
-func clipTail(text string, maxChars int) string {
-	normalized := []rune(strutil.Trim(text))
-	if len(normalized) <= maxChars {
-		return string(normalized)
-	}
-	if maxChars <= 1 {
-		return ""
-	}
-	start := max(0, len(normalized)-maxChars+1)
-	return "…" + string(normalized[start:])
 }

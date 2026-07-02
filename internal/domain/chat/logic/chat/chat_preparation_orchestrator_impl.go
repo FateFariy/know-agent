@@ -1,4 +1,4 @@
-package logic
+package chat
 
 import (
 	"context"
@@ -9,17 +9,20 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	logic2 "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 var (
@@ -28,40 +31,41 @@ var (
 	chitchatHints   = []string{"你好", "您好", "hello", "hi", "谢谢", "感谢", "再见", "拜拜"}
 )
 
-// ChatPreparationOrchestratorImpl 聊天准备编排器实现
-type ChatPreparationOrchestratorImpl struct {
-	repo                   adapter.ChatRepository
-	properties             config.RagConf
-	sessionMemoryLogic     SessionMemoryLogic
-	queryRewriteLogic      QueryRewriteLogic
-	documentQuestionRouter DocumentQuestionRouter
-	knowledgeRouteService  KnowledgeRouteService
-	documentKnowledgeLogic logic.DocumentKnowledgeLogic
+// PreparationOrchestratorImpl 聊天准备编排器实现
+type PreparationOrchestratorImpl struct {
+	repo                    adapter.ChatRepository
+	memoryLogic             logic2.SessionMemoryLogic
+	queryRewriteLogic       logic2.QueryRewriteLogic
+	documentQuestionRouter  logic2.DocumentQuestionRouter
+	knowledgeRouteService   logic2.KnowledgeRouteService
+	documentKnowledgeLogic  logic.DocumentKnowledgeLogic
+	planningHistoryMaxChars int // 规划历史最大字符数
+	questionHistoryMaxChars int // 问题历史最大字符数
 }
 
 // NewChatPreparationOrchestrator 创建聊天准备编排器实例
-func NewChatPreparationOrchestrator(
+func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	properties config.RagConf,
-	sessionMemoryLogic SessionMemoryLogic,
-	queryRewriteLogic QueryRewriteLogic,
-	documentQuestionRouter DocumentQuestionRouter,
-	knowledgeRouteService KnowledgeRouteService,
+	memoryLogic logic2.SessionMemoryLogic,
+	queryRewriteLogic logic2.QueryRewriteLogic,
+	documentQuestionRouter logic2.DocumentQuestionRouter,
+	knowledgeRouteService logic2.KnowledgeRouteService,
 	documentKnowledgeLogic logic.DocumentKnowledgeLogic,
-) *ChatPreparationOrchestratorImpl {
-	return &ChatPreparationOrchestratorImpl{
-		repo:                   repo,
-		properties:             properties,
-		sessionMemoryLogic:     sessionMemoryLogic,
-		queryRewriteLogic:      queryRewriteLogic,
-		documentQuestionRouter: documentQuestionRouter,
-		knowledgeRouteService:  knowledgeRouteService,
-		documentKnowledgeLogic: documentKnowledgeLogic,
+) *PreparationOrchestratorImpl {
+	return &PreparationOrchestratorImpl{
+		repo:                    repo,
+		memoryLogic:             memoryLogic,
+		queryRewriteLogic:       queryRewriteLogic,
+		documentQuestionRouter:  documentQuestionRouter,
+		knowledgeRouteService:   knowledgeRouteService,
+		documentKnowledgeLogic:  documentKnowledgeLogic,
+		planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
+		questionHistoryMaxChars: max(1, svcCtx.Config.Chat.Rag.QuestionHistoryMaxChars),
 	}
 }
 
 // Prepare 准备对话执行计划
-func (o *ChatPreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
+func (o *PreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
 	conversationId := convCtx.ConversationId
 	question := convCtx.Question
 	chatMode := convCtx.ChatMode
@@ -78,7 +82,10 @@ func (o *ChatPreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *
 		return nil, err
 	}
 
-	historyPlanningContext, historySummary, answerHistoryContext := o.buildHistoryContext(memoryContext, question)
+	// 构建历史规划上下文
+	historyPlanningContext := vo.NewHistoryPlanningContext(memoryContext.Summary)
+	historySummary := o.buildPlanningHistory(memoryContext, historyPlanningContext)
+	answerHistoryContext := support.BuildQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript), o.questionHistoryMaxChars)
 
 	// 判断时间敏感和实时搜索需求
 	requiresCurrentDateAnchoring := support.RequiresCurrentDateAnchoring(question)
@@ -239,7 +246,7 @@ func (o *ChatPreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *
 
 	retrievalQuestion := rewriteQuestion
 	if navigationDecision != nil && navigationDecision.RetrievalPlan != nil {
-		retrievalQuestion = o.firstNonBlank(navigationDecision.RetrievalPlan.RetrievalQuestion, rewriteQuestion)
+		retrievalQuestion = utils.BlankToDefault(navigationDecision.RetrievalPlan.RetrievalQuestion, rewriteQuestion)
 	}
 
 	retrievalSubQuestions := rewriteSubQuestions
@@ -268,23 +275,15 @@ func (o *ChatPreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *
 	return plan, nil
 }
 
-func (o *ChatPreparationOrchestratorImpl) buildHistoryContext(memoryContext *vo.MemoryContext, question string) (vo.HistoryPlanningContext, string, *vo.QuestionHistoryContext) {
-	// 构建历史规划上下文
-	historyPlanningContext := vo.NewHistoryPlanningContext(memoryContext.Summary)
-	historySummary := o.buildPlanningHistory(memoryContext, historyPlanningContext)
-	answerHistoryContext := o.buildQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript))
-	return historyPlanningContext, historySummary, answerHistoryContext
-}
-
 // summarizeHistory 构建会话记忆
-func (o *ChatPreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
+func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
 	tracer := convCtx.Tracer
 	memoryStage := tracer.StartStage(vo.ConversationTraceStageMemory, convCtx.ChatMode.Name(), "正在装载会话记忆与最近窗口。", nil)
 	if err := o.repo.InsertStage(ctx, tracer.ConvChatExchangeTraceStage()); err != nil {
 		return nil, err
 	}
 
-	memoryContext, err := o.sessionMemoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, tracer)
+	memoryContext, err := o.memoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, tracer)
 	if err != nil {
 		tracer.FailStage(memoryStage, "会话记忆装载失败。", err, nil)
 		if err = o.repo.InsertStage(ctx, tracer.ConvChatExchangeTraceStage()); err != nil {
@@ -307,7 +306,7 @@ func (o *ChatPreparationOrchestratorImpl) summarizeHistory(ctx context.Context, 
 	return memoryContext, nil
 }
 
-func (o *ChatPreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.RagRewriteResult, error) {
+func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.RagRewriteResult, error) {
 	tracer := convCtx.Tracer
 	rewriteStage := tracer.StartStage(vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), "正在生成检索友好的问题表达。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
 	rewriteResult, err := o.queryRewriteLogic.Rewrite(ctx, convCtx.Question, historySummary, tracer)
@@ -326,7 +325,7 @@ func (o *ChatPreparationOrchestratorImpl) questionRewrite(ctx context.Context, c
 }
 
 // basePlan 构建基础执行计划
-func (o *ChatPreparationOrchestratorImpl) basePlan(question string, chatMode vo.ChatQueryMode, memoryContext *vo.MemoryContext,
+func (o *PreparationOrchestratorImpl) basePlan(question string, chatMode vo.ChatQueryMode, memoryContext *vo.MemoryContext,
 	historyPlanningContext vo.HistoryPlanningContext, historySummary string, answerHistoryContext *vo.QuestionHistoryContext,
 	currentDate time.Time, currentDateText string, requiresCurrentDateAnchoring, requiresFreshSearch bool) *vo.ConversationExecutionPlan {
 
@@ -357,7 +356,7 @@ func (o *ChatPreparationOrchestratorImpl) basePlan(question string, chatMode vo.
 }
 
 // buildRewriteStageSnapshot 构建改写阶段快照
-func (o *ChatPreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.RagRewriteResult) map[string]interface{} {
+func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.RagRewriteResult) map[string]interface{} {
 	snapshot := make(map[string]interface{})
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)
@@ -376,37 +375,32 @@ func (o *ChatPreparationOrchestratorImpl) buildRewriteStageSnapshot(question, hi
 }
 
 // buildPlanningHistory 构建规划历史
-func (o *ChatPreparationOrchestratorImpl) buildPlanningHistory(memoryContext *vo.MemoryContext, historyPlanningContext *vo.HistoryPlanningContext) string {
+func (o *PreparationOrchestratorImpl) buildPlanningHistory(memoryContext *vo.MemoryContext, historyPlanningContext *vo.HistoryPlanningContext) string {
 	var sb strings.Builder
 	o.appendSection(&sb, "会话目标", historyPlanningContext.ConversationGoal)
 	o.appendBulletSection(&sb, "已确认事实", historyPlanningContext.StableFacts)
 	o.appendBulletSection(&sb, "待跟进问题", historyPlanningContext.PendingQuestions)
 	o.appendBulletSection(&sb, "检索提示", historyPlanningContext.RetrievalHints)
-	structuredHistory := strings.TrimSpace(sb.String())
+	structuredHistory := strutil.Trim(sb.String())
 	recentTranscript := strutil.Trim(memoryContext.RecentTranscript)
 
-	maxChars := max(1, o.properties.PlanningHistoryMaxChars)
+	maxChars := o.planningHistoryMaxChars
 	if recentTranscript == "" {
-		return o.clipHead(structuredHistory, maxChars)
+		return utils.ClipHead(structuredHistory, maxChars)
 	}
 
 	recentBudget := int(math.Round(float64(maxChars) * 0.65))
-	recentPart := o.clipTail(recentTranscript, recentBudget)
+	recentPart := utils.ClipTail(recentTranscript, recentBudget)
 
-	structuredBudget := max(0, maxChars-len(recentPart)-2)
-	structuredPart := o.clipHead(structuredHistory, structuredBudget)
+	structuredBudget := max(0, maxChars-utf8.RuneCountInString(recentPart)-2)
+	structuredPart := utils.ClipHead(structuredHistory, structuredBudget)
 
-	return o.joinNonBlank(structuredPart, recentPart)
-}
-
-// buildQuestionHistoryContext 构建回答历史上下文
-func (o *ChatPreparationOrchestratorImpl) buildQuestionHistoryContext(question, questionRecentTranscript string) *vo.QuestionHistoryContext {
-	return support.Assemble(question, questionRecentTranscript)
+	return utils.JoinNonBlank(structuredPart, recentPart, "\n\n")
 }
 
 // appendSection 追加章节
-func (o *ChatPreparationOrchestratorImpl) appendSection(sb *strings.Builder, title, content string) {
-	if content == "" {
+func (o *PreparationOrchestratorImpl) appendSection(sb *strings.Builder, title, content string) {
+	if strutil.IsBlank(content) {
 		return
 	}
 	if sb.Len() > 0 {
@@ -415,12 +409,12 @@ func (o *ChatPreparationOrchestratorImpl) appendSection(sb *strings.Builder, tit
 	sb.WriteString("【")
 	sb.WriteString(title)
 	sb.WriteString("】\n")
-	sb.WriteString(strings.TrimSpace(content))
+	sb.WriteString(strutil.Trim(content))
 	sb.WriteString("\n")
 }
 
 // appendBulletSection 追加带项目符号的章节
-func (o *ChatPreparationOrchestratorImpl) appendBulletSection(sb *strings.Builder, title string, values []string) {
+func (o *PreparationOrchestratorImpl) appendBulletSection(sb *strings.Builder, title string, values []string) {
 	if len(values) == 0 {
 		return
 	}
@@ -442,52 +436,16 @@ func (o *ChatPreparationOrchestratorImpl) appendBulletSection(sb *strings.Builde
 		})
 }
 
-// clipHead 截取头部
-func (o *ChatPreparationOrchestratorImpl) clipHead(text string, maxChars int) string {
-	normalized := []rune(strutil.Trim(text))
-	if len(normalized) <= maxChars {
-		return string(normalized)
-	}
-	if maxChars <= 1 {
-		return ""
-	}
-	return string(normalized[:maxChars-1]) + "…"
-}
-
-// clipTail 截取尾部
-func (o *ChatPreparationOrchestratorImpl) clipTail(text string, maxChars int) string {
-	normalized := []rune(strutil.Trim(text))
-	if len(normalized) <= maxChars {
-		return string(normalized)
-	}
-	if maxChars <= 1 {
-		return ""
-	}
-	start := max(0, len(normalized)-maxChars+1)
-	return "…" + string(normalized[start:])
-}
-
-// joinNonBlank 连接非空字符串
-func (o *ChatPreparationOrchestratorImpl) joinNonBlank(left, right string) string {
-	if left == "" {
-		return strutil.Trim(right)
-	}
-	if right == "" {
-		return strutil.Trim(left)
-	}
-	return strutil.Trim(left) + "\n\n" + strutil.Trim(left)
-}
-
 // firstNonBlank 返回第一个非空字符串
-func (o *ChatPreparationOrchestratorImpl) firstNonBlank(left, right string) string {
-	if strings.TrimSpace(left) != "" {
-		return strings.TrimSpace(left)
+func (o *PreparationOrchestratorImpl) firstNonBlank(left, right string) string {
+	if strutil.IsNotBlank(left) {
+		return strutil.Trim(left)
 	}
 	return strutil.Trim(right)
 }
 
 // selectAutoCandidates 选择自动候选文档
-func (o *ChatPreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, routeDecision *vo.KnowledgeRouteDecision, question, rewriteQuestion string) []*vo.DocumentRouteCandidate {
+func (o *PreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, routeDecision *vo.KnowledgeRouteDecision, question, rewriteQuestion string) []*vo.DocumentRouteCandidate {
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return o.fallbackDocuments(ctx, question, rewriteQuestion, 5)
 	}
@@ -519,7 +477,7 @@ func (o *ChatPreparationOrchestratorImpl) selectAutoCandidates(ctx context.Conte
 }
 
 // fallbackDocuments 获取后备候选文档
-func (o *ChatPreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*vo.DocumentRouteCandidate {
+func (o *PreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*vo.DocumentRouteCandidate {
 	descriptors, err := o.documentKnowledgeLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("获取可检索文档失败: %v", err)
@@ -558,7 +516,7 @@ func (o *ChatPreparationOrchestratorImpl) fallbackDocuments(ctx context.Context,
 }
 
 // mergeCandidates 合并候选文档
-func (o *ChatPreparationOrchestratorImpl) mergeCandidates(primary, secondary []*vo.DocumentRouteCandidate, limit int) []*vo.DocumentRouteCandidate {
+func (o *PreparationOrchestratorImpl) mergeCandidates(primary, secondary []*vo.DocumentRouteCandidate, limit int) []*vo.DocumentRouteCandidate {
 	merged := make(map[string]*vo.DocumentRouteCandidate)
 	for _, doc := range primary {
 		merged[doc.DocumentId] = doc
@@ -580,7 +538,7 @@ func (o *ChatPreparationOrchestratorImpl) mergeCandidates(primary, secondary []*
 }
 
 // shouldAskClarification 判断是否需要澄清
-func (o *ChatPreparationOrchestratorImpl) shouldAskClarification(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) bool {
+func (o *PreparationOrchestratorImpl) shouldAskClarification(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) bool {
 	if len(candidateDocuments) == 0 {
 		return true
 	}
@@ -603,7 +561,7 @@ func (o *ChatPreparationOrchestratorImpl) shouldAskClarification(routeDecision *
 }
 
 // buildClarificationReply 构建澄清回复
-func (o *ChatPreparationOrchestratorImpl) buildClarificationReply(originalQuestion string, routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
+func (o *PreparationOrchestratorImpl) buildClarificationReply(originalQuestion string, routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
 	topCandidates := candidateDocuments
 	if len(topCandidates) > 3 {
 		topCandidates = topCandidates[:3]
@@ -643,7 +601,7 @@ func (o *ChatPreparationOrchestratorImpl) buildClarificationReply(originalQuesti
 }
 
 // buildClarificationOptions 构建澄清选项
-func (o *ChatPreparationOrchestratorImpl) buildClarificationOptions(candidateDocuments []*vo.DocumentRouteCandidate) []string {
+func (o *PreparationOrchestratorImpl) buildClarificationOptions(candidateDocuments []*vo.DocumentRouteCandidate) []string {
 	if len(candidateDocuments) == 0 {
 		return []string{}
 	}
@@ -663,7 +621,7 @@ func (o *ChatPreparationOrchestratorImpl) buildClarificationOptions(candidateDoc
 }
 
 // buildClarificationReason 构建澄清原因
-func (o *ChatPreparationOrchestratorImpl) buildClarificationReason(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
+func (o *PreparationOrchestratorImpl) buildClarificationReason(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return "当前自动知识路由没有形成稳定候选，已改为先向用户确认文档范围。"
 	}
@@ -675,7 +633,7 @@ func (o *ChatPreparationOrchestratorImpl) buildClarificationReason(routeDecision
 }
 
 // extractFallbackTerms 提取后备检索词
-func (o *ChatPreparationOrchestratorImpl) extractFallbackTerms(question, rewriteQuestion string) []string {
+func (o *PreparationOrchestratorImpl) extractFallbackTerms(question, rewriteQuestion string) []string {
 	terms := make(map[string]bool)
 	routingText := strutil.Trim(question) + " " + strutil.Trim(rewriteQuestion)
 
@@ -683,7 +641,7 @@ func (o *ChatPreparationOrchestratorImpl) extractFallbackTerms(question, rewrite
 	segments := re.Split(routingText, -1)
 
 	for _, segment := range segments {
-		trimmed := strings.TrimSpace(segment)
+		trimmed := strutil.Trim(segment)
 		if len(trimmed) >= 2 {
 			terms[trimmed] = true
 			if len(trimmed) >= 4 {
@@ -712,7 +670,7 @@ func (o *ChatPreparationOrchestratorImpl) extractFallbackTerms(question, rewrite
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (o *ChatPreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.KnowledgeDocument, queryTerms []string) float64 {
+func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.KnowledgeDocument, queryTerms []string) float64 {
 	content := strings.Join([]string{
 		descriptor.DocumentName,
 		descriptor.KnowledgeScopeCode,
@@ -776,7 +734,7 @@ func (o *ChatPreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *kl
 }
 
 // normalizeFallbackText 标准化后备文本
-func (o *ChatPreparationOrchestratorImpl) normalizeFallbackText(value string) string {
+func (o *PreparationOrchestratorImpl) normalizeFallbackText(value string) string {
 	if value == "" {
 		return ""
 	}
@@ -785,7 +743,7 @@ func (o *ChatPreparationOrchestratorImpl) normalizeFallbackText(value string) st
 }
 
 // buildDocumentModeNoEvidenceReply 构建文档模式无证据回复
-func (o *ChatPreparationOrchestratorImpl) buildDocumentModeNoEvidenceReply(question string, requiresFreshSearch bool) string {
+func (o *PreparationOrchestratorImpl) buildDocumentModeNoEvidenceReply(question string, requiresFreshSearch bool) string {
 	normalizedQuestion := strutil.Trim(question)
 
 	if o.looksLikeCapabilityQuestion(normalizedQuestion) {
@@ -804,7 +762,7 @@ func (o *ChatPreparationOrchestratorImpl) buildDocumentModeNoEvidenceReply(quest
 }
 
 // looksLikeCapabilityQuestion 判断是否为能力询问
-func (o *ChatPreparationOrchestratorImpl) looksLikeCapabilityQuestion(normalizedQuestion string) bool {
+func (o *PreparationOrchestratorImpl) looksLikeCapabilityQuestion(normalizedQuestion string) bool {
 	if normalizedQuestion == "" {
 		return false
 	}
@@ -817,7 +775,7 @@ func (o *ChatPreparationOrchestratorImpl) looksLikeCapabilityQuestion(normalized
 }
 
 // looksLikeOpenChatQuestion 判断是否为开放式聊天问题
-func (o *ChatPreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQuestion string, requiresFreshSearch bool) bool {
+func (o *PreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQuestion string, requiresFreshSearch bool) bool {
 	if normalizedQuestion == "" {
 		return false
 	}
@@ -838,7 +796,7 @@ func (o *ChatPreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQu
 }
 
 // extractDocumentIds 提取文档ID列表
-func (o *ChatPreparationOrchestratorImpl) extractDocumentIds(candidates []*vo.DocumentRouteCandidate) []int64 {
+func (o *PreparationOrchestratorImpl) extractDocumentIds(candidates []*vo.DocumentRouteCandidate) []int64 {
 	result := make([]int64, 0, len(candidates))
 	for _, doc := range candidates {
 		if doc.DocumentId != "" {
@@ -851,7 +809,7 @@ func (o *ChatPreparationOrchestratorImpl) extractDocumentIds(candidates []*vo.Do
 }
 
 // extractTaskIds 提取任务ID列表
-func (o *ChatPreparationOrchestratorImpl) extractTaskIds(candidates []*vo.DocumentRouteCandidate) []int64 {
+func (o *PreparationOrchestratorImpl) extractTaskIds(candidates []*vo.DocumentRouteCandidate) []int64 {
 	result := make([]int64, 0, len(candidates))
 	for _, doc := range candidates {
 		if doc.LastIndexTaskId != "" {
@@ -863,7 +821,7 @@ func (o *ChatPreparationOrchestratorImpl) extractTaskIds(candidates []*vo.Docume
 	return result
 }
 
-func (o *ChatPreparationOrchestratorImpl) StartStage(ctx context.Context, convCtx *vo.ConversationContext) *vo.StageContext {
+func (o *PreparationOrchestratorImpl) StartStage(ctx context.Context, convCtx *vo.ConversationContext) *vo.StageContext {
 	return convCtx.Tracer.StartStage(vo.ConversationTraceStagePrepare, vo.ExecutionModeRetrieval.String(), "正在准备知识路由。", nil)
 }
 

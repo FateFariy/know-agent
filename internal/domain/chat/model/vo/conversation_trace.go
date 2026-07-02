@@ -31,9 +31,9 @@ type ConversationTrace struct {
 }
 
 type StageHandle struct {
-	StageId     int64
-	StartTimeMs int64
-	StageCode   *ConversationTraceStage
+	StageId   int64
+	StartTime time.Time
+	StageCode *ConversationTraceStage
 }
 
 func NewConversationTrace(conversationId string, exchangeId int64, traceId string) *ConversationTrace {
@@ -63,9 +63,9 @@ func (t *ConversationTrace) StartStage(stageCode *ConversationTraceStage, execut
 	t.setSnapshot(snapshot)
 	t.stageState = ConversationTraceStageStateRunning
 	return &StageHandle{
-		StageId:     t.id,
-		StartTimeMs: time.Now().UnixMilli(),
-		StageCode:   stageCode,
+		StageId:   t.id,
+		StartTime: time.Now(),
+		StageCode: stageCode,
 	}
 }
 
@@ -74,7 +74,7 @@ func (t *ConversationTrace) CompleteStage(stageHandle *StageHandle, summaryText 
 	t.id = stageHandle.StageId
 	t.summaryText = summaryText
 	t.setSnapshot(snapshot)
-	t.durationMs = time.Now().UnixMilli() - stageHandle.StartTimeMs
+	t.durationMs = time.Since(stageHandle.StartTime).Milliseconds()
 	t.stageState = ConversationTraceStageStateCompleted
 }
 
@@ -85,7 +85,7 @@ func (t *ConversationTrace) FailStage(stageHandle *StageHandle, summaryText stri
 	t.summaryText = summaryText
 	t.errorMessage = error.Error()
 	t.setSnapshot(snapshot)
-	t.durationMs = time.Now().UnixMilli() - stageHandle.StartTimeMs
+	t.durationMs = time.Since(stageHandle.StartTime).Milliseconds()
 }
 
 // ConvChatExchangeTraceStage 转换为 ChatExchangeTraceStage

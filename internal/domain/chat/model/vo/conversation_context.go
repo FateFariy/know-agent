@@ -18,8 +18,8 @@ type ConversationContext struct {
 	SelectedTaskId       int64                                     // 选中的任务ID
 	CurrentDate          time.Time                                 // 当前日期
 	CurrentDateText      string                                    // 当前日期文本
-	ExecutionPlan        atomic.Pointer[ConversationExecutionPlan] // 执行计划（对应volatile）
-	DebugTrace           atomic.Pointer[ChatDebugTrace]            // 调试追踪（对应volatile）
+	ExecutionPlan        atomic.Pointer[ConversationExecutionPlan] // 执行计划
+	DebugTrace           atomic.Pointer[ChatDebugTrace]            // 调试追踪
 	// todo 待确认 RunnableConfig      RunnableConfig                            // 运行配置
 	Tracer              *ConversationTrace  // 追踪记录器
 	Channel             chan string         // 响应流

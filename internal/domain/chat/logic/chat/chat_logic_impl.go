@@ -1,4 +1,4 @@
-package logic
+package chat
 
 import (
 	"context"
@@ -209,7 +209,7 @@ func (c *ChatLogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand
 func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) (<-chan string, error) {
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       launchPlan.ConversationId,
-		ChatMode:             launchPlan.ChatMode,
+		ChatMode:             launchPlan.ChatMode.Value(),
 		SelectedDocumentId:   launchPlan.SelectedDocumentId,
 		SelectedDocumentName: launchPlan.SelectedDocumentName,
 		Question:             launchPlan.Question,
@@ -358,19 +358,10 @@ func (c *ChatLogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conv
 		return
 	}
 
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	convCtx.CancelExecute = cancelFunc
+	go c.startLeaseRenewal(ctx, convCtx)
 
-	go c.startLeaseRenewal(cancelCtx, convCtx)
-
+	c.buildConversationExecution(convCtx)(ctx)
 	if convCtx.Finalized.Load() {
-		cancelFunc()
-		return
-	}
-
-	c.buildConversationExecution(convCtx)(cancelCtx)
-	if convCtx.Finalized.Load() {
-		cancelFunc()
 		return
 	}
 
