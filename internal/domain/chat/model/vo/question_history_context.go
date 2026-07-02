@@ -1,4 +1,4 @@
-package support
+package vo
 
 import (
 	"regexp"
@@ -7,18 +7,28 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
+
+// QuestionHistoryContext 提问历史上下文
+type QuestionHistoryContext struct {
+	RenderedText      string
+	StructuredContext string
+	RecentContext     string
+	FollowUpQuestion  bool
+	TotalBudget       int
+	RecentBudget      int
+	StructuredBudget  int
+}
 
 var followUpHints = []string{
 	"刚才", "上面", "前面", "前文", "上一条", "上一个", "上一轮", "这个", "那个", "这条", "那条",
 	"继续", "展开", "补充", "详细", "细说", "进一步", "为什么", "怎么做", "怎么理解", "还有呢",
 }
 
-var followUpPattern = regexp.MustCompile(`.*第\s*[0-9一二三四五六七八九十百]+\s*(条|点|项).*`)
+var followUpPattern = regexp.MustCompile(`.*第\s*[0-9一二三四五六七八九十百]+\s*([条点项]).*`)
 
-// BuildQuestionHistoryContext 组装问题历史上下文, 仅当问题为续问类型（如"为什么"、"还有呢"等）且存在历史上下文时，才组装最近对话
-func BuildQuestionHistoryContext(question, recentQuestionTranscript string, questionHistoryMaxChars int) *vo.QuestionHistoryContext {
+// NewQuestionHistoryContext 组装问题历史上下文, 仅当问题为续问类型（如"为什么"、"还有呢"等）且存在历史上下文时，才组装最近对话
+func NewQuestionHistoryContext(question, recentQuestionTranscript string, questionHistoryMaxChars int) *QuestionHistoryContext {
 	// 提取最近用户问题（过滤掉助手回答，只保留"用户："开头的行）
 	recentUserContext := extractRecentUserQuestions(recentQuestionTranscript)
 
@@ -26,7 +36,7 @@ func BuildQuestionHistoryContext(question, recentQuestionTranscript string, ques
 	followUpQuestion := looksLikeFollowUpQuestion(strutil.Trim(question))
 
 	// 初始化上下文对象
-	questionHistoryContext := &vo.QuestionHistoryContext{
+	questionHistoryContext := &QuestionHistoryContext{
 		FollowUpQuestion: followUpQuestion,
 		TotalBudget:      questionHistoryMaxChars,
 	}

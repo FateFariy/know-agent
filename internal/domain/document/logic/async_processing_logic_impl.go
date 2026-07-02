@@ -637,7 +637,7 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 		TaskStatus:   vo.TaskStatusSuccess,
 		CurrentStage: currentStage,
 		FinishTime:   time.Now(),
-		CostMillis:   int64(time.Since(startTime) / time.Millisecond),
+		CostMillis:   time.Since(startTime).Milliseconds(),
 		ErrorCode:    utils.Pointer(""),
 		ErrorMsg:     utils.Pointer(""),
 	})
@@ -733,7 +733,7 @@ func (d *AsyncProcessingLogicImpl) failTask(txCtx context.Context, task *entity.
 		TaskStatus:   vo.TaskStatusFailed,
 		CurrentStage: task.CurrentStage,
 		FinishTime:   time.Now(),
-		CostMillis:   int64(time.Since(task.StartTime) / time.Millisecond),
+		CostMillis:   time.Since(task.StartTime).Milliseconds(),
 		ErrorCode:    utils.Pointer("TASK_FAILED"),
 		ErrorMsg:     utils.Pointer(errorMsg),
 	})

@@ -93,7 +93,7 @@ func (b *StreamEventBuilder) event(eventType string, content any, conversationId
 	payload := &StreamEvent{
 		Type:      eventType,
 		Content:   content,
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: time.Now().Format(time.DateTime),
 	}
 	payload.ConversationId = strutil.Trim(conversationId)
 	payload.ExchangeId = exchangeId

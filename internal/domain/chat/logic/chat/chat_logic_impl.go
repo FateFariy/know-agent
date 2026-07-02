@@ -13,6 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
@@ -102,8 +103,8 @@ func (c *ChatLogicImpl) GetSession(ctx context.Context, conversationId string) (
 		ConversationId: conversationId,
 		Title:          "测试会话",
 		LatestMessage:  "你好，有什么可以帮助你的？",
-		CreateTime:     time.Now().Format(time.RFC3339),
-		UpdateTime:     time.Now().Format(time.RFC3339),
+		CreateTime:     time.Now().Format(time.DateTime),
+		UpdateTime:     time.Now().Format(time.DateTime),
 	}, nil
 }
 
@@ -114,7 +115,7 @@ func (c *ChatLogicImpl) GetExchangeDetail(ctx context.Context, conversationId, e
 		ConversationId: conversationId,
 		UserMessage:    "你好",
 		AgentMessage:   "你好，有什么可以帮助你的？",
-		CreateTime:     time.Now().Format(time.RFC3339),
+		CreateTime:     time.Now().Format(time.DateTime),
 	}, nil
 }
 
@@ -138,15 +139,15 @@ func (c *ChatLogicImpl) ListSessions(ctx context.Context, req *chat.Conversation
 				ConversationId: uuid.New().String(),
 				Title:          "会话1",
 				LatestMessage:  "消息内容1",
-				CreateTime:     time.Now().Format(time.RFC3339),
-				UpdateTime:     time.Now().Format(time.RFC3339),
+				CreateTime:     time.Now().Format(time.DateTime),
+				UpdateTime:     time.Now().Format(time.DateTime),
 			},
 			{
 				ConversationId: uuid.New().String(),
 				Title:          "会话2",
 				LatestMessage:  "消息内容2",
-				CreateTime:     time.Now().Format(time.RFC3339),
-				UpdateTime:     time.Now().Format(time.RFC3339),
+				CreateTime:     time.Now().Format(time.DateTime),
+				UpdateTime:     time.Now().Format(time.DateTime),
 			},
 		},
 	}, nil

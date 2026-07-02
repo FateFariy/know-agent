@@ -95,5 +95,5 @@ type DocumentQuestionRouter interface {
 // ChatPreparationOrchestrator 聊天准备编排器接口
 type ChatPreparationOrchestrator interface {
 	// Prepare 准备对话执行计划
-	Prepare(ctx context.Context, taskInfo *vo.TaskInfo) (*vo.ConversationExecutionPlan, error)
+	Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error)
 }

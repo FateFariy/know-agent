@@ -126,8 +126,8 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 					"charCount":         chunk.CharCount,
 					"tokenCount":        chunk.TokenCount,
 					"embeddingModel":    m.model,
-					"createTime":        time.Now().Format("2006-01-02 15:04:05"),
-					"updateTime":        time.Now().Format("2006-01-02 15:04:05"),
+					"createTime":        time.Now().Format(time.DateTime),
+					"updateTime":        time.Now().Format(time.DateTime),
 					"status":            1,
 				},
 			})
