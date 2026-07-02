@@ -16,6 +16,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
@@ -49,7 +50,7 @@ func NewDocumentKnowledgeService(repo adapter.KnowledgeRepository, port *adapter
 }
 
 // ListRetrievableDocuments 列出可检索的文档
-func (s *DocumentKnowledgeLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo2.KnowledgeDocument, error) {
+func (s *DocumentKnowledgeLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error) {
 	return s.repo.SelectRetrievableDocuments(ctx)
 }
 

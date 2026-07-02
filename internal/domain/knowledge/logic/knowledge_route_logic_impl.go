@@ -15,7 +15,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
@@ -36,7 +35,7 @@ const (
 
 // 基础分隔符与规范化正则
 var (
-	alnumPattern             = regexp.MustCompile(`[a-zA-Z0-9]`)
+	alpNumPattern            = regexp.MustCompile(`[a-zA-Z0-9]`)
 	tokenSplitPattern        = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)
 	normalizePattern         = regexp.MustCompile(`[\s>\x60*#_\-，,。；;：:（）()“”"'\\[]]+`)
 	normalizeCodeInvalidChar = regexp.MustCompile(`[^a-z0-9]+`)
@@ -44,26 +43,41 @@ var (
 
 // KnowledgeRouteLogicImpl 知识路由服务实现：负责根据问题/改写问题匹配 scope/topic/document
 type KnowledgeRouteLogicImpl struct {
-	repo         adapter.KnowledgeRepository
+	repo adapter.KnowledgeRepository
+	*options
+}
+
+type options struct {
 	embedder     adapter.Embedder
 	lexicalIndex adapter.RouteLexicalIndex
 }
 
+type Option func(*options)
+
 // NewKnowledgeRouteLogic 创建路由服务实例
-func NewKnowledgeRouteLogic(repo adapter.KnowledgeRepository) *KnowledgeRouteLogicImpl {
-	return &KnowledgeRouteLogicImpl{repo: repo}
+func NewKnowledgeRouteLogic(repo adapter.KnowledgeRepository, opts ...Option) *KnowledgeRouteLogicImpl {
+	base := new(options)
+	for _, opt := range opts {
+		opt(base)
+	}
+	return &KnowledgeRouteLogicImpl{
+		repo:    repo,
+		options: base,
+	}
 }
 
 // WithEmbeddingProvider 注册嵌入模型（可选）
-func (s *KnowledgeRouteLogicImpl) WithEmbeddingProvider(emb adapter.Embedder) *KnowledgeRouteLogicImpl {
-	s.embedder = emb
-	return s
+func WithEmbeddingProvider(emb adapter.Embedder) Option {
+	return func(o *options) {
+		o.embedder = emb
+	}
 }
 
 // WithLexicalIndex 注册词面索引（可选）
-func (s *KnowledgeRouteLogicImpl) WithLexicalIndex(index adapter.RouteLexicalIndex) *KnowledgeRouteLogicImpl {
-	s.lexicalIndex = index
-	return s
+func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
+	return func(o *options) {
+		o.lexicalIndex = index
+	}
 }
 
 // Route 根据问题执行知识路由，返回范围/主题/文档候选列表与置信度
@@ -126,7 +140,7 @@ func (s *KnowledgeRouteLogicImpl) RecordAutoRoute(ctx context.Context, conversat
 	}
 	trace.HitSelectedDocument = s.resolveHitSelectedDocument(trace.SelectedDocumentId, decision)
 	if err := s.repo.SaveKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", conversationId, err)
+		Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", conversationId, err)
 		return err
 	}
 	return nil
@@ -146,7 +160,7 @@ type routeQueryContext struct {
 }
 
 func (q *routeQueryContext) semanticEnabled() bool {
-	return q != nil && len(q.QueryEmbedding) > 0
+	return len(q.QueryEmbedding) > 0
 }
 
 // buildQueryContext 组装路由上下文：拼接检索文本 + 分词 + 可选生成向量
@@ -154,7 +168,7 @@ func (s *KnowledgeRouteLogicImpl) buildQueryContext(ctx context.Context, questio
 	routingText := s.buildRoutingText(question, rewriteQuestion)
 	terms := s.tokenize(routingText)
 
-	// 若外部 embedding 未配置，则回退到纯词面
+	// 若外部 embedder 未配置，则回退到纯词面
 	var queryEmbedding []float64
 	if s.embedder != nil && strutil.IsNotBlank(routingText) {
 		if vectors, err := s.embedder.EmbedStrings(ctx, routingText); err == nil && len(vectors) > 0 {
@@ -251,10 +265,7 @@ func (s *KnowledgeRouteLogicImpl) rankScopes(ctx context.Context, q *routeQueryC
 		if i < len(semanticScores) {
 			semantic = semanticScores[i]
 		}
-		lexical := 0.0
-		if v, ok := lexicalScores[node.ScopeCode]; ok {
-			lexical = v
-		}
+		lexical := lexicalScores[node.ScopeCode]
 		finalScore := s.semanticMainScore(semantic) + s.lexicalAssistScore(lexical) +
 			s.keywordEntityMatchScore(q.QueryTerms, routeTexts[i])
 		if finalScore > 0 || semantic > 0 {
@@ -268,10 +279,8 @@ func (s *KnowledgeRouteLogicImpl) rankScopes(ctx context.Context, q *routeQueryC
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	limit := 5
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
+	candidates = candidates[:max(5, len(candidates))]
+
 	return candidates
 }
 
@@ -284,35 +293,31 @@ func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context,
 	}
 	best := make(map[string]*vo.ScopeRouteCandidate)
 	for _, doc := range docs {
+		if strutil.IsBlank(doc.KnowledgeScopeCode) && strutil.IsBlank(doc.KnowledgeScopeName) {
+			continue
+		}
 		scopeCode := utils.BlankToDefault(doc.KnowledgeScopeCode, "general_document")
 		scopeName := utils.BlankToDefault(doc.KnowledgeScopeName, "通用文档")
 		routeText := s.joinNonBlank(scopeCode, scopeName, doc.BusinessCategory, doc.DocumentTags)
-		keywordScore := s.keywordEntityMatchScore(q.QueryTerms, routeText)
 		semanticScore := s.singleSemanticScore(ctx, q, routeText)
-		total := s.semanticMainScore(semanticScore) + keywordScore
-		if total <= 0 && !q.semanticEnabled() {
+		finalScore := s.semanticMainScore(semanticScore) + s.keywordEntityMatchScore(q.QueryTerms, routeText)
+		if finalScore <= 0 && len(q.QueryEmbedding) == 0 {
 			continue
 		}
-		if existing, ok := best[scopeCode]; ok && existing.Score >= total {
-			continue
-		}
-		best[scopeCode] = &vo.ScopeRouteCandidate{
-			ScopeCode: scopeCode,
-			ScopeName: scopeName,
-			Score:     total,
-			Reason:    s.buildReason(q.QueryTerms, routeText, semanticScore),
+		if existing := best[scopeCode]; existing.Score < finalScore {
+			best[scopeCode] = &vo.ScopeRouteCandidate{
+				ScopeCode: scopeCode,
+				ScopeName: scopeName,
+				Score:     finalScore,
+				Reason:    s.buildReason(q.QueryTerms, routeText, semanticScore),
+			}
 		}
 	}
 
-	candidates := make([]*vo.ScopeRouteCandidate, 0, len(best))
-	for _, c := range best {
-		candidates = append(candidates, c)
-	}
+	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	limit := 5
-	if len(candidates) > limit {
-		candidates = candidates[:limit]
-	}
+	candidates = candidates[:max(5, len(candidates))]
+
 	return candidates
 }
 
@@ -320,7 +325,7 @@ func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context,
 func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryContext, scopeCandidates []*vo.ScopeRouteCandidate) []*vo.TopicRouteCandidate {
 	nodes, err := s.repo.SelectKnowledgeTopicNodes(ctx)
 	if err != nil {
-		logx.Warnf("查询 topic 节点失败: %v", err)
+		Warnf("查询 topic 节点失败: %v", err)
 	}
 	preferredScopes := make(map[string]struct{}, len(scopeCandidates))
 	for _, sc := range scopeCandidates {
@@ -375,12 +380,12 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, q *routeQueryContext, preferredScopes map[string]struct{}) []*vo.TopicRouteCandidate {
 	profiles, err := s.repo.SelectDocumentProfiles(ctx)
 	if err != nil {
-		logx.Warnf("查询文档画像失败: %v", err)
+		Warnf("查询文档画像失败: %v", err)
 		return nil
 	}
 	docs, err := s.repo.SelectRetrievableDocuments(ctx)
 	if err != nil {
-		logx.Warnf("查询可检索文档失败: %v", err)
+		Warnf("查询可检索文档失败: %v", err)
 	}
 	scopeByDoc := make(map[int64]string, len(docs))
 	for _, d := range docs {
@@ -437,7 +442,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQueryContext, scopeCandidates []*vo.ScopeRouteCandidate, topicCandidates []*vo.TopicRouteCandidate) []*vo.DocumentRouteCandidate {
 	documents, err := s.repo.SelectRetrievableDocuments(ctx)
 	if err != nil {
-		logx.Warnf("查询可检索文档失败: %v", err)
+		Warnf("查询可检索文档失败: %v", err)
 		return nil
 	}
 	if len(documents) == 0 {
@@ -447,7 +452,7 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	if err != nil {
 		Warnf("查询文档画像失败: %v", err)
 	}
-	profileByDoc := make(map[int64]*kvo.KnowledgeDocumentProfile, len(profiles))
+	profileByDoc := make(map[int64]*vo.KnowledgeDocumentProfile, len(profiles))
 	for _, p := range profiles {
 		if p == nil {
 			continue
@@ -459,13 +464,13 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	if err != nil {
 		Warnf("查询 topic-document 关系失败: %v", err)
 	}
-	relationByTopic := make(map[string]map[int64]*kvo.KnowledgeTopicDocumentRelation, len(relations))
+	relationByTopic := make(map[string]map[int64]*vo.KnowledgeTopicDocumentRelation, len(relations))
 	for _, rel := range relations {
 		if rel == nil {
 			continue
 		}
 		if _, ok := relationByTopic[rel.TopicCode]; !ok {
-			relationByTopic[rel.TopicCode] = make(map[int64]*kvo.KnowledgeTopicDocumentRelation)
+			relationByTopic[rel.TopicCode] = make(map[int64]*vo.KnowledgeTopicDocumentRelation)
 		}
 		relationByTopic[rel.TopicCode][rel.DocumentId] = rel
 	}
@@ -546,7 +551,7 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
-func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *kvo.KnowledgeDocument, profile *kvo.KnowledgeDocumentProfile) string {
+func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *vo.KnowledgeDocument, profile *vo.KnowledgeDocumentProfile) string {
 	if profile == nil {
 		return s.joinNonBlank(doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}
@@ -558,24 +563,20 @@ func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *kvo.KnowledgeDocum
 // 语义与词面打分辅助
 // =====================================================
 
-// computeSemanticScores 批量计算 routingText 与每个候选文本的余弦相似度；embedding 未配置时返回全 0 长度相同
+// computeSemanticScores 批量计算 routingText 与每个候选文本的余弦相似度；embedder 未配置时返回全 0 长度相同
 func (s *KnowledgeRouteLogicImpl) computeSemanticScores(ctx context.Context, q *routeQueryContext, routeTexts []string) []float64 {
 	scores := make([]float64, len(routeTexts))
-	if !q.semanticEnabled() || s.embedding == nil || len(routeTexts) == 0 {
+	if len(q.QueryEmbedding) == 0 || s.embedder == nil || len(routeTexts) == 0 {
 		return scores
 	}
 
-	total := len(routeTexts)
-	for start := 0; start < total; start += routeEmbeddingBatchSize {
-		end := start + routeEmbeddingBatchSize
-		if end > total {
-			end = total
-		}
+	for start := 0; start < len(routeTexts); start += routeEmbeddingBatchSize {
+		end := min(start+routeEmbeddingBatchSize, len(routeTexts))
 		batch := routeTexts[start:end]
-		embeddings, err := s.embedding.EmbedBatch(ctx, batch)
+		embeddings, err := s.embedder.EmbedStrings(ctx, batch...)
 		if err != nil || len(embeddings) != len(batch) {
-			logx.Warnf("知识路由批量向量计算失败: batchStart=%d, size=%d, err=%v", start, len(batch), err)
-			return make([]float64, total)
+			Warnf("知识路由批量向量计算失败: batchStart=%d, size=%d, err=%v", start, len(batch), err)
+			return make([]float64, len(routeTexts))
 		}
 		for idx, emb := range embeddings {
 			scores[start+idx] = cosineSimilarity(q.QueryEmbedding, emb)
@@ -586,10 +587,10 @@ func (s *KnowledgeRouteLogicImpl) computeSemanticScores(ctx context.Context, q *
 
 // singleSemanticScore 仅对单一文本做语义相似度（失败或未配置返回 0）
 func (s *KnowledgeRouteLogicImpl) singleSemanticScore(ctx context.Context, q *routeQueryContext, text string) float64 {
-	if !q.semanticEnabled() || s.embedding == nil || strutil.IsBlank(text) {
+	if len(q.QueryEmbedding) == 0 || s.embedder == nil || strutil.IsBlank(text) {
 		return 0
 	}
-	vectors, err := s.embedding.EmbedBatch(ctx, []string{text})
+	vectors, err := s.embedder.EmbedStrings(ctx, text)
 	if err != nil || len(vectors) == 0 {
 		return 0
 	}
@@ -607,12 +608,7 @@ func (s *KnowledgeRouteLogicImpl) searchLexicalScores(ctx context.Context, routi
 	}
 	result := make(map[string]float64, len(hits))
 	for _, hit := range hits {
-		if hit == nil {
-			continue
-		}
-		if strutil.IsNotBlank(hit.EntityCode) {
-			result[hit.EntityCode] = hit.Score
-		}
+		result[hit.EntityCode] = hit.Score
 	}
 	return result
 }
@@ -638,10 +634,7 @@ func (s *KnowledgeRouteLogicImpl) searchDocumentLexicalScores(ctx context.Contex
 
 // semanticMainScore 将余弦相似度映射为可累加分值（低于 0.2 视为无效）
 func (s *KnowledgeRouteLogicImpl) semanticMainScore(semanticScore float64) float64 {
-	if semanticScore <= 0.20 {
-		return 0
-	}
-	return (semanticScore - 0.20) * 50
+	return max(0, (semanticScore-0.20)*50)
 }
 
 // lexicalAssistScore 词面辅助分的软化
@@ -660,7 +653,7 @@ func (s *KnowledgeRouteLogicImpl) keywordEntityMatchScore(queryTerms []string, r
 	normalizedContent := normalize(routeText)
 	var score float64
 	for _, term := range queryTerms {
-		if !(alnumPattern.MatchString(term) || utf8.RuneCountInString(term) <= 4) {
+		if !alpNumPattern.MatchString(term) && utf8.RuneCountInString(term) > 4 {
 			continue
 		}
 		termNorm := normalize(term)
@@ -679,15 +672,15 @@ func (s *KnowledgeRouteLogicImpl) keywordEntityMatchScore(queryTerms []string, r
 // =====================================================
 
 // cosineSimilarity 计算两个等长向量的余弦相似度
-func cosineSimilarity(left, right []float32) float64 {
+func cosineSimilarity(left, right []float64) float64 {
 	if len(left) == 0 || len(right) == 0 || len(left) != len(right) {
 		return 0
 	}
 	var dot, lNorm, rNorm float64
 	for i := 0; i < len(left); i++ {
-		dot += float64(left[i]) * float64(right[i])
-		lNorm += float64(left[i]) * float64(left[i])
-		rNorm += float64(right[i]) * float64(right[i])
+		dot += left[i] * right[i]
+		lNorm += left[i] * left[i]
+		rNorm += right[i] * right[i]
 	}
 	if lNorm <= 0 || rNorm <= 0 {
 		return 0
@@ -748,7 +741,7 @@ func (s *KnowledgeRouteLogicImpl) buildReason(queryTerms []string, content strin
 }
 
 // resolveConfidence 计算整体置信度：以 top1 分数/(top1+top2+5) 归一化
-func (s *KnowledgeRouteLogicImpl) resolveConfidence(documents []*cvo.DocumentRouteCandidate) float64 {
+func (s *KnowledgeRouteLogicImpl) resolveConfidence(documents []*vo.DocumentRouteCandidate) float64 {
 	if len(documents) == 0 {
 		return 0
 	}
@@ -761,7 +754,7 @@ func (s *KnowledgeRouteLogicImpl) resolveConfidence(documents []*cvo.DocumentRou
 }
 
 // resolveDecisionReason 根据候选与置信度生成决策原因
-func (s *KnowledgeRouteLogicImpl) resolveDecisionReason(documents []*cvo.DocumentRouteCandidate, confidence float64) string {
+func (s *KnowledgeRouteLogicImpl) resolveDecisionReason(documents []*vo.DocumentRouteCandidate, confidence float64) string {
 	if len(documents) == 0 {
 		return "没有找到可用候选文档"
 	}
@@ -818,8 +811,8 @@ func splitAndTrim(s, sep string) []string {
 // =====================================================
 
 // buildTrace 组装路由跟踪结构（不含选中文档与命中标记，由各路由模式补充）
-func (s *KnowledgeRouteLogicImpl) buildTrace(conversationId, exchangeId, question, rewriteQuestion, mode string, decision *cvo.KnowledgeRouteDecision) *kvo.KnowledgeRouteTrace {
-	trace := &kvo.KnowledgeRouteTrace{
+func (s *KnowledgeRouteLogicImpl) buildTrace(conversationId, exchangeId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *vo.KnowledgeRouteTrace {
+	trace := &vo.KnowledgeRouteTrace{
 		ConversationId:  conversationId,
 		ExchangeId:      exchangeId,
 		Question:        strutil.Trim(question),
@@ -841,7 +834,7 @@ func (s *KnowledgeRouteLogicImpl) buildTrace(conversationId, exchangeId, questio
 }
 
 // resolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三
-func (s *KnowledgeRouteLogicImpl) resolveHitSelectedDocument(selectedDocumentId int64, decision *cvo.KnowledgeRouteDecision) *int {
+func (s *KnowledgeRouteLogicImpl) resolveHitSelectedDocument(selectedDocumentId int64, decision *vo.KnowledgeRouteDecision) *int {
 	if selectedDocumentId == 0 || decision == nil || len(decision.Documents) == 0 {
 		return nil
 	}
@@ -870,7 +863,7 @@ func toCompactJSON(v any, limit int) string {
 	// 简单起见：我们仅对几种候选类型进行序列化
 	var items []map[string]any
 	switch list := v.(type) {
-	case []*cvo.ScopeRouteCandidate:
+	case []*vo.ScopeRouteCandidate:
 		for i, it := range list {
 			if i >= limit {
 				break
@@ -885,7 +878,7 @@ func toCompactJSON(v any, limit int) string {
 				"reason":    strutil.Trim(it.Reason),
 			})
 		}
-	case []*cvo.TopicRouteCandidate:
+	case []*vo.TopicRouteCandidate:
 		for i, it := range list {
 			if i >= limit {
 				break
@@ -901,7 +894,7 @@ func toCompactJSON(v any, limit int) string {
 				"reason":    strutil.Trim(it.Reason),
 			})
 		}
-	case []*cvo.DocumentRouteCandidate:
+	case []*vo.DocumentRouteCandidate:
 		for i, it := range list {
 			if i >= limit {
 				break
