@@ -59,7 +59,7 @@ type ChatRepository interface {
 	InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) error
 
 	// UpdateStageById 更新阶段记录
-	UpdateStageById(ctx context.Context, id int64, updates map[string]any) error
+	UpdateStageById(ctx context.Context, stage *entity.ChatExchangeTraceStage) error
 
 	// SelectStages 查询阶段记录
 	SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error)

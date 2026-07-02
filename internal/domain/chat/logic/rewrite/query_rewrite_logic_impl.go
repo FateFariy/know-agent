@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -81,7 +82,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	}
 
 	// 调用LLM生成改写结果
-	raw, err := q.chatModel.Generate(ctx, vo.ChatStageRewrite, "", promptText, tracer, q.options...)
+	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, tracer, q.options...)
 	if err != nil {
 		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil
@@ -116,9 +117,9 @@ func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.RagRewri
 // needsRewrite 是否需要改写
 func (q *QueryRewriteLogicImpl) needsRewrite(question, historySummary string) bool {
 	if strutil.IsBlank(historySummary) {
-		return len([]rune(question)) < 8 || q.looksLikeExplicitMultiQuestion(question)
+		return utf8.RuneCountInString(question) < 8 || q.looksLikeExplicitMultiQuestion(question)
 	}
-	return len([]rune(question)) < 18 || q.looksLikeExplicitMultiQuestion(question)
+	return utf8.RuneCountInString(question) < 18 || q.looksLikeExplicitMultiQuestion(question)
 }
 
 // looksLikeExplicitMultiQuestion 是否显式多问题

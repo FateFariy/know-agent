@@ -21,7 +21,7 @@ type ChatExchangeTraceStage struct {
 	StartTime      time.Time `gorm:"column:start_time"`
 	EndTime        time.Time `gorm:"column:end_time"`
 	DurationMs     int64     `gorm:"column:duration_ms"`
-	SummaryText    string    `gorm:"column:summary_text"`
-	ErrorMessage   string    `gorm:"column:error_message"`
-	SnapshotJson   string    `gorm:"column:snapshot_json"`
+	SummaryText    *string   `gorm:"column:summary_text"`
+	ErrorMessage   *string   `gorm:"column:error_message"`
+	SnapshotJson   *string   `gorm:"column:snapshot_json"`
 }

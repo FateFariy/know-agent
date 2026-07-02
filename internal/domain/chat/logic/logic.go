@@ -76,8 +76,8 @@ type RecommendationLogic interface {
 	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) []string
 }
 
-// KnowledgeRouteService 知识路由服务接口
-type KnowledgeRouteService interface {
+// KnowledgeRouteLogic 知识路由服务接口
+type KnowledgeRouteLogic interface {
 	// Route 根据问题进行知识路由
 	Route(ctx context.Context, question, rewriteQuestion string) (*vo.KnowledgeRouteDecision, error)
 	// RecordAutoRoute 记录自动路由结果
@@ -86,8 +86,8 @@ type KnowledgeRouteService interface {
 	RecordShadowRoute(ctx context.Context, conversationId, exchangeId string, documentId int64, question, rewriteQuestion string) error
 }
 
-// DocumentQuestionRouter 文档问题路由接口
-type DocumentQuestionRouter interface {
+// DocumentQuestionRouteLogic 文档问题路由接口
+type DocumentQuestionRouteLogic interface {
 	// Route 根据文档ID和问题进行文档内路由
 	Route(ctx context.Context, documentId *int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
 }

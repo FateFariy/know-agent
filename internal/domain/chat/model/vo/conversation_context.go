@@ -21,7 +21,7 @@ type ConversationContext struct {
 	ExecutionPlan        atomic.Pointer[ConversationExecutionPlan] // 执行计划
 	DebugTrace           atomic.Pointer[ChatDebugTrace]            // 调试追踪
 	// todo 待确认 RunnableConfig      RunnableConfig                            // 运行配置
-	Tracer              *ConversationTrace  // 追踪记录器
+	Trace               *ConversationTrace  // 追踪记录
 	Channel             chan string         // 响应流
 	LeaseKey            string              // 租约锁键
 	AnswerBuffer        strings.Builder     // 响应内容缓冲区

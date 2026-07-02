@@ -18,6 +18,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
@@ -33,16 +34,26 @@ var (
 
 // PreparationOrchestratorImpl 聊天准备编排器实现
 type PreparationOrchestratorImpl struct {
-	repo                    adapter.ChatRepository
-	memoryLogic             logic2.SessionMemoryLogic
-	rewriteLogic            logic2.QueryRewriteLogic
-	documentQuestionRouter  logic2.DocumentQuestionRouter
-	knowledgeRouteService   logic2.KnowledgeRouteService
-	documentKnowledgeLogic  logic.DocumentKnowledgeLogic
-	ragEnabled              bool
-	planningHistoryMaxChars int // 规划历史最大字符数
-	questionHistoryMaxChars int // 问题历史最大字符数
-	noEvidenceReply         string
+	repo                   adapter.ChatRepository
+	memoryLogic            logic2.SessionMemoryLogic
+	rewriteLogic           logic2.QueryRewriteLogic
+	documentQuestionRouter logic2.DocumentQuestionRouteLogic
+	RouteLogic             logic2.KnowledgeRouteLogic
+	documentKnowledgeLogic logic.DocumentKnowledgeLogic
+	tracer                 *trace.ConversationTraceRecorder
+	*option
+}
+
+type option struct {
+	ragEnabled              bool    // 是否启用rag
+	planningHistoryMaxChars int     // 规划历史最大字符数
+	questionHistoryMaxChars int     // 问题历史最大字符数
+	noEvidenceReply         string  // 无证据回复
+	rewriteEnabled          bool    // 是否启用问题改写
+	maxSubQuestions         int     // 最大子问题数量
+	temperature             float32 // 温度参数
+	topP                    float32 // TopP参数
+	thinking                bool    // 是否启用思考过程
 }
 
 // NewChatPreparationOrchestrator 创建聊天准备编排器实例
@@ -50,21 +61,29 @@ func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	memoryLogic logic2.SessionMemoryLogic,
 	rewriteLogic logic2.QueryRewriteLogic,
-	documentQuestionRouter logic2.DocumentQuestionRouter,
-	knowledgeRouteService logic2.KnowledgeRouteService,
+	documentQuestionRouter logic2.DocumentQuestionRouteLogic,
+	knowledgeRouteService logic2.KnowledgeRouteLogic,
 	documentKnowledgeLogic logic.DocumentKnowledgeLogic,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
-		repo:                    repo,
-		memoryLogic:             memoryLogic,
-		rewriteLogic:            rewriteLogic,
-		documentQuestionRouter:  documentQuestionRouter,
-		knowledgeRouteService:   knowledgeRouteService,
-		documentKnowledgeLogic:  documentKnowledgeLogic,
-		ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
-		planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
-		questionHistoryMaxChars: max(1, svcCtx.Config.Chat.Rag.QuestionHistoryMaxChars),
-		noEvidenceReply:         utils.BlankToDefault(svcCtx.Config.Chat.Rag.NoEvidenceReply, "当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。"),
+		repo:                   repo,
+		memoryLogic:            memoryLogic,
+		rewriteLogic:           rewriteLogic,
+		documentQuestionRouter: documentQuestionRouter,
+		RouteLogic:             knowledgeRouteService,
+		documentKnowledgeLogic: documentKnowledgeLogic,
+		tracer:                 trace.NewConversationTraceRecorder(repo),
+		option: &option{
+			ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
+			planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
+			questionHistoryMaxChars: max(1, svcCtx.Config.Chat.Rag.QuestionHistoryMaxChars),
+			noEvidenceReply:         utils.BlankToDefault(svcCtx.Config.Chat.Rag.NoEvidenceReply, "当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。"),
+			rewriteEnabled:          svcCtx.Config.Chat.Rewrite.Enabled,
+			maxSubQuestions:         svcCtx.Config.Chat.Rewrite.MaxSubQuestions,
+			temperature:             svcCtx.Config.Chat.Rewrite.Temperature,
+			thinking:                svcCtx.Config.Chat.Rewrite.Thinking,
+			topP:                    svcCtx.Config.Chat.Rewrite.TopP,
+		},
 	}
 }
 
@@ -78,14 +97,19 @@ func (o *PreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *vo.C
 
 	switch convCtx.ChatMode {
 	case vo.ChatQueryModeOpenChat:
-		return o.prepareOpenChat(ctx, execPlan)
+		err = o.prepareOpenChat(ctx, convCtx, execPlan)
 	case vo.ChatQueryModeDocument:
-		return o.prepareDocumentMode(ctx, execPlan)
+		err = o.prepareDocumentMode(ctx, convCtx, execPlan)
 	case vo.ChatQueryModeAutoDocument:
-		return o.prepareAutoDocumentMode(ctx, execPlan)
+		err = o.prepareAutoDocumentMode(ctx, convCtx, execPlan)
 	default:
 		return nil, fmt.Errorf("不支持的聊天模式: %s", convCtx.ChatMode.Name())
 	}
+	if err != nil {
+		return nil, err
+
+	}
+	return execPlan, err
 }
 
 // prepareCommon 执行所有模式共享的准备步骤：记忆装载、历史规划上下文、时间信号、问题改写。
@@ -141,13 +165,8 @@ func (o *PreparationOrchestratorImpl) prepareCommon(ctx context.Context, convCtx
 		if err != nil {
 			return nil, err
 		}
-		execPlan.RewriteResult = rewriteResult
 		execPlan.RewriteQuestion = utils.BlankToDefault(rewriteResult.RewrittenQuestion, strutil.Trim(convCtx.Question))
-		if len(rewriteResult.SubQuestions) > 0 {
-			execPlan.rewriteSubQuestions = rewriteResult.SubQuestions
-		} else {
-			execPlan.rewriteSubQuestions = []string{prepCtx.rewriteQuestion}
-		}
+		execPlan.RewriteSubQuestions = rewriteResult.SubQuestions
 	}
 	return execPlan, nil
 }
@@ -155,48 +174,51 @@ func (o *PreparationOrchestratorImpl) prepareCommon(ctx context.Context, convCtx
 // prepareOpenChat 开放式聊天：直接返回 ReactAgent 模式执行计划
 func (o *PreparationOrchestratorImpl) prepareOpenChat(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	execPlan.Mode = vo.ExecutionModeReactAgent
-
-	tracer := convCtx.Tracer
-	if tracer != nil {
-		// todo 未持久化trace
-		stage := tracer.StartStage(vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), "路由到开放式 Agent。", nil)
-		tracer.CompleteStage(stage, "已判定走开放式 Agent 路径。", map[string]any{
+	if convCtx.Trace != nil {
+		stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), "路由到开放式 Agent。", nil)
+		if err != nil {
+			return err
+		}
+		snapshot := map[string]any{
 			"chatMode":                     convCtx.ChatMode.String(),
 			"executionMode":                vo.ExecutionModeReactAgent.String(),
 			"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
 			"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-		})
+		}
+		if err = o.tracer.CompleteStage(ctx, stage, "已判定走开放式 Agent 路径。", snapshot); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // prepareDocumentMode 指定文档问答：记录影子路由 → 文档内导航 → 生成执行计划。
-func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, execPlan *vo.ConversationExecutionPlan) error {
-	if execPlan.selectedDocumentId == 0 || execPlan.selectedTaskId == 0 {
-		return nil, fmt.Errorf("当前文档问答模式缺少有效的文档范围")
+func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
+	if convCtx.SelectedDocumentId == 0 || convCtx.SelectedTaskId == 0 {
+		return fmt.Errorf("当前文档问答模式缺少有效的文档范围")
 	}
 
 	// 记录影子路由（不影响业务结果，失败仅告警）
-	if err := o.knowledgeRouteService.RecordShadowRoute(ctx, execPlan.convCtx.ConversationId,
-		strconv.FormatInt(execPlan.convCtx.ExchangeId, 10), execPlan.selectedDocumentId, execPlan.question, execPlan.rewriteQuestion); err != nil {
+	if err := o.RouteLogic.RecordShadowRoute(ctx, convCtx.ConversationId,
+		strconv.FormatInt(convCtx.ExchangeId, 10), convCtx.SelectedDocumentId, convCtx.Question, convCtx.RewriteQuestion); err != nil {
 		Warnf("记录影子路由失败: %v", err)
 	}
 
 	// 初始化文档范围（使用 *int64 形式的路由文档ID，便于下游传递给 documentQuestionRouter）
-	routedDocIdPtr := o.int64Ptr(prepCtx.selectedDocumentId)
-	routedTaskIdPtr := o.int64Ptr(prepCtx.selectedTaskId)
-	routedDocumentIds := []int64{prepCtx.selectedDocumentId}
-	routedTaskIds := []int64{prepCtx.selectedTaskId}
+	routedDocIdPtr := o.int64Ptr(convCtx.SelectedDocumentId)
+	routedTaskIdPtr := o.int64Ptr(convCtx.SelectedTaskId)
+	routedDocumentIds := []int64{convCtx.SelectedDocumentId}
+	routedTaskIds := []int64{convCtx.SelectedTaskId}
 
 	// 文档内导航
-	navigationDecision := o.runDocumentNavigation(ctx, prepCtx, routedDocIdPtr)
+	navigationDecision := o.runDocumentNavigation(ctx, convCtx, routedDocIdPtr)
 
 	// 确定执行模式与检索问题
 	executionMode := vo.ExecutionModeRetrieval
 	if navigationDecision != nil && navigationDecision.ExecutionMode != 0 {
 		executionMode = navigationDecision.ExecutionMode
 	}
-	retrievalQuestion, retrievalSubQuestions := o.resolveRetrievalQuestions(navigationDecision, prepCtx.rewriteQuestion, prepCtx.rewriteSubQuestions)
+	retrievalQuestion, retrievalSubQuestions := o.resolveRetrievalQuestions(navigationDecision, convCtx.RewriteQuestion, convCtx.RewriteSubQuestions)
 
 	// 构建最终执行计划
 	plan := o.buildBasePlan(prepCtx)
@@ -217,21 +239,21 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, e
 		prepCtx.convCtx.ConversationId, prepCtx.chatMode.String(), strutil.Trim(prepCtx.question),
 		prepCtx.rewriteQuestion, retrievalQuestion, executionMode.String())
 
-	return plan, nil
+	return nil
 }
 
 // prepareAutoDocumentMode 自动文档问答：执行知识路由 → 必要时澄清 → 确定主文档 → 导航 → 生成计划。
-func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, prepCtx *preparationContext) (*vo.ConversationExecutionPlan, error) {
-	tracer := prepCtx.convCtx.Tracer
+func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
+	tracer := convCtx.Trace
 	exchangeIdText := strconv.FormatInt(prepCtx.convCtx.ExchangeId, 10)
 
 	// 执行知识路由
-	routeDecision, err := o.knowledgeRouteService.Route(ctx, prepCtx.question, prepCtx.rewriteQuestion)
+	routeDecision, err := o.RouteLogic.Route(ctx, prepCtx.question, prepCtx.rewriteQuestion)
 	if err != nil {
 		Warnf("知识路由失败: %v", err)
 		routeDecision = nil
 	}
-	if recordErr := o.knowledgeRouteService.RecordAutoRoute(ctx, prepCtx.convCtx.ConversationId,
+	if recordErr := o.RouteLogic.RecordAutoRoute(ctx, prepCtx.convCtx.ConversationId,
 		exchangeIdText, prepCtx.question, prepCtx.rewriteQuestion, routeDecision); recordErr != nil {
 		Warnf("记录自动路由失败: %v", recordErr)
 	}
@@ -290,7 +312,6 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 	retrievalQuestion, retrievalSubQuestions := o.resolveRetrievalQuestions(navigationDecision, prepCtx.rewriteQuestion, prepCtx.rewriteSubQuestions)
 
 	// 构建最终执行计划
-	plan := o.buildBasePlan(prepCtx)
 	plan.Mode = executionMode
 	plan.NavigationDecision = navigationDecision
 	plan.RewriteQuestion = prepCtx.rewriteQuestion
@@ -375,21 +396,20 @@ func (o *PreparationOrchestratorImpl) resolveRetrievalQuestions(navigationDecisi
 
 // summarizeHistory 构建会话记忆
 func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
-	tracer := convCtx.Tracer
-	memoryStage := tracer.StartStage(vo.ConversationTraceStageMemory, convCtx.ChatMode.Name(), "正在装载会话记忆与最近窗口。", nil)
-	if err := o.repo.InsertStage(ctx, tracer.ConvChatExchangeTraceStage()); err != nil {
+	tracer := convCtx.Trace
+	memoryStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageMemory, convCtx.ChatMode.Name(), "正在装载会话记忆与最近窗口。", nil)
+	if err != nil {
 		return nil, err
 	}
 
 	memoryContext, err := o.memoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, tracer)
 	if err != nil {
-		tracer.FailStage(memoryStage, "会话记忆装载失败。", err, nil)
-		if err = o.repo.InsertStage(ctx, tracer.ConvChatExchangeTraceStage()); err != nil {
+		if err = o.tracer.FailStage(ctx, memoryStage, "会话记忆装载失败。", err, nil); err != nil {
 			return nil, err
 		}
 		return nil, err
 	}
-	tracer.CompleteStage(memoryStage, "会话记忆装载完成。", map[string]any{
+	snapshot := map[string]any{
 		"compressionApplied":       memoryContext.CompressionApplied,
 		"coveredExchangeId":        memoryContext.CoveredExchangeId,
 		"coveredExchangeCount":     memoryContext.CoveredExchangeCount,
@@ -397,21 +417,27 @@ func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, conv
 		"longTermSummary":          strutil.Trim(memoryContext.LongTermSummary),
 		"recentTranscript":         strutil.Trim(memoryContext.RecentTranscript),
 		"RecentQuestionTranscript": strutil.Trim(memoryContext.RecentQuestionTranscript),
-	})
-	if err = o.repo.InsertStage(ctx, tracer.ConvChatExchangeTraceStage()); err != nil {
+	}
+	if err = o.tracer.CompleteStage(ctx, memoryStage, "会话记忆装载完成。", snapshot); err != nil {
 		return nil, err
 	}
 	return memoryContext, nil
 }
 
 func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.RagRewriteResult, error) {
-	tracer := convCtx.Tracer
-	rewriteStage := tracer.StartStage(vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), "正在生成检索友好的问题表达。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
-	rewriteResult, err := o.rewriteLogic.Rewrite(ctx, convCtx.Question, historySummary, tracer)
+	rewriteStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), "正在生成检索友好的问题表达。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
 	if err != nil {
-		tracer.FailStage(rewriteStage, "问题改写失败。", err, o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
+		return nil, err
 	}
-	tracer.CompleteStage(rewriteStage, "问题改写完成。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, rewriteResult))
+	rewriteResult, err := o.rewriteLogic.Rewrite(ctx, convCtx.Question, historySummary, convCtx.Trace)
+	if err != nil {
+		if err = o.tracer.FailStage(ctx, rewriteStage, "问题改写失败。", err, o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)); err != nil {
+			return nil, err
+		}
+	}
+	if err = o.tracer.CompleteStage(ctx, rewriteStage, "问题改写完成。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, rewriteResult)); err != nil {
+		return nil, err
+	}
 
 	// 获取改写后的问题
 	rewriteQuestion := utils.BlankToDefault(rewriteResult.RewrittenQuestion, strutil.Trim(convCtx.Question))
@@ -419,12 +445,12 @@ func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convC
 	if len(rewriteSubQuestions) == 0 {
 		rewriteSubQuestions = []string{rewriteQuestion}
 	}
-	return rewriteResult, err
+	return rewriteResult, nil
 }
 
 // buildRewriteStageSnapshot 构建改写阶段快照
-func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.RagRewriteResult) map[string]interface{} {
-	snapshot := make(map[string]interface{})
+func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.RagRewriteResult) map[string]any {
+	snapshot := make(map[string]any)
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)
 
@@ -432,12 +458,11 @@ func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, histor
 		snapshot["rewriteQuestion"] = strutil.Trim(rewriteResult.RewrittenQuestion)
 		snapshot["subQuestions"] = rewriteResult.SubQuestions
 		snapshot["rawModelOutput"] = strutil.Trim(rewriteResult.RawModelOutput)
-	} else {
-		snapshot["rewriteQuestion"] = ""
-		snapshot["subQuestions"] = []string{}
-		snapshot["rawModelOutput"] = ""
 	}
-
+	snapshot["rewriteOverrideEnabled"] = o.rewriteEnabled
+	snapshot["rewriteTemperature"] = o.temperature
+	snapshot["rewriteTopP"] = o.topP
+	snapshot["rewriteThinking"] = o.thinking
 	return snapshot
 }
 
@@ -881,7 +906,7 @@ func (o *PreparationOrchestratorImpl) extractTaskIds(candidates []*vo.DocumentRo
 }
 
 func (o *PreparationOrchestratorImpl) StartStage(ctx context.Context, convCtx *vo.ConversationContext) *vo.StageContext {
-	return convCtx.Tracer.StartStage(vo.ConversationTraceStagePrepare, vo.ExecutionModeRetrieval.String(), "正在准备知识路由。", nil)
+	return convCtx.Trace.StartStage(vo.ConversationTraceStagePrepare, vo.ExecutionModeRetrieval.String(), "正在准备知识路由。", nil)
 }
 
 func Warnf(format string, v ...any) {

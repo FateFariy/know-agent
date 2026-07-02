@@ -343,10 +343,10 @@ func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.Chat
 }
 
 // UpdateStageById 更新阶段记录
-func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, id int64, updates map[string]any) error {
+func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
 	return r.dbWithContext(ctx).Model(&model.ChatExchangeTraceStage{}).
-		Where("id = ?", id).
-		Updates(updates).Error
+		Where("id = ?", stage.ID).
+		Updates(stage).Error
 }
 
 // SelectStages 查询阶段记录

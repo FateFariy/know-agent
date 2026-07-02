@@ -893,7 +893,7 @@ func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange
 		// ExecutionPlan:        nil,
 		// DebugTrace:           debugTrace,
 		// RunnableConfig:       runnableConfig,
-		Tracer:  tracer,
+		Trace:   tracer,
 		Channel: make(chan string, channelBufferSize),
 		// EventMetadata:   eventMetadata,
 		LeaseKey: chatRunningLeasePrefix + plan.ConversationId,
