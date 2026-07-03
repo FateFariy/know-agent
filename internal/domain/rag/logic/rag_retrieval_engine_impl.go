@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
@@ -60,7 +59,7 @@ func NewRagRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.Retrie
 
 var _ vo.RagRetriever = (*RagRetrievalEngine)(nil)
 
-func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.ConversationExecutionPlan, tracer *cvo.ConversationTrace) (*vo.RagRetrievalContext, error) {
+func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.ConversationExecutionPlan, trace *cvo.ConversationTrace) (*vo.RagRetrievalContext, error) {
 	ragCtx := vo.NewRagRetrievalContext(plan.RetrievalQuestion)
 
 	subQuestions := plan.RetrievalSubQuestions
@@ -68,7 +67,7 @@ func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.Conversatio
 		subQuestions = []string{plan.RetrievalQuestion}
 	}
 
-	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan, tracer)
+	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan, trace)
 	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.Documents) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
@@ -81,7 +80,7 @@ func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.Conversatio
 }
 
 func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
-	plan *cvo.ConversationExecutionPlan, tracer *cvo.ConversationTrace) []*vo.SubQuestionEvidence {
+	plan *cvo.ConversationExecutionPlan, trace *cvo.ConversationTrace) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
 	defer cancel()
 
@@ -135,11 +134,11 @@ func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ra
 				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments)))
 
 			// 记录观测数据
-			if tracer != nil {
-				if err = e.recordChannelObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
+			if trace != nil {
+				if err = e.recordChannelObservations(trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
 					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
-				if err = e.recordRetrievalResultObservations(tracer, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
+				if err = e.recordRetrievalResultObservations(trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
 					Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 			}
@@ -484,7 +483,7 @@ func (e *RagRetrievalEngine) buildChannelTraces(rawResults, filteredResults []*v
 }
 
 // recordChannelObservations 记录渠道执行观测数据，包括召回数量、接受数量、分数等
-func (e *RagRetrievalEngine) recordChannelObservations(tracer *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RagRetrievalEngine) recordChannelObservations(trace *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -501,8 +500,8 @@ func (e *RagRetrievalEngine) recordChannelObservations(tracer *cvo.ConversationT
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
 		execution := &vo.ChannelExecutionView{
-			ExchangeId:       tracer.GetExchangeId(),
-			TraceId:          tracer.GetTraceId(),
+			ExchangeId:       trace.ExchangeId(),
+			TraceId:          trace.TraceId(),
 			SubQuestionIndex: subQuestionIndex,
 			SubQuestion:      subQuestion,
 			ChannelType:      channelName,
@@ -522,12 +521,12 @@ func (e *RagRetrievalEngine) recordChannelObservations(tracer *cvo.ConversationT
 	}
 
 	// todo 待完善最终保存
-	tracer.RecordChannelExecutions(executions)
+	trace.RecordChannelExecutions(executions)
 	return nil
 }
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
-func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RagRetrievalEngine) recordRetrievalResultObservations(trace *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -552,8 +551,8 @@ func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.Conve
 		channelName := rawResult.ChannelName
 		for i, doc := range rawResult.Documents {
 			view := &vo.RetrievalResultView{
-				ExchangeId:       tracer.GetExchangeId(),
-				TraceId:          tracer.GetTraceId(),
+				ExchangeId:       trace.ExchangeId(),
+				TraceId:          trace.TraceId(),
 				SubQuestionIndex: subQuestionIndex,
 				SubQuestion:      subQuestion,
 				ChannelType:      channelName,
@@ -588,7 +587,7 @@ func (e *RagRetrievalEngine) recordRetrievalResultObservations(tracer *cvo.Conve
 	}
 
 	// todo 待完善最终保存
-	tracer.RecordRetrievalResults(results)
+	trace.RecordRetrievalResults(results)
 	return nil
 }
 
@@ -609,7 +608,7 @@ func (e *RagRetrievalEngine) renderParentEvidenceText(parentBlock *entity.Docume
 		childSummaryBuilder.WriteString("- child#")
 		childSummaryBuilder.WriteString(strconv.Itoa(childDocument.ChunkNo))
 		childSummaryBuilder.WriteString("：")
-		childSummaryBuilder.WriteString(trimText(childDocument.OriginalSnippet, 140))
+		childSummaryBuilder.WriteString(utils.ClipHead(childDocument.OriginalSnippet, 140))
 	}
 
 	var composed string
@@ -619,16 +618,7 @@ func (e *RagRetrievalEngine) renderParentEvidenceText(parentBlock *entity.Docume
 		composed = fmt.Sprintf("[父块内容]\n%s", parentText)
 	}
 
-	return trimText(composed, max(maxChars, 1))
-}
-
-// trimText 截取文本，并添加省略号
-func trimText(text string, maxChars int) string {
-	charLen := utf8.RuneCountInString(text)
-	if charLen <= maxChars-1 {
-		return text
-	}
-	return text[:max(maxChars-1, 0)] + "…"
+	return utils.ClipHead(composed, max(maxChars, 1))
 }
 
 func Warnf(format string, args ...interface{}) {

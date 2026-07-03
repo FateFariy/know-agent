@@ -7,6 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/chat"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	documentLogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	knowledgeLogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 )
 
 var ProviderSet = wire.NewSet(
@@ -23,4 +24,6 @@ var ProviderSet = wire.NewSet(
 	documentadapter.NewDocumentPort,
 	chat.NewChatLogic,
 	wire.Bind(new(chatLogic.ChatLogic), new(*chat.ChatLogicImpl)),
+	knowledgeLogic.NewKnowledgeRouteLogicImpl,
+	wire.Bind(new(knowledgeLogic.KnowledgeRouteLogic), new(*knowledgeLogic.KnowledgeRouteLogicImpl)),
 )

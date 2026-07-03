@@ -58,7 +58,7 @@ func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, u
 }
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
-func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (string, error) {
+func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (string, error) {
 	startTime := time.Now()
 
 	// 记录当前阶段的调用选项日志
@@ -71,7 +71,7 @@ func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage,
 	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt))
 	if err != nil {
 		// 调用失败，记录使用量并返回错误
-		appendUsage(tracer, usageTrace)
+		appendUsage(trace, usageTrace)
 		return "", err
 	}
 
@@ -81,14 +81,14 @@ func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage,
 	// 构建成功状态的使用量轨迹
 	usageTrace = o.buildUsageTrace(stage, response, startTime, "COMPLETED", systemPrompt, userPrompt, responseText)
 
-	// 将使用量记录添加到追踪器
-	appendUsage(tracer, usageTrace)
+	// 将使用量记录添加到追踪
+	appendUsage(trace, usageTrace)
 
 	return responseText, nil
 }
 
 // StreamWithTrace 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, tracer *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
+func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
 	startTime := time.Now()
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
@@ -101,7 +101,7 @@ func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, s
 	if err != nil {
 		// 连接建立失败，记录使用量并返回错误
 		usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
-		appendUsage(tracer, usageTrace)
+		appendUsage(trace, usageTrace)
 		return nil, err
 	}
 
@@ -124,7 +124,7 @@ func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, s
 			// 处理接收过程中的错误
 			if err != nil {
 				usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-				appendUsage(tracer, usageTrace)
+				appendUsage(trace, usageTrace)
 				logx.Errorf("模型调用失败: %v", err)
 				return
 			}
@@ -140,7 +140,7 @@ func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, s
 				case <-ctx.Done():
 					// 外部主动取消，记录终止日志和使用量
 					usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-					appendUsage(tracer, usageTrace)
+					appendUsage(trace, usageTrace)
 					logx.Alert("由外部终止调用...")
 					return
 				}
@@ -149,7 +149,7 @@ func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, s
 
 		// 流式处理结束，构建成功状态的使用量轨迹并记录
 		usageTrace := o.buildUsageTrace(stage, chunk, startTime, "COMPLETED", systemPrompt, userPrompt, outputBuilder.String())
-		appendUsage(tracer, usageTrace)
+		appendUsage(trace, usageTrace)
 	}()
 
 	return resultChan, nil
@@ -205,9 +205,9 @@ func (o *ObservedChatModelImpl[M]) logStageCallOptions(stage string, opts ...mod
 }
 
 // appendUsage 添加使用量记录
-func appendUsage(tracer *vo.ConversationTrace, trace *vo.ChatModelUsageTrace) {
-	if tracer != nil && trace != nil {
-		tracer.AddModelUsageTrace(trace)
+func appendUsage(trace *vo.ConversationTrace, usageTrace *vo.ChatModelUsageTrace) {
+	if trace != nil && usageTrace != nil {
+		trace.AddModelUsageTrace(usageTrace)
 	}
 }
 

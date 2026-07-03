@@ -53,8 +53,8 @@ type options struct {
 
 type Option func(*options)
 
-// NewKnowledgeRouteLogic 创建路由服务实例
-func NewKnowledgeRouteLogic(repo adapter.KnowledgeRepository, opts ...Option) *KnowledgeRouteLogicImpl {
+// NewKnowledgeRouteLogicImpl 创建路由服务实例
+func NewKnowledgeRouteLogicImpl(repo adapter.KnowledgeRepository, opts ...Option) *KnowledgeRouteLogicImpl {
 	base := new(options)
 	for _, opt := range opts {
 		opt(base)
@@ -200,18 +200,17 @@ func (s *KnowledgeRouteLogicImpl) tokenize(text string) []string {
 		return nil
 	}
 
-	seen := make(map[string]struct{})
+	terms := make(map[string]struct{})
 	for _, part := range tokenSplitPattern.Split(cleaned, -1) {
 		trimmed := strutil.Trim(part)
 		if utf8.RuneCountInString(trimmed) > 1 {
-			seen[trimmed] = struct{}{}
-			s.expandChineseNgrams(trimmed, seen)
+			terms[trimmed] = struct{}{}
+			s.expandChineseNgrams(trimmed, terms)
 		}
 	}
 
 	// 限制最大关键词数量
-	terms := maputil.Keys(seen)
-	return terms[:min(40, len(terms))]
+	return utils.LimitSlice(maputil.Keys(terms), 40)
 }
 
 // expandChineseNgrams 对中文短片段做 2~maxGram 的滑动窗口扩展（用于提高短实体召回）
@@ -272,9 +271,7 @@ func (s *KnowledgeRouteLogicImpl) rankScopes(ctx context.Context, q *routeQueryC
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	candidates = candidates[:max(5, len(candidates))]
-
-	return candidates
+	return utils.LimitSlice(candidates, 5)
 }
 
 // deriveScopesFromDocuments 当没有配置 scope 节点时，从文档元数据派生粗略的 scope 候选
@@ -309,9 +306,7 @@ func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context,
 
 	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	candidates = candidates[:max(5, len(candidates))]
-
-	return candidates
+	return utils.LimitSlice(candidates, 5)
 }
 
 // rankTopics 对主题节点打分：语义 + 词面 + 关键词 + 与当前 scope 命中的加分
@@ -359,9 +354,7 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	candidates = candidates[:max(8, len(candidates))]
-
-	return candidates
+	return utils.LimitSlice(candidates, 8)
 }
 
 // deriveTopicsFromProfiles 当 topic 节点未配置时，按文档画像的 CoreTopics 派生主题候选
@@ -409,9 +402,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 
 	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	candidates = candidates[:max(8, len(candidates))]
-
-	return candidates
+	return utils.LimitSlice(candidates, 8)
 }
 
 // rankDocuments 对文档进行打分，并将 top-score 的文档返回
@@ -502,9 +493,7 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	}
 
 	sort.Slice(matched, func(i, j int) bool { return matched[i].Score > matched[j].Score })
-	matched = matched[:max(5, len(matched))]
-
-	return matched
+	return utils.LimitSlice(matched, 5)
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本

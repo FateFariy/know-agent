@@ -36,12 +36,12 @@ type ChatLogicImpl struct {
 	repo               adapter.ChatRepository
 	streamEventBuilder *support.StreamEventBuilder
 	runtimeRegistry    *support.ChatRuntimeRegistry
-	knowledgeLogic     logic.DocumentKnowledgeLogic
+	knowledgeLogic     logic.KnowledgeLogic
 	distributedLock    adapter.DistributedLock
 }
 
 // NewChatLogic 创建聊天逻辑实例
-func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic logic.DocumentKnowledgeLogic, distributedLock adapter.DistributedLock) *ChatLogicImpl {
+func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic logic.KnowledgeLogic, distributedLock adapter.DistributedLock) *ChatLogicImpl {
 	return &ChatLogicImpl{
 		repo:               repo,
 		streamEventBuilder: &support.StreamEventBuilder{},
@@ -854,7 +854,7 @@ func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange
 	// usedTools := &syncSet{data: make(map[string]struct{})}
 
 	traceId := utils.GenerateUUIDWithoutHyphen()
-	tracer := vo.NewConversationTrace(plan.ConversationId, exchange.ID, traceId)
+	trace := vo.NewConversationTrace(plan.ConversationId, exchange.ID, traceId)
 	// eventMetadata := &StreamEventMetadata{
 	// 	ConversationId: plan.ConversationId,
 	// 	ExchangeId:     exchange.ID,
@@ -893,7 +893,7 @@ func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange
 		// ExecutionPlan:        nil,
 		// DebugTrace:           debugTrace,
 		// RunnableConfig:       runnableConfig,
-		Trace:   tracer,
+		Trace:   trace,
 		Channel: make(chan string, channelBufferSize),
 		// EventMetadata:   eventMetadata,
 		LeaseKey: chatRunningLeasePrefix + plan.ConversationId,

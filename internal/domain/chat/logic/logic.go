@@ -47,7 +47,7 @@ type ChatLogic interface {
 // SessionMemoryLogic 会话记忆逻辑接口
 type SessionMemoryLogic interface {
 	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error)
+	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
 
 	// RefreshConversationSummaryAsync 异步刷新会话摘要
 	RefreshConversationSummaryAsync(ctx context.Context, conversationId string)
@@ -67,29 +67,19 @@ type PromptTemplateLogic interface {
 }
 
 type QueryRewriteLogic interface {
-	Rewrite(ctx context.Context, question, historySummary string, tracer *vo.ConversationTrace) (*vo.RagRewriteResult, error)
+	Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.RagRewriteResult, error)
 }
 
 // RecommendationLogic 推荐追问业务逻辑接口
 type RecommendationLogic interface {
 	// GenerateRecommendations 生成推荐追问
-	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) []string
-}
-
-// KnowledgeRouteLogic 知识路由服务接口
-type KnowledgeRouteLogic interface {
-	// Route 根据问题进行知识路由
-	Route(ctx context.Context, question, rewriteQuestion string) (*vo.KnowledgeRouteDecision, error)
-	// RecordAutoRoute 记录自动路由结果
-	RecordAutoRoute(ctx context.Context, conversationId, exchangeId string, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error
-	// RecordShadowRoute 记录影子路由结果
-	RecordShadowRoute(ctx context.Context, conversationId, exchangeId string, documentId int64, question, rewriteQuestion string) error
+	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string
 }
 
 // DocumentQuestionRouteLogic 文档问题路由接口
 type DocumentQuestionRouteLogic interface {
 	// Route 根据文档ID和问题进行文档内路由
-	Route(ctx context.Context, documentId *int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
+	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
 }
 
 // ChatPreparationOrchestrator 聊天准备编排器接口

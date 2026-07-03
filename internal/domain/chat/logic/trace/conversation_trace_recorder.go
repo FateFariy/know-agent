@@ -25,6 +25,9 @@ func NewConversationTraceRecorder(repo adapter.ChatRepository) *ConversationTrac
 // StartStage 阶段开始
 func (t *ConversationTraceRecorder) StartStage(ctx context.Context, trace *vo.ConversationTrace, stageCode *vo.ConversationTraceStage,
 	executionMode, summaryText string, snapshot any) (*vo.StageHandle, error) {
+	if trace == nil {
+		return nil, nil
+	}
 	stage := &entity.ChatExchangeTraceStage{
 		ID:             utils.GetSnowflakeNextID(),
 		ConversationId: trace.ConversationId(),

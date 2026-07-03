@@ -51,7 +51,7 @@ func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.Obser
 
 // Rewrite 改写问题（结合历史上下文）
 // 流程：空问题直接返回 -> 判断是否需要改写 -> 不需要则规则改写 -> 需要则LLM改写 -> 规范化结果
-func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, tracer *vo.ConversationTrace) (*vo.RagRewriteResult, error) {
+func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.RagRewriteResult, error) {
 	// 空问题直接返回空结果
 	question = strutil.Trim(question)
 	if strutil.IsBlank(question) {
@@ -82,7 +82,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	}
 
 	// 调用LLM生成改写结果
-	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, tracer, q.options...)
+	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, trace, q.options...)
 	if err != nil {
 		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil

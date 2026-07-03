@@ -11,6 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/duke-git/lancet/v2/maputil"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -22,14 +24,17 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	klvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	rvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 var (
-	capabilityHints = []string{"你都能干什么", "你能做什么", "你可以做什么", "你会什么", "你是谁", "怎么用你", "你能帮我什么"}
-	openChatHints   = []string{"天气", "温度", "下雨", "新闻", "股价", "汇率", "热搜", "今天", "明天", "最新", "现在"}
-	chitchatHints   = []string{"你好", "您好", "hello", "hi", "谢谢", "感谢", "再见", "拜拜"}
+	capabilityHints    = []string{"你都能干什么", "你能做什么", "你可以做什么", "你会什么", "你是谁", "怎么用你", "你能帮我什么"}
+	openChatHints      = []string{"天气", "温度", "下雨", "新闻", "股价", "汇率", "热搜", "今天", "明天", "最新", "现在"}
+	chitchatHints      = []string{"你好", "您好", "hello", "hi", "谢谢", "感谢", "再见", "拜拜"}
+	fallbackCleanRegex = regexp.MustCompile(`[\s>\` + "`" + `*#_\-，,。；;：:（）()“”\"'\\[\\]]+`)
+	fallbackSplitRegex = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)
 )
 
 // PreparationOrchestratorImpl 聊天准备编排器实现
@@ -38,8 +43,8 @@ type PreparationOrchestratorImpl struct {
 	memoryLogic            logic2.SessionMemoryLogic
 	rewriteLogic           logic2.QueryRewriteLogic
 	documentQuestionRouter logic2.DocumentQuestionRouteLogic
-	RouteLogic             logic2.KnowledgeRouteLogic
-	documentKnowledgeLogic logic.DocumentKnowledgeLogic
+	knowledgeRouteLogic    logic.KnowledgeRouteLogic
+	knowledgeLogic         logic.KnowledgeLogic
 	tracer                 *trace.ConversationTraceRecorder
 	*option
 }
@@ -62,17 +67,18 @@ func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 	memoryLogic logic2.SessionMemoryLogic,
 	rewriteLogic logic2.QueryRewriteLogic,
 	documentQuestionRouter logic2.DocumentQuestionRouteLogic,
-	knowledgeRouteService logic2.KnowledgeRouteLogic,
-	documentKnowledgeLogic logic.DocumentKnowledgeLogic,
+	knowledgeRoute logic.KnowledgeRouteLogic,
+	knowledgeLogic logic.KnowledgeLogic,
+	tracer *trace.ConversationTraceRecorder,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
 		repo:                   repo,
 		memoryLogic:            memoryLogic,
 		rewriteLogic:           rewriteLogic,
 		documentQuestionRouter: documentQuestionRouter,
-		RouteLogic:             knowledgeRouteService,
-		documentKnowledgeLogic: documentKnowledgeLogic,
-		tracer:                 trace.NewConversationTraceRecorder(repo),
+		knowledgeRouteLogic:    knowledgeRoute,
+		knowledgeLogic:         knowledgeLogic,
+		tracer:                 tracer,
 		option: &option{
 			ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
 			planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
@@ -107,7 +113,6 @@ func (o *PreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *vo.C
 	}
 	if err != nil {
 		return nil, err
-
 	}
 	return execPlan, err
 }
@@ -174,21 +179,20 @@ func (o *PreparationOrchestratorImpl) prepareCommon(ctx context.Context, convCtx
 // prepareOpenChat 开放式聊天：直接返回 ReactAgent 模式执行计划
 func (o *PreparationOrchestratorImpl) prepareOpenChat(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	execPlan.Mode = vo.ExecutionModeReactAgent
-	if convCtx.Trace != nil {
-		stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), "路由到开放式 Agent。", nil)
-		if err != nil {
-			return err
-		}
-		snapshot := map[string]any{
-			"chatMode":                     convCtx.ChatMode.String(),
-			"executionMode":                vo.ExecutionModeReactAgent.String(),
-			"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
-			"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-		}
-		if err = o.tracer.CompleteStage(ctx, stage, "已判定走开放式 Agent 路径。", snapshot); err != nil {
-			return err
-		}
+	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), "路由到开放式 Agent。", nil)
+	if err != nil {
+		return err
 	}
+	snapshot := map[string]any{
+		"chatMode":                     convCtx.ChatMode.String(),
+		"executionMode":                vo.ExecutionModeReactAgent.String(),
+		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
+		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
+	}
+	if err = o.tracer.CompleteStage(ctx, stage, "已判定走开放式 Agent 路径。", snapshot); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -199,210 +203,120 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, c
 	}
 
 	// 记录影子路由（不影响业务结果，失败仅告警）
-	if err := o.RouteLogic.RecordShadowRoute(ctx, convCtx.ConversationId,
-		strconv.FormatInt(convCtx.ExchangeId, 10), convCtx.SelectedDocumentId, convCtx.Question, convCtx.RewriteQuestion); err != nil {
+	if err := o.knowledgeRouteLogic.RecordShadowRoute(ctx, convCtx.ExchangeId, convCtx.ConversationId, convCtx.SelectedDocumentId, convCtx.Question, execPlan.RewriteQuestion); err != nil {
 		Warnf("记录影子路由失败: %v", err)
 	}
-
-	// 初始化文档范围（使用 *int64 形式的路由文档ID，便于下游传递给 documentQuestionRouter）
-	routedDocIdPtr := o.int64Ptr(convCtx.SelectedDocumentId)
-	routedTaskIdPtr := o.int64Ptr(convCtx.SelectedTaskId)
-	routedDocumentIds := []int64{convCtx.SelectedDocumentId}
-	routedTaskIds := []int64{convCtx.SelectedTaskId}
-
-	// 文档内导航
-	navigationDecision := o.runDocumentNavigation(ctx, convCtx, routedDocIdPtr)
-
-	// 确定执行模式与检索问题
-	executionMode := vo.ExecutionModeRetrieval
-	if navigationDecision != nil && navigationDecision.ExecutionMode != 0 {
-		executionMode = navigationDecision.ExecutionMode
-	}
-	retrievalQuestion, retrievalSubQuestions := o.resolveRetrievalQuestions(navigationDecision, convCtx.RewriteQuestion, convCtx.RewriteSubQuestions)
-
-	// 构建最终执行计划
-	plan := o.buildBasePlan(prepCtx)
-	plan.Mode = executionMode
-	plan.NavigationDecision = navigationDecision
-	plan.RewriteQuestion = prepCtx.rewriteQuestion
-	plan.RewriteSubQuestions = prepCtx.rewriteSubQuestions
-	plan.RetrievalQuestion = retrievalQuestion
-	plan.RetrievalSubQuestions = retrievalSubQuestions
-	plan.SelectedDocumentId = prepCtx.selectedDocumentId
-	plan.SelectedDocumentName = prepCtx.selectedDocumentName
-	plan.SelectedTaskId = prepCtx.selectedTaskId
-	plan.RetrievalDocumentIds = routedDocumentIds
-	plan.RetrievalTaskIds = routedTaskIds
-	plan.NoEvidenceReply = o.buildDocumentModeNoEvidenceReply(prepCtx.question, prepCtx.requiresRealTimeSearch)
-
-	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s",
-		prepCtx.convCtx.ConversationId, prepCtx.chatMode.String(), strutil.Trim(prepCtx.question),
-		prepCtx.rewriteQuestion, retrievalQuestion, executionMode.String())
-
 	return nil
 }
 
 // prepareAutoDocumentMode 自动文档问答：执行知识路由 → 必要时澄清 → 确定主文档 → 导航 → 生成计划。
 func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
-	tracer := convCtx.Trace
-	exchangeIdText := strconv.FormatInt(prepCtx.convCtx.ExchangeId, 10)
-
 	// 执行知识路由
-	routeDecision, err := o.RouteLogic.Route(ctx, prepCtx.question, prepCtx.rewriteQuestion)
+	routeDecision, err := o.knowledgeRouteLogic.Route(ctx, convCtx.Question, execPlan.RewriteQuestion)
 	if err != nil {
+		routeDecision = &klvo.KnowledgeRouteDecision{}
 		Warnf("知识路由失败: %v", err)
-		routeDecision = nil
 	}
-	if recordErr := o.RouteLogic.RecordAutoRoute(ctx, prepCtx.convCtx.ConversationId,
-		exchangeIdText, prepCtx.question, prepCtx.rewriteQuestion, routeDecision); recordErr != nil {
-		Warnf("记录自动路由失败: %v", recordErr)
+	if err = o.knowledgeRouteLogic.RecordAutoRoute(ctx, convCtx.ExchangeId, convCtx.ConversationId, convCtx.Question, execPlan.RewriteQuestion, routeDecision); err != nil {
+		Warnf("记录自动路由失败: %v", err)
 	}
 
 	// 选择候选文档（含低置信度时的 fallback）
-	candidateDocuments := o.selectAutoCandidates(ctx, routeDecision, prepCtx.question, prepCtx.rewriteQuestion)
+	candidateDocuments := o.selectAutoCandidates(ctx, routeDecision, convCtx.Question, execPlan.RewriteQuestion)
+	execPlan.RetrievalDocumentIds = o.extractDocumentIds(candidateDocuments)
+	execPlan.RetrievalTaskIds = o.extractTaskIds(candidateDocuments)
 
 	// 若需要澄清，直接返回澄清模式执行计划
 	if o.shouldAskClarification(routeDecision, candidateDocuments) {
-		return o.buildClarificationPlan(prepCtx, routeDecision, candidateDocuments), nil
-	}
-
-	// 路由跟踪
-	if tracer != nil && routeDecision != nil {
-		confidentTop := routeDecision.Confidence >= 0.55
-		tracer.CompleteStage(
-			tracer.StartStage(vo.StageCodeRoute, "AUTO_DOCUMENT", "正在生成知识范围候选。", nil),
-			"知识范围路由完成。",
-			map[string]interface{}{
-				"confidence":             routeDecision.Confidence,
-				"routeStatus":            routeDecision.RouteStatus,
-				"candidateDocumentCount": len(candidateDocuments),
-				"confidentTopDocument":   confidentTop,
-			},
-		)
+		execPlan.Mode = vo.ExecutionModeClarification
+		execPlan.ClarificationReply = o.buildClarificationReply(candidateDocuments)
+		execPlan.ClarificationOptions = o.buildClarificationOptions(candidateDocuments)
+		execPlan.ClarificationReason = o.buildClarificationReason(routeDecision, candidateDocuments)
+		return nil
 	}
 
 	// 选择最高置信度的文档作为主文档；否则回退到“不指定主文档，使用多文档范围检索”
-	var routedDocIdPtr *int64
-	var routedTaskIdPtr *int64
-	routedDocumentName := ""
-	if routeDecision != nil && routeDecision.Confidence >= 0.55 && len(candidateDocuments) > 0 {
-		topDocument := candidateDocuments[0]
-		if topDocument.DocumentId != "" && topDocument.LastIndexTaskId != "" {
-			if docId, parseErr := strconv.ParseInt(topDocument.DocumentId, 10, 64); parseErr == nil {
-				routedDocIdPtr = &docId
-			}
-			if taskId, parseErr := strconv.ParseInt(topDocument.LastIndexTaskId, 10, 64); parseErr == nil {
-				routedTaskIdPtr = &taskId
-			}
-			routedDocumentName = topDocument.DocumentName
-		}
+	topDocument := &klvo.DocumentRouteCandidate{}
+	confidentTop := routeDecision.Confidence >= 0.55
+	if confidentTop && len(candidateDocuments) > 0 {
+		topDocument = candidateDocuments[0]
 	}
 
-	routedDocumentIds := o.extractDocumentIds(candidateDocuments)
-	routedTaskIds := o.extractTaskIds(candidateDocuments)
+	// 路由跟踪
+	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "AUTO_DOCUMENT", "正在生成知识范围候选。", nil)
+	if err != nil {
+		return err
+	}
+	snapshot := map[string]any{
+		"confidence":             routeDecision.Confidence,
+		"routeStatus":            routeDecision.RouteStatus,
+		"candidateDocumentCount": len(candidateDocuments),
+		"confidentTopDocument":   confidentTop,
+		"topDocumentId":          topDocument.DocumentId,
+		"topDocumentName":        topDocument.DocumentName,
+	}
+	if err = o.tracer.CompleteStage(ctx, stage, "知识范围路由完成。", snapshot); err != nil {
+		return err
+	}
 
 	// 文档内导航
-	navigationDecision := o.runDocumentNavigation(ctx, prepCtx, routedDocIdPtr)
+	stage, err = o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), "正在判定图查询还是混合检索。", nil)
+	if err != nil {
+		return err
+	}
+
+	navigationDecision, err := o.documentQuestionRouter.Route(ctx, topDocument.DocumentId, convCtx.Question, prepCtx.rewriteResult)
+	if err == nil {
+		snapshot = map[string]any{
+			"executionMode":     navigationDecision.ExecutionMode.Name(),
+			"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.AnchorName),
+			"targetItemIndex":   navigationDecision.ItemAnchor.ItemIndex,
+			"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
+		}
+		if err = o.tracer.CompleteStage(ctx, stage, "执行路由完成。", snapshot); err != nil {
+			return err
+		}
+	} else {
+		if err = o.tracer.FailStage(ctx, stage, "执行路由失败。", err, nil); err != nil {
+			return err
+		}
+	}
 
 	// 确定执行模式与检索问题
 	executionMode := vo.ExecutionModeRetrieval
-	if navigationDecision != nil && navigationDecision.ExecutionMode != 0 {
+	if navigationDecision.ExecutionMode != nil {
 		executionMode = navigationDecision.ExecutionMode
 	}
-	retrievalQuestion, retrievalSubQuestions := o.resolveRetrievalQuestions(navigationDecision, prepCtx.rewriteQuestion, prepCtx.rewriteSubQuestions)
+
+	if navigationDecision.RetrievalPlan != nil {
+		execPlan.RetrievalQuestion = utils.BlankToDefault(navigationDecision.RetrievalPlan.RetrievalQuestion, execPlan.RewriteQuestion)
+		if len(navigationDecision.RetrievalPlan.SubQuestions) > 0 {
+			execPlan.RetrievalSubQuestions = navigationDecision.RetrievalPlan.SubQuestions
+		}
+	}
 
 	// 构建最终执行计划
-	plan.Mode = executionMode
-	plan.NavigationDecision = navigationDecision
-	plan.RewriteQuestion = prepCtx.rewriteQuestion
-	plan.RewriteSubQuestions = prepCtx.rewriteSubQuestions
-	plan.RetrievalQuestion = retrievalQuestion
-	plan.RetrievalSubQuestions = retrievalSubQuestions
-	if routedDocIdPtr != nil {
-		plan.SelectedDocumentId = *routedDocIdPtr
-	}
-	plan.SelectedDocumentName = routedDocumentName
-	if routedTaskIdPtr != nil {
-		plan.SelectedTaskId = *routedTaskIdPtr
-	}
-	plan.RetrievalDocumentIds = routedDocumentIds
-	plan.RetrievalTaskIds = routedTaskIds
-	plan.NoEvidenceReply = o.buildDocumentModeNoEvidenceReply(prepCtx.question, prepCtx.requiresRealTimeSearch)
+	execPlan.Mode = executionMode
+	execPlan.SelectedDocumentId = topDocument.DocumentId
+	execPlan.SelectedDocumentName = topDocument.DocumentName
+	execPlan.SelectedTaskId = topDocument.LastIndexTaskId
+	execPlan.NavigationDecision = navigationDecision
+	execPlan.NoEvidenceReply = o.buildDocumentModeNoEvidenceReply(convCtx.Question, execPlan.RequiresRealTimeSearch)
 
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s",
-		prepCtx.convCtx.ConversationId, prepCtx.chatMode.String(), strutil.Trim(prepCtx.question),
-		prepCtx.rewriteQuestion, retrievalQuestion, executionMode.String())
-	return plan, nil
-}
-
-// buildClarificationPlan 构建澄清模式的执行计划（仅在自动文档模式下返回）。
-func (o *PreparationOrchestratorImpl) buildClarificationPlan(prepCtx *preparationContext, routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) *vo.ConversationExecutionPlan {
-	plan := o.buildBasePlan(prepCtx)
-	plan.Mode = vo.ExecutionModeClarification
-	plan.RewriteQuestion = prepCtx.rewriteQuestion
-	plan.RewriteSubQuestions = prepCtx.rewriteSubQuestions
-	plan.RetrievalQuestion = prepCtx.rewriteQuestion
-	plan.RetrievalSubQuestions = prepCtx.rewriteSubQuestions
-	plan.RetrievalDocumentIds = o.extractDocumentIds(candidateDocuments)
-	plan.RetrievalTaskIds = o.extractTaskIds(candidateDocuments)
-	plan.ClarificationReply = o.buildClarificationReply(prepCtx.question, routeDecision, candidateDocuments)
-	plan.ClarificationOptions = o.buildClarificationOptions(candidateDocuments)
-	plan.ClarificationReason = o.buildClarificationReason(routeDecision, candidateDocuments)
-	return plan
-}
-
-// runDocumentNavigation 统一执行“文档内导航路由”，并负责 tracer 的成功 / 失败记录。
-// 使用 recover 风格 try 原语义不变。
-func (o *PreparationOrchestratorImpl) runDocumentNavigation(ctx context.Context, prepCtx *preparationContext, routedDocumentId *int64) *vo.DocumentNavigationDecision {
-	tracer := prepCtx.convCtx.Tracer
-	var stage *vo.StageHandle
-	if tracer != nil {
-		stage = tracer.StartStage(vo.StageCodeRoute, vo.ExecutionModeRetrieval.String(), "正在判定图查询还是混合检索。", nil)
-	}
-	var navigationDecision *vo.DocumentNavigationDecision
-	try(func() {
-		var routeErr error
-		navigationDecision, routeErr = o.documentQuestionRouter.Route(ctx, routedDocumentId, prepCtx.question, prepCtx.rewriteResult)
-		if routeErr != nil {
-			panic(routeErr)
-		}
-		if tracer != nil && stage != nil && navigationDecision != nil {
-			tracer.CompleteStage(stage, "执行路由完成。", map[string]interface{}{
-				"executionMode":     navigationDecision.ExecutionMode.String(),
-				"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.AnchorName),
-				"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
-			})
-		}
-	}, func(err error) {
-		if tracer != nil && stage != nil {
-			tracer.FailStage(stage, "执行路由失败。", err, nil)
-		}
-	})
-	return navigationDecision
-}
-
-// resolveRetrievalQuestions 根据导航结果确定最终的检索问题与子问题列表；导航为空时回退到 rewrite 结果。
-func (o *PreparationOrchestratorImpl) resolveRetrievalQuestions(navigationDecision *vo.DocumentNavigationDecision, rewriteQuestion string, rewriteSubQuestions []string) (string, []string) {
-	retrievalQuestion := rewriteQuestion
-	retrievalSubQuestions := rewriteSubQuestions
-	if navigationDecision != nil && navigationDecision.RetrievalPlan != nil {
-		retrievalQuestion = utils.BlankToDefault(navigationDecision.RetrievalPlan.RetrievalQuestion, rewriteQuestion)
-		if len(navigationDecision.RetrievalPlan.SubQuestions) > 0 {
-			retrievalSubQuestions = navigationDecision.RetrievalPlan.SubQuestions
-		}
-	}
-	return retrievalQuestion, retrievalSubQuestions
+		convCtx.ConversationId, convCtx.ChatMode.String(), strutil.Trim(convCtx.Question),
+		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, executionMode.String())
+	return nil
 }
 
 // summarizeHistory 构建会话记忆
 func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
-	tracer := convCtx.Trace
 	memoryStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageMemory, convCtx.ChatMode.Name(), "正在装载会话记忆与最近窗口。", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	memoryContext, err := o.memoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, tracer)
+	memoryContext, err := o.memoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, convCtx.Trace)
 	if err != nil {
 		if err = o.tracer.FailStage(ctx, memoryStage, "会话记忆装载失败。", err, nil); err != nil {
 			return nil, err
@@ -529,19 +443,15 @@ func (o *PreparationOrchestratorImpl) appendBulletSection(sb *strings.Builder, t
 }
 
 // selectAutoCandidates 选择自动候选文档
-func (o *PreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, routeDecision *vo.KnowledgeRouteDecision, question, rewriteQuestion string) []*vo.DocumentRouteCandidate {
+func (o *PreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, routeDecision *klvo.KnowledgeRouteDecision, question, rewriteQuestion string) []*klvo.DocumentRouteCandidate {
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return o.fallbackDocuments(ctx, question, rewriteQuestion, 5)
 	}
 
-	candidateLimit := 5
-	if routeDecision.Confidence >= 0.80 {
-		candidateLimit = 3
-	}
-
-	var candidates []*vo.DocumentRouteCandidate
+	candidateLimit := utils.Ternary(routeDecision.Confidence >= 0.80, 5, 3)
+	var candidates []*klvo.DocumentRouteCandidate
 	for _, doc := range routeDecision.Documents {
-		if doc.DocumentId != "" && doc.LastIndexTaskId != "" {
+		if doc.DocumentId > 0 && doc.LastIndexTaskId > 0 {
 			candidates = append(candidates, doc)
 			if len(candidates) >= candidateLimit {
 				break
@@ -561,32 +471,32 @@ func (o *PreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, 
 }
 
 // fallbackDocuments 获取后备候选文档
-func (o *PreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*vo.DocumentRouteCandidate {
-	descriptors, err := o.documentKnowledgeLogic.ListRetrievableDocuments(ctx)
+func (o *PreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*klvo.DocumentRouteCandidate {
+	docs, err := o.knowledgeLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("获取可检索文档失败: %v", err)
-		return []*vo.DocumentRouteCandidate{}
+		return []*klvo.DocumentRouteCandidate{}
 	}
-	if len(descriptors) == 0 {
-		return []*vo.DocumentRouteCandidate{}
+	if len(docs) == 0 {
+		return []*klvo.DocumentRouteCandidate{}
 	}
 
 	queryTerms := o.extractFallbackTerms(question, rewriteQuestion)
 
-	sort.Slice(descriptors, func(i, j int) bool {
-		return o.fallbackDescriptorScore(descriptors[j], queryTerms) < o.fallbackDescriptorScore(descriptors[i], queryTerms)
+	sort.Slice(docs, func(i, j int) bool {
+		return o.fallbackDescriptorScore(docs[j], queryTerms) < o.fallbackDescriptorScore(docs[i], queryTerms)
 	})
 
-	result := make([]*vo.DocumentRouteCandidate, 0, limit)
-	for i, desc := range descriptors {
+	result := make([]*klvo.DocumentRouteCandidate, 0, limit)
+	for i, desc := range docs {
 		if i >= limit {
 			break
 		}
 		score := o.fallbackDescriptorScore(desc, queryTerms)
-		result = append(result, &vo.DocumentRouteCandidate{
-			DocumentId:         strconv.FormatInt(desc.DocumentId, 10),
+		result = append(result, &klvo.DocumentRouteCandidate{
+			DocumentId:         desc.DocumentId,
 			DocumentName:       desc.DocumentName,
-			LastIndexTaskId:    strconv.FormatInt(desc.LastIndexTaskId, 10),
+			LastIndexTaskId:    desc.LastIndexTaskId,
 			KnowledgeScopeCode: desc.KnowledgeScopeCode,
 			KnowledgeScopeName: desc.KnowledgeScopeName,
 			BusinessCategory:   desc.BusinessCategory,
@@ -600,8 +510,8 @@ func (o *PreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, que
 }
 
 // mergeCandidates 合并候选文档
-func (o *PreparationOrchestratorImpl) mergeCandidates(primary, secondary []*vo.DocumentRouteCandidate, limit int) []*vo.DocumentRouteCandidate {
-	merged := make(map[string]*vo.DocumentRouteCandidate)
+func (o *PreparationOrchestratorImpl) mergeCandidates(primary, secondary []*klvo.DocumentRouteCandidate, limit int) []*klvo.DocumentRouteCandidate {
+	merged := make(map[int64]*klvo.DocumentRouteCandidate)
 	for _, doc := range primary {
 		merged[doc.DocumentId] = doc
 	}
@@ -611,7 +521,7 @@ func (o *PreparationOrchestratorImpl) mergeCandidates(primary, secondary []*vo.D
 		}
 	}
 
-	result := make([]*vo.DocumentRouteCandidate, 0, limit)
+	result := make([]*klvo.DocumentRouteCandidate, 0, limit)
 	for _, doc := range merged {
 		if len(result) >= limit {
 			break
@@ -622,7 +532,7 @@ func (o *PreparationOrchestratorImpl) mergeCandidates(primary, secondary []*vo.D
 }
 
 // shouldAskClarification 判断是否需要澄清
-func (o *PreparationOrchestratorImpl) shouldAskClarification(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) bool {
+func (o *PreparationOrchestratorImpl) shouldAskClarification(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) bool {
 	if len(candidateDocuments) == 0 {
 		return true
 	}
@@ -641,11 +551,15 @@ func (o *PreparationOrchestratorImpl) shouldAskClarification(routeDecision *vo.K
 	topScope := candidateDocuments[0].KnowledgeScopeCode
 	secondScope := candidateDocuments[1].KnowledgeScopeCode
 
+	if topScore == 0 && secondScore == 0 {
+		return false
+	}
+
 	return topScore-secondScore <= 3 && topScope != secondScope
 }
 
 // buildClarificationReply 构建澄清回复
-func (o *PreparationOrchestratorImpl) buildClarificationReply(originalQuestion string, routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
+func (o *PreparationOrchestratorImpl) buildClarificationReply(candidateDocuments []*klvo.DocumentRouteCandidate) string {
 	topCandidates := candidateDocuments
 	if len(topCandidates) > 3 {
 		topCandidates = topCandidates[:3]
@@ -661,18 +575,12 @@ func (o *PreparationOrchestratorImpl) buildClarificationReply(originalQuestion s
 	for i, item := range topCandidates {
 		sb.WriteString(strconv.Itoa(i + 1))
 		sb.WriteString(". 《")
-		name := item.DocumentName
-		if name == "" {
-			name = item.DocumentId
-		}
+		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
 		sb.WriteString(name)
 		sb.WriteString("》")
 
-		scope := item.KnowledgeScopeName
-		if scope == "" {
-			scope = item.KnowledgeScopeCode
-		}
-		if scope != "" {
+		scope := utils.BlankToDefault(item.KnowledgeScopeName, item.KnowledgeScopeCode)
+		if strutil.IsNotBlank(scope) {
 			sb.WriteString("（")
 			sb.WriteString(scope)
 			sb.WriteString("）")
@@ -685,76 +593,53 @@ func (o *PreparationOrchestratorImpl) buildClarificationReply(originalQuestion s
 }
 
 // buildClarificationOptions 构建澄清选项
-func (o *PreparationOrchestratorImpl) buildClarificationOptions(candidateDocuments []*vo.DocumentRouteCandidate) []string {
+func (o *PreparationOrchestratorImpl) buildClarificationOptions(candidateDocuments []*klvo.DocumentRouteCandidate) []string {
 	if len(candidateDocuments) == 0 {
-		return []string{}
+		return nil
 	}
 
 	result := make([]string, 0, 3)
-	for i, item := range candidateDocuments {
-		if i >= 3 {
-			break
-		}
-		name := item.DocumentName
-		if name == "" {
-			name = item.DocumentId
-		}
+	for _, item := range utils.LimitSlice(candidateDocuments, 3) {
+		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
 		result = append(result, "我想问《"+name+"》")
 	}
 	return result
 }
 
 // buildClarificationReason 构建澄清原因
-func (o *PreparationOrchestratorImpl) buildClarificationReason(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
+func (o *PreparationOrchestratorImpl) buildClarificationReason(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) string {
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return "当前自动知识路由没有形成稳定候选，已改为先向用户确认文档范围。"
 	}
 
-	confidenceText := strconv.FormatFloat(routeDecision.Confidence, 'f', -1, 64)
-	candidateCount := len(candidateDocuments)
-
-	return "当前自动知识路由置信度为 " + confidenceText + "，候选文档数为 " + strconv.Itoa(candidateCount) + "，为避免误选文档，先返回澄清问题。"
+	return fmt.Sprintf("当前自动知识路由置信度为 %.2f，候选文档数为 %d，为避免误选文档，先返回澄清问题。", routeDecision.Confidence, len(candidateDocuments))
 }
 
 // extractFallbackTerms 提取后备检索词
 func (o *PreparationOrchestratorImpl) extractFallbackTerms(question, rewriteQuestion string) []string {
-	terms := make(map[string]bool)
 	routingText := strutil.Trim(question) + " " + strutil.Trim(rewriteQuestion)
-
-	re := regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)
-	segments := re.Split(routingText, -1)
-
+	segments := fallbackSplitRegex.Split(routingText, -1)
+	terms := make(map[string]struct{})
 	for _, segment := range segments {
 		trimmed := strutil.Trim(segment)
-		if len(trimmed) >= 2 {
-			terms[trimmed] = true
-			if len(trimmed) >= 4 {
-				maxGram := len(trimmed)
-				if maxGram > 6 {
-					maxGram = 6
-				}
+		trimmedLen := utf8.RuneCountInString(trimmed)
+		if trimmedLen >= 2 {
+			terms[trimmed] = struct{}{}
+			if trimmedLen >= 4 {
+				maxGram := max(6, trimmedLen)
 				for gram := 2; gram <= maxGram; gram++ {
-					for start := 0; start+gram <= len(trimmed); start++ {
-						terms[trimmed[start:start+gram]] = true
+					for start := 0; start+gram <= trimmedLen; start++ {
+						terms[trimmed[start:start+gram]] = struct{}{}
 					}
 				}
 			}
 		}
 	}
-
-	result := make([]string, 0, len(terms))
-	for term := range terms {
-		result = append(result, term)
-	}
-
-	if len(result) > 40 {
-		result = result[:40]
-	}
-	return result
+	return utils.LimitSlice(maputil.Keys(terms), 40)
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.KnowledgeDocument, queryTerms []string) float64 {
+func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *rvo.KnowledgeDocument, queryTerms []string) float64 {
 	content := strings.Join([]string{
 		descriptor.DocumentName,
 		descriptor.KnowledgeScopeCode,
@@ -779,34 +664,27 @@ func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *klvo.K
 	}
 
 	sort.Slice(sortedTerms, func(i, j int) bool {
-		return len(sortedTerms[i]) > len(sortedTerms[j])
+		return utf8.RuneCountInString(sortedTerms[i]) > utf8.RuneCountInString(sortedTerms[j])
 	})
 
-	matched := make(map[string]bool)
+	matched := make([]string, 0, len(sortedTerms))
 	for _, term := range sortedTerms {
-		if len(term) < 2 {
+		if utf8.RuneCountInString(term) < 2 {
 			continue
 		}
 
-		isCovered := false
-		for existing := range matched {
-			if strings.Contains(existing, term) {
-				isCovered = true
-				break
-			}
-		}
-		if isCovered {
+		if strutil.ContainsAny(term, matched) {
 			continue
 		}
 
 		if strings.Contains(content, term) {
-			matched[term] = true
+			matched = append(matched, term)
 			switch {
-			case len(term) >= 8:
+			case utf8.RuneCountInString(term) >= 8:
 				score += 12
-			case len(term) >= 5:
+			case utf8.RuneCountInString(term) >= 5:
 				score += 8
-			case len(term) >= 3:
+			case utf8.RuneCountInString(term) >= 3:
 				score += 4
 			default:
 				score += 2
@@ -822,27 +700,23 @@ func (o *PreparationOrchestratorImpl) normalizeFallbackText(value string) string
 	if value == "" {
 		return ""
 	}
-	re := regexp.MustCompile(`[\s>\` + "`" + `*#_\-，,。；;：:（）()“”\"'\\[\\]]+`)
-	return strings.ToLower(re.ReplaceAllString(value, ""))
+	cleaned := fallbackCleanRegex.ReplaceAllString(value, "")
+	return strings.ToLower(cleaned)
 }
 
 // buildDocumentModeNoEvidenceReply 构建文档模式无证据回复
-func (o *PreparationOrchestratorImpl) buildDocumentModeNoEvidenceReply(question string, requiresFreshSearch bool) string {
+func (o *PreparationOrchestratorImpl) buildDocumentModeNoEvidenceReply(question string, requiresRealTimeSearch bool) string {
 	normalizedQuestion := strutil.Trim(question)
 
 	if o.looksLikeCapabilityQuestion(normalizedQuestion) {
 		return "当前你正在使用“当前文档问答”模式，我会优先基于所选文档回答。这个问题更像是在询问助手能力，而不是当前文档内容。如果你想了解我能做什么，请切换到“开放式提问”模式。"
 	}
 
-	if o.looksLikeOpenChatQuestion(normalizedQuestion, requiresFreshSearch) {
+	if o.looksLikeOpenChatQuestion(normalizedQuestion, requiresRealTimeSearch) {
 		return "当前你正在使用“当前文档问答”模式，我只能基于所选文档回答。这个问题更像开放式提问，例如天气、最新信息或一般交流。如果你想继续问这类问题，请切换到“开放式提问”模式。"
 	}
 
-	if o.properties.NoEvidenceReply != "" {
-		return o.properties.NoEvidenceReply
-	}
-
-	return "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。"
+	return utils.BlankToDefault(o.noEvidenceReply, "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。")
 }
 
 // looksLikeCapabilityQuestion 判断是否为能力询问
@@ -850,63 +724,25 @@ func (o *PreparationOrchestratorImpl) looksLikeCapabilityQuestion(normalizedQues
 	if normalizedQuestion == "" {
 		return false
 	}
-	for _, hint := range capabilityHints {
-		if strings.Contains(normalizedQuestion, hint) {
-			return true
-		}
-	}
-	return false
+	return strutil.ContainsAny(normalizedQuestion, capabilityHints)
 }
 
 // looksLikeOpenChatQuestion 判断是否为开放式聊天问题
-func (o *PreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQuestion string, requiresFreshSearch bool) bool {
+func (o *PreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQuestion string, requiresRealTimeSearch bool) bool {
 	if normalizedQuestion == "" {
 		return false
 	}
-	if requiresFreshSearch {
-		return true
-	}
-	for _, hint := range openChatHints {
-		if strings.Contains(normalizedQuestion, hint) {
-			return true
-		}
-	}
-	for _, hint := range chitchatHints {
-		if strings.Contains(normalizedQuestion, hint) {
-			return true
-		}
-	}
-	return false
+	return requiresRealTimeSearch || strutil.ContainsAny(normalizedQuestion, openChatHints) || strutil.ContainsAny(normalizedQuestion, chitchatHints)
 }
 
 // extractDocumentIds 提取文档ID列表
-func (o *PreparationOrchestratorImpl) extractDocumentIds(candidates []*vo.DocumentRouteCandidate) []int64 {
-	result := make([]int64, 0, len(candidates))
-	for _, doc := range candidates {
-		if doc.DocumentId != "" {
-			if id, err := strconv.ParseInt(doc.DocumentId, 10, 64); err == nil {
-				result = append(result, id)
-			}
-		}
-	}
-	return result
+func (o *PreparationOrchestratorImpl) extractDocumentIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
+	return slice.Map(candidates, func(_ int, item *klvo.DocumentRouteCandidate) int64 { return item.DocumentId })
 }
 
 // extractTaskIds 提取任务ID列表
-func (o *PreparationOrchestratorImpl) extractTaskIds(candidates []*vo.DocumentRouteCandidate) []int64 {
-	result := make([]int64, 0, len(candidates))
-	for _, doc := range candidates {
-		if doc.LastIndexTaskId != "" {
-			if id, err := strconv.ParseInt(doc.LastIndexTaskId, 10, 64); err == nil {
-				result = append(result, id)
-			}
-		}
-	}
-	return result
-}
-
-func (o *PreparationOrchestratorImpl) StartStage(ctx context.Context, convCtx *vo.ConversationContext) *vo.StageContext {
-	return convCtx.Trace.StartStage(vo.ConversationTraceStagePrepare, vo.ExecutionModeRetrieval.String(), "正在准备知识路由。", nil)
+func (o *PreparationOrchestratorImpl) extractTaskIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
+	return slice.Map(candidates, func(_ int, item *klvo.DocumentRouteCandidate) int64 { return item.LastIndexTaskId })
 }
 
 func Warnf(format string, v ...any) {

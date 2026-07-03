@@ -15,7 +15,7 @@ import (
 // MemoryStrategy 记忆策略接口
 type MemoryStrategy interface {
 	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error)
+	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
 
 	// GetStrategyType 获取记忆策略类型
 	GetStrategyType() string
@@ -30,7 +30,7 @@ const (
 	maxAnswerLength   = 320
 )
 
-func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error) {
+func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error) {
 	panic("implement me")
 }
 

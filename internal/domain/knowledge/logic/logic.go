@@ -10,8 +10,8 @@ import (
 	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
-// DocumentKnowledgeLogic 文档知识服务
-type DocumentKnowledgeLogic interface {
+// KnowledgeLogic 文档知识服务
+type KnowledgeLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
 	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 

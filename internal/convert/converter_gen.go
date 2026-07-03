@@ -12,6 +12,7 @@ import (
 	aggregate "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"time"
 )
@@ -668,4 +669,27 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 }
 func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source
+}
+
+func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.KnowledgeRouteTrace {
+	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
+	if source != nil {
+		var modelKnowledgeRouteTrace model.KnowledgeRouteTrace
+		modelKnowledgeRouteTrace.ID = (*source).ID
+		modelKnowledgeRouteTrace.ConversationId = (*source).ConversationId
+		modelKnowledgeRouteTrace.ExchangeId = (*source).ExchangeId
+		modelKnowledgeRouteTrace.Question = (*source).Question
+		modelKnowledgeRouteTrace.RewriteQuestion = (*source).RewriteQuestion
+		modelKnowledgeRouteTrace.Mode = (*source).Mode
+		modelKnowledgeRouteTrace.TopScopesJson = (*source).TopScopesJson
+		modelKnowledgeRouteTrace.TopTopicsJson = (*source).TopTopicsJson
+		modelKnowledgeRouteTrace.TopDocumentsJson = (*source).TopDocumentsJson
+		modelKnowledgeRouteTrace.SelectedDocumentId = (*source).SelectedDocumentId
+		modelKnowledgeRouteTrace.HitSelectedDocument = (*source).HitSelectedDocument
+		modelKnowledgeRouteTrace.Confidence = (*source).Confidence
+		modelKnowledgeRouteTrace.RouteStatus = (*source).RouteStatus
+		modelKnowledgeRouteTrace.ErrorMsg = (*source).ErrorMsg
+		pModelKnowledgeRouteTrace = &modelKnowledgeRouteTrace
+	}
+	return pModelKnowledgeRouteTrace
 }

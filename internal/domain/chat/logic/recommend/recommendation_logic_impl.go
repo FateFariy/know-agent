@@ -40,7 +40,7 @@ func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic
 }
 
 // GenerateRecommendations 生成推荐追问
-func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) []string {
+func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string {
 	// 检查是否启用推荐且回答不为空
 	if !r.properties.Enabled || strutil.IsBlank(answer) {
 		return []string{}
@@ -55,7 +55,7 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 	defer cancelFunc()
 
 	go func() {
-		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges, tracer)
+		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges, trace)
 		if err != nil {
 			errChan <- err
 			return
@@ -78,7 +78,7 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 }
 
 // generateRecommendations 生成推荐追问
-func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, tracer *vo.ConversationTrace) ([]string, error) {
+func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) ([]string, error) {
 	// 构建最近上下文
 	recentContext := r.buildRecentContext(recentExchanges)
 
@@ -93,7 +93,7 @@ func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, q
 	}
 
 	// 调用LLM生成推荐
-	content, err := r.chatModel.Generate(ctx, vo.ConversationTraceStageRecommendation.Code, "", userPrompt, tracer)
+	content, err := r.chatModel.GenerateWithTrace(ctx, vo.ConversationTraceStageRecommendation.Code, "", userPrompt, trace)
 	if strutil.IsBlank(content) {
 		return nil, err
 	}

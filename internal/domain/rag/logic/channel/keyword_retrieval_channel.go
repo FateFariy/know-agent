@@ -41,13 +41,14 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.Docume
 		return nil, nil
 	}
 
+	knowledgeMap, err := c.getDocumentsMap(ctx, query.DocumentIds)
+	if err != nil {
+		return nil, err
+	}
+
 	docs, err := c.keywordDB.SearchByKeyword(ctx, query)
 	if err != nil {
 		Warnf("关键词检索失败: question='%s', error=%v", query.Question, err)
-		return nil, err
-	}
-	knowledgeMap, err := c.getDocumentsMap(ctx, query.DocumentIds)
-	if err != nil {
 		return nil, err
 	}
 

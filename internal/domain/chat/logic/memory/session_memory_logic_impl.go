@@ -21,8 +21,8 @@ func NewSessionMemoryLogic(memoryStrategy strategy.MemoryStrategy) *SessionMemor
 }
 
 // LoadMemoryContext 加载会话记忆上下文
-func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error) {
-	return s.memoryStrategy.LoadMemoryContext(ctx, conversationId, tracer)
+func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error) {
+	return s.memoryStrategy.LoadMemoryContext(ctx, conversationId, trace)
 }
 
 // RefreshConversationSummaryAsync 异步刷新会话摘要

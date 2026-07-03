@@ -88,16 +88,22 @@ type DocumentNavigationDecision struct {
 
 // ConversationStructureAnchor 会话结构锚点
 type ConversationStructureAnchor struct {
-	AnchorType string `json:"anchorType"` // 锚点类型
-	AnchorId   int64  `json:"anchorId"`   // 锚点ID
-	AnchorName string `json:"anchorName"` // 锚点名称
+	AnchorType        string `json:"anchorType"`        // 锚点类型（范围/章节等）
+	AnchorId          int64  `json:"anchorId"`          // 锚点ID（sectionNodeId）
+	AnchorName        string `json:"anchorName"`        // 锚点名称，通常与 SectionTitle 对齐
+	SectionTitle      string `json:"sectionTitle"`      // 章节标题
+	SectionNodeCode   string `json:"sectionNodeCode"`   // 章节编号（如 1.2.3）
+	CanonicalPath     string `json:"canonicalPath"`     // 章节完整路径
+	TargetSectionHint string `json:"targetSectionHint"` // 给 LLM 直接使用的展示用文本
+	ScopeMode         string `json:"scopeMode"`         // NONE / SOFT / GRAPH
 }
 
 // ConversationItemAnchor 会话项目锚点
 type ConversationItemAnchor struct {
-	ItemId   int64  `json:"itemId"`   // 项目ID
-	ItemType string `json:"itemType"` // 项目类型
-	ItemName string `json:"itemName"` // 项目名称
+	ItemIndex       int    `json:"itemIndex"`       // 项目索引
+	ItemText        string `json:"itemText"`        // 项目文本
+	StructureNodeId int64  `json:"structureNodeId"` // 结构节点ID
+	CanonicalPath   string `json:"canonicalPath"`   // 正规路径
 }
 
 // RetrievalQuestionPlan 检索问题计划

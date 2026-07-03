@@ -10,6 +10,7 @@ import (
 	dagg "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
@@ -69,6 +70,17 @@ type ChatConverter interface {
 	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
 	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
 	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
+}
+
+// goverter:converter
+// goverter:output:format function
+// goverter:output:file ./converter_gen.go
+// goverter:useZeroValueOnPointerInconsistency
+// goverter:ignoreMissing
+// goverter:extend .*
+// goverter:skipCopySameType
+type KnowledgeConverter interface {
+	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 }
 
 func TimeToString(t time.Time) string {

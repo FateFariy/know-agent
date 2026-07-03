@@ -34,7 +34,7 @@ func NewSlidingWindowStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepos
 }
 
 // LoadMemoryContext 加载会话记忆上下文（滑动窗口策略）
-func (s *SlidingWindowStrategy) LoadMemoryContext(ctx context.Context, conversationId string, tracer *vo.ConversationTrace) (*vo.MemoryContext, error) {
+func (s *SlidingWindowStrategy) LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error) {
 	memoryCtx := &vo.MemoryContext{}
 	if strutil.IsBlank(conversationId) {
 		return memoryCtx, nil
