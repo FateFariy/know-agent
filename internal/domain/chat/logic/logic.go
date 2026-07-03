@@ -67,7 +67,7 @@ type PromptTemplateLogic interface {
 }
 
 type QueryRewriteLogic interface {
-	Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.RagRewriteResult, error)
+	Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.QuestionRewriteResult, error)
 }
 
 // RecommendationLogic 推荐追问业务逻辑接口
@@ -79,7 +79,7 @@ type RecommendationLogic interface {
 // DocumentQuestionRouteLogic 文档问题路由接口
 type DocumentQuestionRouteLogic interface {
 	// Route 根据文档ID和问题进行文档内路由
-	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error)
+	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
 }
 
 // ChatPreparationOrchestrator 聊天准备编排器接口

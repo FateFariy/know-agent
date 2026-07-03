@@ -51,11 +51,11 @@ func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.Obser
 
 // Rewrite 改写问题（结合历史上下文）
 // 流程：空问题直接返回 -> 判断是否需要改写 -> 不需要则规则改写 -> 需要则LLM改写 -> 规范化结果
-func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.RagRewriteResult, error) {
+func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.QuestionRewriteResult, error) {
 	// 空问题直接返回空结果
 	question = strutil.Trim(question)
 	if strutil.IsBlank(question) {
-		return vo.NewRagRewriteResult("", []string{}), nil
+		return vo.NewQuestionRewriteResult("", []string{}), nil
 	}
 
 	// 预计算兜底结果，用于快速返回
@@ -107,11 +107,11 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 }
 
 // fallback 兜底改写
-func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.RagRewriteResult {
+func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.QuestionRewriteResult {
 	if q.looksLikeExplicitMultiQuestion(normalizedQuestion) {
-		return vo.NewRagRewriteResult(normalizedQuestion, q.ruleBasedSplit(normalizedQuestion))
+		return vo.NewQuestionRewriteResult(normalizedQuestion, q.ruleBasedSplit(normalizedQuestion))
 	}
-	return vo.NewRagRewriteResult(normalizedQuestion, []string{normalizedQuestion})
+	return vo.NewQuestionRewriteResult(normalizedQuestion, []string{normalizedQuestion})
 }
 
 // needsRewrite 是否需要改写
@@ -155,7 +155,7 @@ func (q *QueryRewriteLogicImpl) looksLikeExplicitMultiQuestion(question string) 
 }
 
 // normalizeRewriteResult 规范化改写结果
-func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, parsed *parsedRewritePayload) *vo.RagRewriteResult {
+func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, parsed *parsedRewritePayload) *vo.QuestionRewriteResult {
 	if parsed == nil {
 		return nil
 	}
@@ -198,7 +198,7 @@ func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, 
 		subQuestions = []string{rewrite}
 	}
 
-	return vo.NewRagRewriteResult(rewrite, subQuestions)
+	return vo.NewQuestionRewriteResult(rewrite, subQuestions)
 }
 
 // parse 解析改写结果

@@ -278,8 +278,8 @@ func (o *PreparationOrchestratorImpl) funcName(ctx context.Context, convCtx *vo.
 	if err != nil {
 		return err
 	}
-
-	navigationDecision, err := o.documentQuestionRouter.Route(ctx, execPlan.SelectedDocumentId, convCtx.Question, prepCtx.rewriteResult)
+	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
+	navigationDecision, err := o.documentQuestionRouter.Route(ctx, execPlan.SelectedDocumentId, convCtx.Question, rewriteResult)
 	if err != nil {
 		if err = o.tracer.FailStage(ctx, stage, "执行路由失败。", err, nil); err != nil {
 			return err
@@ -345,7 +345,7 @@ func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, conv
 	return memoryContext, nil
 }
 
-func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.RagRewriteResult, error) {
+func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.QuestionRewriteResult, error) {
 	rewriteStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), "正在生成检索友好的问题表达。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
 	if err != nil {
 		return nil, err
@@ -369,7 +369,7 @@ func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convC
 }
 
 // buildRewriteStageSnapshot 构建改写阶段快照
-func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.RagRewriteResult) map[string]any {
+func (o *PreparationOrchestratorImpl) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.QuestionRewriteResult) map[string]any {
 	snapshot := make(map[string]any)
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)

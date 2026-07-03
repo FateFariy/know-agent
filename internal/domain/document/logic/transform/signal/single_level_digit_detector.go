@@ -46,7 +46,7 @@ func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string, 
 
 	// 提取标题内容
 	title := strutil.Trim(matches[2])
-	itemIndex := d.parseLooseNumber(matches[1])
+	itemIndex := utils.ParseChineseNumber(matches[1])
 
 	// 判断是否与相邻行形成连续序列（如：1. 2. 3. 连续）
 	sequential := d.isNeighborSequence(detCtx.LineContext, itemIndex, arabicSingle)

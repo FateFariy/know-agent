@@ -46,7 +46,7 @@ func (d *ChineseOutlineDetector) Detect(detCtx *DetectorContext, text string, op
 
 	// 提取标题内容
 	title := strutil.Trim(matches[2])
-	itemIndex := d.parseLooseNumber(matches[1])
+	itemIndex := utils.ParseChineseNumber(matches[1])
 
 	// 判断是否与相邻行形成连续序列（如：一、二、三、连续）
 	sequential := d.isNeighborSequence(detCtx.LineContext, itemIndex, chineseOutline)

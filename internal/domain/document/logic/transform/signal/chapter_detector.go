@@ -47,7 +47,7 @@ func (d *ChapterHeadingDetector) Detect(detCtx *DetectorContext, text string, op
 	}
 
 	// 解析章节编号（支持中文数字）
-	chapterNo := d.parseLooseNumber(matches[2])
+	chapterNo := utils.ParseChineseNumber(matches[2])
 
 	return &vo.DocumentStructureSignal{
 		Kind:        vo.SignalKindHeading,

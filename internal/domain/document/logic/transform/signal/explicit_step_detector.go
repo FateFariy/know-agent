@@ -33,7 +33,7 @@ func (d *ExplicitStepDetector) Detect(detCtx *DetectorContext, text string, opts
 	}
 
 	// 合并两个数字捕获组（取非空的那个）
-	itemIndex := d.parseLooseNumber(utils.BlankToDefault(strutil.Trim(matches[1]), strutil.Trim(matches[2])))
+	itemIndex := utils.ParseChineseNumber(utils.BlankToDefault(strutil.Trim(matches[1]), strutil.Trim(matches[2])))
 
 	return &vo.DocumentStructureSignal{
 		Kind:       vo.SignalKindStepItem,

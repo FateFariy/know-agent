@@ -116,17 +116,17 @@ func NewDocumentQuestionRouter(structureGraphQuerier vo2.StructureGraphQuerier) 
 }
 
 // Route 根据文档 ID、原问题与改写结果进行路由，返回导航决策
-func (r *DocumentQuestionRouter) Route(ctx context.Context, documentId int64, originalQuestion string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error) {
-	rewrittenQuestion := utils.BlankToDefault(
-		safeRewriteQuestion(rewriteResult),
-		strutil.Trim(originalQuestion),
-	)
+func (r *DocumentQuestionRouter) Route(ctx context.Context, documentId int64, originalQuestion string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error) {
+	rewrittenQuestion := strutil.Trim(originalQuestion)
+	if rewriteResult != nil && strutil.IsNotBlank(rewriteResult.RewrittenQuestion) {
+		rewrittenQuestion = strutil.Trim(rewriteResult.RewrittenQuestion)
+	}
 	subQuestions := normalizeSubQuestions(rewriteResult, rewrittenQuestion)
 	retrievalPlan := &vo.RetrievalQuestionPlan{
 		RetrievalQuestion: rewrittenQuestion,
 		SubQuestions:      subQuestions,
 	}
-	routeText := strings.TrimSpace(safeText(originalQuestion) + " " + rewrittenQuestion)
+	routeText := strutil.Trim(strutil.Trim(originalQuestion) + " " + rewrittenQuestion)
 
 	questionIntent := r.detectQuestionIntent(routeText, originalQuestion, rewrittenQuestion, subQuestions)
 	singleQuestionGraphOnlyMatched := questionIntent.graphOnly.matched && len(subQuestions) <= 1
@@ -244,7 +244,7 @@ func (r *DocumentQuestionRouter) buildDecision(mode vo.ExecutionMode, action str
 
 // detectQuestionIntent 统一判断当前问题在 route 阶段需要的多个意图维度
 func (r *DocumentQuestionRouter) detectQuestionIntent(routeText, originalQuestion, rewrittenQuestion string, subQuestions []string) *questionIntentDecision {
-	normalized := safeText(routeText)
+	normalized := strutil.Trim(routeText)
 	if strutil.IsBlank(normalized) {
 		return noQuestionIntentDecision("问题为空，跳过路由意图判断。")
 	}
@@ -252,12 +252,11 @@ func (r *DocumentQuestionRouter) detectQuestionIntent(routeText, originalQuestio
 	itemLookup := looksExplicitItemQuestion(normalized)
 	analytic := looksAnalyticQuestion(normalized)
 	outline := asksOutline(normalized)
-	contentHints := mentionsContentHint(normalized)
+	contentHints := strutil.ContainsAny(normalized, graphOnlyContentHints)
 	structureHint := mentionsStructure(normalized) || hasGraphOnlyAnchor(normalized) || outline
 	graphOnly := noGraphOnlyIntent("本地规则未命中结构图直答意图。")
 
-	hasMultipleSubQuestions := len(subQuestions) > 1
-	canTryGraphOnlyRules := !hasMultipleSubQuestions && !itemLookup && !contentHints && !(analytic && containsAny(normalized, analyticStrongHints))
+	canTryGraphOnlyRules := len(subQuestions) < 2 && !itemLookup && !contentHints && !(analytic && strutil.ContainsAny(normalized, analyticStrongHints))
 	if canTryGraphOnlyRules {
 		graphOnly = r.detectGraphOnlyIntentByRules(normalized)
 	}
@@ -292,7 +291,7 @@ func (r *DocumentQuestionRouter) detectQuestionIntent(routeText, originalQuestio
 
 // detectGraphOnlyIntentByRules 根据本地规则判断是否允许进入 GRAPH_ONLY
 func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *graphOnlyIntentDecision {
-	if containsAny(question, adjacencyHints) {
+	if strutil.ContainsAny(question, adjacencyHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
 			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
@@ -304,8 +303,8 @@ func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *
 	hasSectionCode := sectionCodePattern.MatchString(question)
 	hasChineseReference := chineseSectionReferencePattern.MatchString(question)
 	hasSectionReference := hasSectionCode || hasChineseReference
-	hasExplicitAdjacency := containsAny(question, graphOnlyExplicitAdjacencyHints)
-	hasAdjacencyAnswerTarget := containsAny(question, graphOnlyAdjacencyAnswerHints)
+	hasExplicitAdjacency := strutil.ContainsAny(question, graphOnlyExplicitAdjacencyHints)
+	hasAdjacencyAnswerTarget := strutil.ContainsAny(question, graphOnlyAdjacencyAnswerHints)
 	if hasSectionReference && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
@@ -315,7 +314,7 @@ func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *
 			source:     "rule-section-code-direction",
 		}
 	}
-	if quotedTitleMatches(question) && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
+	if quotedTextPattern.MatchString(question) && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
 			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
@@ -324,7 +323,9 @@ func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *
 			source:     "rule-quoted-title-direction",
 		}
 	}
-	if containsAny(question, graphOnlyStructureObjectHints) && containsAny(question, graphOnlyOutlineActionHints) && containsAny(question, graphOnlyAdjacencyAnswerHints) {
+	if strutil.ContainsAny(question, graphOnlyStructureObjectHints) &&
+		strutil.ContainsAny(question, graphOnlyOutlineActionHints) &&
+		strutil.ContainsAny(question, graphOnlyAdjacencyAnswerHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
 			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
@@ -333,7 +334,7 @@ func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *
 			source:     "rule-pronoun-direction-answer",
 		}
 	}
-	if containsAny(question, graphOnlyStructureObjectHints) && containsAny(question, graphOnlyExplicitAdjacencyHints) {
+	if strutil.ContainsAny(question, graphOnlyStructureObjectHints) && strutil.ContainsAny(question, graphOnlyExplicitAdjacencyHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
 			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
@@ -351,7 +352,7 @@ func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *
 			source:     "rule-outline-hint",
 		}
 	}
-	if hasGraphOnlyAnchor(question) && containsAny(question, graphOnlyOutlineActionHints) {
+	if hasGraphOnlyAnchor(question) && strutil.ContainsAny(question, graphOnlyOutlineActionHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
 			action:     vo.DocumentNavigationActionChildSectionDescend,
@@ -394,7 +395,7 @@ func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, docum
 	if r.structureGraphQuerier == nil {
 		return nil
 	}
-	combined := safeText(originalQuestion) + " " + safeText(rewrittenQuestion)
+	combined := strutil.Trim(originalQuestion) + " " + strutil.Trim(rewrittenQuestion)
 
 	// 1) 1.2.3 类编号
 	for _, code := range sectionCodePattern.FindAllString(combined, -1) {
@@ -408,7 +409,7 @@ func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, docum
 		if len(m) < 2 {
 			continue
 		}
-		parsed := parseChineseNumber(m[1])
+		parsed := utils.ParseChineseNumber(m[1])
 		if parsed <= 0 {
 			continue
 		}
@@ -479,7 +480,7 @@ func (r *DocumentQuestionRouter) buildSectionPhrases(originalQuestion, rewritten
 	for _, q := range extractQuotedPhrases(rewrittenQuestion) {
 		addIfAbsent(q)
 	}
-	combined := safeText(originalQuestion) + " " + safeText(rewrittenQuestion)
+	combined := strutil.Trim(originalQuestion) + " " + strutil.Trim(rewrittenQuestion)
 	for _, marker := range adjacencyHints {
 		addIfAbsent(textBeforeMarker(combined, marker))
 	}
@@ -536,7 +537,7 @@ func scoreSection(section *vo2.GraphSection, phrases []string) float64 {
 // 小工具函数
 // ============================================================
 
-func normalizeSubQuestions(rewriteResult *vo.RagRewriteResult, fallback string) []string {
+func normalizeSubQuestions(rewriteResult *vo.QuestionRewriteResult, fallback string) []string {
 	if rewriteResult == nil || len(rewriteResult.SubQuestions) == 0 {
 		return []string{strutil.Trim(fallback)}
 	}
@@ -560,172 +561,64 @@ func normalizeSubQuestions(rewriteResult *vo.RagRewriteResult, fallback string) 
 func resolveExplicitItemIndex(question string) *int {
 	for _, match := range stepReferencePattern.FindAllStringSubmatch(question, -1) {
 		if len(match) >= 2 {
-			v := parseChineseNumber(match[1])
-			if v > 0 {
-				return &v
-			}
+			return utils.Pointer(utils.ParseChineseNumber(match[1]))
 		}
 	}
 	for _, match := range ordinalReferencePattern.FindAllStringSubmatch(question, -1) {
 		if len(match) >= 2 {
-			v := parseChineseNumber(match[1])
-			if v > 0 {
-				return &v
-			}
+			return utils.Pointer(utils.ParseChineseNumber(match[1]))
 		}
 	}
 	return nil
 }
 
-// parseChineseNumber 将阿拉伯数字或常见中文数字（一/二 ... 十）解析为整数
-func parseChineseNumber(raw string) int {
-	cleaned := strutil.Trim(raw)
-	if strutil.IsBlank(cleaned) {
-		return 0
-	}
-	// 纯数字
-	if n, err := strconv.Atoi(cleaned); err == nil {
-		return n
-	}
-	// 中文数字映射
-	digitMap := map[rune]int{
-		'一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-		'六': 6, '七': 7, '八': 8, '九': 9,
-	}
-	if cleaned == "十" {
-		return 10
-	}
-	runes := []rune(cleaned)
-	if len(runes) == 2 && runes[0] == '十' {
-		if v, ok := digitMap[runes[1]]; ok {
-			return 10 + v
-		}
-	}
-	if len(runes) == 2 && runes[1] == '十' {
-		if v, ok := digitMap[runes[0]]; ok {
-			return v * 10
-		}
-	}
-	if len(runes) == 3 && runes[1] == '十' {
-		if a, ok1 := digitMap[runes[0]]; ok1 {
-			if b, ok2 := digitMap[runes[2]]; ok2 {
-				return a*10 + b
-			}
-		}
-	}
-	if len(runes) == 1 {
-		if v, ok := digitMap[runes[0]]; ok {
-			return v
-		}
-	}
-	return 0
-}
-
 func looksExplicitItemQuestion(question string) bool {
-	if containsAny(question, itemHints) {
+	if strutil.ContainsAny(question, itemHints) {
 		return true
 	}
 	return resolveExplicitItemIndex(question) != nil
 }
 
 func looksAnalyticQuestion(question string) bool {
-	if containsAny(question, analyticStrongHints) {
+	if strutil.ContainsAny(question, analyticStrongHints) {
 		return true
 	}
-	if !containsAny(question, analyticWeakHints) {
+	if !strutil.ContainsAny(question, analyticWeakHints) {
 		return false
 	}
 	return !looksStructuralRelationQuestion(question)
 }
 
 func looksStructuralRelationQuestion(question string) bool {
-	if containsAny(question, structuralRelationHints) {
+	if strutil.ContainsAny(question, structuralRelationHints) {
 		return true
 	}
 	if !hasGraphOnlyAnchor(question) {
 		return false
 	}
-	return containsAny(question, graphOnlyExplicitAdjacencyHints)
+	return strutil.ContainsAny(question, graphOnlyExplicitAdjacencyHints) || strutil.ContainsAny(question, graphOnlyDirectionHints)
 }
 
 func mentionsStructure(question string) bool {
-	normalized := safeText(question)
-	if strutil.IsBlank(normalized) {
-		return false
-	}
-	if strings.Contains(normalized, "章节") || strings.Contains(normalized, "小节") ||
-		strings.Contains(normalized, "条目") || strings.Contains(normalized, "步骤") || strings.Contains(normalized, "项") {
-		return true
-	}
-	if quotedTextPattern.MatchString(normalized) {
-		return true
-	}
-	return sectionCodePattern.MatchString(normalized)
+	return strutil.ContainsAny(question, []string{"章节", "小节", "条目", "步骤", "项"}) ||
+		quotedTextPattern.MatchString(question) ||
+		sectionCodePattern.MatchString(question)
 }
 
 func hasGraphOnlyAnchor(question string) bool {
-	if sectionCodePattern.MatchString(question) {
-		return true
-	}
-	if chineseSectionReferencePattern.MatchString(question) {
-		return true
-	}
-	if quotedTextPattern.MatchString(question) {
-		return true
-	}
-	if containsAny(question, graphOnlyStructureObjectHints) {
-		return true
-	}
-	return false
-}
-
-func mentionsContentHint(question string) bool {
-	normalized := safeText(question)
-	if strutil.IsBlank(normalized) {
-		return false
-	}
-	hints := []string{"内容", "要求", "规定", "流程", "步骤", "处理", "执行", "怎么做", "讲了什么", "写了什么", "说了什么"}
-	return containsAny(normalized, hints)
+	return sectionCodePattern.MatchString(question) ||
+		chineseSectionReferencePattern.MatchString(question) ||
+		quotedTextPattern.MatchString(question) ||
+		strutil.ContainsAny(question, graphOnlyStructureObjectHints) ||
+		strutil.ContainsAny(question, graphOnlyPronounAnchorHints)
 }
 
 func asksOutline(question string) bool {
-	normalized := safeText(question)
-	if strutil.IsBlank(normalized) {
+	if strutil.ContainsAny(question, graphOnlyContentHints) {
 		return false
 	}
-	if mentionsContentHint(normalized) {
-		return false
-	}
-	if containsAny(normalized, outlineHints) {
-		return true
-	}
-	if hasGraphOnlyAnchor(normalized) && containsAny(normalized, graphOnlyOutlineActionHints) {
-		return true
-	}
-	return false
-}
-
-func containsAny(question string, candidates []string) bool {
-	normalized := safeText(question)
-	if strutil.IsBlank(normalized) || len(candidates) == 0 {
-		return false
-	}
-	for _, c := range candidates {
-		if strutil.IsBlank(c) {
-			continue
-		}
-		if strings.Contains(normalized, c) {
-			return true
-		}
-	}
-	return false
-}
-
-func firstNonBlank(a, b string) string {
-	if strutil.IsNotBlank(a) {
-		return strutil.Trim(a)
-	}
-	return strutil.Trim(b)
+	return strutil.ContainsAny(question, outlineHints) ||
+		(hasGraphOnlyAnchor(question) && strutil.ContainsAny(question, graphOnlyOutlineActionHints))
 }
 
 func normalizeForSection(text string) string {
@@ -781,10 +674,6 @@ func textBeforeMarker(text, marker string) string {
 	return strutil.Trim(text[:idx])
 }
 
-func quotedTitleMatches(text string) bool {
-	return quotedTextPattern.MatchString(strutil.Trim(text))
-}
-
 // ============================================================
 // 构造决策输出辅助
 // ============================================================
@@ -829,7 +718,7 @@ func buildQueryHints(retrievalPlan *vo.RetrievalQuestionPlan, section *vo2.Graph
 
 // splitRoughTerms 将问题按常见分隔符切分为关键词
 func splitRoughTerms(text string) []string {
-	cleaned := safeText(text)
+	cleaned := strutil.Trim(text)
 	if strutil.IsBlank(cleaned) {
 		return nil
 	}
@@ -895,24 +784,15 @@ func modeName(mode vo.ExecutionMode) string {
 
 func noGraphOnlyIntent(reason string) *graphOnlyIntentDecision {
 	return &graphOnlyIntentDecision{
-		matched:    false,
-		action:     "",
-		confidence: 0,
-		reason:     reason,
-		source:     "none",
+		reason: reason,
+		source: "none",
 	}
 }
 
 func noQuestionIntentDecision(reason string) *questionIntentDecision {
 	return &questionIntentDecision{
-		graphOnly:     noGraphOnlyIntent(reason),
-		analytic:      false,
-		outline:       false,
-		itemLookup:    false,
-		structureHint: false,
-		contentHints:  false,
-		confidence:    0,
-		reason:        reason,
-		source:        "none",
+		graphOnly: noGraphOnlyIntent(reason),
+		reason:    reason,
+		source:    "none",
 	}
 }
