@@ -96,7 +96,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	// 组装长期摘要和上下文元数据
 	if summaryState != nil {
 		memoryCtx.LongTermSummary = strutil.Trim(summaryState.SummaryText)
-		memoryCtx.AssembledHistory = utils.JoinNonBlank(memoryCtx.LongTermSummary, memoryCtx.RecentTranscript, "\n\n")
+		memoryCtx.AssembledHistory = utils.JoinNonBlank("\n\n", memoryCtx.LongTermSummary, memoryCtx.RecentTranscript)
 		memoryCtx.CompressionApplied = memoryCtx.LongTermSummary != ""
 		memoryCtx.CoveredExchangeId = summaryState.CoveredExchangeId
 		memoryCtx.CoveredExchangeCount = summaryState.CoveredExchangeCount
@@ -307,7 +307,7 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.Conversati
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要文本（用分号连接旧摘要和批次高亮）
-	newSummary.Summary = utils.JoinNonBlank(newSummary.Summary, batchHighlight, ";")
+	newSummary.Summary = utils.JoinNonBlank(";", newSummary.Summary, batchHighlight)
 	newSummary.Summary = utils.ClipTail(newSummary.Summary, s.historySummary.SummaryMaxChars)
 
 	// 设置会话目标（若尚未设置，则取最后一条问题作为目标）
