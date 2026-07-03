@@ -45,16 +45,14 @@ func ClipTail(text string, maxChars int) string {
 }
 
 // JoinNonBlank 连接非空字符串
-func JoinNonBlank(left, right, delimiter string) string {
-	left = strutil.Trim(left)
-	right = strutil.Trim(right)
-	if strutil.IsBlank(left) {
-		return right
+func JoinNonBlank(sep string, parts ...string) string {
+	result := make([]string, 0, len(parts))
+	for i := 0; i < len(parts); i++ {
+		if strutil.IsNotBlank(parts[i]) {
+			result = append(result, strutil.Trim(parts[i]))
+		}
 	}
-	if strutil.IsBlank(right) {
-		return left
-	}
-	return left + delimiter + right
+	return strings.Join(result, sep)
 }
 
 // ParseChineseNumber 解析松散格式的数字（支持阿拉伯数字和中文数字）

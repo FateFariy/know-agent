@@ -245,7 +245,7 @@ func (s *KnowledgeRouteLogicImpl) rankScopes(ctx context.Context, q *routeQueryC
 	// 生成 routeText 列表
 	routeTexts := make([]string, 0, len(nodes))
 	for _, node := range nodes {
-		routeTexts = append(routeTexts, s.joinNonBlank(node.ScopeName, node.Description, node.Aliases, node.Examples))
+		routeTexts = append(routeTexts, utils.JoinNonBlank(" ", node.ScopeName, node.Description, node.Aliases, node.Examples))
 	}
 	semanticScores := s.computeSemanticScores(ctx, q, routeTexts)
 	lexicalScores := s.searchLexicalScores(ctx, q.RoutingText, "scope", 5)
@@ -288,7 +288,7 @@ func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context,
 		}
 		scopeCode := utils.BlankToDefault(doc.KnowledgeScopeCode, "general_document")
 		scopeName := utils.BlankToDefault(doc.KnowledgeScopeName, "通用文档")
-		routeText := s.joinNonBlank(scopeCode, scopeName, doc.BusinessCategory, doc.DocumentTags)
+		routeText := utils.JoinNonBlank(" ", scopeCode, scopeName, doc.BusinessCategory, doc.DocumentTags)
 		semanticScore := s.singleSemanticScore(ctx, q, routeText)
 		finalScore := s.semanticMainScore(semanticScore) + s.keywordEntityMatchScore(q.QueryTerms, routeText)
 		if finalScore <= 0 && len(q.QueryEmbedding) == 0 {
@@ -326,7 +326,7 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 
 	routeTexts := make([]string, 0, len(nodes))
 	for _, node := range nodes {
-		routeTexts = append(routeTexts, s.joinNonBlank(node.TopicName, node.Description, node.Aliases, node.Examples, node.AnswerShape, node.ExecutionPreference))
+		routeTexts = append(routeTexts, utils.JoinNonBlank(" ", node.TopicName, node.Description, node.Aliases, node.Examples, node.AnswerShape, node.ExecutionPreference))
 	}
 	semanticScores := s.computeSemanticScores(ctx, q, routeTexts)
 	lexicalScores := s.searchLexicalScores(ctx, q.RoutingText, "topic", 8)
@@ -380,7 +380,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 			if utf8.RuneCountInString(topic) < 2 {
 				continue
 			}
-			routeText := s.joinNonBlank(topic, profile.DocumentSummary, profile.ExampleQuestions)
+			routeText := utils.JoinNonBlank(" ", topic, profile.DocumentSummary, profile.ExampleQuestions)
 			keywordScore := s.keywordEntityMatchScore(q.QueryTerms, routeText)
 			semanticScore := s.singleSemanticScore(ctx, q, routeText)
 			scopeCode := scopeByDoc[profile.DocumentId]
@@ -499,9 +499,9 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
 func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *vo.KnowledgeDocument, profile *entity.KnowledgeDocumentProfile) string {
 	if profile == nil {
-		return s.joinNonBlank(doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
+		return utils.JoinNonBlank(" ", doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}
-	return s.joinNonBlank(doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags,
+	return utils.JoinNonBlank(" ", doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags,
 		profile.DocumentSummary, profile.CoreTopics, profile.ExampleQuestions, profile.DocumentType)
 }
 
@@ -646,17 +646,6 @@ func normalizeCode(value string) string {
 		return ""
 	}
 	return normalizeCodeInvalidChar.ReplaceAllString(cleaned, "_")
-}
-
-// joinNonBlank 用空格连接非空字符串列表
-func (s *KnowledgeRouteLogicImpl) joinNonBlank(values ...string) string {
-	nonBlank := make([]string, 0, len(values))
-	for _, v := range values {
-		if strutil.IsNotBlank(v) {
-			nonBlank = append(nonBlank, strutil.Trim(v))
-		}
-	}
-	return strings.Join(nonBlank, " ")
 }
 
 // buildReason 根据关键词命中和语义得分生成原因说明
