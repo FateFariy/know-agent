@@ -12,7 +12,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
-	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -69,7 +68,6 @@ func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 	documentQuestionRouter logic2.DocumentQuestionRouteLogic,
 	knowledgeRoute logic.KnowledgeRouteLogic,
 	knowledgeLogic logic.KnowledgeLogic,
-	tracer *trace.ConversationTraceRecorder,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
 		repo:                   repo,
@@ -78,7 +76,7 @@ func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 		documentQuestionRouter: documentQuestionRouter,
 		knowledgeRouteLogic:    knowledgeRoute,
 		knowledgeLogic:         knowledgeLogic,
-		tracer:                 tracer,
+		tracer:                 trace.NewConversationTraceRecorder(repo),
 		option: &option{
 			ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
 			planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
@@ -170,8 +168,10 @@ func (o *PreparationOrchestratorImpl) prepareCommon(ctx context.Context, convCtx
 		if err != nil {
 			return nil, err
 		}
-		execPlan.RewriteQuestion = utils.BlankToDefault(rewriteResult.RewrittenQuestion, strutil.Trim(convCtx.Question))
+		execPlan.RewriteQuestion = rewriteResult.RewrittenQuestion
 		execPlan.RewriteSubQuestions = rewriteResult.SubQuestions
+		execPlan.RetrievalQuestion = rewriteResult.RewrittenQuestion
+		execPlan.RetrievalSubQuestions = rewriteResult.SubQuestions
 	}
 	return execPlan, nil
 }
@@ -206,11 +206,18 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, c
 	if err := o.knowledgeRouteLogic.RecordShadowRoute(ctx, convCtx.ExchangeId, convCtx.ConversationId, convCtx.SelectedDocumentId, convCtx.Question, execPlan.RewriteQuestion); err != nil {
 		Warnf("记录影子路由失败: %v", err)
 	}
-	return nil
+
+	return o.funcName(ctx, convCtx, execPlan)
 }
 
 // prepareAutoDocumentMode 自动文档问答：执行知识路由 → 必要时澄清 → 确定主文档 → 导航 → 生成计划。
 func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
+	// 路由跟踪
+	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "AUTO_DOCUMENT", "正在生成知识范围候选。", nil)
+	if err != nil {
+		return err
+	}
+
 	// 执行知识路由
 	routeDecision, err := o.knowledgeRouteLogic.Route(ctx, convCtx.Question, execPlan.RewriteQuestion)
 	if err != nil {
@@ -226,15 +233,6 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 	execPlan.RetrievalDocumentIds = o.extractDocumentIds(candidateDocuments)
 	execPlan.RetrievalTaskIds = o.extractTaskIds(candidateDocuments)
 
-	// 若需要澄清，直接返回澄清模式执行计划
-	if o.shouldAskClarification(routeDecision, candidateDocuments) {
-		execPlan.Mode = vo.ExecutionModeClarification
-		execPlan.ClarificationReply = o.buildClarificationReply(candidateDocuments)
-		execPlan.ClarificationOptions = o.buildClarificationOptions(candidateDocuments)
-		execPlan.ClarificationReason = o.buildClarificationReason(routeDecision, candidateDocuments)
-		return nil
-	}
-
 	// 选择最高置信度的文档作为主文档；否则回退到“不指定主文档，使用多文档范围检索”
 	topDocument := &klvo.DocumentRouteCandidate{}
 	confidentTop := routeDecision.Confidence >= 0.55
@@ -242,11 +240,6 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 		topDocument = candidateDocuments[0]
 	}
 
-	// 路由跟踪
-	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "AUTO_DOCUMENT", "正在生成知识范围候选。", nil)
-	if err != nil {
-		return err
-	}
 	snapshot := map[string]any{
 		"confidence":             routeDecision.Confidence,
 		"routeStatus":            routeDecision.RouteStatus,
@@ -259,35 +252,51 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 		return err
 	}
 
+	// 若需要澄清，直接返回澄清模式执行计划
+	if o.shouldAskClarification(routeDecision, candidateDocuments) {
+		execPlan.Mode = vo.ExecutionModeClarification
+		execPlan.ClarificationReply = o.buildClarificationReply(candidateDocuments)
+		execPlan.ClarificationOptions = o.buildClarificationOptions(candidateDocuments)
+		execPlan.ClarificationReason = o.buildClarificationReason(routeDecision, candidateDocuments)
+		return nil
+	}
+
+	execPlan.SelectedDocumentId = topDocument.DocumentId
+	execPlan.SelectedDocumentName = topDocument.DocumentName
+	execPlan.SelectedTaskId = topDocument.LastIndexTaskId
+
+	if err = o.funcName(ctx, convCtx, execPlan); err != nil {
+		return err
+
+	}
+	return nil
+}
+
+func (o *PreparationOrchestratorImpl) funcName(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 文档内导航
-	stage, err = o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), "正在判定图查询还是混合检索。", nil)
+	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), "正在判定图查询还是混合检索。", nil)
 	if err != nil {
 		return err
 	}
 
-	navigationDecision, err := o.documentQuestionRouter.Route(ctx, topDocument.DocumentId, convCtx.Question, prepCtx.rewriteResult)
-	if err == nil {
-		snapshot = map[string]any{
-			"executionMode":     navigationDecision.ExecutionMode.Name(),
-			"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.AnchorName),
-			"targetItemIndex":   navigationDecision.ItemAnchor.ItemIndex,
-			"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
-		}
-		if err = o.tracer.CompleteStage(ctx, stage, "执行路由完成。", snapshot); err != nil {
-			return err
-		}
-	} else {
+	navigationDecision, err := o.documentQuestionRouter.Route(ctx, execPlan.SelectedDocumentId, convCtx.Question, prepCtx.rewriteResult)
+	if err != nil {
 		if err = o.tracer.FailStage(ctx, stage, "执行路由失败。", err, nil); err != nil {
 			return err
 		}
+		return err
+	}
+	snapshot := map[string]any{
+		"executionMode":     navigationDecision.ExecutionMode.Name(),
+		"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.AnchorName),
+		"targetItemIndex":   navigationDecision.ItemAnchor.ItemIndex,
+		"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
+	}
+	if err = o.tracer.CompleteStage(ctx, stage, "执行路由完成。", snapshot); err != nil {
+		return err
 	}
 
-	// 确定执行模式与检索问题
-	executionMode := vo.ExecutionModeRetrieval
-	if navigationDecision.ExecutionMode != nil {
-		executionMode = navigationDecision.ExecutionMode
-	}
-
+	// 确定检索问题
 	if navigationDecision.RetrievalPlan != nil {
 		execPlan.RetrievalQuestion = utils.BlankToDefault(navigationDecision.RetrievalPlan.RetrievalQuestion, execPlan.RewriteQuestion)
 		if len(navigationDecision.RetrievalPlan.SubQuestions) > 0 {
@@ -296,16 +305,14 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 	}
 
 	// 构建最终执行计划
-	execPlan.Mode = executionMode
-	execPlan.SelectedDocumentId = topDocument.DocumentId
-	execPlan.SelectedDocumentName = topDocument.DocumentName
-	execPlan.SelectedTaskId = topDocument.LastIndexTaskId
+	execPlan.Mode = navigationDecision.ExecutionMode
 	execPlan.NavigationDecision = navigationDecision
 	execPlan.NoEvidenceReply = o.buildDocumentModeNoEvidenceReply(convCtx.Question, execPlan.RequiresRealTimeSearch)
 
-	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s",
+	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s, targetSection='%s",
 		convCtx.ConversationId, convCtx.ChatMode.String(), strutil.Trim(convCtx.Question),
-		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, executionMode.String())
+		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
+
 	return nil
 }
 
@@ -348,16 +355,15 @@ func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convC
 		if err = o.tracer.FailStage(ctx, rewriteStage, "问题改写失败。", err, o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)); err != nil {
 			return nil, err
 		}
+		return nil, err
 	}
 	if err = o.tracer.CompleteStage(ctx, rewriteStage, "问题改写完成。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, rewriteResult)); err != nil {
 		return nil, err
 	}
-
 	// 获取改写后的问题
-	rewriteQuestion := utils.BlankToDefault(rewriteResult.RewrittenQuestion, strutil.Trim(convCtx.Question))
-	rewriteSubQuestions := rewriteResult.SubQuestions
-	if len(rewriteSubQuestions) == 0 {
-		rewriteSubQuestions = []string{rewriteQuestion}
+	rewriteResult.RewrittenQuestion = utils.BlankToDefault(rewriteResult.RewrittenQuestion, strutil.Trim(convCtx.Question))
+	if len(rewriteResult.SubQuestions) == 0 {
+		rewriteResult.SubQuestions = []string{rewriteResult.RewrittenQuestion}
 	}
 	return rewriteResult, nil
 }
@@ -737,12 +743,24 @@ func (o *PreparationOrchestratorImpl) looksLikeOpenChatQuestion(normalizedQuesti
 
 // extractDocumentIds 提取文档ID列表
 func (o *PreparationOrchestratorImpl) extractDocumentIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
-	return slice.Map(candidates, func(_ int, item *klvo.DocumentRouteCandidate) int64 { return item.DocumentId })
+	result := make([]int64, 0, len(candidates))
+	for _, item := range candidates {
+		if item.DocumentId > 0 {
+			result = append(result, item.DocumentId)
+		}
+	}
+	return result
 }
 
 // extractTaskIds 提取任务ID列表
 func (o *PreparationOrchestratorImpl) extractTaskIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
-	return slice.Map(candidates, func(_ int, item *klvo.DocumentRouteCandidate) int64 { return item.LastIndexTaskId })
+	result := make([]int64, 0, len(candidates))
+	for _, item := range candidates {
+		if item.LastIndexTaskId > 0 {
+			result = append(result, item.LastIndexTaskId)
+		}
+	}
+	return result
 }
 
 func Warnf(format string, v ...any) {
