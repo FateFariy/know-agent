@@ -82,8 +82,8 @@ type DocumentQuestionRouteLogic interface {
 	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
 }
 
-// ChatPreparationOrchestrator 聊天准备编排器接口
-type ChatPreparationOrchestrator interface {
+// ChatPreparationOrchestratorLogic 聊天准备编排器接口
+type ChatPreparationOrchestratorLogic interface {
 	// Prepare 准备对话执行计划
 	Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error)
 }

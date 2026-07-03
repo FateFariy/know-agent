@@ -23,7 +23,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(documentLogic.TextPreProcessLogic), new(*documentLogic.TextPreProcessLogicImpl)),
 	documentadapter.NewDocumentPort,
 	chat.NewChatLogic,
-	wire.Bind(new(chatLogic.ChatLogic), new(*chat.ChatLogicImpl)),
+	wire.Bind(new(chatLogic.ChatLogic), new(*chat.LogicImpl)),
 	knowledgeLogic.NewKnowledgeRouteLogicImpl,
 	wire.Bind(new(knowledgeLogic.KnowledgeRouteLogic), new(*knowledgeLogic.KnowledgeRouteLogicImpl)),
 )

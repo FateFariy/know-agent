@@ -1,39 +1,108 @@
 package vo
 
+import list "github.com/duke-git/lancet/v2/datastructure/list"
+
 // ChatDebugTrace 单轮对话调试轨迹
 type ChatDebugTrace struct {
-	ExecutionMode                 string                      `json:"executionMode"`                 // 执行模式
-	ChatMode                      int                         `json:"chatMode"`                      // 聊天模式
-	OriginalQuestion              string                      `json:"originalQuestion"`              // 原始问题
-	RewriteQuestion               string                      `json:"rewriteQuestion"`               // 重写问题
-	RewriteSubQuestions           []string                    `json:"rewriteSubQuestions"`           // 重写子问题列表
-	RetrievalQuestion             string                      `json:"rewrittenQuestion"`             // 检索问题
-	AgentQuestion                 string                      `json:"agentQuestion"`                 // Agent问题
-	NavigationDecision            *DocumentNavigationDecision `json:"navigationDecision"`            // 文档导航决策
-	HistorySummary                string                      `json:"historySummary"`                // 历史摘要
-	LongTermSummary               string                      `json:"longTermSummary"`               // 长期摘要
-	RecentHistoryTranscript       string                      `json:"recentHistoryTranscript"`       // 近期历史转录
-	AnswerRecentTranscript        string                      `json:"answerRecentTranscript"`        // 回答近期转录
-	AnswerHistoryContext          string                      `json:"answerHistoryContext"`          // 回答历史上下文
-	AnswerHistoryFollowUpQuestion bool                        `json:"answerHistoryFollowUpQuestion"` // 回答历史追问
-	HistoryCompressionApplied     bool                        `json:"historyCompressionApplied"`     // 历史压缩已应用
-	HistoryCoveredExchangeId      int64                       `json:"historyCoveredExchangeId"`      // 历史覆盖交换ID
-	HistoryCoveredExchangeCount   int                         `json:"historyCoveredExchangeCount"`   // 历史覆盖交换数量
-	HistoryCompressionCount       int                         `json:"historyCompressionCount"`       // 历史压缩次数
-	CurrentDateText               string                      `json:"currentDateText"`               // 当前日期文本
-	RequiresFreshSearch           bool                        `json:"requiresFreshSearch"`           // 需要新鲜搜索
-	RequiresCurrentDateAnchoring  bool                        `json:"requiresCurrentDateAnchoring"`  // 需要当前日期锚定
-	RetrievalSubQuestions         []string                    `json:"subQuestions"`                  // 检索子问题列表（别名：subQuestions）
-	SelectedDocumentId            int64                       `json:"selectedDocumentId"`            // 选中的文档ID
-	SelectedTaskId                int64                       `json:"selectedTaskId"`                // 选中的任务ID
-	RetrievalNotes                []string                    `json:"retrievalNotes"`                // 检索备注列表
-	UsedChannels                  []string                    `json:"usedChannels"`                  // 使用的渠道列表
-	ToolTraces                    []*ChatToolTrace            `json:"toolTraces"`                    // 工具调用轨迹列表
-	ModelUsageTraces              []*ChatModelUsageTrace      `json:"modelUsageTraces"`              // 模型使用轨迹列表
-	LimitStats                    *ChatLimitStats             `json:"limitStats"`                    // 限制统计
-	RagSystemPrompt               string                      `json:"ragSystemPrompt"`               // RAG系统提示词
-	RagUserPrompt                 string                      `json:"ragUserPrompt"`                 // RAG用户提示词
-	NoEvidenceReply               string                      `json:"noEvidenceReply"`               // 无证据回复
+	ExecutionMode                   string                                `json:"executionMode"`                   // 执行模式
+	ChatMode                        ChatQueryMode                         `json:"chatMode"`                        // 聊天模式
+	OriginalQuestion                string                                `json:"originalQuestion"`                // 原始问题
+	RewriteQuestion                 string                                `json:"rewriteQuestion"`                 // 重写问题
+	RewriteSubQuestions             []string                              `json:"rewriteSubQuestions"`             // 重写子问题列表
+	RetrievalQuestion               string                                `json:"rewrittenQuestion"`               // 检索问题
+	AgentQuestion                   string                                `json:"agentQuestion"`                   // Agent问题
+	NavigationDecision              *DocumentNavigationDecision           `json:"navigationDecision"`              // 文档导航决策
+	HistorySummary                  string                                `json:"historySummary"`                  // 历史摘要
+	LongTermSummary                 string                                `json:"longTermSummary"`                 // 长期摘要
+	RecentHistoryTranscript         string                                `json:"recentHistoryTranscript"`         // 近期历史转录
+	RecentQuestionTranscript        string                                `json:"RecentQuestionTranscript"`        // 回答近期转录
+	QuestionHistoryContext          string                                `json:"questionHistoryContext"`          // 回答历史上下文
+	QuestionHistoryFollowUpQuestion bool                                  `json:"questionHistoryFollowUpQuestion"` // 回答历史追问
+	HistoryCompressionApplied       bool                                  `json:"historyCompressionApplied"`       // 历史压缩已应用
+	HistoryCoveredExchangeId        int64                                 `json:"historyCoveredExchangeId"`        // 历史覆盖交换ID
+	HistoryCoveredExchangeCount     int                                   `json:"historyCoveredExchangeCount"`     // 历史覆盖交换数量
+	HistoryCompressionCount         int                                   `json:"historyCompressionCount"`         // 历史压缩次数
+	CurrentDateText                 string                                `json:"currentDateText"`                 // 当前日期文本
+	RequiresRealTimeSearch          bool                                  `json:"requiresRealTimeSearch"`          // 需要实时搜索
+	RequiresCurrentDateAnchoring    bool                                  `json:"requiresCurrentDateAnchoring"`    // 需要当前日期锚定
+	RetrievalSubQuestions           []string                              `json:"subQuestions"`                    // 检索子问题列表（别名：subQuestions）
+	SelectedDocumentId              int64                                 `json:"selectedDocumentId"`              // 选中的文档ID
+	SelectedTaskId                  int64                                 `json:"selectedTaskId"`                  // 选中的任务ID
+	RetrievalNotes                  *list.CopyOnWriteList[string]         `json:"retrievalNotes"`                  // 检索备注列表
+	UsedChannels                    *list.CopyOnWriteList[string]         `json:"usedChannels"`                    // 使用的渠道列表
+	ToolTraces                      *list.CopyOnWriteList[*ChatToolTrace] `json:"toolTraces"`                      // 工具调用轨迹列表
+	ModelUsageTraces                []*ChatModelUsageTrace                `json:"modelUsageTraces"`                // 模型使用轨迹列表
+	LimitStats                      *ChatLimitStats                       `json:"limitStats"`                      // 限制统计
+	RagSystemPrompt                 string                                `json:"ragSystemPrompt"`                 // RAG系统提示词
+	RagUserPrompt                   string                                `json:"ragUserPrompt"`                   // RAG用户提示词
+	NoEvidenceReply                 string                                `json:"noEvidenceReply"`                 // 无证据回复
+}
+
+// NewChatDebugTrace 创建新的调试轨迹实例
+func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
+	trace := &ChatDebugTrace{
+		RetrievalNotes: list.NewCopyOnWriteList[string](nil),
+		UsedChannels:   list.NewCopyOnWriteList[string](nil),
+		ToolTraces:     list.NewCopyOnWriteList[*ChatToolTrace](nil),
+	}
+	if execPlan == nil {
+		return trace
+	}
+
+	// 基础模式
+	if execPlan.Mode != nil {
+		trace.ExecutionMode = execPlan.Mode.Name()
+	}
+	trace.ChatMode = execPlan.ChatMode
+
+	// 问题相关
+	trace.OriginalQuestion = execPlan.OriginalQuestion
+	trace.RewriteQuestion = execPlan.RewriteQuestion
+	trace.RewriteSubQuestions = append(trace.RewriteSubQuestions, execPlan.RewriteSubQuestions...)
+	trace.RetrievalQuestion = execPlan.RetrievalQuestion
+	trace.AgentQuestion = execPlan.AgentQuestion
+	trace.NavigationDecision = execPlan.NavigationDecision
+
+	// 历史摘要
+	trace.HistorySummary = execPlan.HistorySummary
+	trace.LongTermSummary = execPlan.LongTermSummary
+	trace.RecentHistoryTranscript = execPlan.RecentHistoryTranscript
+	trace.RecentQuestionTranscript = execPlan.RecentQuestionTranscript
+	if execPlan.QuestionHistoryContext != nil {
+		trace.QuestionHistoryContext = execPlan.QuestionHistoryContext.RenderedText
+		trace.QuestionHistoryFollowUpQuestion = execPlan.QuestionHistoryContext.FollowUpQuestion
+	}
+	trace.HistoryCompressionApplied = execPlan.HistoryCompressionApplied
+	trace.HistoryCoveredExchangeId = execPlan.HistoryCoveredExchangeId
+	trace.HistoryCoveredExchangeCount = execPlan.HistoryCoveredExchangeCount
+	trace.HistoryCompressionCount = execPlan.HistoryCompressionCount
+	trace.CurrentDateText = execPlan.CurrentDateText
+	trace.RequiresRealTimeSearch = execPlan.RequiresRealTimeSearch
+	trace.RequiresCurrentDateAnchoring = execPlan.RequiresCurrentDateAnchoring
+
+	// 检索子问题
+	trace.RetrievalSubQuestions = append(trace.RetrievalSubQuestions, execPlan.RetrievalSubQuestions...)
+	trace.SelectedDocumentId = execPlan.SelectedDocumentId
+	trace.SelectedTaskId = execPlan.SelectedTaskId
+
+	trace.NoEvidenceReply = execPlan.NoEvidenceReply
+
+	return trace
+}
+
+// AddToolTrace 添加工具调用轨迹
+func (t *ChatDebugTrace) AddToolTrace(trace *ChatToolTrace) {
+	t.ToolTraces.Add(trace)
+}
+
+// AddModelUsageTrace 添加模型使用轨迹
+func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
+	t.ModelUsageTraces = append(t.ModelUsageTraces, trace)
+}
+
+// AddUsedChannel 添加使用的渠道
+func (t *ChatDebugTrace) AddUsedChannel(channel string) {
+	t.UsedChannels.Add(channel)
 }
 
 // ChatLimitStats 单轮对话的调用限制统计
@@ -88,14 +157,12 @@ type DocumentNavigationDecision struct {
 
 // ConversationStructureAnchor 会话结构锚点
 type ConversationStructureAnchor struct {
-	AnchorType        string `json:"anchorType"`        // 锚点类型（范围/章节等）
-	AnchorId          int64  `json:"anchorId"`          // 锚点ID（sectionNodeId）
-	AnchorName        string `json:"anchorName"`        // 锚点名称，通常与 SectionTitle 对齐
-	SectionTitle      string `json:"sectionTitle"`      // 章节标题
-	SectionNodeCode   string `json:"sectionNodeCode"`   // 章节编号（如 1.2.3）
-	CanonicalPath     string `json:"canonicalPath"`     // 章节完整路径
-	TargetSectionHint string `json:"targetSectionHint"` // 给 LLM 直接使用的展示用文本
-	ScopeMode         string `json:"scopeMode"`         // NONE / SOFT / GRAPH
+	RootSectionCode   string `json:"rootSectionCode"`   // 根章节代码
+	RootSectionTitle  string `json:"rootSectionTitle"`  // 根章节标题
+	TargetSectionHint string `json:"targetSectionHint"` // 目标章节提示
+	StructureNodeId   int64  `json:"structureNodeId"`   // 结构节点ID
+	CanonicalPath     string `json:"canonicalPath"`     // 正规路径
+	ScopeMode         string `json:"scopeMode"`         // 作用域模式
 }
 
 // ConversationItemAnchor 会话项目锚点
@@ -118,40 +185,10 @@ type RetrievalQuestionPlan struct {
 	ExpandToChildren  bool     `json:"expandToChildren"`  // 是否扩展到子级
 }
 
-// NewChatDebugTrace 创建新的调试轨迹实例 todo 待完善
-func NewChatDebugTrace(plan *ConversationExecutionPlan) *ChatDebugTrace {
-	if plan == nil {
-		return &ChatDebugTrace{
-			RewriteSubQuestions:   []string{},
-			RetrievalSubQuestions: []string{},
-			RetrievalNotes:        []string{},
-			UsedChannels:          []string{},
-			ToolTraces:            []*ChatToolTrace{},
-			ModelUsageTraces:      []*ChatModelUsageTrace{},
-		}
-	}
-	return nil
-}
-
 // NewDocumentNavigationDecision 创建新的文档导航决策实例
 func NewDocumentNavigationDecision() *DocumentNavigationDecision {
 	return &DocumentNavigationDecision{
 		QueryContextHints: []string{},
 		SoftSectionHints:  []string{},
 	}
-}
-
-// AddToolTrace 添加工具调用轨迹
-func (t *ChatDebugTrace) AddToolTrace(trace *ChatToolTrace) {
-	t.ToolTraces = append(t.ToolTraces, trace)
-}
-
-// AddModelUsageTrace 添加模型使用轨迹
-func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
-	t.ModelUsageTraces = append(t.ModelUsageTraces, trace)
-}
-
-// AddUsedChannel 添加使用的渠道
-func (t *ChatDebugTrace) AddUsedChannel(channel string) {
-	t.UsedChannels = append(t.UsedChannels, channel)
 }

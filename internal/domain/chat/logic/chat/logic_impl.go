@@ -7,17 +7,20 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	kllg "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -30,20 +33,28 @@ const (
 	channelBufferSize             = 100
 )
 
-// ChatLogicImpl 聊天业务逻辑实现
-type ChatLogicImpl struct {
+// LogicImpl 聊天业务逻辑实现
+type LogicImpl struct {
 	svcCtx             *svc.ServiceContext
 	repo               adapter.ChatRepository
+	orchestratorLogic  logic.ChatPreparationOrchestratorLogic
+	promptTempLogic    logic.PromptTemplateLogic
+	tracer             *trace.ConversationTraceRecorder
 	streamEventBuilder *support.StreamEventBuilder
 	runtimeRegistry    *support.ChatRuntimeRegistry
-	knowledgeLogic     logic.KnowledgeLogic
+	knowledgeLogic     kllg.KnowledgeLogic
 	distributedLock    adapter.DistributedLock
 }
 
 // NewChatLogic 创建聊天逻辑实例
-func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic logic.KnowledgeLogic, distributedLock adapter.DistributedLock) *ChatLogicImpl {
-	return &ChatLogicImpl{
+func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic kllg.KnowledgeLogic,
+	orchestratorLogic logic.ChatPreparationOrchestratorLogic, promptTempLogic logic.PromptTemplateLogic,
+	distributedLock adapter.DistributedLock) *LogicImpl {
+	return &LogicImpl{
 		repo:               repo,
+		orchestratorLogic:  orchestratorLogic,
+		promptTempLogic:    promptTempLogic,
+		tracer:             trace.NewConversationTraceRecorder(repo),
 		streamEventBuilder: &support.StreamEventBuilder{},
 		runtimeRegistry:    &support.ChatRuntimeRegistry{},
 		knowledgeLogic:     knowledgeLogic,
@@ -52,7 +63,7 @@ func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic logic.KnowledgeLog
 }
 
 // OpenConversationStream 打开会话流
-func (c *ChatLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string {
+func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string {
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("======request内容：%s", string(cmdJSON))
 
@@ -79,7 +90,7 @@ func (c *ChatLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.Chat
 }
 
 // ListKnowledgeDocumentOptions 获取知识文档选项列表
-func (c *ChatLogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
+func (c *LogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
 	return []*chat.KnowledgeDocumentOptionResp{
 		{DocumentId: 1, DocumentName: "产品手册.pdf"},
 		{DocumentId: 2, DocumentName: "技术文档.docx"},
@@ -88,7 +99,7 @@ func (c *ChatLogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*ch
 }
 
 // StopConversation 停止会话
-func (c *ChatLogicImpl) StopConversation(ctx context.Context, conversationId string) (*chat.ConversationStopResp, error) {
+func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string) (*chat.ConversationStopResp, error) {
 	convCtx, ok := c.runtimeRegistry.Get(conversationId)
 	if !ok {
 		return &chat.ConversationStopResp{Success: false}, fmt.Errorf("没有找到正在执行的会话")
@@ -98,7 +109,7 @@ func (c *ChatLogicImpl) StopConversation(ctx context.Context, conversationId str
 }
 
 // GetSession 获取会话详情
-func (c *ChatLogicImpl) GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
+func (c *LogicImpl) GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
 	return &chat.ConversationSessionResp{
 		ConversationId: conversationId,
 		Title:          "测试会话",
@@ -109,18 +120,12 @@ func (c *ChatLogicImpl) GetSession(ctx context.Context, conversationId string) (
 }
 
 // GetExchangeDetail 获取对话详情
-func (c *ChatLogicImpl) GetExchangeDetail(ctx context.Context, conversationId, exchangeId string) (*chat.ConversationExchangeDetailResp, error) {
-	return &chat.ConversationExchangeDetailResp{
-		ExchangeId:     exchangeId,
-		ConversationId: conversationId,
-		UserMessage:    "你好",
-		AgentMessage:   "你好，有什么可以帮助你的？",
-		CreateTime:     time.Now().Format(time.DateTime),
-	}, nil
+func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId, exchangeId string) (*chat.ConversationExchangeDetailResp, error) {
+	return &chat.ConversationExchangeDetailResp{}, nil
 }
 
 // ListSessions 获取会话列表
-func (c *ChatLogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
+func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
 	pageNo := req.PageNo
 	if pageNo <= 0 {
 		pageNo = 1
@@ -154,12 +159,12 @@ func (c *ChatLogicImpl) ListSessions(ctx context.Context, req *chat.Conversation
 }
 
 // ResetConversation 重置会话
-func (c *ChatLogicImpl) ResetConversation(ctx context.Context, conversationId string) (*chat.ConversationResetResp, error) {
+func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string) (*chat.ConversationResetResp, error) {
 	return &chat.ConversationResetResp{Success: true}, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
-func (c *ChatLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error) {
+func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error) {
 	return &chat.ConversationMemorySummaryResp{
 		ConversationId: conversationId,
 		Summary:        "这是会话的摘要内容",
@@ -167,21 +172,21 @@ func (c *ChatLogicImpl) RebuildConversationSummary(ctx context.Context, conversa
 }
 
 // GetRetrievalResults 获取检索结果
-func (c *ChatLogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.RetrievalResultResp, error) {
+func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.RetrievalResultResp, error) {
 	return []*chat.RetrievalResultResp{}, nil
 }
 
 // GetChannelExecutions 获取渠道执行结果
-func (c *ChatLogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.ChannelExecutionResp, error) {
+func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.ChannelExecutionResp, error) {
 	return []*chat.ChannelExecutionResp{}, nil
 }
 
 // GetStageBenchmarks 获取阶段基准
-func (c *ChatLogicImpl) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error) {
+func (c *LogicImpl) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error) {
 	return []*chat.StageBenchmarkResp{}, nil
 }
 
-func (c *ChatLogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
+func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
 	launchPlan := &vo.StreamLaunchPlan{
 		Question:       cmd.Question,
 		ConversationId: cmd.ConversationId,
@@ -207,7 +212,7 @@ func (c *ChatLogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand
 }
 
 // bootstrapConversation 启动会话
-func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) (<-chan string, error) {
+func (c *LogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) (<-chan string, error) {
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       launchPlan.ConversationId,
 		ChatMode:             launchPlan.ChatMode.Value(),
@@ -245,7 +250,7 @@ func (c *ChatLogicImpl) bootstrapConversation(ctx context.Context, launchPlan *v
 	return convCtx.Channel, nil
 }
 
-func (c *ChatLogicImpl) executeConversation(convCtx *vo.ConversationContext, stream chan<- string) {
+func (c *LogicImpl) executeConversation(convCtx *vo.ConversationContext, stream chan<- string) {
 	thinkingMsg := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.EventMetadata)
 	stream <- thinkingMsg
 
@@ -288,64 +293,8 @@ func (c *ChatLogicImpl) executeConversation(convCtx *vo.ConversationContext, str
 	stream <- recMsg
 }
 
-// PrepareExecutionPlan 准备对话执行计划
-func (c *ChatLogicImpl) PrepareExecutionPlan(convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
-	// 1. 调用编排器准备基础计划
-	executionPlan, err := chatPreparationOrchestrator.Prepare(context.Background(), convCtx)
-	if err != nil {
-		logx.Errorf("准备执行计划失败, conversationId=%s, exchangeId=%d, error=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
-		return nil, err
-	}
-
-	// 2. 设置 Agent 问题
-	executionPlan.AgentQuestion = buildAgentQuestion(executionPlan)
-
-	// 3. 如果选中的文档 ID 不为空，并且与 convCtx 中的不同，则更新会话范围并存入上下文
-	if executionPlan.SelectedDocumentId != nil &&
-		(convCtx.SelectedDocumentId == nil || *executionPlan.SelectedDocumentId != *convCtx.SelectedDocumentId) {
-
-		// 刷新会话范围（存储到数据库/缓存）
-		if conversationArchiveStore != nil {
-			err := conversationArchiveStore.RefreshSessionScope(
-				context.Background(),
-				convCtx.ConversationId,
-				executionPlan.ChatMode,
-				executionPlan.SelectedDocumentId,
-				executionPlan.SelectedDocumentName,
-			)
-			if err != nil {
-				logx.Warnf("刷新会话范围失败, conversationId=%s, error=%v", convCtx.ConversationId, err)
-				// 原 Java 未抛出异常，仅记录？这里也仅记录继续执行
-			}
-		}
-
-		// 将选中的文档/任务信息放入 runnableConfig 的上下文中
-		if convCtx.RunnableConfig.Context == nil {
-			convCtx.RunnableConfig.Context = make(map[string]interface{})
-		}
-		PutContextIfNotNull(convCtx.RunnableConfig.Context, "selectedDocumentId", executionPlan.SelectedDocumentId)
-		PutContextIfNotBlank(convCtx.RunnableConfig.Context, "selectedDocumentName", executionPlan.SelectedDocumentName)
-		PutContextIfNotNull(convCtx.RunnableConfig.Context, "selectedTaskId", executionPlan.SelectedTaskId)
-	}
-
-	// 4. 将执行计划存入 vo.ConversationContext
-	convCtx.SetExecutionPlan(executionPlan)
-
-	// 5. 初始化调试追踪并存入 vo.ConversationContext 和配置上下文
-	debugTrace := initializeDebugTrace(executionPlan)
-	convCtx.SetDebugTrace(debugTrace)
-
-	if convCtx.RunnableConfig.Context == nil {
-		convCtx.RunnableConfig.Context = make(map[string]interface{})
-	}
-	convCtx.RunnableConfig.Context["debugTrace"] = debugTrace
-
-	return executionPlan, nil
-}
-
 // activateGeneration 激活生成逻辑
-func (c *ChatLogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
@@ -378,7 +327,7 @@ func (c *ChatLogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conv
 }
 
 // startLeaseRenewal 启动租约续期
-func (c *ChatLogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.ConversationContext) {
 	ticker := time.NewTicker(chatRunningLeaseRenewInterval)
 	defer ticker.Stop()
 	for {
@@ -399,7 +348,7 @@ func (c *ChatLogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conve
 }
 
 // buildConversationExecution 构建对话执行函数
-func (c *ChatLogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
+func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
 	return func(ctx context.Context) {
 		// 发送“正在分析问题上下文”事件
 		metadata := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
@@ -413,7 +362,7 @@ func (c *ChatLogicImpl) buildConversationExecution(convCtx *vo.ConversationConte
 			panic(err)
 		}
 
-		// 获取执行器
+		// todo 获取执行器
 		executor := c.conversationExecutorRegistry.Get(plan.Mode)
 		if executor == nil {
 			c.finishWithFailure(ctx, convCtx, fmt.Errorf("no executor for mode %v", plan.Mode))
@@ -434,7 +383,7 @@ func (c *ChatLogicImpl) buildConversationExecution(convCtx *vo.ConversationConte
 }
 
 // emitModelChunk 发送模型输出块
-func (c *ChatLogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
+func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
 	convCtx.AnswerBuffer.WriteString(chunk)
 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
 
@@ -442,42 +391,66 @@ func (c *ChatLogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk st
 }
 
 // prepareExecutionPlan 准备执行计划
-func (c *ChatLogicImpl) prepareExecutionPlan(ctx context.Context, conversationCtx *vo.ConversationContext) (*plan.ConversationExecutionPlan, error) {
-	executionPlan, err := c.chatPreparationOrchestrator.Prepare(ctx, conversationCtx)
+func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
+	// 1. 调用编排器准备基础计划
+	execPlan, err := c.orchestratorLogic.Prepare(ctx, convCtx)
 	if err != nil {
+		logx.Errorf("准备执行计划失败, conversationId=%s, exchangeId=%d, error=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, err)
 		return nil, err
 	}
-	executionPlan.AgentQuestion = c.buildAgentQuestion(executionPlan)
 
-	if executionPlan.SelectedDocumentId != nil &&
-		(conversationCtx.SelectedDocumentId == nil || *executionPlan.SelectedDocumentId != *conversationCtx.SelectedDocumentId) {
-		// 刷新会话范围
-		c.conversationArchiveStore.RefreshSessionScope(ctx,
-			conversationCtx.ConversationId,
-			executionPlan.ChatMode,
-			executionPlan.SelectedDocumentId,
-			executionPlan.SelectedDocumentName,
-		)
-		// 更新上下文
-		putContextIfNotNull(conversationCtx.RunnableConfig.Context, "selectedDocumentId", executionPlan.SelectedDocumentId)
-		putContextIfNotBlank(conversationCtx.RunnableConfig.Context, "selectedDocumentName", executionPlan.SelectedDocumentName)
-		putContextIfNotNull(conversationCtx.RunnableConfig.Context, "selectedTaskId", executionPlan.SelectedTaskId)
+	variables := map[string]any{
+		"currentDateText":              execPlan.CurrentDateText,
+		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
+		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
+		"hasHistorySummary":            strutil.IsNotBlank(execPlan.HistorySummary),
+		"historySummary":               execPlan.HistorySummary,
+		"question":                     execPlan.OriginalQuestion,
+	}
+	agentQuestion, err := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
+	if err != nil {
+		logx.Errorf("渲染问题失败, conversationId=%s, exchangeId=%d, error=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, err)
+		return nil, err
 	}
 
-	conversationCtx.SetExecutionPlan(executionPlan)
-	debugTrace := c.initializeDebugTrace(executionPlan)
-	conversationCtx.SetDebugTrace(debugTrace)
-	conversationCtx.RunnableConfig.Context["debugTrace"] = debugTrace
-	return executionPlan, nil
+	// 2. 设置 Agent 问题
+	execPlan.AgentQuestion = agentQuestion
+
+	if execPlan.SelectedDocumentId > 0 && execPlan.SelectedDocumentId != convCtx.SelectedDocumentId {
+		dialogue := &entity.ChatDialogue{
+			ConversationId:       convCtx.ConversationId,
+			ChatMode:             execPlan.ChatMode.Value(),
+			SelectedDocumentId:   execPlan.SelectedDocumentId,
+			SelectedDocumentName: execPlan.SelectedDocumentName,
+		}
+		// 刷新会话范围
+		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
+			logx.Errorf("刷新会话范围失败, conversationId=%s, exchangeId=%d, error=%v",
+				convCtx.ConversationId, convCtx.ExchangeId, err)
+			return nil, err
+		}
+
+		// todo 更新上下文
+		// putContextIfNotNull(convCtx.RunnableConfig.Context, "selectedDocumentId", execPlan.SelectedDocumentId)
+		// putContextIfNotBlank(convCtx.RunnableConfig.Context, "selectedDocumentName", execPlan.SelectedDocumentName)
+		// putContextIfNotNull(convCtx.RunnableConfig.Context, "selectedTaskId", execPlan.SelectedTaskId)
+	}
+
+	convCtx.ExecutionPlan.Store(execPlan)
+	debugTrace := vo.NewChatDebugTrace(execPlan)
+	convCtx.DebugTrace.Store(debugTrace)
+	// convCtx.RunnableConfig.Context["debugTrace"] = debugTrace
+	return execPlan, nil
 }
 
 // stopTask 停止任务
-func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
+func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
 	// 原子地将 finalized 从 false 设置为 true，若已经是 true 则直接返回“会话已经结束”
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return &vo.ConversationStop{
 			ConversationId: convCtx.ConversationId,
-			Stopped:        false,
 			Message:        "会话已经结束",
 		}
 	}
@@ -486,7 +459,6 @@ func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationCo
 	if currentTask, exists := c.runtimeRegistry.Get(convCtx.ConversationId); exists && currentTask != convCtx {
 		return &vo.ConversationStop{
 			ConversationId: convCtx.ConversationId,
-			Stopped:        false,
 			Message:        "会话已由新的执行接管",
 		}
 	}
@@ -501,21 +473,20 @@ func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationCo
 		}
 	}
 
-	// 释放执行任务（disposable）
-	if execCancel := convCtx.GetExecutionCancel(); execCancel != nil {
+	// 释放执行任务
+	if execCancel := convCtx.CancelExecute; execCancel != nil {
 		execCancel()
-		convCtx.SetExecutionCancel(nil) // 避免重复调用
+		convCtx.CancelExecute = nil // 避免重复调用
 	}
 
 	// 准备停止响应的消息
 	responseMessage := "已停止会话生成"
 
-	// 开始追踪收尾阶段（如果 traceRecorder 存在）
-	var finalizeStage interface{} // 原 Java 中的 StageHandle 对象，这里用 interface{} 占位
-	if convCtx.TraceRecorder != nil {
-		// TODO: 调用 traceRecorder.StartStage，需要定义相应接口
-		// finalizeStage = convCtx.TraceRecorder.StartStage(...)
-		// 参数：ConversationTraceStage.FINALIZE, modeName, description, metadata
+	// 开始追踪收尾阶段
+	finalizeStage, err := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize, convCtx.ModeName, "正在收尾停止中的会话。", nil)
+	if err != nil {
+		logx.Errorf("开始追踪收尾阶段失败, conversationId=%s, exchangeId=%d, error=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 
 	// 辅助函数：安全发送状态事件
@@ -622,7 +593,7 @@ func (c *ChatLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationCo
 }
 
 // finishSuccessfully 成功完成处理
-func (c *ChatLogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
@@ -736,7 +707,7 @@ func (c *ChatLogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conv
 }
 
 // finishWithFailure 失败处理
-func (c *ChatLogicImpl) finishWithFailure(ctx context.Context, conversationCtx *vo.ConversationContext, err error) {
+func (c *LogicImpl) finishWithFailure(ctx context.Context, conversationCtx *vo.ConversationContext, err error) {
 	if !conversationCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
@@ -803,13 +774,13 @@ func (c *ChatLogicImpl) finishWithFailure(ctx context.Context, conversationCtx *
 }
 
 // buildErrorMessage 构建错误消息
-func (c *ChatLogicImpl) buildErrorMessage(err error) string {
+func (c *LogicImpl) buildErrorMessage(err error) string {
 	// 简化实现，可根据需要包装
 	return err.Error()
 }
 
 // refreshDebugTraceRuntimeStats 刷新调试追踪统计
-func (c *ChatLogicImpl) refreshDebugTraceRuntimeStats(conversationCtx *vo.ConversationContext) {
+func (c *LogicImpl) refreshDebugTraceRuntimeStats(conversationCtx *vo.ConversationContext) {
 	if conversationCtx.DebugTrace == nil || conversationCtx.TraceRecorder == nil {
 		return
 	}
@@ -840,14 +811,14 @@ func (c *ChatLogicImpl) refreshDebugTraceRuntimeStats(conversationCtx *vo.Conver
 // }
 
 // rejectStream 拒绝流式请求
-func (c *ChatLogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
+func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
 	stream := make(chan string, 1)
 	defer close(stream)
 	stream <- c.streamEventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
 	return stream
 }
 
-func (c *ChatLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
+func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
 	// todo runnableConfig := s.buildSessionConfig(plan.ConversationId)
 	// thinkingSteps := &syncSlice{data: make([]string, 0)}
 	// references := &syncSliceRef{data: make([]chat.SearchReference, 0)}
