@@ -1,0 +1,918 @@
+package chat
+
+import (
+	"context"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/cloudwego/eino/schema"
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/zeromicro/go-zero/core/logx"
+
+	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
+)
+
+var (
+	sectionCodePattern             = regexp.MustCompile(`(\d+(?:\.\d+)+)`)                     // 匹配 1.2 / 3.4.5 这类章节编号
+	chineseSectionReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(章|节|小节)`)  // 匹配 "第 3 章 / 第三节 / 第 4 小节"
+	stepReferencePattern           = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)         // 匹配 "第几步"，偏向结构图定位取证
+	ordinalReferencePattern        = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(条|点|项|个)`) // 匹配 "第几条/点/项/个"
+	quotedTextPattern              = regexp.MustCompile(`[“"']([^”"']{2,40})[”"']`)            // 匹配引号包裹的标题短语，例如 "上线观察"
+)
+
+// 意图分类所需的关键词短语
+var (
+	adjacencyHints       = []string{"上一节", "下一节", "前一节", "后一节", "上一章", "下一章", "前一章", "后一章", "上章", "下章", "上一个章节", "下一个章节", "属于哪个章节", "章节位置"}
+	outlineHints         = []string{"包含哪些章节", "都包含哪些章节", "有哪些章节", "有哪些小节", "包含哪些小节", "章节列表", "目录"}
+	outlineExplicitHints = []string{
+		"包含哪些章节", "都包含哪些章节", "有哪些章节", "有哪些小节", "包含哪些小节",
+		"章节列表", "小节列表", "子章节", "子小节", "下级章节", "展开目录", "列出目录",
+	}
+
+	itemHints               = []string{"哪一步", "哪一项", "第几步", "第几项", "具体步骤", "步骤中的"}
+	analyticStrongHints     = []string{"为什么", "原因", "可能原因", "影响", "区别", "对比", "比较", "如何理解", "怎么理解", "说明了什么", "是否意味着", "是否说明", "分析", "解释"}
+	analyticWeakHints       = []string{"关系", "关联", "联系", "相关"}
+	structuralRelationHints = []string{
+		"前后关系", "相邻关系", "上下级关系", "父子关系", "目录关系", "章节关系",
+		"所属关系", "位置关系", "顺序关系", "属于哪个章节", "上级章节", "下级章节",
+		"同级章节", "父章节", "子章节",
+	}
+
+	graphOnlyBlockingAnalyticHints = []string{
+		"为什么", "原因", "可能原因", "影响", "区别", "对比", "比较",
+		"如何理解", "怎么理解", "说明了什么", "是否意味着", "是否说明", "分析", "解释",
+	}
+	graphOnlyContentHints = []string{
+		"内容", "要求", "规定", "流程", "步骤", "处理", "执行",
+		"怎么做", "讲了什么", "写了什么", "说了什么",
+	}
+	graphOnlyDirectionHints = []string{
+		"前面", "后面", "上面", "下面", "之前", "之后", "此前", "随后", "后续", "接着", "紧接着",
+		"往前", "往后",
+		"前一个", "后一个", "上一个", "下一个", "上一", "下一", "相邻", "前后",
+		"顺序", "位置", "属于", "上级", "父章节", "同级",
+	}
+
+	// 用于明确相邻 / 目录动作的强信号
+	graphOnlyExplicitAdjacencyHints = []string{"前一个", "后一个", "上一个", "下一个", "上一", "下一", "相邻", "前后", "顺序", "位置", "属于", "上级", "父章节", "同级"}
+
+	graphOnlyStructureObjectHints = []string{"章节", "小节", "这章", "这节", "这部分", "这一章", "该章", "本章", "标题", "目录", "部分", "模块", "节点", "条目"}
+
+	graphOnlyOutlineActionHints = []string{"下面", "下级", "子章节", "子小节", "子项", "展开", "包含哪些", "包括哪些", "有哪些", "列出", "列一下", "组成", "目录"}
+
+	graphOnlyPronounAnchorHints = []string{"这个", "该", "它", "刚才", "上述", "上面"}
+
+	graphOnlyAdjacencyAnswerHints = []string{"哪一节", "哪一章", "哪个章节", "哪个小节", "哪个标题", "哪部分", "哪块"}
+)
+
+const graphOnlyIntentConfidenceThreshold = 0.75 // 判定的置信度阈值
+
+// ============================================================
+// 路由内的意图结构体（仅内部使用）
+// ============================================================
+
+// graphOnlyIntentDecision 是否进入 GRAPH_ONLY 的判定
+type graphOnlyIntentDecision struct {
+	matched    bool
+	action     string // SECTION_ADJACENCY_LOOKUP / CHILD_SECTION_DESCEND
+	confidence float64
+	reason     string
+	source     string // rule-adjacency-hint / rule-outline-hint / rule-section-code-direction / llm-xxx
+}
+
+// questionIntentDecision 文档问题意图分类结果
+type questionIntentDecision struct {
+	graphOnly     *graphOnlyIntentDecision
+	analytic      bool
+	outline       bool
+	itemLookup    bool
+	structureHint bool
+	contentHints  bool
+	confidence    float64
+	reason        string
+	source        string
+}
+
+// ============================================================
+// 构造函数
+// ============================================================
+
+// DocumentQuestionRouter 文档问题路由：在某个文档内部进行结构/意图判断并生成导航决策
+type DocumentQuestionRouter struct {
+	chatModel             *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	structureGraphQuerier vo2.StructureGraphQuerier
+	promptTemplateLogic   prompt.TemplateLogicImpl
+}
+
+// NewDocumentQuestionRouter 构造函数
+func NewDocumentQuestionRouter(structureGraphQuerier vo2.StructureGraphQuerier) *DocumentQuestionRouter {
+	return &DocumentQuestionRouter{structureGraphQuerier: structureGraphQuerier}
+}
+
+// Route 根据文档 ID、原问题与改写结果进行路由，返回导航决策
+func (r *DocumentQuestionRouter) Route(ctx context.Context, documentId int64, originalQuestion string, rewriteResult *vo.RagRewriteResult) (*vo.DocumentNavigationDecision, error) {
+	rewrittenQuestion := utils.BlankToDefault(
+		safeRewriteQuestion(rewriteResult),
+		strutil.Trim(originalQuestion),
+	)
+	subQuestions := normalizeSubQuestions(rewriteResult, rewrittenQuestion)
+	retrievalPlan := &vo.RetrievalQuestionPlan{
+		RetrievalQuestion: rewrittenQuestion,
+		SubQuestions:      subQuestions,
+	}
+	routeText := strings.TrimSpace(safeText(originalQuestion) + " " + rewrittenQuestion)
+
+	questionIntent := r.detectQuestionIntent(routeText, originalQuestion, rewrittenQuestion, subQuestions)
+	singleQuestionGraphOnlyMatched := questionIntent.graphOnly.matched && len(subQuestions) <= 1
+
+	if singleQuestionGraphOnlyMatched {
+		section := r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
+		return r.buildDecision(
+			vo.ExecutionModeGraphOnly,
+			questionIntent.graphOnly.action,
+			section,
+			nil,
+			retrievalPlan,
+			questionIntent.graphOnly.reason,
+		), nil
+	}
+
+	itemIndex := resolveExplicitItemIndex(routeText)
+	itemLookupMatched := itemIndex != nil || questionIntent.itemLookup
+	shouldUseGraphThenEvidence := itemLookupMatched && !questionIntent.analytic
+	if shouldUseGraphThenEvidence {
+		section := r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
+		return r.buildDecision(
+			vo.ExecutionModeGraphThenEvidence,
+			vo.DocumentNavigationActionItemReference,
+			section,
+			itemIndex,
+			retrievalPlan,
+			"编号项或步骤型问题走图定位取证",
+		), nil
+	}
+
+	var assistedSection *vo2.GraphSection
+	needsStructureAssistedRetrieval := questionIntent.analytic || questionIntent.outline || itemIndex != nil || questionIntent.structureHint
+	if needsStructureAssistedRetrieval {
+		assistedSection = r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
+	}
+
+	action := vo.DocumentNavigationActionFreshTopic
+	if itemIndex != nil {
+		action = vo.DocumentNavigationActionItemReference
+	}
+	reason := "普通文档问题走混合检索"
+	if assistedSection != nil {
+		reason = "结构线索仅作为软提示辅助混合检索"
+	}
+	return r.buildDecision(
+		vo.ExecutionModeRetrieval,
+		action,
+		assistedSection,
+		itemIndex,
+		retrievalPlan,
+		reason,
+	), nil
+}
+
+// ============================================================
+// 构建决策输出
+// ============================================================
+
+// buildDecision 将导航信息填入领域 VO
+func (r *DocumentQuestionRouter) buildDecision(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
+	decision := vo.NewDocumentNavigationDecision()
+	decision.ExecutionMode = mode
+	decision.NavigationAction = action
+	decision.RetrievalPlan = retrievalPlan
+
+	scopeMode := "SOFT"
+	if mode == vo.ExecutionModeGraphOnly {
+		scopeMode = "GRAPH"
+	} else if mode == vo.ExecutionModeRetrieval && section == nil {
+		scopeMode = "NONE"
+	}
+
+	if section != nil {
+		decision.StructureAnchor = &vo.ConversationStructureAnchor{
+			AnchorType:        "SECTION",
+			AnchorId:          section.NodeId,
+			AnchorName:        strutil.Trim(section.Title),
+			SectionTitle:      strutil.Trim(section.Title),
+			SectionNodeCode:   strutil.Trim(section.NodeNo),
+			CanonicalPath:     strutil.Trim(section.SectionPath()),
+			TargetSectionHint: strutil.Trim(section.DisplayTitle()),
+			ScopeMode:         scopeMode,
+		}
+	} else {
+		decision.StructureAnchor = &vo.ConversationStructureAnchor{
+			AnchorType: "SECTION",
+			ScopeMode:  scopeMode,
+		}
+	}
+	if itemIndex != nil {
+		decision.ItemAnchor = &vo.ConversationItemAnchor{
+			ItemId:   int64(*itemIndex),
+			ItemName: "第" + strconv.Itoa(*itemIndex) + "项",
+		}
+	}
+
+	decision.QueryContextHints = buildQueryHints(retrievalPlan, section, itemIndex)
+	decision.SoftSectionHints = buildSoftSectionHints(section)
+	decision.SummaryText = buildSummaryText(mode, action, section, itemIndex, reason)
+
+	logx.Infof("文档问答路由完成: documentId=%d, mode=%s, action=%s, section='%s', itemIndex=%+v, reason='%s'",
+		-1, modeName(mode), action, func() string {
+			if section != nil {
+				return section.DisplayTitle()
+			}
+			return ""
+		}(), itemIndex, reason)
+	return decision
+}
+
+// ============================================================
+// 问题意图识别
+// ============================================================
+
+// detectQuestionIntent 统一判断当前问题在 route 阶段需要的多个意图维度
+func (r *DocumentQuestionRouter) detectQuestionIntent(routeText, originalQuestion, rewrittenQuestion string, subQuestions []string) *questionIntentDecision {
+	normalized := safeText(routeText)
+	if strutil.IsBlank(normalized) {
+		return noQuestionIntentDecision("问题为空，跳过路由意图判断。")
+	}
+
+	itemLookup := looksExplicitItemQuestion(normalized)
+	analytic := looksAnalyticQuestion(normalized)
+	outline := asksOutline(normalized)
+	contentHints := mentionsContentHint(normalized)
+	structureHint := mentionsStructure(normalized) || hasGraphOnlyAnchor(normalized) || outline
+	graphOnly := noGraphOnlyIntent("本地规则未命中结构图直答意图。")
+
+	hasMultipleSubQuestions := len(subQuestions) > 1
+	canTryGraphOnlyRules := !hasMultipleSubQuestions && !itemLookup && !contentHints && !(analytic && containsAny(normalized, analyticStrongHints))
+	if canTryGraphOnlyRules {
+		graphOnly = r.detectGraphOnlyIntentByRules(normalized)
+	}
+
+	if graphOnly.matched {
+		return &questionIntentDecision{
+			graphOnly:     graphOnly,
+			analytic:      analytic,
+			outline:       outline || graphOnly.action == vo.DocumentNavigationActionChildSectionDescend,
+			itemLookup:    itemLookup,
+			structureHint: true,
+			contentHints:  contentHints,
+			confidence:    graphOnly.confidence,
+			reason:        graphOnly.reason,
+			source:        graphOnly.source,
+		}
+	}
+
+	// 未命中强规则时，使用本地中等置信度作为默认
+	return &questionIntentDecision{
+		graphOnly:     graphOnly,
+		analytic:      analytic,
+		outline:       outline,
+		itemLookup:    itemLookup,
+		structureHint: structureHint,
+		contentHints:  contentHints,
+		confidence:    0.65,
+		reason:        "本地路由意图规则判断完成。",
+		source:        "local-rules",
+	}
+}
+
+// detectGraphOnlyIntentByRules 根据本地规则判断是否允许进入 GRAPH_ONLY
+func (r *DocumentQuestionRouter) detectGraphOnlyIntentByRules(question string) *graphOnlyIntentDecision {
+	if containsAny(question, adjacencyHints) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			confidence: 1.0,
+			reason:     "命中明确相邻章节表达，结构型问题直接走图查询。",
+			source:     "rule-adjacency-hint",
+		}
+	}
+	hasSectionCode := sectionCodePattern.MatchString(question)
+	hasChineseReference := chineseSectionReferencePattern.MatchString(question)
+	hasSectionReference := hasSectionCode || hasChineseReference
+	hasExplicitAdjacency := containsAny(question, graphOnlyExplicitAdjacencyHints)
+	hasAdjacencyAnswerTarget := containsAny(question, graphOnlyAdjacencyAnswerHints)
+	if hasSectionReference && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			confidence: 0.92,
+			reason:     "命中章节编号与方向词组合，结构相邻关系问题走图查询。",
+			source:     "rule-section-code-direction",
+		}
+	}
+	if quotedTitleMatches(question) && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			confidence: 0.9,
+			reason:     "命中标题锚点与方向词组合，结构相邻关系问题走图查询。",
+			source:     "rule-quoted-title-direction",
+		}
+	}
+	if containsAny(question, graphOnlyStructureObjectHints) && containsAny(question, graphOnlyOutlineActionHints) && containsAny(question, graphOnlyAdjacencyAnswerHints) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			confidence: 0.88,
+			reason:     "命中指代锚点、方向词和章节答案目标，结构相邻关系问题走图查询。",
+			source:     "rule-pronoun-direction-answer",
+		}
+	}
+	if containsAny(question, graphOnlyStructureObjectHints) && containsAny(question, graphOnlyExplicitAdjacencyHints) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			confidence: 0.86,
+			reason:     "命中结构对象与方向关系组合，结构相邻关系问题走图查询。",
+			source:     "rule-structure-direction",
+		}
+	}
+	if asksOutline(question) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionChildSectionDescend,
+			confidence: 1.0,
+			reason:     "命中明确章节展开表达，结构型问题直接走图查询。",
+			source:     "rule-outline-hint",
+		}
+	}
+	if hasGraphOnlyAnchor(question) && containsAny(question, graphOnlyOutlineActionHints) {
+		return &graphOnlyIntentDecision{
+			matched:    true,
+			action:     vo.DocumentNavigationActionChildSectionDescend,
+			confidence: 0.86,
+			reason:     "命中章节锚点与目录展开动作，结构型问题直接走图查询。",
+			source:     "rule-outline-action",
+		}
+	}
+	return noGraphOnlyIntent("本地规则未命中结构图直答意图。")
+}
+
+// ============================================================
+// 章节定位
+// ============================================================
+
+// resolveSection 依次：章节编号 -> 索引 -> 本地短语打分 -> 兜底 bestSection
+func (r *DocumentQuestionRouter) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *vo2.GraphSection {
+	if r.structureGraphQuerier == nil || documentId == 0 {
+		return nil
+	}
+	byCode := r.resolveBySectionCode(ctx, documentId, originalQuestion, rewrittenQuestion)
+	if byCode != nil {
+		return byCode
+	}
+	phrases := r.buildSectionPhrases(originalQuestion, rewrittenQuestion)
+	localMatch := r.resolveByLocalStructure(ctx, documentId, phrases)
+	if localMatch != nil {
+		return localMatch
+	}
+	section, err := r.structureGraphQuerier.FindBestSection(ctx, documentId, rewrittenQuestion, "")
+	if err != nil {
+		Warnf("FindBestSection 调用失败: documentId=%d, err=%v", documentId, err)
+		return nil
+	}
+	return section
+}
+
+// resolveBySectionCode 从问题文本中抽取章节编号进行定位
+func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *vo2.GraphSection {
+	if r.structureGraphQuerier == nil {
+		return nil
+	}
+	combined := safeText(originalQuestion) + " " + safeText(rewrittenQuestion)
+
+	// 1) 1.2.3 类编号
+	for _, code := range sectionCodePattern.FindAllString(combined, -1) {
+		section, err := r.structureGraphQuerier.FindSectionByCode(ctx, documentId, code)
+		if err == nil && section != nil {
+			return section
+		}
+	}
+	// 2) 中文编号引用：第 3 章 / 第三节
+	for _, m := range chineseSectionReferencePattern.FindAllStringSubmatch(combined, -1) {
+		if len(m) < 2 {
+			continue
+		}
+		parsed := parseChineseNumber(m[1])
+		if parsed <= 0 {
+			continue
+		}
+		code := strconv.Itoa(parsed)
+		section, err := r.structureGraphQuerier.FindSectionByCode(ctx, documentId, code)
+		if err == nil && section != nil {
+			return section
+		}
+	}
+	return nil
+}
+
+// resolveByLocalStructure 在章节列表上用本地关键词打分；得分 >= 45 才返回
+func (r *DocumentQuestionRouter) resolveByLocalStructure(ctx context.Context, documentId int64, phrases []string) *vo2.GraphSection {
+	if r.structureGraphQuerier == nil || len(phrases) == 0 {
+		return nil
+	}
+	sections, err := r.structureGraphQuerier.ListSections(ctx, documentId)
+	if err != nil || len(sections) == 0 {
+		return nil
+	}
+
+	type scored struct {
+		section *vo2.GraphSection
+		score   float64
+	}
+	candidates := make([]*scored, 0, len(sections))
+	for _, s := range sections {
+		if s == nil {
+			continue
+		}
+		score := scoreSection(s, phrases)
+		if score >= 45 {
+			candidates = append(candidates, &scored{section: s, score: score})
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+	return candidates[0].section
+}
+
+// ============================================================
+// 短语抽取与打分
+// ============================================================
+
+// buildSectionPhrases 组装用于章节匹配的短语列表（上限 8）
+func (r *DocumentQuestionRouter) buildSectionPhrases(originalQuestion, rewrittenQuestion string) []string {
+	seen := make(map[string]struct{})
+	phrases := make([]string, 0, 8)
+	addIfAbsent := func(p string) {
+		cleaned := cleanPhrase(p)
+		if strutil.IsBlank(cleaned) {
+			return
+		}
+		if _, ok := seen[cleaned]; ok {
+			return
+		}
+		seen[cleaned] = struct{}{}
+		phrases = append(phrases, cleaned)
+	}
+	addIfAbsent(originalQuestion)
+	addIfAbsent(rewrittenQuestion)
+	for _, q := range extractQuotedPhrases(originalQuestion) {
+		addIfAbsent(q)
+	}
+	for _, q := range extractQuotedPhrases(rewrittenQuestion) {
+		addIfAbsent(q)
+	}
+	combined := safeText(originalQuestion) + " " + safeText(rewrittenQuestion)
+	for _, marker := range adjacencyHints {
+		addIfAbsent(textBeforeMarker(combined, marker))
+	}
+	for _, marker := range outlineHints {
+		addIfAbsent(textBeforeMarker(combined, marker))
+	}
+	for _, step := range stepReferencePattern.FindAllString(combined, -1) {
+		addIfAbsent(strings.TrimSpace(step))
+	}
+	return phrases
+}
+
+// scoreSection 对单个章节按标题/路径/锚/正文叠加打分
+func scoreSection(section *vo2.GraphSection, phrases []string) float64 {
+	if section == nil || len(phrases) == 0 {
+		return 0
+	}
+	title := normalizeForSection(section.Title)
+	path := normalizeForSection(section.SectionPath())
+	anchor := normalizeForSection(section.AnchorText())
+	content := normalizeForSection(section.ContentText)
+
+	var best float64
+	for _, phrase := range phrases {
+		normalized := normalizeForSection(phrase)
+		if len(normalized) < 2 {
+			continue
+		}
+		if path != "" && strings.Contains(path, normalized) {
+			if v := 100.0 + float64(len(normalized)); v > best {
+				best = v
+			}
+		}
+		if title != "" && strings.Contains(title, normalized) {
+			if v := 90.0 + float64(len(normalized)); v > best {
+				best = v
+			}
+		}
+		if anchor != "" && strings.Contains(anchor, normalized) {
+			if v := 80.0 + float64(len(normalized)); v > best {
+				best = v
+			}
+		}
+		if content != "" && strings.Contains(content, normalized) {
+			if v := 45.0 + float64(min(len(normalized), 20)); v > best {
+				best = v
+			}
+		}
+	}
+	return best
+}
+
+// ============================================================
+// 小工具函数
+// ============================================================
+
+func normalizeSubQuestions(rewriteResult *vo.RagRewriteResult, fallback string) []string {
+	if rewriteResult == nil || len(rewriteResult.SubQuestions) == 0 {
+		return []string{strutil.Trim(fallback)}
+	}
+	out := make([]string, 0, len(rewriteResult.SubQuestions))
+	seen := make(map[string]struct{})
+	for _, q := range rewriteResult.SubQuestions {
+		trimmed := strutil.Trim(q)
+		if strutil.IsNotBlank(trimmed) {
+			if _, ok := seen[trimmed]; !ok {
+				seen[trimmed] = struct{}{}
+				out = append(out, trimmed)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return []string{strutil.Trim(fallback)}
+	}
+	return out
+}
+
+func resolveExplicitItemIndex(question string) *int {
+	for _, match := range stepReferencePattern.FindAllStringSubmatch(question, -1) {
+		if len(match) >= 2 {
+			v := parseChineseNumber(match[1])
+			if v > 0 {
+				return &v
+			}
+		}
+	}
+	for _, match := range ordinalReferencePattern.FindAllStringSubmatch(question, -1) {
+		if len(match) >= 2 {
+			v := parseChineseNumber(match[1])
+			if v > 0 {
+				return &v
+			}
+		}
+	}
+	return nil
+}
+
+// parseChineseNumber 将阿拉伯数字或常见中文数字（一/二 ... 十）解析为整数
+func parseChineseNumber(raw string) int {
+	cleaned := strutil.Trim(raw)
+	if strutil.IsBlank(cleaned) {
+		return 0
+	}
+	// 纯数字
+	if n, err := strconv.Atoi(cleaned); err == nil {
+		return n
+	}
+	// 中文数字映射
+	digitMap := map[rune]int{
+		'一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+		'六': 6, '七': 7, '八': 8, '九': 9,
+	}
+	if cleaned == "十" {
+		return 10
+	}
+	runes := []rune(cleaned)
+	if len(runes) == 2 && runes[0] == '十' {
+		if v, ok := digitMap[runes[1]]; ok {
+			return 10 + v
+		}
+	}
+	if len(runes) == 2 && runes[1] == '十' {
+		if v, ok := digitMap[runes[0]]; ok {
+			return v * 10
+		}
+	}
+	if len(runes) == 3 && runes[1] == '十' {
+		if a, ok1 := digitMap[runes[0]]; ok1 {
+			if b, ok2 := digitMap[runes[2]]; ok2 {
+				return a*10 + b
+			}
+		}
+	}
+	if len(runes) == 1 {
+		if v, ok := digitMap[runes[0]]; ok {
+			return v
+		}
+	}
+	return 0
+}
+
+func looksExplicitItemQuestion(question string) bool {
+	if containsAny(question, itemHints) {
+		return true
+	}
+	return resolveExplicitItemIndex(question) != nil
+}
+
+func looksAnalyticQuestion(question string) bool {
+	if containsAny(question, analyticStrongHints) {
+		return true
+	}
+	if !containsAny(question, analyticWeakHints) {
+		return false
+	}
+	return !looksStructuralRelationQuestion(question)
+}
+
+func looksStructuralRelationQuestion(question string) bool {
+	if containsAny(question, structuralRelationHints) {
+		return true
+	}
+	if !hasGraphOnlyAnchor(question) {
+		return false
+	}
+	return containsAny(question, graphOnlyExplicitAdjacencyHints)
+}
+
+func mentionsStructure(question string) bool {
+	normalized := safeText(question)
+	if strutil.IsBlank(normalized) {
+		return false
+	}
+	if strings.Contains(normalized, "章节") || strings.Contains(normalized, "小节") ||
+		strings.Contains(normalized, "条目") || strings.Contains(normalized, "步骤") || strings.Contains(normalized, "项") {
+		return true
+	}
+	if quotedTextPattern.MatchString(normalized) {
+		return true
+	}
+	return sectionCodePattern.MatchString(normalized)
+}
+
+func hasGraphOnlyAnchor(question string) bool {
+	if sectionCodePattern.MatchString(question) {
+		return true
+	}
+	if chineseSectionReferencePattern.MatchString(question) {
+		return true
+	}
+	if quotedTextPattern.MatchString(question) {
+		return true
+	}
+	if containsAny(question, graphOnlyStructureObjectHints) {
+		return true
+	}
+	return false
+}
+
+func mentionsContentHint(question string) bool {
+	normalized := safeText(question)
+	if strutil.IsBlank(normalized) {
+		return false
+	}
+	hints := []string{"内容", "要求", "规定", "流程", "步骤", "处理", "执行", "怎么做", "讲了什么", "写了什么", "说了什么"}
+	return containsAny(normalized, hints)
+}
+
+func asksOutline(question string) bool {
+	normalized := safeText(question)
+	if strutil.IsBlank(normalized) {
+		return false
+	}
+	if mentionsContentHint(normalized) {
+		return false
+	}
+	if containsAny(normalized, outlineHints) {
+		return true
+	}
+	if hasGraphOnlyAnchor(normalized) && containsAny(normalized, graphOnlyOutlineActionHints) {
+		return true
+	}
+	return false
+}
+
+func containsAny(question string, candidates []string) bool {
+	normalized := safeText(question)
+	if strutil.IsBlank(normalized) || len(candidates) == 0 {
+		return false
+	}
+	for _, c := range candidates {
+		if strutil.IsBlank(c) {
+			continue
+		}
+		if strings.Contains(normalized, c) {
+			return true
+		}
+	}
+	return false
+}
+
+func firstNonBlank(a, b string) string {
+	if strutil.IsNotBlank(a) {
+		return strutil.Trim(a)
+	}
+	return strutil.Trim(b)
+}
+
+func normalizeForSection(text string) string {
+	if strutil.IsBlank(text) {
+		return ""
+	}
+	replacer := strings.NewReplacer(
+		" ", "", "\t", "", "、", "", "，", "", "。", "", ";", "",
+		"“", "", "”", "", "\"", "", "'", "", "-", "", "：", "", "：", "",
+	)
+	return strings.ToLower(replacer.Replace(text))
+}
+
+func cleanPhrase(text string) string {
+	cleaned := strutil.Trim(text)
+	if strutil.IsBlank(cleaned) {
+		return ""
+	}
+	noise := []string{
+		"刚才说的", "请问", "帮我", "这个", "那个", "所属的具体章节", "所属章节",
+		"具体章节", "章节", "小节", "目录", "上一节", "下一节", "分别是什么",
+		"是什么", "有哪些", "都有哪些", "包含哪些", "中的", "里面的", "里的", "中",
+		"“", "”", "?", "？",
+	}
+	for _, n := range noise {
+		cleaned = strings.ReplaceAll(cleaned, n, "")
+	}
+	return strutil.Trim(cleaned)
+}
+
+func extractQuotedPhrases(text string) []string {
+	matches := quotedTextPattern.FindAllStringSubmatch(strutil.Trim(text), -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
+		if len(m) >= 2 {
+			out = append(out, strutil.Trim(m[1]))
+		}
+	}
+	return out
+}
+
+func textBeforeMarker(text, marker string) string {
+	if strutil.IsBlank(text) || strutil.IsBlank(marker) {
+		return ""
+	}
+	idx := strings.Index(text, marker)
+	if idx <= 0 {
+		return ""
+	}
+	return strutil.Trim(text[:idx])
+}
+
+func quotedTitleMatches(text string) bool {
+	return quotedTextPattern.MatchString(strutil.Trim(text))
+}
+
+// ============================================================
+// 构造决策输出辅助
+// ============================================================
+
+func buildQueryHints(retrievalPlan *vo.RetrievalQuestionPlan, section *vo2.GraphSection, itemIndex *int) []string {
+	seen := make(map[string]struct{})
+	hints := make([]string, 0, 10)
+	add := func(h string) {
+		h = strutil.Trim(h)
+		if strutil.IsBlank(h) {
+			return
+		}
+		if _, ok := seen[h]; ok {
+			return
+		}
+		seen[h] = struct{}{}
+		hints = append(hints, h)
+	}
+
+	if retrievalPlan != nil {
+		if strutil.IsNotBlank(retrievalPlan.RetrievalQuestion) {
+			add(retrievalPlan.RetrievalQuestion)
+		}
+		for _, sub := range retrievalPlan.SubQuestions {
+			add(sub)
+		}
+		for _, term := range splitRoughTerms(retrievalPlan.RetrievalQuestion) {
+			add(term)
+		}
+	}
+	if section != nil {
+		add(section.DisplayTitle())
+		add(section.AnchorText())
+		add(section.NodeNo)
+	}
+	if itemIndex != nil {
+		add("第" + strconv.Itoa(*itemIndex) + "步")
+		add("第" + strconv.Itoa(*itemIndex) + "项")
+	}
+	return hints
+}
+
+// splitRoughTerms 将问题按常见分隔符切分为关键词
+func splitRoughTerms(text string) []string {
+	cleaned := safeText(text)
+	if strutil.IsBlank(cleaned) {
+		return nil
+	}
+	seps := []string{" ", "、", "，", ",", ";", "；", ":", "：", "的", "和", "及", "与", "或"}
+	working := cleaned
+	for _, sep := range seps {
+		working = strings.ReplaceAll(working, sep, "|")
+	}
+	raw := strings.Split(working, "|")
+	out := make([]string, 0, len(raw))
+	seen := make(map[string]struct{})
+	for _, r := range raw {
+		t := strutil.Trim(r)
+		if strutil.IsBlank(t) || len(t) < 2 {
+			continue
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	limit := 6
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func buildSoftSectionHints(section *vo2.GraphSection) []string {
+	if section == nil {
+		return []string{}
+	}
+	title := strutil.Trim(section.DisplayTitle())
+	if strutil.IsBlank(title) {
+		return []string{}
+	}
+	return []string{title}
+}
+
+func buildSummaryText(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, reason string) string {
+	sectionTitle := ""
+	if section != nil {
+		sectionTitle = section.DisplayTitle()
+	}
+	itemIndexStr := ""
+	if itemIndex != nil {
+		itemIndexStr = strconv.Itoa(*itemIndex)
+	}
+	return "mode=" + modeName(mode) + "; action=" + action + "; section=" + sectionTitle + "; itemIndex=" + itemIndexStr + "; reason=" + strutil.Trim(reason)
+}
+
+func modeName(mode vo.ExecutionMode) string {
+	if mode == nil {
+		return "retrieval"
+	}
+	return mode.Name()
+}
+
+// ============================================================
+// 空意图决策构造器
+// ============================================================
+
+func noGraphOnlyIntent(reason string) *graphOnlyIntentDecision {
+	return &graphOnlyIntentDecision{
+		matched:    false,
+		action:     "",
+		confidence: 0,
+		reason:     reason,
+		source:     "none",
+	}
+}
+
+func noQuestionIntentDecision(reason string) *questionIntentDecision {
+	return &questionIntentDecision{
+		graphOnly:     noGraphOnlyIntent(reason),
+		analytic:      false,
+		outline:       false,
+		itemLookup:    false,
+		structureHint: false,
+		contentHints:  false,
+		confidence:    0,
+		reason:        reason,
+		source:        "none",
+	}
+}
