@@ -21,17 +21,17 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// ObservedChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
-type ObservedChatModelImpl[M adk.MessageType] struct {
+// ChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
+type ChatModelImpl[M adk.MessageType] struct {
 	chatModel      model.BaseModel[M]
 	config         *config.LLMConf
 	defaultOptions *model.Options
 }
 
 // NewObservedChatModelImpl 创建可观测聊天模型实例
-func NewObservedChatModelImpl[M adk.MessageType](svcCtx *svc.ServiceContext, chatModel model.BaseModel[M]) *ObservedChatModelImpl[M] {
+func NewObservedChatModelImpl[M adk.MessageType](svcCtx *svc.ServiceContext, chatModel model.BaseModel[M]) *ChatModelImpl[M] {
 	conf := svcCtx.Config.ChatModel[resolveProvider(chatModel)]
-	return &ObservedChatModelImpl[M]{
+	return &ChatModelImpl[M]{
 		chatModel: chatModel,
 		config:    conf,
 		defaultOptions: &model.Options{
@@ -44,7 +44,7 @@ func NewObservedChatModelImpl[M adk.MessageType](svcCtx *svc.ServiceContext, cha
 }
 
 // Generate 同步调用模型，返回文本响应
-func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
+func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
 	// 调用底层模型执行生成
 	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
 	if err != nil {
@@ -58,7 +58,7 @@ func (o *ObservedChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, u
 }
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
-func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (string, error) {
+func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (string, error) {
 	startTime := time.Now()
 
 	// 记录当前阶段的调用选项日志
@@ -88,7 +88,7 @@ func (o *ObservedChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage,
 }
 
 // StreamWithTrace 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
+func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
 	startTime := time.Now()
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
@@ -156,7 +156,7 @@ func (o *ObservedChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, s
 }
 
 // buildPrompt 构建提示词
-func (o *ObservedChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
+func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 	if userPrompt == "" {
 		panic("userPrompt is empty")
 	}
@@ -182,7 +182,7 @@ func (o *ObservedChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) 
 }
 
 // logStageCallOptions 记录阶段调用选项日志
-func (o *ObservedChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Option) {
+func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Option) {
 	provider := resolveProvider(o.chatModel)
 	modelName := utils.PointerOrDefault(o.defaultOptions.Model, "")
 	if len(opts) == 0 {
@@ -212,7 +212,7 @@ func appendUsage(trace *vo.ConversationTrace, usageTrace *vo.ChatModelUsageTrace
 }
 
 // buildUsageTrace 构建使用量轨迹
-func (o *ObservedChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Time, status, systemPrompt, userPrompt, responseText string) *vo.ChatModelUsageTrace {
+func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Time, status, systemPrompt, userPrompt, responseText string) *vo.ChatModelUsageTrace {
 	provider := resolveProvider(o.chatModel)
 	tokenUsage := resolveTokenUsage(resp)
 
@@ -291,7 +291,7 @@ func resolveProvider[M adk.MessageType](chatModel model.BaseModel[M]) string {
 }
 
 // estimateCost 估算调用成本
-func (o *ObservedChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) float64 {
+func (o *ChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) float64 {
 	if promptTokens <= 0 && completionTokens <= 0 {
 		return 0
 	}

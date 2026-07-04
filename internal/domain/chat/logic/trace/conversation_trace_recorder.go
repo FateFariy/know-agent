@@ -3,8 +3,11 @@ package trace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
@@ -28,9 +31,10 @@ func (t *ConversationTraceRecorder) StartStage(ctx context.Context, trace *vo.Co
 	if trace == nil {
 		return nil, nil
 	}
+	conversationId := trace.ConversationId()
 	stage := &entity.ChatExchangeTraceStage{
 		ID:             utils.GetSnowflakeNextID(),
-		ConversationId: trace.ConversationId(),
+		ConversationId: conversationId,
 		ExchangeId:     trace.ExchangeId(),
 		TraceId:        trace.TraceId(),
 		StageCode:      stageCode.Code,
@@ -43,12 +47,14 @@ func (t *ConversationTraceRecorder) StartStage(ctx context.Context, trace *vo.Co
 		SnapshotJson:   utils.Pointer(t.snapshot(snapshot)),
 	}
 	if err := t.repo.InsertStage(ctx, stage); err != nil {
+		logx.Alert(fmt.Sprintf("插入阶段信息失败: conversationId=%s err=%v", conversationId, err))
 		return nil, err
 	}
 	return &vo.StageHandle{
-		StageId:   stage.ID,
-		StartTime: time.Now(),
-		StageCode: stageCode,
+		StageId:        stage.ID,
+		ConversationId: conversationId,
+		StartTime:      time.Now(),
+		StageCode:      stageCode,
 	}, nil
 }
 
@@ -77,7 +83,11 @@ func (t *ConversationTraceRecorder) updateStage(ctx context.Context, stageHandle
 		SnapshotJson: utils.Pointer(t.snapshot(snapshot)),
 		EndTime:      time.Now(),
 	}
-	return t.repo.UpdateStageById(ctx, stage)
+	if err := t.repo.UpdateStageById(ctx, stage); err != nil {
+		logx.Alert(fmt.Sprintf("更新阶段信息失败: conversationId=%s err=%v", stageHandle.ConversationId, err))
+		return err
+	}
+	return nil
 }
 
 // snapshot 获取快照

@@ -24,7 +24,7 @@ type GraphThenEvidenceExecutor struct {
 	structureQuerier   ragvo.StructureGraphQuerier
 	ragRetriever       ragvo.RagRetriever
 	ragPromptAssembler ragvo.RagPromptAssembler
-	chatModel          logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
 }
 
@@ -33,7 +33,7 @@ func NewGraphThenEvidenceExecutor(
 	structureQuerier ragvo.StructureGraphQuerier,
 	ragRetriever ragvo.RagRetriever,
 	ragPromptAssembler ragvo.RagPromptAssembler,
-	chatModel logic.ObservedChatModelImpl[*schema.AgenticMessage],
+	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *GraphThenEvidenceExecutor {
 	return &GraphThenEvidenceExecutor{
@@ -62,13 +62,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	publishThinking(convCtx, "正在定位目标章节/项，再基于对应内容回答你的问题。")
 
 	// 结构图查询阶段
-	graphStage, err := e.tracer.StartStage(
-		ctx, convCtx.Trace,
-		vo.ConversationTraceStageGraphQuery,
-		e.Mode().String(),
-		"正在查询结构图以定位锚点。",
-		nil,
-	)
+	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在查询结构图以定位锚点。", nil)
 
 	decision := plan.NavigationDecision
 	var (
@@ -100,7 +94,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	graphResult, err := e.structureQuerier.BuildGraphResult(ctx, plan.SelectedDocumentId, sectionNodeId, itemIndex, keyword)
 	if err != nil {
 		logx.Errorf("结构图查询失败: conversationId=%s error=%v", convCtx.ConversationId, err)
-		e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
+		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return err
 	}
@@ -121,8 +115,8 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	}
 
 	// 证据检索阶段
-	retrieveStage := startTraceStage(
-		ctx, e.tracer, convCtx.Trace,
+	retrieveStage, _ := e.tracer.StartStage(
+		ctx, convCtx.Trace,
 		vo.ConversationTraceStageRAGRetrieve,
 		e.Mode().String(),
 		"正在根据结构图线索检索证据。",
@@ -131,19 +125,17 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	retrievalCtx, err := e.ragRetriever.Retrieve(ctx, plan, convCtx.Trace)
 	if err != nil {
 		logx.Errorf("RAG 检索失败: conversationId=%s error=%v", convCtx.ConversationId, err)
-		e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil)
+		_ = e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return err
 	}
-	e.tracer.CompleteStage(ctx, retrieveStage,
-		"证据检索完成。",
-		map[string]any{
-			"referenceCount":   len(retrievalCtx.FlattenReferences()),
-			"usedChannels":     retrievalCtx.GetUsedChannels(),
-			"retrievalNotes":   retrievalCtx.GetRetrievalNotes(),
-			"subQuestionCount": len(retrievalCtx.SubQuestionEvidenceList),
-		},
-	)
+	snapshot := map[string]any{
+		"referenceCount":   len(retrievalCtx.FlattenReferences()),
+		"usedChannels":     retrievalCtx.GetUsedChannels(),
+		"retrievalNotes":   retrievalCtx.GetRetrievalNotes(),
+		"subQuestionCount": len(retrievalCtx.SubQuestionEvidenceList),
+	}
+	_ = e.tracer.CompleteStage(ctx, retrieveStage, "证据检索完成。", snapshot)
 
 	// 注入引用
 	uniqueRefs := flattenRagReferencesSnapshot(retrievalCtx.FlattenReferences())
@@ -163,27 +155,19 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	publishThinking(convCtx, "已整理结构图与检索证据，正在生成回答。")
 
 	// Prompt 装配
-	budgetStage, err := e.tracer.StartStage(
-		ctx, convCtx.Trace,
-		vo.ConversationTraceStageEvidenceBudget,
-		e.Mode().Name(),
-		"正在组装证据与 Prompt。",
-		nil,
-	)
+	budgetStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageEvidenceBudget, e.Mode().Name(), "正在组装证据与 Prompt。", nil)
 	promptResult, err := e.ragPromptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
 		logx.Errorf("Prompt 组装失败: conversationId=%s err=%v", convCtx.ConversationId, err)
-		e.tracer.FailStage(ctx, budgetStage, "Prompt 组装失败。", err, nil)
+		_ = e.tracer.FailStage(ctx, budgetStage, "Prompt 组装失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return err
 	}
-	e.tracer.CompleteStage(ctx, budgetStage,
-		"Prompt 组装完成。",
-		map[string]any{
-			"renderedReferenceCount": promptResult.RenderedReferenceCount,
-			"omittedReferenceCount":  promptResult.OmittedReferenceCount,
-		},
-	)
+	snapshot = map[string]any{
+		"renderedReferenceCount": promptResult.RenderedReferenceCount,
+		"omittedReferenceCount":  promptResult.OmittedReferenceCount,
+	}
+	_ = e.tracer.CompleteStage(ctx, budgetStage, "Prompt 组装完成。", snapshot)
 
 	// 模型流式回答
 	answerStage, err := e.tracer.StartStage(
@@ -218,12 +202,10 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		}
 	}
 
-	e.tracer.CompleteStage(ctx, answerStage,
-		"答案生成完成。",
-		map[string]any{
-			"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-			"answerLength":        convCtx.AnswerBuffer.Len(),
-		},
-	)
+	snapshot = map[string]any{
+		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
+		"answerLength":        convCtx.AnswerBuffer.Len(),
+	}
+	_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", snapshot)
 	return nil
 }

@@ -21,7 +21,7 @@ import (
 type RagChatExecutor struct {
 	ragRetriever       ragvo.RagRetriever
 	ragPromptAssembler ragvo.RagPromptAssembler
-	chatModel          logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
 }
 
@@ -29,7 +29,7 @@ type RagChatExecutor struct {
 func NewRagChatExecutor(
 	ragRetriever ragvo.RagRetriever,
 	ragPromptAssembler ragvo.RagPromptAssembler,
-	chatModel logic.ObservedChatModelImpl[*schema.AgenticMessage],
+	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *RagChatExecutor {
 	return &RagChatExecutor{

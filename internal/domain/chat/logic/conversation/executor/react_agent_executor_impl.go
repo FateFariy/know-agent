@@ -46,13 +46,8 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 
 	publishThinking(convCtx, "问题涉及多方面信息，交由 ReAct Agent 综合回答。")
 
-	agentStage, err := e.tracer.StartStage(
-		ctx, convCtx.Trace,
-		vo.ConversationTraceStageReActAgent,
-		e.Mode().String(),
-		"ReAct Agent 正在思考与执行。",
-		nil,
-	)
+	agentStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
+		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
 
 	streamCh, err := e.reactAgentService.Stream(ctx, plan.OriginalQuestion)
 	if err != nil {
@@ -79,12 +74,10 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 		}
 	}
 
-	e.tracer.CompleteStage(ctx, agentStage,
-		"ReAct Agent 回答完成。",
-		map[string]any{
-			"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-			"answerLength":        convCtx.AnswerBuffer.Len(),
-		},
-	)
+	snapshot := map[string]any{
+		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
+		"answerLength":        convCtx.AnswerBuffer.Len(),
+	}
+	_ = e.tracer.CompleteStage(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
 	return nil
 }
