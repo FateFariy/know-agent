@@ -12,15 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// MemoryStrategy 记忆策略接口
-type MemoryStrategy interface {
-	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
-
-	// GetStrategyType 获取记忆策略类型
-	GetStrategyType() string
-}
-
 // baseMemoryStrategy 记忆策略基类（封装公共渲染和裁剪方法）
 type baseMemoryStrategy struct {
 }

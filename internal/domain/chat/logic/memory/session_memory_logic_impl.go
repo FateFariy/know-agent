@@ -10,11 +10,11 @@ import (
 
 // SessionMemoryLogicImpl 会话记忆逻辑实现
 type SessionMemoryLogicImpl struct {
-	memoryStrategy strategy.MemoryStrategy
+	memoryStrategy Strategy
 }
 
 // NewSessionMemoryLogic 创建会话记忆逻辑实例
-func NewSessionMemoryLogic(memoryStrategy strategy.MemoryStrategy) *SessionMemoryLogicImpl {
+func NewSessionMemoryLogic(memoryStrategy Strategy) *SessionMemoryLogicImpl {
 	return &SessionMemoryLogicImpl{
 		memoryStrategy: memoryStrategy,
 	}
