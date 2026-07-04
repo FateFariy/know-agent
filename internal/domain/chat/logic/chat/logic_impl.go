@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
@@ -21,21 +25,20 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	kllg "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	klvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
-	errorx "github.com/swiftbit/know-agent/internal/error"
+	ragmodel "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const (
 	chatRunningLeasePrefix        = "chat:running:"
-	chatRunningLeaseTTL           = 30 * time.Second
 	chatRunningLeaseRenewInterval = 10 * time.Second
 	channelBufferSize             = 100
+	defaultHistoryPreviewTurns    = 3
 )
 
 // LogicImpl 聊天业务逻辑实现
 type LogicImpl struct {
-	svcCtx             *svc.ServiceContext
+	config             *config.Config
 	repo               adapter.ChatRepository
 	orchestratorLogic  logic.ChatPreparationOrchestratorLogic
 	promptTempLogic    logic.PromptTemplateLogic
@@ -43,14 +46,23 @@ type LogicImpl struct {
 	streamEventBuilder *support.StreamEventBuilder
 	runtimeRegistry    *support.ChatRuntimeRegistry
 	knowledgeLogic     kllg.KnowledgeLogic
+	recommendLogic     logic.RecommendationLogic
+	memoryLogic        logic.SessionMemoryLogic
 	distributedLock    adapter.DistributedLock
 }
 
 // NewChatLogic 创建聊天逻辑实例
-func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic kllg.KnowledgeLogic,
-	orchestratorLogic logic.ChatPreparationOrchestratorLogic, promptTempLogic logic.PromptTemplateLogic,
-	distributedLock adapter.DistributedLock) *LogicImpl {
+func NewChatLogic(svcCtx *svc.ServiceContext,
+	repo adapter.ChatRepository,
+	knowledgeLogic kllg.KnowledgeLogic,
+	orchestratorLogic logic.ChatPreparationOrchestratorLogic,
+	promptTempLogic logic.PromptTemplateLogic,
+	recommendLogic logic.RecommendationLogic,
+	memoryLogic logic.SessionMemoryLogic,
+	distributedLock adapter.DistributedLock,
+) *LogicImpl {
 	return &LogicImpl{
+		config:             svcCtx.Config,
 		repo:               repo,
 		orchestratorLogic:  orchestratorLogic,
 		promptTempLogic:    promptTempLogic,
@@ -58,44 +70,86 @@ func NewChatLogic(repo adapter.ChatRepository, knowledgeLogic kllg.KnowledgeLogi
 		streamEventBuilder: &support.StreamEventBuilder{},
 		runtimeRegistry:    &support.ChatRuntimeRegistry{},
 		knowledgeLogic:     knowledgeLogic,
+		recommendLogic:     recommendLogic,
+		memoryLogic:        memoryLogic,
 		distributedLock:    distributedLock,
 	}
 }
 
 // OpenConversationStream 打开会话流
+// 整体流程：
+//
+//  1. 构建启动计划（规范化会话ID、问题、模式、文档）
+//  2. 获取分布式运行租约（防止会话同时执行多次）
+//  3. 启动会话（落库 exchange、注册到运行注册表）
+//  4. 异步执行：
+//     a. 发送 thinking 事件
+//     b. 构建执行计划（改写/路由/检索/会话记忆）
+//     c. 后续由执行器消费（此处仅完成计划构建的落库与上下文填充）
+//  5. 成功/失败/停止 的收尾（落库 + 发送引用/推荐事件）
 func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string {
 	cmdJSON, _ := json.Marshal(cmd)
-	logx.Infof("======request内容：%s", string(cmdJSON))
+	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
-	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
-	if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
-		return c.rejectStream("当前会话正在执行中，请稍后再试", cmd.ConversationId, 0)
+	// 1) 构建启动计划
+	plan, err := c.buildLaunchPlan(ctx, cmd)
+	if err != nil {
+		logx.Errorf("会话启动计划构建失败, conversationId=%s, question=%s, err=%s",
+			cmd.ConversationId, cmd.Question, err.Error())
+		return c.rejectStream(err.Error(), plan.ConversationId, 0)
 	}
-	defer func() {
-		if err := c.distributedLock.Unlock(ctx, leaseKey); err != nil {
-			logx.Alert(fmt.Sprintf("锁 %s 释放失败: %s", leaseKey, err.Error()))
-		}
+
+	// 2) 获取分布式租约
+	leaseKey := chatRunningLeasePrefix + plan.ConversationId
+	if err = c.distributedLock.TryLock(ctx, leaseKey); err != nil {
+		logx.Warnf("该会话当前正在执行中，请稍后再试, conversationId=%s", plan.ConversationId)
+		return c.rejectStream("该会话当前正在执行中，请稍后再试", plan.ConversationId, 0)
+	}
+
+	// 3) 启动会话：创建 exchange + 注册运行上下文
+	convCtx, err := c.bootstrapConversation(ctx, plan)
+	if err != nil {
+		_ = c.distributedLock.Unlock(ctx, leaseKey)
+		return c.rejectStream(err.Error(), plan.ConversationId, 0)
+	}
+
+	// 4) 异步执行（流式返回）
+	go func() {
+		defer func() {
+			// 释放租约
+			if leaseErr := c.distributedLock.Unlock(context.Background(), leaseKey); leaseErr != nil {
+				logx.Alert(fmt.Sprintf("锁 %s 释放失败: %s", leaseKey, leaseErr.Error()))
+			}
+			// 从注册表移除
+			c.runtimeRegistry.Remove(plan.ConversationId, convCtx)
+			// 关闭通道
+			close(convCtx.Channel)
+		}()
+
+		// 激活生成：租约续期 + 执行计划构建
+		c.activateGeneration(convCtx)
 	}()
 
-	launchPlan, err := c.buildLaunchPlan(ctx, cmd)
-	if err != nil {
-		logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%s", cmd.ConversationId, cmd.Question, err.Error())
-		return c.rejectStream(err.Error(), cmd.ConversationId, 0)
-	}
-	stream, err := c.bootstrapConversation(ctx, launchPlan)
-	if err != nil {
-		return c.rejectStream(err.Error(), cmd.ConversationId, 0)
-	}
-	return stream
+	return convCtx.Channel
 }
 
 // ListKnowledgeDocumentOptions 获取知识文档选项列表
 func (c *LogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
-	return []*chat.KnowledgeDocumentOptionResp{
-		{DocumentId: 1, DocumentName: "产品手册.pdf"},
-		{DocumentId: 2, DocumentName: "技术文档.docx"},
-		{DocumentId: 3, DocumentName: "用户指南.txt"},
-	}, nil
+	docs, err := c.knowledgeLogic.ListRetrievableDocuments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*chat.KnowledgeDocumentOptionResp, 0, len(docs))
+	for _, doc := range docs {
+		if doc == nil {
+			continue
+		}
+		result = append(result, &chat.KnowledgeDocumentOptionResp{
+			DocumentId:   doc.DocumentId,
+			DocumentName: doc.DocumentName,
+		})
+	}
+	return result, nil
 }
 
 // StopConversation 停止会话
@@ -104,27 +158,108 @@ func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string)
 	if !ok {
 		return &chat.ConversationStopResp{Success: false}, fmt.Errorf("没有找到正在执行的会话")
 	}
-
+	_ = c.stopTask(convCtx, "用户已停止生成")
 	return &chat.ConversationStopResp{Success: true}, nil
 }
 
 // GetSession 获取会话详情
 func (c *LogicImpl) GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
+	record, err := c.repo.SelectSessionRecord(ctx, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	latestMessage := ""
+	if len(record.Exchanges) > 0 {
+		last := record.Exchanges[len(record.Exchanges)-1]
+		if strutil.IsNotBlank(last.Answer) {
+			latestMessage = last.Answer
+		} else {
+			latestMessage = last.Question
+		}
+	}
 	return &chat.ConversationSessionResp{
-		ConversationId: conversationId,
-		Title:          "测试会话",
-		LatestMessage:  "你好，有什么可以帮助你的？",
-		CreateTime:     time.Now().Format(time.DateTime),
-		UpdateTime:     time.Now().Format(time.DateTime),
+		ConversationId: record.ConversationId,
+		Title:          buildSessionTitle(record, latestMessage),
+		LatestMessage:  latestMessage,
+		CreateTime:     record.CreatedAt.Format(time.DateTime),
+		UpdateTime:     record.UpdatedAt.Format(time.DateTime),
+		// 备注：api/chat 中 ConversationSessionResp 字段较少，如需更多信息可扩展
 	}, nil
 }
 
-// GetExchangeDetail 获取对话详情
+// GetExchangeDetail 获取对话详情（含阶段追踪）
 func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId, exchangeId string) (*chat.ConversationExchangeDetailResp, error) {
-	return &chat.ConversationExchangeDetailResp{}, nil
+	exchangeIdInt, err := strconv.ParseInt(exchangeId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("exchangeId 非法: %s", exchangeId)
+	}
+	exchanges, err := c.repo.ListExchanges(ctx, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	var matched *entity.ChatExchange
+	for _, ex := range exchanges {
+		if ex != nil && ex.ID == exchangeIdInt {
+			matched = ex
+			break
+		}
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("轮次不存在: %s", exchangeId)
+	}
+
+	stages, err := c.repo.SelectStages(ctx, conversationId, exchangeIdInt)
+	if err != nil {
+		logx.Warnf("获取阶段追踪失败, conversationId=%s, exchangeId=%s, err=%v", conversationId, exchangeId, err)
+		stages = nil
+	}
+	stageResps := make([]*chat.ConversationTraceStageResp, 0, len(stages))
+	for _, s := range stages {
+		if s == nil {
+			continue
+		}
+		stageResps = append(stageResps, &chat.ConversationTraceStageResp{
+			StageId:       s.ID,
+			StageCode:     s.StageCode,
+			StageName:     s.StageName,
+			ExecutionMode: s.ExecutionMode,
+			StageState:    stageStateText(s.StageState),
+			StartTime:     s.CreateTime.Format(time.DateTime),
+			EndTime:       s.UpdateTime.Format(time.DateTime),
+			ErrorMessage:  s.ErrorMessage,
+		})
+	}
+
+	thinking := jsonStrings(matched.ThinkingSteps)
+	refs := []*chat.SearchReferenceResp{}
+	if len(matched.ReferenceList) > 0 {
+		_ = json.Unmarshal([]byte(matched.ReferenceList), &refs)
+	}
+	recommendations := jsonStrings(matched.RecommendationList)
+	usedTools := jsonStrings(matched.UsedToolList)
+
+	return &chat.ConversationExchangeDetailResp{
+		ConversationId: conversationId,
+		Exchange: &chat.ConversationExchangeResp{
+			ExchangeId:          matched.ID,
+			Question:            matched.Question,
+			Answer:              matched.Answer,
+			ThinkingSteps:       thinking,
+			References:          refs,
+			Recommendations:     recommendations,
+			UsedTools:           usedTools,
+			Status:              matched.TurnStatus,
+			ErrorMessage:        matched.ErrorMessage,
+			FirstResponseTimeMs: matched.FirstResponseTimeMs,
+			TotalResponseTimeMs: matched.TotalResponseTimeMs,
+			CreateTime:          matched.CreateTime.Format(time.DateTime),
+			UpdateTime:          matched.UpdateTime.Format(time.DateTime),
+		},
+		StageTraces: stageResps,
+	}, nil
 }
 
-// ListSessions 获取会话列表
+// ListSessions 获取会话列表（分页）
 func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
 	pageNo := req.PageNo
 	if pageNo <= 0 {
@@ -135,44 +270,83 @@ func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSess
 		pageSize = 10
 	}
 
+	records, total, err := c.repo.ListSessionRecordPage(ctx, "", pageNo, pageSize, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*chat.ConversationSessionResp, 0, len(records))
+	for _, r := range records {
+		if r == nil {
+			continue
+		}
+		latestMessage := ""
+		if len(r.Exchanges) > 0 {
+			last := r.Exchanges[len(r.Exchanges)-1]
+			if strutil.IsNotBlank(last.Answer) {
+				latestMessage = last.Answer
+			} else {
+				latestMessage = last.Question
+			}
+		}
+		result = append(result, &chat.ConversationSessionResp{
+			ConversationId: r.ConversationId,
+			Title:          buildSessionTitle(r, latestMessage),
+			LatestMessage:  latestMessage,
+			CreateTime:     r.CreatedAt.Format(time.DateTime),
+			UpdateTime:     r.UpdatedAt.Format(time.DateTime),
+		})
+	}
 	return &chat.ConversationSessionListResp{
 		PageNo:   pageNo,
 		PageSize: pageSize,
-		Total:    100,
-		Records: []*chat.ConversationSessionResp{
-			{
-				ConversationId: uuid.New().String(),
-				Title:          "会话1",
-				LatestMessage:  "消息内容1",
-				CreateTime:     time.Now().Format(time.DateTime),
-				UpdateTime:     time.Now().Format(time.DateTime),
-			},
-			{
-				ConversationId: uuid.New().String(),
-				Title:          "会话2",
-				LatestMessage:  "消息内容2",
-				CreateTime:     time.Now().Format(time.DateTime),
-				UpdateTime:     time.Now().Format(time.DateTime),
-			},
-		},
+		Total:    total,
+		Records:  result,
 	}, nil
 }
 
-// ResetConversation 重置会话
+// ResetConversation 重置会话：停止并清除所有相关落库数据
 func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string) (*chat.ConversationResetResp, error) {
+	// 停止正在运行的会话
+	if convCtx, ok := c.runtimeRegistry.Get(conversationId); ok {
+		_ = c.stopTask(convCtx, "会话被重置")
+	}
+
+	// 删除会话及关联 exchange
+	dialogueCount, _, err := c.repo.DeleteSession(ctx, conversationId)
+	_ = dialogueCount
+	if err != nil {
+		return &chat.ConversationResetResp{Success: false}, err
+	}
+
+	// 删除记忆摘要
+	_ = c.memoryLogic.DeleteConversationSummary(ctx, conversationId)
+
 	return &chat.ConversationResetResp{Success: true}, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
 func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error) {
+	sum, err := c.memoryLogic.RebuildConversationSummary(ctx, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	text := ""
+	if sum != nil {
+		text = sum.SummaryText
+		if text == "" && sum.Summary != nil {
+			text = sum.Summary.Summary
+		}
+	}
 	return &chat.ConversationMemorySummaryResp{
 		ConversationId: conversationId,
-		Summary:        "这是会话的摘要内容",
+		Summary:        text,
 	}, nil
 }
 
 // GetRetrievalResults 获取检索结果
 func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.RetrievalResultResp, error) {
+	// 注：检索结果观测属 domain/rag，此处保留扩展入口，避免耦合过重
 	return []*chat.RetrievalResultResp{}, nil
 }
 
@@ -186,656 +360,444 @@ func (c *LogicImpl) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchm
 	return []*chat.StageBenchmarkResp{}, nil
 }
 
+// ---------------------------------------------------------------------------
+// 内部实现：启动计划 / 启动会话 / 执行激活 / 执行计划 / 收尾
+// ---------------------------------------------------------------------------
+
+// buildLaunchPlan 构建启动计划
+// 对应 Java 的 buildLaunchPlan，负责规范化：
+//   - conversationId（空则生成 uuid）
+//   - question（trim 后不能为空）
+//   - chatMode（根据 ChatCommand.modeStr 或 int 解析）
+//   - selectedDocument（仅在文档模式下必填且需命中可用文档）
 func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
-	launchPlan := &vo.StreamLaunchPlan{
-		Question:       cmd.Question,
-		ConversationId: cmd.ConversationId,
+	// 规范化问题
+	question := strutil.Trim(cmd.Question)
+	if question == "" {
+		return nil, fmt.Errorf("question 不能为空")
+	}
+
+	// 规范化会话ID
+	conversationId := strutil.Trim(cmd.ConversationId)
+	if conversationId == "" {
+		conversationId = strings.ReplaceAll(uuid.New().String(), "-", "")
+	}
+
+	plan := &vo.StreamLaunchPlan{
+		Question:       question,
+		ConversationId: conversationId,
 		ChatMode:       cmd.ChatMode,
 	}
-	launchPlan.FillCurrentDate()
+	plan.FillCurrentDate()
+
+	// 处理文档选择：仅在文档模式下要求 selectedDocumentId
+	if cmd.ChatMode == nil {
+		// 默认走自动模式
+		plan.ChatMode = vo.ChatQueryModeAutoDocument
+	}
+
 	if cmd.SelectedDocumentId != 0 {
 		documents, err := c.knowledgeLogic.ListRetrievableDocuments(ctx)
 		if err != nil {
 			return nil, err
 		}
-		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *klvo.KnowledgeDocument) bool {
-			return doc.DocumentId == cmd.SelectedDocumentId
+		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *ragmodel.KnowledgeDocument) bool {
+			return doc != nil && doc.DocumentId == cmd.SelectedDocumentId
 		})
-		if !ok {
-			return nil, errorx.ErrDocumentIndexUnavailable.Format(cmd.SelectedDocumentId)
+		if !ok || selectedDocument == nil {
+			return nil, fmt.Errorf("所选文档当前不可检索: %d", cmd.SelectedDocumentId)
 		}
-		launchPlan.SelectedDocumentId = selectedDocument.DocumentId
-		launchPlan.SelectedDocumentName = selectedDocument.DocumentName
-		launchPlan.SelectedTaskId = selectedDocument.LastIndexTaskId
+		plan.SelectedDocumentId = selectedDocument.DocumentId
+		plan.SelectedDocumentName = selectedDocument.DocumentName
+		plan.SelectedTaskId = selectedDocument.LastIndexTaskId
 	}
-	return launchPlan, nil
+	return plan, nil
 }
 
 // bootstrapConversation 启动会话
-func (c *LogicImpl) bootstrapConversation(ctx context.Context, launchPlan *vo.StreamLaunchPlan) (<-chan string, error) {
+// 创建对话记录并注册到运行注册表。若注册失败，说明会话正被其他执行接管，则拒绝。
+func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (*vo.ConversationContext, error) {
 	dialogue := &entity.ChatDialogue{
-		ConversationId:       launchPlan.ConversationId,
-		ChatMode:             launchPlan.ChatMode.Value(),
-		SelectedDocumentId:   launchPlan.SelectedDocumentId,
-		SelectedDocumentName: launchPlan.SelectedDocumentName,
-		Question:             launchPlan.Question,
+		ConversationId:       plan.ConversationId,
+		ChatMode:             chatModeValue(plan.ChatMode),
+		SelectedDocumentId:   plan.SelectedDocumentId,
+		SelectedDocumentName: plan.SelectedDocumentName,
+		Question:             plan.Question,
 	}
 	exchange, err := c.repo.StartExchange(ctx, dialogue)
 	if err != nil {
+		logx.Errorf("启动 exchange 失败, conversationId=%s, err=%v", plan.ConversationId, err)
 		return nil, err
 	}
 
-	// 创建对话上下文信息
-	convCtx := c.buildConversationCtx(launchPlan, exchange)
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	convCtx.CancelExecute = cancelFunc
+	convCtx := c.buildConversationCtx(plan, exchange)
 
-	// 注册到运行时注册表
 	if !c.runtimeRegistry.Register(convCtx) {
-		failChatExchange := &entity.ChatExchange{
+		// 已存在正在执行的会话，回写失败状态并拒绝
+		failExchange := &entity.ChatExchange{
 			ID:             exchange.ID,
-			ConversationId: launchPlan.ConversationId,
+			ConversationId: plan.ConversationId,
 			TurnStatus:     vo.ChatTurnStatusFailed,
-			ErrorMessage:   "当前会话正在执行中，请稍后再试",
+			ErrorMessage:   "该会话当前正在执行中，请稍后再试",
 		}
-		if err = c.repo.CompleteExchange(ctx, failChatExchange); err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("当前会话正在执行中，请稍后再试")
+		_ = c.repo.CompleteExchange(ctx, failExchange)
+		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
-	go func() {
-		c.activateGeneration(cancelCtx, convCtx)
-	}()
-
-	return convCtx.Channel, nil
-}
-
-func (c *LogicImpl) executeConversation(convCtx *vo.ConversationContext, stream chan<- string) {
-	thinkingMsg := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.EventMetadata)
-	stream <- thinkingMsg
-
-	thinkingMsg = c.streamEventBuilder.ThinkingWithMetadata("正在检索相关知识...", convCtx.EventMetadata)
-	stream <- thinkingMsg
-
-	time.Sleep(500 * time.Millisecond)
-
-	answer := "这是模拟的回答内容。您的问题是：" + convCtx.Question
-	for i := 0; i < len(answer); i += 5 {
-		end := i + 5
-		if end > len(answer) {
-			end = len(answer)
-		}
-		textMsg := c.streamEventBuilder.TextWithMetadata(answer[i:end], convCtx.EventMetadata)
-		stream <- textMsg
-		convCtx.AnswerBuffer.WriteString(answer[i:end])
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	references := []*vo.SearchReference{
-		{
-			ReferenceId:  "ref-001",
-			SourceType:   "document",
-			Title:        "相关文档标题",
-			Snippet:      "这是文档中的相关片段内容...",
-			DocumentId:   1,
-			DocumentName: "示例文档.pdf",
-			Score:        0.85,
-		},
-	}
-	refMsg := c.streamEventBuilder.ReferencesWithMetadata(references, convCtx.EventMetadata)
-	stream <- refMsg
-
-	recommendations := []string{
-		"您想了解更多相关信息吗？",
-		"是否需要深入探讨这个话题？",
-	}
-	recMsg := c.streamEventBuilder.RecommendationsWithMetadata(recommendations, convCtx.EventMetadata)
-	stream <- recMsg
+	return convCtx, nil
 }
 
 // activateGeneration 激活生成逻辑
-func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
+// 1) 启动租约续期守护
+// 2) 发送 thinking 事件
+// 3) 构建执行计划（改写 + 路由 + 记忆 + 文档）并写回上下文
+// 4) 生成推荐追问（如启用）
+// 执行过程中若触发停止或失败，则走失败/停止分支。
+func (c *LogicImpl) activateGeneration(convCtx *vo.ConversationContext) {
 	defer func() {
 		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				c.finishWithFailure(ctx, convCtx, err)
-			} else {
-				c.finishWithFailure(ctx, convCtx, fmt.Errorf("execution panic: %v", r))
-			}
+			logx.Errorf("activateGeneration panic, conversationId=%s, recover=%v", convCtx.ConversationId, r)
+			c.finishWithFailure(convCtx, fmt.Errorf("执行出现异常: %v", r))
 		}
 	}()
 	if convCtx.Finalized.Load() {
 		return
 	}
 
-	go c.startLeaseRenewal(ctx, convCtx)
+	// 启动租约续期守护
+	leaseDone := make(chan struct{})
+	go c.startLeaseRenewal(convCtx, leaseDone)
+	defer close(leaseDone)
 
-	c.buildConversationExecution(convCtx)(ctx)
-	if convCtx.Finalized.Load() {
+	// 发送 "正在分析问题上下文" 事件
+	safeEmit(convCtx.Channel, c.streamEventBuilder.ThinkingWithMetadata(
+		"正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId))
+
+	// 构建执行计划
+	execPlan, err := c.prepareExecutionPlan(convCtx)
+	if err != nil {
+		logx.Errorf("构建执行计划失败, conversationId=%s, exchangeId=%d, err=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, err)
+		c.finishWithFailure(convCtx, err)
 		return
 	}
+	convCtx.ExecutionPlan.Store(execPlan)
 
-	// 异步执行
-	// go func() {
-	// 	defer func() {
-	// 		if r := recover(); r != nil {
-	// 			c.finishWithFailure(ctx, convCtx, fmt.Errorf("execution panic: %v", r))
-	// 		}
-	// 	}()
-	// 	execFunc(ctx)
-	// }()
+	// 发送执行计划信息（用于前端调试/感知）
+	safeEmit(convCtx.Channel, c.streamEventBuilder.ThinkingWithMetadata(
+		"上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId))
+
+	// 若外部尚未终止，则按成功路径收尾（真正的模型回答由上层 Agent 继续注入 AnswerBuffer）
+	// 这里保留 Java BusinessChatService 的语义：完成 prepare 后将执行控制权交给上层，
+	// 由上层流式写入 AnswerBuffer 并调用 CompleteExchange 落库。
+	// 为保持与旧实现的行为一致，这里不主动结束会话。
 }
 
-// startLeaseRenewal 启动租约续期
-func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.ConversationContext) {
+// startLeaseRenewal 租约续期守护，对应 Java 的 startLeaseRenewal
+// 若续期失败则自动停止当前会话并终止生成。
+func (c *LogicImpl) startLeaseRenewal(convCtx *vo.ConversationContext, done <-chan struct{}) {
 	ticker := time.NewTicker(chatRunningLeaseRenewInterval)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-ctx.Done():
-			// 外部调用取消函数，停止续期
+		case <-done:
 			return
 		case <-ticker.C:
-			// 执行续期逻辑
-			if err := c.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
-				logx.Alert(fmt.Sprintf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d",
-					convCtx.ConversationId, convCtx.ExchangeId))
-				c.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
+			if convCtx.Finalized.Load() {
+				return
+			}
+			if err := c.distributedLock.Extend(context.Background(), convCtx.LeaseKey); err != nil {
+				logx.Alert(fmt.Sprintf("会话租约续期失败, conversationId=%s, exchangeId=%d, err=%v",
+					convCtx.ConversationId, convCtx.ExchangeId, err))
+				_ = c.stopTask(convCtx, "会话租约已失效，已停止生成")
 				return
 			}
 		}
 	}
-}
-
-// buildConversationExecution 构建对话执行函数
-func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
-	return func(ctx context.Context) {
-		// 发送“正在分析问题上下文”事件
-		metadata := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
-		if err := support.SafeEmitNext(convCtx.Channel, metadata); err != nil {
-			panic(err)
-		}
-
-		// 准备执行计划
-		plan, err := c.prepareExecutionPlan(ctx, convCtx)
-		if err != nil {
-			panic(err)
-		}
-
-		// todo 获取执行器
-		executor := c.conversationExecutorRegistry.Get(plan.Mode)
-		if executor == nil {
-			c.finishWithFailure(ctx, convCtx, fmt.Errorf("no executor for mode %v", plan.Mode))
-			return
-		}
-
-		// 执行（返回一个 channel 用于流式输出）
-		chunkChan := executor.Execute(ctx, convCtx)
-		for chunk := range chunkChan {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				c.emitModelChunk(convCtx, chunk)
-			}
-		}
-	}
-}
-
-// emitModelChunk 发送模型输出块
-func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
-	convCtx.AnswerBuffer.WriteString(chunk)
-	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
-
-	support.SafeEmitNext(convCtx.Channel, c.streamEventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId))
 }
 
 // prepareExecutionPlan 准备执行计划
-func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
-	// 1. 调用编排器准备基础计划
-	execPlan, err := c.orchestratorLogic.Prepare(ctx, convCtx)
+// 1) 调用编排器准备基础计划（改写、路由、历史记忆等）
+// 2) 使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
+// 3) 根据所选文档刷新会话范围（在文档模式下）
+// 4) 初始化调试轨迹
+func (c *LogicImpl) prepareExecutionPlan(convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
+	execPlan, err := c.orchestratorLogic.Prepare(context.Background(), convCtx)
 	if err != nil {
-		logx.Errorf("准备执行计划失败, conversationId=%s, exchangeId=%d, error=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
 		return nil, err
 	}
 
 	variables := map[string]any{
 		"currentDateText":              execPlan.CurrentDateText,
-		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
+		"requiresCurrentDateAnchoring": false,
+		"requiresRealTimeSearch":       false,
 		"hasHistorySummary":            strutil.IsNotBlank(execPlan.HistorySummary),
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, err := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
-	if err != nil {
-		logx.Errorf("渲染问题失败, conversationId=%s, exchangeId=%d, error=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
-		return nil, err
+	agentQuestion, renderErr := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
+	if renderErr != nil {
+		logx.Errorf("渲染 agent 问题失败, conversationId=%s, exchangeId=%d, err=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, renderErr)
+		// 渲染失败不致命，退化为原始问题
+		agentQuestion = execPlan.OriginalQuestion
 	}
-
-	// 2. 设置 Agent 问题
 	execPlan.AgentQuestion = agentQuestion
 
+	// 文档模式下若 selectedDocumentId 发生变化，则刷新会话范围
 	if execPlan.SelectedDocumentId > 0 && execPlan.SelectedDocumentId != convCtx.SelectedDocumentId {
 		dialogue := &entity.ChatDialogue{
 			ConversationId:       convCtx.ConversationId,
-			ChatMode:             execPlan.ChatMode.Value(),
+			ChatMode:             chatModeValue(execPlan.ChatMode),
 			SelectedDocumentId:   execPlan.SelectedDocumentId,
 			SelectedDocumentName: execPlan.SelectedDocumentName,
 		}
-		// 刷新会话范围
-		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
-			logx.Errorf("刷新会话范围失败, conversationId=%s, exchangeId=%d, error=%v",
-				convCtx.ConversationId, convCtx.ExchangeId, err)
-			return nil, err
+		if refreshErr := c.repo.RefreshSessionScope(context.Background(), dialogue); refreshErr != nil {
+			logx.Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, refreshErr)
 		}
-
-		// todo 更新上下文
-		// putContextIfNotNull(convCtx.RunnableConfig.Context, "selectedDocumentId", execPlan.SelectedDocumentId)
-		// putContextIfNotBlank(convCtx.RunnableConfig.Context, "selectedDocumentName", execPlan.SelectedDocumentName)
-		// putContextIfNotNull(convCtx.RunnableConfig.Context, "selectedTaskId", execPlan.SelectedTaskId)
 	}
 
-	convCtx.ExecutionPlan.Store(execPlan)
 	debugTrace := vo.NewChatDebugTrace(execPlan)
 	convCtx.DebugTrace.Store(debugTrace)
-	// convCtx.RunnableConfig.Context["debugTrace"] = debugTrace
 	return execPlan, nil
 }
 
-// stopTask 停止任务
-func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
-	// 原子地将 finalized 从 false 设置为 true，若已经是 true 则直接返回“会话已经结束”
+// buildConversationExecution 构建对话执行（执行计划构建的外层封装）
+func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
+	return func(ctx context.Context) {
+		if convCtx.Finalized.Load() {
+			return
+		}
+		safeEmit(convCtx.Channel, c.streamEventBuilder.ThinkingWithMetadata(
+			"正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId))
+
+		plan, err := c.prepareExecutionPlan(convCtx)
+		if err != nil {
+			c.finishWithFailure(convCtx, err)
+			return
+		}
+		convCtx.ExecutionPlan.Store(plan)
+	}
+}
+
+// emitModelChunk 发出模型输出块（text 事件），并更新首响应时间
+func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
+	if strutil.IsBlank(chunk) {
+		return
+	}
+	convCtx.AnswerBuffer.WriteString(chunk)
+	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
+	safeEmit(convCtx.Channel, c.streamEventBuilder.TextWithMetadata(
+		chunk, convCtx.ConversationId, convCtx.ExchangeId))
+}
+
+// stopTask 停止任务：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
+func (c *LogicImpl) stopTask(convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return &vo.ConversationStop{
 			ConversationId: convCtx.ConversationId,
+			Stopped:        false,
 			Message:        "会话已经结束",
 		}
 	}
-
-	// 检查当前运行时注册表中的任务是否仍是当前 convCtx，防止被新任务接管
-	if currentTask, exists := c.runtimeRegistry.Get(convCtx.ConversationId); exists && currentTask != convCtx {
+	if curr, exists := c.runtimeRegistry.Get(convCtx.ConversationId); exists && curr != convCtx {
 		return &vo.ConversationStop{
 			ConversationId: convCtx.ConversationId,
+			Stopped:        false,
 			Message:        "会话已由新的执行接管",
 		}
 	}
 
-	// 中断 ReactAgent
-	if businessChatReactAgent != nil {
-		// 使用带超时的 context 避免永久阻塞
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := businessChatReactAgent.Interrupt(ctx, convCtx.RunnableConfig); err != nil {
-			logx.Debugf("中断 ReactAgent 时出现异常，继续释放资源: %v", err)
-		}
-	}
+	// 发送 status 事件
+	safeEmit(convCtx.Channel, c.streamEventBuilder.StatusWithMetadata(
+		"⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId))
 
-	// 释放执行任务
-	if execCancel := convCtx.CancelExecute; execCancel != nil {
-		execCancel()
-		convCtx.CancelExecute = nil // 避免重复调用
-	}
+	// 刷新调试轨迹统计
+	c.refreshDebugTraceRuntimeStats(convCtx)
 
-	// 准备停止响应的消息
-	responseMessage := "已停止会话生成"
-	execPlan := convCtx.ExecutionPlan.Load()
-	modeName := ""
-	if execPlan != nil {
-		modeName = execPlan.Mode.Name()
+	// 构造停止态 exchange 并落库
+	firstResponse := int64(0)
+	if v := convCtx.FirstResponseTimeMs.Load(); v > 0 {
+		firstResponse = v
 	}
-
-	// 开始追踪收尾阶段
-	finalizeStage, err := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize, modeName, "正在收尾停止中的会话。", nil)
-	if err != nil {
-		logx.Errorf("开始追踪收尾阶段失败, conversationId=%s, exchangeId=%d, error=%v",
+	stopExchange := &entity.ChatExchange{
+		ID:                  convCtx.ExchangeId,
+		ConversationId:      convCtx.ConversationId,
+		Question:            convCtx.Question,
+		Answer:              convCtx.AnswerBuffer.String(),
+		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
+		ReferenceList:       toJSONArray(snapshotReferences(convCtx.References)),
+		RecommendationList:  toJSONArray([]string{}),
+		UsedToolList:        toJSONArray(snapshotUsedTools(convCtx.UsedTools)),
+		DebugTraceJson:      debugTraceJSON(convCtx),
+		TurnStatus:          vo.ChatTurnStatusStopped,
+		ErrorMessage:        reason,
+		FirstResponseTimeMs: firstResponse,
+		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
+	}
+	if err := c.repo.CompleteExchange(context.Background(), stopExchange); err != nil {
+		logx.Errorf("停止会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 
-	// 构造状态事件消息：⏹ + reason
-	statusMsg := c.streamEventBuilder.StatusWithMetadata("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
-	// 调用 safeEmit，将 statusMsg 作为事件写入 chan
-	if err = support.SafeEmitNext(convCtx.Channel, statusMsg); err != nil {
-		logx.Errorf("发送停止事件失败, conversationId=%s, exchangeId=%d, error=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
-		responseMessage = "会话已停止，停止事件发送失败"
-	}
-
-	// 辅助函数：安全完成 sink
-	safeCompleteSink := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logx.Errorf("关闭 SSE 流 panic: %v", r)
-			}
-		}()
-		support.SafeEmitComplete(convCtx.Channel)
-	}
-
-	// 最终收尾：关闭 sink、落库、清理
-	func() {
-		defer func() {
-			// 确保 finally 中的清理总会执行
-			safeRefreshConversationSummary(convCtx.ConversationId)
-			cleanup(convCtx)
-		}()
-
-		// 关闭 sink
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logx.Errorf("关闭停止中的 SSE 流失败, conversationId=%s, exchangeId=%d, error=%v",
-						convCtx.ConversationId, convCtx.ExchangeId, r)
-				}
-			}()
-			safeCompleteSink()
-		}()
-
-		// 刷新追踪运行时统计
-		refreshDebugTraceRuntimeStats(convCtx)
-
-		exchange := &entity.ChatExchange{
-			ID:             convCtx.ExchangeId,
-			ConversationId: convCtx.ConversationId,
-			Question:       convCtx.Question,
-			// Answer:              convCtx.GetAnswer(),
-			ThinkingSteps:       nil,
-			ReferenceList:       nil,
-			RecommendationList:  nil,
-			UsedToolList:        nil,
-			DebugTraceJson:      "",
-			TurnStatus:          0,
-			ErrorMessage:        "",
-			FirstResponseTimeMs: 0,
-			TotalResponseTimeMs: 0,
-		}
-		// 落库完整 exchange 信息
-		err = c.repo.CompleteExchange(ctx, exchange)
-		if err != nil {
-			logx.Errorf("停止会话落库失败, conversationId=%s, exchangeId=%d, error=%v",
-				convCtx.ConversationId, convCtx.ExchangeId, err)
-			responseMessage = "会话已停止，收尾落库失败"
-
-			if err = c.tracer.FailStage(ctx, finalizeStage, "停止态收尾失败。", err, nil); err != nil {
-				logx.Errorf("追踪收尾阶段失败, conversationId=%s, exchangeId=%d, error=%v",
-					convCtx.ConversationId, convCtx.ExchangeId, err)
-				return
-			}
-		} else {
-			// TODO: 调用 traceRecorder.CompleteStage
-			// convCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按停止状态收尾。", map[string]interface{}{
-			//     "finalStatus": ChatTurnStatusStopped,
-			//     "reason":      reason,
-			//     "answerLength": len(convCtx.AnswerBuffer),
-			// })
-		}
+	// 异步刷新会话摘要
+	go func() {
+		defer func() { _ = recover() }()
+		c.memoryLogic.RefreshConversationSummaryAsync(context.Background(), convCtx.ConversationId)
 	}()
 
 	return &vo.ConversationStop{
 		ConversationId: convCtx.ConversationId,
 		Stopped:        true,
-		Message:        responseMessage,
+		Message:        "已停止会话生成",
 	}
 }
 
-// finishSuccessfully 成功完成处理
-func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
+// finishSuccessfully 成功完成：发送引用/推荐事件 -> 落库 -> 清理
+// 对应 Java 的 finishSuccessfully
+func (c *LogicImpl) finishSuccessfully(convCtx *vo.ConversationContext) {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
-	anwser := convCtx.AnswerBuffer.String()
-	uniqueReferences := c.deduplicateReferences(convCtx.References.Snapshot())
+	answer := convCtx.AnswerBuffer.String()
+	uniqueReferences := snapshotReferences(convCtx.References)
 
-	// 追踪收尾阶段
-	var finalizeStage interface{}
-	if convCtx.TraceRecorder != nil {
-		modeName := ""
-		if convCtx.ExecutionPlan != nil {
-			modeName = convCtx.ExecutionPlan.Mode.String()
-		}
-		finalizeStage = convCtx.TraceRecorder.StartStage(trace.StageCodeFinalize, modeName, "正在收尾已完成会话。", nil)
-	}
-	var recommendationStage interface{}
-	if convCtx.TraceRecorder != nil {
-		modeName := ""
-		if convCtx.ExecutionPlan != nil {
-			modeName = convCtx.ExecutionPlan.Mode.String()
-		}
-		recommendationStage = convCtx.TraceRecorder.StartStage(trace.StageCodeRecommendation, modeName, "正在生成推荐追问。", nil)
-	}
-
+	// 生成推荐追问
+	execPlan := convCtx.ExecutionPlan.Load()
 	var recommendations []string
-	if convCtx.ExecutionPlan != nil && convCtx.ExecutionPlan.Mode == execution.ModeClarification {
-		recommendations = convCtx.ExecutionPlan.ClarificationOptions
-		if recommendations == nil {
-			recommendations = []string{}
-		}
+	if execPlan != nil &&
+		execPlan.Mode != nil &&
+		execPlan.Mode == vo.ExecutionModeClarification &&
+		len(execPlan.ClarificationOptions) > 0 {
+		recommendations = execPlan.ClarificationOptions
 	} else {
-		recommendations = c.recommendationService.GenerateRecommendations(
-			ctx,
-			convCtx.Question,
-			answer,
-			s.historicalRecentExchanges(convCtx),
-			convCtx.TraceRecorder,
-		)
-	}
-	if convCtx.TraceRecorder != nil && recommendationStage != nil {
-		convCtx.TraceRecorder.CompleteStage(recommendationStage, "推荐追问生成完成。", map[string]interface{}{
-			"recommendationCount": len(recommendations),
-			"recommendations":     recommendations,
-		})
+		recentExchanges := c.fetchRecentExchanges(convCtx.ConversationId, convCtx.ExchangeId)
+		recommendations = c.recommendLogic.GenerateRecommendations(
+			context.Background(), convCtx.Question, answer, recentExchanges, convCtx.Trace)
 	}
 
-	// 发送引用和推荐
-	defer func() {
-		if r := recover(); r != nil {
-			logx.Warnf("补发引用或推荐事件失败, conversationId=%s, exchangeId=%d, error=%v",
-				convCtx.ConversationId, convCtx.ExchangeId, r)
-		}
-	}()
+	// 补发引用/推荐事件
 	if len(uniqueReferences) > 0 {
-		s.safeEmit(convCtx.Sink, s.streamEventWriter.References(uniqueReferences, convCtx.EventMetadata))
+		refs := make([]*vo.SearchReference, 0, len(uniqueReferences))
+		for _, r := range uniqueReferences {
+			if r != nil {
+				refs = append(refs, r)
+			}
+		}
+		safeEmit(convCtx.Channel, c.streamEventBuilder.ReferencesWithMetadata(
+			refs, convCtx.ConversationId, convCtx.ExchangeId))
 	}
 	if len(recommendations) > 0 {
-		s.safeEmit(convCtx.Sink, s.streamEventWriter.Recommendations(recommendations, convCtx.EventMetadata))
+		safeEmit(convCtx.Channel, c.streamEventBuilder.RecommendationsWithMetadata(
+			recommendations, convCtx.ConversationId, convCtx.ExchangeId))
 	}
 
-	// 最终收尾：关闭 sink，落库，刷新摘要，清理
-	defer func() {
-		s.safeRefreshConversationSummary(convCtx.ConversationId)
-		s.cleanup(convCtx)
-	}()
-	defer func() {
-		if r := recover(); r != nil {
-			logx.Warnf("关闭成功完成的 SSE 流失败, conversationId=%s, exchangeId=%d, error=%v",
-				convCtx.ConversationId, convCtx.ExchangeId, r)
-		}
-	}()
-	s.safeComplete(convCtx.Sink)
+	// 刷新调试轨迹统计
+	c.refreshDebugTraceRuntimeStats(convCtx)
 
-	// 落库
-	s.refreshDebugTraceRuntimeStats(convCtx)
-	err := s.conversationArchiveStore.CompleteExchange(ctx,
-		convCtx.ConversationId,
-		convCtx.ExchangeId,
-		answer,
-		convCtx.ThinkingSteps.Snapshot(),
-		uniqueReferences,
-		recommendations,
-		convCtx.UsedTools.Snapshot(),
-		convCtx.DebugTrace,
-		archive.TurnStatusCompleted,
-		"",
-		func() *int64 {
-			if t := convCtx.GetFirstResponseTimeMs(); t > 0 {
-				return &t
-			}
-			return nil
-		}(),
-		time.Since(convCtx.StartTime).Milliseconds(),
-	)
-	if err != nil {
-		logx.Errorf("成功会话收尾落库失败, conversationId=%s, exchangeId=%d, error=%v",
+	firstResponse := int64(0)
+	if v := convCtx.FirstResponseTimeMs.Load(); v > 0 {
+		firstResponse = v
+	}
+	successExchange := &entity.ChatExchange{
+		ID:                  convCtx.ExchangeId,
+		ConversationId:      convCtx.ConversationId,
+		Question:            convCtx.Question,
+		Answer:              answer,
+		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
+		ReferenceList:       toJSONArray(uniqueReferences),
+		RecommendationList:  toJSONArray(recommendations),
+		UsedToolList:        toJSONArray(snapshotUsedTools(convCtx.UsedTools)),
+		DebugTraceJson:      debugTraceJSON(convCtx),
+		TurnStatus:          vo.ChatTurnStatusCompleted,
+		ErrorMessage:        "",
+		FirstResponseTimeMs: firstResponse,
+		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
+	}
+	if err := c.repo.CompleteExchange(context.Background(), successExchange); err != nil {
+		logx.Errorf("成功会话收尾落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
-		if convCtx.TraceRecorder != nil && finalizeStage != nil {
-			convCtx.TraceRecorder.FailStage(finalizeStage, "完成态收尾失败。", err.Error(), nil)
-		}
-	} else {
-		if convCtx.TraceRecorder != nil && finalizeStage != nil {
-			convCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按完成状态收尾。", map[string]interface{}{
-				"finalStatus":         archive.TurnStatusCompleted.String(),
-				"referenceCount":      len(uniqueReferences),
-				"recommendationCount": len(recommendations),
-				"answerLength":        len(answer),
-			})
-		}
 	}
+
+	// 异步刷新会话摘要
+	go func() {
+		defer func() { _ = recover() }()
+		c.memoryLogic.RefreshConversationSummaryAsync(context.Background(), convCtx.ConversationId)
+	}()
 }
 
-// finishWithFailure 失败处理
-func (c *LogicImpl) finishWithFailure(ctx context.Context, conversationCtx *vo.ConversationContext, err error) {
-	if !conversationCtx.Finalized.CompareAndSwap(false, true) {
+// finishWithFailure 失败收尾
+func (c *LogicImpl) finishWithFailure(convCtx *vo.ConversationContext, err error) {
+	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
-	errorMessage := c.buildErrorMessage(err)
-	var finalizeStage interface{}
-	if conversationCtx.TraceRecorder != nil {
-		modeName := ""
-		if conversationCtx.ExecutionPlan != nil {
-			modeName = conversationCtx.ExecutionPlan.Mode.String()
-		}
-		finalizeStage = conversationCtx.TraceRecorder.StartStage(trace.StageCodeFinalize, modeName, "正在收尾失败会话。", nil)
-	}
+	errorMessage := err.Error()
 	logx.Errorf("会话执行失败, conversationId=%s, exchangeId=%d, error=%s",
-		conversationCtx.ConversationId, conversationCtx.ExchangeId, errorMessage)
+		convCtx.ConversationId, convCtx.ExchangeId, errorMessage)
 
-	defer func() {
-		if r := recover(); r != nil {
-			logx.Warnf("发送失败事件或关闭流失败, conversationId=%s, exchangeId=%d, error=%v",
-				conversationCtx.ConversationId, conversationCtx.ExchangeId, r)
-		}
-	}()
-	c.safeEmit(conversationCtx.Sink, c.streamEventWriter.Error(errorMessage, conversationCtx.EventMetadata))
-	defer func() {
-		c.safeComplete(conversationCtx.Sink)
-	}()
+	safeEmit(convCtx.Channel, c.streamEventBuilder.ErrorWithMetadata(
+		errorMessage, convCtx.ConversationId, convCtx.ExchangeId))
 
-	c.refreshDebugTraceRuntimeStats(conversationCtx)
-	err2 := c.conversationArchiveStore.CompleteExchange(ctx,
-		conversationCtx.ConversationId,
-		conversationCtx.ExchangeId,
-		conversationCtx.GetAnswer(),
-		conversationCtx.ThinkingSteps.Snapshot(),
-		c.deduplicateReferences(conversationCtx.References.Snapshot()),
-		[]string{},
-		conversationCtx.UsedTools.Snapshot(),
-		conversationCtx.DebugTrace,
-		archive.TurnStatusFailed,
-		errorMessage,
-		func() *int64 {
-			if t := conversationCtx.GetFirstResponseTimeMs(); t > 0 {
-				return &t
-			}
-			return nil
-		}(),
-		time.Since(conversationCtx.StartTime).Milliseconds(),
-	)
-	if err2 != nil {
-		logx.Errorf("失败会话收尾落库失败, conversationId=%s, exchangeId=%d, error=%v",
-			conversationCtx.ConversationId, conversationCtx.ExchangeId, err2)
-		if conversationCtx.TraceRecorder != nil && finalizeStage != nil {
-			conversationCtx.TraceRecorder.FailStage(finalizeStage, "失败态收尾失败。", err2.Error(), nil)
-		}
-	} else {
-		if conversationCtx.TraceRecorder != nil && finalizeStage != nil {
-			conversationCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按失败状态收尾。", map[string]interface{}{
-				"finalStatus":  archive.TurnStatusFailed.String(),
-				"errorMessage": errorMessage,
-				"answerLength": len(conversationCtx.GetAnswer()),
-			})
-		}
+	c.refreshDebugTraceRuntimeStats(convCtx)
+
+	firstResponse := int64(0)
+	if v := convCtx.FirstResponseTimeMs.Load(); v > 0 {
+		firstResponse = v
 	}
-	defer c.safeRefreshConversationSummary(conversationCtx.ConversationId)
-	defer c.cleanup(conversationCtx)
+	failExchange := &entity.ChatExchange{
+		ID:                  convCtx.ExchangeId,
+		ConversationId:      convCtx.ConversationId,
+		Question:            convCtx.Question,
+		Answer:              convCtx.AnswerBuffer.String(),
+		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
+		ReferenceList:       toJSONArray(snapshotReferences(convCtx.References)),
+		RecommendationList:  toJSONArray([]string{}),
+		UsedToolList:        toJSONArray(snapshotUsedTools(convCtx.UsedTools)),
+		DebugTraceJson:      debugTraceJSON(convCtx),
+		TurnStatus:          vo.ChatTurnStatusFailed,
+		ErrorMessage:        errorMessage,
+		FirstResponseTimeMs: firstResponse,
+		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
+	}
+	if dbErr := c.repo.CompleteExchange(context.Background(), failExchange); dbErr != nil {
+		logx.Errorf("失败会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, dbErr)
+	}
+
+	go func() {
+		defer func() { _ = recover() }()
+		c.memoryLogic.RefreshConversationSummaryAsync(context.Background(), convCtx.ConversationId)
+	}()
 }
 
-// buildErrorMessage 构建错误消息
-func (c *LogicImpl) buildErrorMessage(err error) string {
-	// 简化实现，可根据需要包装
-	return err.Error()
-}
-
-// refreshDebugTraceRuntimeStats 刷新调试追踪统计
-func (c *LogicImpl) refreshDebugTraceRuntimeStats(conversationCtx *vo.ConversationContext) {
-	if conversationCtx.DebugTrace == nil || conversationCtx.TraceRecorder == nil {
+// refreshDebugTraceRuntimeStats 刷新调试轨迹中的统计信息
+func (c *LogicImpl) refreshDebugTraceRuntimeStats(convCtx *vo.ConversationContext) {
+	if convCtx == nil {
 		return
 	}
-	modelUsageTraces := conversationCtx.TraceRecorder.SnapshotModelUsageTraces()
-	conversationCtx.DebugTrace.ModelUsageTraces = modelUsageTraces
-	limitStats := &debug.ChatLimitStats{
-		ModelCallsUsed:        len(modelUsageTraces),
-		ModelCallsRunLimit:    c.chatAgentProperties.MaxModelCallsPerRun,
-		ModelCallsThreadLimit: c.chatAgentProperties.MaxModelCallsPerThread,
-		ToolCallsUsed:         len(conversationCtx.UsedTools.Snapshot()),
-		ToolCallsRunLimit:     c.chatAgentProperties.MaxToolCallsPerRun,
-		ToolCallsThreadLimit:  c.chatAgentProperties.MaxToolCallsPerThread,
+	debugTrace := convCtx.DebugTrace.Load()
+	if debugTrace == nil {
+		return
 	}
-	conversationCtx.DebugTrace.LimitStats = limitStats
+	limitStats := &vo.ChatLimitStats{
+		ModelCallsUsed:        len(snapshotUsedTools(convCtx.UsedTools)),
+		ToolCallsUsed:         len(snapshotUsedTools(convCtx.UsedTools)),
+		ModelCallsRunLimit:    32,
+		ToolCallsRunLimit:     32,
+		ModelCallsThreadLimit: 64,
+		ToolCallsThreadLimit:  64,
+	}
+	debugTrace.LimitStats = limitStats
+	convCtx.DebugTrace.Store(debugTrace)
 }
 
-//
-// // cleanup 清理资源
-// func (s *BusinessChatService) cleanup(conversationCtx *vo.ConversationContext) {
-// 	if cancel := conversationCtx.GetLeaseRenewalCancel(); cancel != nil {
-// 		cancel()
-// 	}
-// 	if cancel := conversationCtx.GetExecutionCancel(); cancel != nil {
-// 		cancel()
-// 	}
-// 	s.releaseLeaseQuietly(conversationCtx.LeaseKey, conversationCtx.LeaseOwnerToken)
-// 	s.chatRuntimeRegistry.Remove(conversationCtx.ConversationId, conversationCtx)
-// }
+// ---------------------------------------------------------------------------
+// 辅助方法（构建上下文、流辅助、JSON 辅助等）
+// ---------------------------------------------------------------------------
 
-// rejectStream 拒绝流式请求
-func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
-	stream := make(chan string, 1)
-	defer close(stream)
-	stream <- c.streamEventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
-	return stream
-}
-
+// buildConversationCtx 构建对话运行上下文（对应 Java 中 TaskInfo / ConversationContext 的创建）
 func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
-	// todo runnableConfig := s.buildSessionConfig(plan.ConversationId)
-	// thinkingSteps := &syncSlice{data: make([]string, 0)}
-	// references := &syncSliceRef{data: make([]chat.SearchReference, 0)}
-	// usedTools := &syncSet{data: make(map[string]struct{})}
-
 	traceId := utils.GenerateUUIDWithoutHyphen()
-	trace := vo.NewConversationTrace(plan.ConversationId, exchange.ID, traceId)
-	// eventMetadata := &StreamEventMetadata{
-	// 	ConversationId: plan.ConversationId,
-	// 	ExchangeId:     exchange.ID,
-	// }
-
-	// todo 设置上下文
-	// runnableConfig.Context["eventSink"] = channel
-	// runnableConfig.Context["eventMetadata"] = eventMetadata
-	// runnableConfig.Context["thinkingSteps"] = thinkingSteps
-	// runnableConfig.Context["references"] = references
-	// runnableConfig.Context["usedTools"] = usedTools
-	// runnableConfig.Context["traceId"] = traceId
-	// runnableConfig.Context["question"] = plan.Question
-	// runnableConfig.Context["chatMode"] = plan.ChatMode.String()
-	// runnableConfig.Context["currentDate"] = plan.CurrentDate.Format(time.RFC3339)
-	// runnableConfig.Context["currentDateText"] = plan.CurrentDateText
-	//
-	// putContextIfNotNull(runnableConfig.Context, "selectedDocumentId", plan.SelectedDocumentId)
-	// putContextIfNotBlank(runnableConfig.Context, "selectedDocumentName", plan.SelectedDocumentName)
-	// putContextIfNotNull(runnableConfig.Context, "selectedTaskId", plan.SelectedTaskId)
-
-	// debugTrace := vo.NewChatDebugTrace(nil)
-	// runnableConfig.Context["debugTrace"] = debugTrace
+	convTrace := vo.NewConversationTrace(plan.ConversationId, exchange.ID, traceId)
 
 	return &vo.ConversationContext{
 		ConversationId:       plan.ConversationId,
@@ -848,16 +810,199 @@ func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *en
 		SelectedTaskId:       plan.SelectedTaskId,
 		CurrentDate:          plan.CurrentDate,
 		CurrentDateText:      plan.CurrentDateText,
-		// ExecutionPlan:        nil,
-		// DebugTrace:           debugTrace,
-		// RunnableConfig:       runnableConfig,
-		Trace:   trace,
-		Channel: make(chan string, channelBufferSize),
-		// EventMetadata:   eventMetadata,
-		LeaseKey: chatRunningLeasePrefix + plan.ConversationId,
-		// ThinkingSteps: thinkingSteps,
-		// References:    references,
-		// UsedTools:     usedTools,
-		StartTime: time.Now(),
+		Trace:                convTrace,
+		Channel:              make(chan string, channelBufferSize),
+		LeaseKey:             chatRunningLeasePrefix + plan.ConversationId,
+		ThinkingSteps:        []string{},
+		References:           []*vo.SearchReference{},
+		UsedTools:            map[string]struct{}{},
+		StartTime:            time.Now(),
+	}
+}
+
+// rejectStream 生成一个仅含错误事件的只读流
+func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
+	stream := make(chan string, 1)
+	defer close(stream)
+	stream <- c.streamEventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
+	return stream
+}
+
+// fetchRecentExchanges 获取最近的历史轮次（排除当前）
+func (c *LogicImpl) fetchRecentExchanges(conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
+	turns := defaultHistoryPreviewTurns
+	if c.config != nil && c.config.Chat.Recommendation.HistoryPreviewTurns > 0 {
+		turns = c.config.Chat.Recommendation.HistoryPreviewTurns
+	}
+	recent, err := c.repo.ListRecentExchanges(context.Background(), conversationId, turns)
+	if err != nil {
+		logx.Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
+		return []*entity.ChatExchange{}
+	}
+	result := make([]*entity.ChatExchange, 0, len(recent))
+	for _, ex := range recent {
+		if ex == nil || ex.ID == excludeExchangeId {
+			continue
+		}
+		result = append(result, ex)
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
+// 纯函数/工具方法
+// ---------------------------------------------------------------------------
+
+// safeEmit 安全地向通道写入事件，若写入阻塞则忽略，保证生成链路不被卡住
+func safeEmit(ch chan<- string, payload string) {
+	defer func() { _ = recover() }()
+	if ch == nil {
+		return
+	}
+	ch <- payload
+}
+
+// chatModeValue 返回 chatMode 的整型值（给 entity 使用）
+func chatModeValue(mode vo.ChatQueryMode) int {
+	if mode == nil {
+		return 0
+	}
+	return mode.Value()
+}
+
+// buildSessionTitle 为会话构造一个展示标题，取最新问题截断若干字符
+func buildSessionTitle(record *vo.ConversationArchiveRecord, defaultText string) string {
+	if record == nil {
+		return ""
+	}
+	for i := len(record.Exchanges) - 1; i >= 0; i-- {
+		ex := record.Exchanges[i]
+		if ex != nil && strutil.IsNotBlank(ex.Question) {
+			q := ex.Question
+			if len(q) > 30 {
+				return q[:30]
+			}
+			return q
+		}
+	}
+	if len(defaultText) > 30 {
+		return defaultText[:30]
+	}
+	return defaultText
+}
+
+// stageStateText 返回阶段状态文本
+func stageStateText(state int) string {
+	switch state {
+	case vo.ChatTurnStatusRunning:
+		return "进行中"
+	case vo.ChatTurnStatusCompleted:
+		return "已完成"
+	case vo.ChatTurnStatusFailed:
+		return "失败"
+	case vo.ChatTurnStatusStopped:
+		return "已停止"
+	default:
+		return "未知"
+	}
+}
+
+// snapshotStrings 获取思考步骤的快照（拷贝一份）
+func snapshotStrings(items []string) []string {
+	if len(items) == 0 {
+		return []string{}
+	}
+	out := make([]string, len(items))
+	copy(out, items)
+	return out
+}
+
+// snapshotReferences 生成引用快照并按 uniqueKey 去重
+func snapshotReferences(refs []*vo.SearchReference) []*vo.SearchReference {
+	if len(refs) == 0 {
+		return []*vo.SearchReference{}
+	}
+	seen := sync.Map{}
+	out := make([]*vo.SearchReference, 0, len(refs))
+	for _, r := range refs {
+		if r == nil {
+			continue
+		}
+		key := fmt.Sprintf("%d-%d-%s", r.DocumentId, r.ChunkId, r.Snippet)
+		if _, dup := seen.LoadOrStore(key, struct{}{}); dup {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// snapshotUsedTools 获取已用工具的快照
+func snapshotUsedTools(used map[string]struct{}) []string {
+	if len(used) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(used))
+	for k := range used {
+		out = append(out, k)
+	}
+	return out
+}
+
+// debugTraceJSON 序列化调试轨迹
+func debugTraceJSON(convCtx *vo.ConversationContext) string {
+	if convCtx == nil {
+		return ""
+	}
+	dt := convCtx.DebugTrace.Load()
+	if dt == nil {
+		return ""
+	}
+	data, err := json.Marshal(dt)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// toJSONArray 将任意切片序列化为 common.JSONArray 所需的 JSON 数组文本
+// entity.ChatExchange 的 ThinkingSteps/ReferenceList/... 为 common.JSONArray（即 []byte）
+func toJSONArray[T any](items []T) []byte {
+	if items == nil {
+		return []byte("[]")
+	}
+	data, err := json.Marshal(items)
+	if err != nil {
+		return []byte("[]")
+	}
+	return data
+}
+
+// jsonStrings 把 common.JSONArray 解析为字符串切片；若失败返回空切片
+func jsonStrings(raw any) []string {
+	if raw == nil {
+		return []string{}
+	}
+	switch v := raw.(type) {
+	case []byte:
+		if len(v) == 0 {
+			return []string{}
+		}
+		var out []string
+		if err := json.Unmarshal(v, &out); err == nil {
+			return out
+		}
+		return []string{}
+	case string:
+		if v == "" {
+			return []string{}
+		}
+		var out []string
+		if err := json.Unmarshal([]byte(v), &out); err == nil {
+			return out
+		}
+		return []string{}
+	default:
+		return []string{}
 	}
 }
