@@ -52,3 +52,7 @@ func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
 		StartTime:            time.Now(),
 	}
 }
+
+func (c *ConversationContext) AddThinkingSteps(steps ...string) {
+	c.ThinkingSteps.AddAll(steps)
+}

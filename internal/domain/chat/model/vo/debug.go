@@ -105,6 +105,10 @@ func (t *ChatDebugTrace) AddUsedChannel(channel string) {
 	t.UsedChannels.Add(channel)
 }
 
+func (t *ChatDebugTrace) AddRetrievalNote(note string) {
+	t.RetrievalNotes.Add(note)
+}
+
 // ChatLimitStats 单轮对话的调用限制统计
 type ChatLimitStats struct {
 	ModelCallsUsed        int    `json:"modelCallsUsed"`        // 已使用的模型调用次数

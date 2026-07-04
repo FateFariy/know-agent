@@ -1,4 +1,4 @@
-package chat
+package conversation
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	chatRunningLeasePrefix        = "chat:running:"
+	chatRunningLeasePrefix        = "conversation:running:"
 	chatRunningLeaseRenewInterval = 10 * time.Second
 	channelBufferSize             = 100
 	defaultHistoryPreviewTurns    = 3
@@ -76,28 +76,18 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 }
 
 // OpenConversationStream 打开会话流
-//
-// 整体流程：
-//  1. 构建启动计划（规范化会话ID、问题、模式、文档）
-//  2. 获取分布式运行租约（防止会话同时执行多次）
-//  3. 启动会话（落库 exchange、注册到运行注册表）
-//  4. 异步执行：
-//     a. 发送 thinking 事件
-//     b. 构建执行计划（改写/路由/检索/会话记忆）
-//     c. 后续由执行器消费（此处仅完成计划构建的落库与上下文填充）
-//  5. 成功/失败/停止 的收尾（落库 + 发送引用/推荐事件）
 func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) (stream <-chan string) {
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
-	isSuccessLock := false
+	isSuccessLock := utils.Pointer(false)
 	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
-				if !isSuccessLock {
-					if err = c.distributedLock.Unlock(ctx, leaseKey); err != nil {
-						Warnf("分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
+				if *isSuccessLock {
+					if leaseErr := c.distributedLock.Unlock(ctx, leaseKey); leaseErr != nil {
+						Warnf("分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, leaseErr)
 					}
 				}
 				logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
@@ -107,25 +97,25 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 		}
 	}()
 
+	// 获取分布式租约
+	if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
+		panic(fmt.Errorf("该会话当前正在执行中，请稍后再试"))
+	}
+	isSuccessLock = utils.Pointer(true)
+
 	// 构建启动计划
 	plan, err := c.buildLaunchPlan(ctx, cmd)
 	if err != nil {
 		panic(err)
 	}
 
-	// 获取分布式租约
-	if err = c.distributedLock.TryLock(ctx, leaseKey); err != nil {
-		panic(fmt.Errorf("该会话当前正在执行中，请稍后再试"))
-	}
-	isSuccessLock = true
-
 	// 启动会话：创建 exchange + 注册运行上下文
-	convCtx, err := c.bootstrapConversation(ctx, plan)
+	stream, err = c.bootstrapConversation(ctx, plan)
 	if err != nil {
 		panic(err)
 	}
 
-	return convCtx.Channel
+	return
 }
 
 // ListKnowledgeDocumentOptions 获取知识文档选项列表
@@ -178,7 +168,7 @@ func (c *LogicImpl) GetSession(ctx context.Context, conversationId string) (*cha
 		LatestMessage:  latestMessage,
 		CreateTime:     record.CreatedAt.Format(time.DateTime),
 		UpdateTime:     record.UpdatedAt.Format(time.DateTime),
-		// 备注：api/chat 中 ConversationSessionResp 字段较少，如需更多信息可扩展
+		// 备注：api/conversation 中 ConversationSessionResp 字段较少，如需更多信息可扩展
 	}, nil
 }
 
@@ -397,15 +387,16 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 }
 
 // bootstrapConversation 启动会话，创建对话记录并注册到运行注册表。若注册失败，说明会话正被其他执行接管，则拒绝。
-func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (*vo.ConversationContext, error) {
+func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (<-chan string, error) {
 	dialogue := plan.ConvChatDialogue()
 	exchange, err := c.repo.StartExchange(ctx, dialogue)
 	if err != nil {
-		logx.Errorf("启动 exchange 失败, conversationId=%s, err=%v", plan.ConversationId, err)
 		return nil, err
 	}
 
 	convCtx := c.buildConversationCtx(plan, exchange)
+	cancelCtx, cancelFunc := context.WithCancel(ctx)
+	convCtx.CancelExecute = cancelFunc
 
 	if !c.runtimeRegistry.Register(convCtx) {
 		// 已存在正在执行的会话，回写失败状态并拒绝
@@ -418,16 +409,12 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 		if err = c.repo.CompleteExchange(ctx, failExchange); err != nil {
 			logx.Errorf("保存 exchange 失败, conversationId=%s, err=%v", plan.ConversationId, err)
 		}
-		if err = c.distributedLock.Unlock(ctx, convCtx.LeaseKey); err != nil {
-			Warnf("锁 %s 释放失败: %v", convCtx.LeaseKey, err)
-		}
 		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
-	// 4) 异步执行（流式返回）
 	go func() {
 		defer func() {
 			// 释放租约
-			if leaseErr := c.distributedLock.Unlock(ctx, convCtx.LeaseKey); leaseErr != nil {
+			if leaseErr := c.distributedLock.Unlock(cancelCtx, convCtx.LeaseKey); leaseErr != nil {
 				Warnf("锁 %s 释放失败: %s", convCtx.LeaseKey, leaseErr.Error())
 			}
 			// 从注册表移除
@@ -437,9 +424,9 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 		}()
 
 		// 激活生成：租约续期 + 执行计划构建
-		c.activateGeneration(ctx, convCtx)
+		c.activateGeneration(cancelCtx, convCtx)
 	}()
-	return convCtx, nil
+	return convCtx.Channel, nil
 }
 
 // activateGeneration 激活生成逻辑
@@ -462,10 +449,15 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 
 	// 启动租约续期
 	go c.startLeaseRenewal(ctx, convCtx)
+	if convCtx.Finalized.Load() && convCtx.CancelExecute != nil {
+		convCtx.CancelExecute()
+		convCtx.CancelExecute = nil
+		return
+	}
 
 	// 发送 "正在分析问题上下文" 事件
-	safeEmit(convCtx.Channel, c.streamEventBuilder.ThinkingWithMetadata(
-		"正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId))
+	thinking := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
+	safeEmit(convCtx.Channel, thinking)
 
 	// 构建执行计划
 	execPlan, err := c.prepareExecutionPlan(ctx, convCtx)
@@ -502,8 +494,8 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 			}
 			// 执行续期逻辑
 			if err := c.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
-				logx.Alert(fmt.Sprintf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d",
-					convCtx.ConversationId, convCtx.ExchangeId))
+				Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d",
+					convCtx.ConversationId, convCtx.ExchangeId)
 				c.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
 				return
 			}
@@ -531,10 +523,10 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, renderErr := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
-	if renderErr != nil {
+	agentQuestion, err := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
+	if err != nil {
 		logx.Errorf("渲染 agent 问题失败, conversationId=%s, exchangeId=%d, err=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, renderErr)
+			convCtx.ConversationId, convCtx.ExchangeId, err)
 		// 渲染失败不致命，退化为原始问题
 		agentQuestion = execPlan.OriginalQuestion
 	}
@@ -548,13 +540,21 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 			SelectedDocumentId:   execPlan.SelectedDocumentId,
 			SelectedDocumentName: execPlan.SelectedDocumentName,
 		}
-		if refreshErr := c.repo.RefreshSessionScope(ctx, dialogue); refreshErr != nil {
-			Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, refreshErr)
+		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
+			Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
+			return nil, err
 		}
+		// todo 更新上下文
+		// putContextIfNotNull(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_DOCUMENT_ID, execPlan.SelectedDocumentId)
+		// putContextIfNotBlank(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_DOCUMENT_NAME, execPlan.SelectedDocumentName)
+		// putContextIfNotNull(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_TASK_ID, execPlan.SelectedTaskId)
 	}
 
 	debugTrace := vo.NewChatDebugTrace(execPlan)
 	convCtx.DebugTrace.Store(debugTrace)
+	convCtx.ExecutionPlan.Store(execPlan)
+	// todo taskInfo.runnableConfig().context().put(ChatContextKeys.DEBUG_TRACE, taskInfo.debugTrace());
+
 	return execPlan, nil
 }
 
