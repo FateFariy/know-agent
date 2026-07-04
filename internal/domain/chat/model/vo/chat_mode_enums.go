@@ -32,3 +32,10 @@ func ToChatQueryMode(name string) ChatQueryMode {
 		return enum.NewItem(-1, "unknown")
 	}
 }
+
+func ChatQueryModeValue(mode ChatQueryMode) int {
+	if mode == nil {
+		return 0
+	}
+	return mode.Value()
+}

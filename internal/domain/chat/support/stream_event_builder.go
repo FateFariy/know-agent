@@ -10,8 +10,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// StreamEvent 流式事件结构体
-type StreamEvent struct {
+// streamEvent 流式事件结构体
+type streamEvent struct {
 	Type           string `json:"type"`                     // 事件类型
 	Content        any    `json:"content"`                  // 事件内容
 	Timestamp      string `json:"timestamp"`                // 时间戳
@@ -89,8 +89,8 @@ func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []strin
 }
 
 // event 构建事件载荷
-func (b *StreamEventBuilder) event(eventType string, content any, conversationId string, exchangeId int64) *StreamEvent {
-	payload := &StreamEvent{
+func (b *StreamEventBuilder) event(eventType string, content any, conversationId string, exchangeId int64) *streamEvent {
+	payload := &streamEvent{
 		Type:      eventType,
 		Content:   content,
 		Timestamp: time.Now().Format(time.DateTime),
@@ -101,7 +101,7 @@ func (b *StreamEventBuilder) event(eventType string, content any, conversationId
 }
 
 // build 将载荷序列化为 JSON 字符串
-func (b *StreamEventBuilder) build(event *StreamEvent) string {
+func (b *StreamEventBuilder) build(event *streamEvent) string {
 	data, _ := json.Marshal(event)
 	return string(data)
 }

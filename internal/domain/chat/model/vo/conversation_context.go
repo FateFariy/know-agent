@@ -3,8 +3,11 @@ package vo
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	list "github.com/duke-git/lancet/v2/datastructure/list"
 )
 
 type ConversationContext struct {
@@ -21,15 +24,31 @@ type ConversationContext struct {
 	ExecutionPlan        atomic.Pointer[ConversationExecutionPlan] // 执行计划
 	DebugTrace           atomic.Pointer[ChatDebugTrace]            // 调试追踪
 	// todo 待确认 RunnableConfig      RunnableConfig                            // 运行配置
-	Trace               *ConversationTrace  // 追踪记录
-	Channel             chan string         // 响应流
-	LeaseKey            string              // 租约锁键
-	AnswerBuffer        strings.Builder     // 响应内容缓冲区
-	ThinkingSteps       []string            // 思考步骤列表
-	References          []SearchReference   // 引用列表
-	UsedTools           map[string]struct{} // 已使用的工具集合
-	StartTime           time.Time           // 开始时间（毫秒精度）
-	FirstResponseTimeMs atomic.Int64        // 首次响应耗时（毫秒）
-	Finalized           atomic.Bool         // 是否已完成
-	CancelExecute       context.CancelFunc  // 资源释放
+	Trace               *ConversationTrace                      // 追踪记录
+	Channel             chan string                             // 响应流
+	LeaseKey            string                                  // 租约锁键
+	AnswerBuffer        strings.Builder                         // 响应内容缓冲区
+	ThinkingSteps       *list.CopyOnWriteList[string]           // 思考步骤列表
+	References          *list.CopyOnWriteList[*SearchReference] // 引用列表
+	UsedTools           sync.Map                                // 已使用的工具集合
+	StartTime           time.Time                               // 开始时间（毫秒精度）
+	FirstResponseTimeMs atomic.Int64                            // 首次响应耗时（毫秒）
+	Finalized           atomic.Bool                             // 是否已完成
+	CancelExecute       context.CancelFunc                      // 资源释放
+}
+
+func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
+	return &ConversationContext{
+		ConversationId:       plan.ConversationId,
+		Question:             plan.Question,
+		ChatMode:             plan.ChatMode,
+		SelectedDocumentId:   plan.SelectedDocumentId,
+		SelectedDocumentName: plan.SelectedDocumentName,
+		SelectedTaskId:       plan.SelectedTaskId,
+		CurrentDate:          plan.CurrentDate,
+		CurrentDateText:      plan.CurrentDateText,
+		ThinkingSteps:        list.NewCopyOnWriteList[string](nil),
+		References:           list.NewCopyOnWriteList[*SearchReference](nil),
+		StartTime:            time.Now(),
+	}
 }
