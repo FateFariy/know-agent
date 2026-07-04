@@ -20,11 +20,11 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
+	cadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	dadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	kadapter "github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -37,7 +37,7 @@ type MilvusVector struct {
 }
 
 var _ dadapter.VectorDB = (*MilvusVector)(nil)
-var _ kadapter.VectorDB = (*MilvusVector)(nil)
+var _ cadapter.VectorDB = (*MilvusVector)(nil)
 
 func NewMilvusVector(svcCtx *svc.ServiceContext) dadapter.VectorDB {
 	ctx := context.Background()
@@ -77,19 +77,14 @@ func (m *MilvusVector) DeleteVectorByDocumentId(ctx context.Context, documentId 
 }
 
 // SearchByVector 根据向量搜索
-func (m *MilvusVector) SearchByVector(ctx context.Context, query string, documentIds, taskIds []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*vo2.DocumentChunk, error) {
+func (m *MilvusVector) SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	// todo 过滤条件
 	filterExpr := ""
-	retrievedDocs, err := m.retriever.Retrieve(ctx, query, retriever.WithTopK(topK), retrievermilvus.WithFilter(filterExpr))
+	retrievedDocs, err := m.retriever.Retrieve(ctx, query.RetrievalQuery, retriever.WithTopK(query.TopK), retrievermilvus.WithFilter(filterExpr))
 	if err != nil {
 		return nil, err
 	}
 	return m.toKnowledgeDocuments(retrievedDocs), nil
-}
-
-func (m *MilvusVector) SearchByKeyword(ctx context.Context, query string, documentIds, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*vo2.DocumentChunk, error) {
-	// TODO implement me
-	panic("implement me")
 }
 
 // markSuccess 批量标记分片向量生成成功
@@ -138,25 +133,25 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 }
 
 // toKnowledgeDocuments 将 Milvus 检索结果（schema.Document）转成统一的 klvo.DocumentChunk 列表
-func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*vo2.DocumentChunk {
-	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *vo2.DocumentChunk {
+func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*vo.DocumentChunk {
+	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *vo.DocumentChunk {
 		meta := doc.MetaData
-		return &vo2.DocumentChunk{
+		return &vo.DocumentChunk{
 			ID:                doc.ID,
 			Content:           doc.Content,
 			OriginalSnippet:   doc.Content,
 			SourceType:        "DOCUMENT",
-			Channel:           vo2.RetrievalChannelVector,
+			Channel:           vo.RetrievalChannelVector,
 			Score:             doc.Score(),
-			TaskId:            metaToInt(meta[vo2.MetaTaskID]),
-			DocumentId:        metaToInt(meta[vo2.MetaDocumentID]),
-			ChunkNo:           int(metaToInt(meta[vo2.MetaChunkNo])),
-			ParentBlockId:     metaToInt(meta[vo2.MetaParentBlockID]),
-			SectionPath:       convertor.ToString(meta[vo2.MetaSectionPath]),
-			StructureNodeId:   metaToInt(meta[vo2.MetaStructureNodeID]),
-			StructureNodeType: int(metaToInt(meta[vo2.MetaStructureNodeType])),
-			CanonicalPath:     convertor.ToString(meta[vo2.MetaCanonicalPath]),
-			ItemIndex:         int(metaToInt(meta[vo2.MetaItemIndex])),
+			TaskId:            metaToInt(meta[vo.MetaTaskID]),
+			DocumentId:        metaToInt(meta[vo.MetaDocumentID]),
+			ChunkNo:           int(metaToInt(meta[vo.MetaChunkNo])),
+			ParentBlockId:     metaToInt(meta[vo.MetaParentBlockID]),
+			SectionPath:       convertor.ToString(meta[vo.MetaSectionPath]),
+			StructureNodeId:   metaToInt(meta[vo.MetaStructureNodeID]),
+			StructureNodeType: int(metaToInt(meta[vo.MetaStructureNodeType])),
+			CanonicalPath:     convertor.ToString(meta[vo.MetaCanonicalPath]),
+			ItemIndex:         int(metaToInt(meta[vo.MetaItemIndex])),
 		}
 	})
 }

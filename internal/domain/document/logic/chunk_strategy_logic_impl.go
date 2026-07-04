@@ -55,7 +55,7 @@ type strategyOption struct {
 	recommendLlmWhenLowQuality  bool
 }
 
-func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel *chatlogic.ObservedChatModelImpl[*schema.Message],
+func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel *chatlogic.ChatModelImpl[*schema.Message],
 	promptTemplate chatlogic.PromptTemplateLogic, structureNode StructureNodeLogic) *ChunkStrategyLogicImpl {
 
 	registry := make(map[int]chunk.Strategy)

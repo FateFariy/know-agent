@@ -387,11 +387,14 @@ func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context,
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	var blocks []*entity.DocumentParentBlock
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).Where("id IN ?", ids).Find(&blocks).Error; err != nil {
+	var parentBlocks []*entity.DocumentParentBlock
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).
+		Where("id IN ?", ids).
+		Order("parent_no ASC").
+		Find(&parentBlocks).Error; err != nil {
 		return nil, err
 	}
-	return blocks, nil
+	return parentBlocks, nil
 }
 
 // SelectParentBlockById 根据父块ID查询父块详情
@@ -404,21 +407,6 @@ func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, bloc
 		return nil, err
 	}
 	return parentBlock, nil
-}
-
-// SelectParentBlocks 根据 ID 列表查询父级块
-func (d *DocumentRepositoryImpl) SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error) {
-	if len(parentBlockIDs) == 0 {
-		return nil, nil
-	}
-	var parentBlocks []*entity.DocumentParentBlock
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).
-		Where("id IN ?", parentBlockIDs).
-		Order("parent_no ASC").
-		Find(&parentBlocks).Error; err != nil {
-		return nil, err
-	}
-	return parentBlocks, nil
 }
 
 // ========== 结构节点相关 ==========

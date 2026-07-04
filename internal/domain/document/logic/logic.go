@@ -45,8 +45,8 @@ type LifecycleLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
 	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
 
-	// ElevateToParentBlocks 将子文档提升到父块级别
-	ElevateToParentBlocks(ctx context.Context, childDocuments []*entity.DocumentChunk, maxChars int) ([]*entity.DocumentChunk, error)
+	// QueryParentBlocks 查询父块列表
+	QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentBlock, error)
 }
 
 // AsyncProcessingLogic 异步处理业务逻辑接口

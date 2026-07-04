@@ -120,9 +120,6 @@ type DocumentRepository interface {
 	// SelectChunkListByParentBlockId 根据父块ID查询块列表
 	SelectChunkListByParentBlockId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error)
 
-	// SelectParentBlocks 根据ID列表查询父级块
-	SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error)
-
 	// ========== 父块相关 ==========
 
 	// InsertParentBlock 插入父块
