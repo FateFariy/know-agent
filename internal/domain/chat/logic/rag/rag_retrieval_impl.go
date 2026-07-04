@@ -15,19 +15,20 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const rrfK = 60
 
-type RetrievalEngine struct {
+type RetrievalImpl struct {
 	channels                  []channel.RetrievalChannel
-	repo                      adapter.ChatRepository
+	documentLogic             doclog.LifecycleLogic
 	channelTimeout            time.Duration
 	subQuestionTimeout        time.Duration
 	minVectorSimilarity       float64
@@ -40,10 +41,10 @@ type RetrievalEngine struct {
 	keywordTopK               int
 }
 
-func NewRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.RetrievalChannel, repo adapter.ChatRepository) *RetrievalEngine {
-	return &RetrievalEngine{
+func NewRetrievalImpl(svcCtx *svc.ServiceContext, channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
+	return &RetrievalImpl{
 		channels:                  channels,
-		repo:                      repo,
+		documentLogic:             documentLogic,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
 		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
 		minVectorSimilarity:       svcCtx.Config.Chat.Rag.MinVectorSimilarity,
@@ -57,9 +58,9 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.Retrieval
 	}
 }
 
-var _ logic.RagRetriever = (*RetrievalEngine)(nil)
+var _ logic.RagRetriever = (*RetrievalImpl)(nil)
 
-func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error) {
+func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error) {
 	ragCtx := vo.NewRagRetrievalContext(plan.RetrievalQuestion)
 
 	subQuestions := plan.RetrievalSubQuestions
@@ -79,7 +80,7 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.ConversationExe
 	return ragCtx, nil
 }
 
-func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
+func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
 	plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
 	defer cancel()
@@ -170,57 +171,98 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCt
 	}
 }
 
-// retrieveChannelParallel 并行检索单个子问题的所有通道
-// 使用goroutine并发执行各通道检索，通过超时控制防止阻塞，失败自动降级返回空结果
-func (e *RetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int,
+// retrieveChannelParallel 并行检索单个子问题的所有通道。
+//
+// 执行流程：
+//  1. 创建带超时的上下文（channelTimeout），用于防止单个通道阻塞整个检索
+//  2. 过滤出当前计划支持的通道（Supports），无通道时直接返回空
+//  3. 为每个通道启动一个 goroutine 执行检索；失败/超时仅告警并返回空文档（即"自动降级"）
+//  4. 主循环通过 select 收集结果或在超时退出时返回已收集的部分结果
+func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int,
 	subQuestion string, plan *vo.ConversationExecutionPlan) ([]*vo.RetrievalChannelResult, error) {
-	// 创建带超时的上下文，超时时间为通道超时配置
+	// 创建带超时的上下文，超时时间为通道超时配置（保证单个通道异常不会阻塞整体）
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.channelTimeout)
 	defer cancel()
 
-	// 过滤仅执行支持当前计划的通道
+	// 过滤出当前计划支持的通道（无通道直接返回空，让上游继续）
 	channels := slice.Filter(e.channels, func(_ int, item channel.RetrievalChannel) bool { return item.Supports(plan) })
 	if len(channels) == 0 {
 		return nil, nil
 	}
 
-	// 创建结果通道，缓冲大小为通道数量，避免goroutine阻塞
+	// 创建带缓冲的结果通道，容量 = 通道数量，避免 goroutine 写阻塞
 	resultCh := make(chan *vo.RetrievalChannelResult, len(channels))
 	defer close(resultCh)
 
-	// 遍历所有通道，并行启动检索
+	// 为每个通道启动一个 goroutine 并行执行检索
 	for _, ch := range channels {
 		go func(ch channel.RetrievalChannel) {
+			// 组装文档检索对象（传入子问题、执行计划、向量 topK）
 			documentRetrieve := vo.NewDocumentRetrieve(subQuestion, plan, e.vectorTopK)
-			result, err := ch.Retrieve(timeoutCtx, documentRetrieve)
+			// 调用 retrieveChannel（实际执行：加载文档元数据 → 调用通道检索 → 回填知识库信息）
+			result, err := e.retrieveChannel(timeoutCtx, ch, documentRetrieve)
 			if err != nil {
+				// 失败/超时：仅告警并写入 RAG 上下文提示，返回空结果（自动降级）
 				Warnf("检索通道失败: subQuestionIndex=%d, subQuestion='%s', channel='%s', error=%v",
 					subQuestionIndex, subQuestion, ch.ChannelName(), err)
 				ragCtx.AddRetrievalNotef("子问题%d通道[%s]检索失败或超时，已自动降级。", subQuestionIndex, ch.ChannelName())
 				result = &vo.RetrievalChannelResult{ChannelName: ch.ChannelName(), Documents: nil}
 			}
+			// 将结果写入结果通道（因 resultCh 带缓冲且容量等于通道数，此处不会阻塞）
 			resultCh <- result
 		}(ch)
 	}
 
-	// 收集结果（或超时退出），确保不会无限等待
+	// 主循环收集结果；一旦全部通道返回或上下文超时即退出
 	channelResults := make([]*vo.RetrievalChannelResult, 0, len(channels))
 	for {
 		select {
 		case result := <-resultCh:
 			channelResults = append(channelResults, result)
+			// 所有通道都返回时结束收集
 			if len(channelResults) == len(channels) {
 				return channelResults, nil
 			}
 		case <-timeoutCtx.Done():
+			// 超时：返回已收集的部分结果 + DeadlineExceeded
 			return channelResults, context.DeadlineExceeded
 		}
 	}
 }
 
+// retrieveChannel 调用单个检索通道，并将通道返回的文档回填知识元信息。
+//
+// 执行流程：
+//  1. 加载 DocumentIds 对应的全部可检索文档，并按 DocumentId 索引为 map
+//  2. 调用通道的 Retrieve 接口执行实际检索
+//  3. 将返回的每个文档根据 DocumentId 从 map 中回填知识信息（名称、范围、标签等）
+func (e *RetrievalImpl) retrieveChannel(ctx context.Context, ch channel.RetrievalChannel, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
+	// 按查询中的文档元信息
+	documents, err := e.documentLogic.ListRetrievableDocuments(ctx, query.DocumentIds...)
+	if err != nil {
+		return nil, err
+	}
+	knowledgeMap := utils.SliceToMapBy(documents, func(t *dvo.KnowledgeDocument) (int64, *dvo.KnowledgeDocument) {
+		return t.DocumentId, t
+	})
+
+	// 调用通道执行实际检索（向量 / 关键词 / 混合等，由通道实现决定）
+	result, err := ch.Retrieve(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 对返回的每个文档，根据 DocumentId 回填知识库元信息
+	for _, document := range result.Documents {
+		document.FillKnowledge(knowledgeMap[document.DocumentId])
+	}
+
+	return result, nil
+}
+
 // elevateToParentBlocks 将子文档提升到父块级别，聚合出更完整的证据
 // 流程：按 parentBlockId 分组 → 查询父块 → 聚合分数/通道 → 按分数排序
-func (e *RetrievalEngine) elevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
+func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
 	if len(childDocuments) == 0 {
 		return nil, nil
 	}
@@ -246,7 +288,7 @@ func (e *RetrievalEngine) elevateToParentBlocks(ctx context.Context, childDocume
 	}
 
 	// 查询父块
-	parentBlocks, err := e.repo.SelectParentBlocks(ctx, parentBlockIds)
+	parentBlocks, err := e.documentLogic.QueryParentBlocks(ctx, parentBlockIds)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +322,7 @@ func (e *RetrievalEngine) elevateToParentBlocks(ctx context.Context, childDocume
 }
 
 // buildParentEvidenceDocument 构建父级证据文档
-func (e *RetrievalEngine) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
+func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
 	if parentBlock == nil || len(childDocuments) == 0 {
 		return nil
 	}
@@ -322,7 +364,7 @@ func (e *RetrievalEngine) buildParentEvidenceDocument(parentBlock *entity.Docume
 }
 
 // applyEvidenceGate 根据通道类型应用不同的分数过滤策略，过滤掉置信度不足的文档
-func (e *RetrievalEngine) applyEvidenceGate(result *vo.RetrievalChannelResult) *vo.RetrievalChannelResult {
+func (e *RetrievalImpl) applyEvidenceGate(result *vo.RetrievalChannelResult) *vo.RetrievalChannelResult {
 	if result == nil || len(result.Documents) == 0 {
 		return result
 	}
@@ -358,7 +400,7 @@ type candidateHolder struct {
 
 // fuseByRRF 融合多个通道的候选结果（基于RRF算法）
 // RRF(Reciprocal Rank Fusion)通过合并各通道的排名信息，计算综合分数，实现多通道结果融合
-func (e *RetrievalEngine) fuseByRRF(channelResults []*vo.RetrievalChannelResult) []*vo.DocumentChunk {
+func (e *RetrievalImpl) fuseByRRF(channelResults []*vo.RetrievalChannelResult) []*vo.DocumentChunk {
 	var holders []*candidateHolder
 
 	// 遍历所有通道结果，累积计算RRF分数
@@ -382,7 +424,7 @@ func (e *RetrievalEngine) fuseByRRF(channelResults []*vo.RetrievalChannelResult)
 }
 
 // accumulateRRF 计算文档的RRF分数
-func (e *RetrievalEngine) accumulateRRF(channelResult *vo.RetrievalChannelResult) []*candidateHolder {
+func (e *RetrievalImpl) accumulateRRF(channelResult *vo.RetrievalChannelResult) []*candidateHolder {
 	holders := make(map[string]*candidateHolder)
 	for rank, doc := range channelResult.Documents {
 		rrfScore := 1.0 / float64(rrfK+rank+1)
@@ -400,7 +442,7 @@ func (e *RetrievalEngine) accumulateRRF(channelResult *vo.RetrievalChannelResult
 	return maputil.Values(holders)
 }
 
-func (e *RetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
+func (e *RetrievalImpl) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
 	if !e.rerankEnabled || len(candidates) == 0 || e.rerankPostProcessor == nil {
 		return candidates
 	}
@@ -415,7 +457,7 @@ func (e *RetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates
 }
 
 // assignReferenceIds 为检索证据分配引用ID
-func (e *RetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
+func (e *RetrievalImpl) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
 	referenceNumber := 1
 	assignedIDs := make(map[string]string)
 
@@ -438,7 +480,7 @@ func (e *RetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEvide
 	}
 }
 
-func (e *RetrievalEngine) summarizeChannelResults(channelResults []*vo.RetrievalChannelResult) string {
+func (e *RetrievalImpl) summarizeChannelResults(channelResults []*vo.RetrievalChannelResult) string {
 	if len(channelResults) == 0 {
 		return "没有启用任何检索通道"
 	}
@@ -450,7 +492,7 @@ func (e *RetrievalEngine) summarizeChannelResults(channelResults []*vo.Retrieval
 
 // buildChannelTraces 构建子问题渠道执行追踪
 // 统计每个检索渠道的召回数量（原始结果）和接受数量（过滤后结果），用于追踪检索效果
-func (e *RetrievalEngine) buildChannelTraces(rawResults, filteredResults []*vo.RetrievalChannelResult) []*vo.SubQuestionChannelTrace {
+func (e *RetrievalImpl) buildChannelTraces(rawResults, filteredResults []*vo.RetrievalChannelResult) []*vo.SubQuestionChannelTrace {
 	if len(rawResults) == 0 && len(filteredResults) == 0 {
 		return nil
 	}
@@ -483,7 +525,7 @@ func (e *RetrievalEngine) buildChannelTraces(rawResults, filteredResults []*vo.R
 }
 
 // recordChannelObservations 记录渠道执行观测数据，包括召回数量、接受数量、分数等
-func (e *RetrievalEngine) recordChannelObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalImpl) recordChannelObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -526,7 +568,7 @@ func (e *RetrievalEngine) recordChannelObservations(trace *vo.ConversationTrace,
 }
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
-func (e *RetrievalEngine) recordRetrievalResultObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalImpl) recordRetrievalResultObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -592,7 +634,7 @@ func (e *RetrievalEngine) recordRetrievalResultObservations(trace *vo.Conversati
 }
 
 // renderParentEvidenceText 渲染父级证据文本：[父块内容] + [命中子片段]
-func (e *RetrievalEngine) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
+func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
 	parentText := strutil.Trim(parentBlock.ParentText)
 
 	// 当父块无内容时，使用首条子文档的内容作为回退

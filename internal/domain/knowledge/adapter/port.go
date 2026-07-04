@@ -3,7 +3,7 @@ package adapter
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type KnowledgePort struct {

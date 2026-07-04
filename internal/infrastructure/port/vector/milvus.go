@@ -84,7 +84,7 @@ func (m *MilvusVector) SearchByVector(ctx context.Context, query *vo.DocumentRet
 	if err != nil {
 		return nil, err
 	}
-	return m.toKnowledgeDocuments(retrievedDocs), nil
+	return m.convertToDocumentChunks(retrievedDocs), nil
 }
 
 // markSuccess 批量标记分片向量生成成功
@@ -132,8 +132,8 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 	return result
 }
 
-// toKnowledgeDocuments 将 Milvus 检索结果（schema.Document）转成统一的 klvo.DocumentChunk 列表
-func (m *MilvusVector) toKnowledgeDocuments(retrievedDocs []*schema.Document) []*vo.DocumentChunk {
+// 转换为文档分片列表
+func (m *MilvusVector) convertToDocumentChunks(retrievedDocs []*schema.Document) []*vo.DocumentChunk {
 	return slice.Map(retrievedDocs, func(_ int, doc *schema.Document) *vo.DocumentChunk {
 		meta := doc.MetaData
 		return &vo.DocumentChunk{

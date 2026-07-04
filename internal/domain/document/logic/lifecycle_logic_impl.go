@@ -684,8 +684,8 @@ func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pa
 }
 
 // ListRetrievableDocuments 列出可检索的文档
-func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error) {
-	return d.repo.SelectRetrievableDocuments(ctx)
+func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
+	return d.repo.SelectRetrievableDocuments(ctx, documentIds...)
 }
 
 // QueryParentBlocks 查询父块列表

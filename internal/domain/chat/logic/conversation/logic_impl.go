@@ -18,12 +18,12 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
-	rvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
-	kllg "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -44,7 +44,7 @@ type LogicImpl struct {
 	tracer             *trace.ConversationTraceRecorder
 	streamEventBuilder *support.StreamEventBuilder
 	runtimeRegistry    *support.ChatRuntimeRegistry
-	knowledgeLogic     kllg.KnowledgeLogic
+	lifecycleLogic     doclog.LifecycleLogic
 	recommendLogic     logic.RecommendationLogic
 	memoryLogic        logic.SessionMemoryLogic
 	distributedLock    adapter.DistributedLock
@@ -53,7 +53,7 @@ type LogicImpl struct {
 // NewChatLogic 创建聊天逻辑实例
 func NewChatLogic(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	knowledgeLogic kllg.KnowledgeLogic,
+	lifecycleLogic doclog.LifecycleLogic,
 	orchestratorLogic logic.ChatPreparationOrchestratorLogic,
 	promptTempLogic logic.PromptTemplateLogic,
 	recommendLogic logic.RecommendationLogic,
@@ -68,7 +68,7 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 		tracer:             trace.NewConversationTraceRecorder(repo),
 		streamEventBuilder: &support.StreamEventBuilder{},
 		runtimeRegistry:    &support.ChatRuntimeRegistry{},
-		knowledgeLogic:     knowledgeLogic,
+		lifecycleLogic:     lifecycleLogic,
 		recommendLogic:     recommendLogic,
 		memoryLogic:        memoryLogic,
 		distributedLock:    distributedLock,
@@ -120,7 +120,7 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 
 // ListKnowledgeDocumentOptions 获取知识文档选项列表
 func (c *LogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
-	docs, err := c.knowledgeLogic.ListRetrievableDocuments(ctx)
+	docs, err := c.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -369,11 +369,11 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 	plan.FillCurrentDate()
 
 	if cmd.SelectedDocumentId != 0 {
-		documents, err := c.knowledgeLogic.ListRetrievableDocuments(ctx)
+		documents, err := c.lifecycleLogic.ListRetrievableDocuments(ctx)
 		if err != nil {
 			return nil, err
 		}
-		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *rvo.KnowledgeDocument) bool {
+		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *dvo.KnowledgeDocument) bool {
 			return doc.DocumentId == cmd.SelectedDocumentId
 		})
 		if !ok {

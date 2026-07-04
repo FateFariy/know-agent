@@ -43,7 +43,7 @@ type LifecycleLogic interface {
 	QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error)
 
 	// ListRetrievableDocuments 获取可检索的文档列表
-	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
+	ListRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
 
 	// QueryParentBlocks 查询父块列表
 	QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentBlock, error)

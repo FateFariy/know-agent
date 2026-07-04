@@ -3,8 +3,6 @@ package adapter
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
-	docentity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 )
 
@@ -12,12 +10,6 @@ import (
 type KnowledgeRepository interface {
 	// Do 运行一个事务
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
-
-	// SelectRetrievableDocuments 查询可检索的文档（可选按 documentIds 过滤）
-	SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
-
-	// SelectParentBlocks 根据 ID 列表查询父级块
-	SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*docentity.DocumentParentBlock, error)
 
 	// SelectKnowledgeScopeNodes 获取有效的知识范围节点
 	SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error)

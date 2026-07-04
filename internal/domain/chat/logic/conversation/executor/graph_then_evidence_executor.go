@@ -12,7 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -23,7 +22,7 @@ import (
 // → Prompt 装配 + 模型流式回答
 type GraphThenEvidenceExecutor struct {
 	structureQuerier   rag.StructureGraphQuerier
-	ragRetriever       ragvo.RagRetriever
+	ragRetriever       logic.RagRetriever
 	ragPromptAssembler rag.RagPromptAssembler
 	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
@@ -32,7 +31,7 @@ type GraphThenEvidenceExecutor struct {
 // NewGraphThenEvidenceExecutor 构造结构图取证执行器
 func NewGraphThenEvidenceExecutor(
 	structureQuerier rag.StructureGraphQuerier,
-	ragRetriever ragvo.RagRetriever,
+	ragRetriever logic.RagRetriever,
 	ragPromptAssembler rag.RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,

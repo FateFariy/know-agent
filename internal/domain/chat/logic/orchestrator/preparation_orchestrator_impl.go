@@ -17,12 +17,13 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	logic2 "github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	rvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -38,11 +39,11 @@ var (
 // PreparationOrchestratorImpl 聊天准备编排器实现
 type PreparationOrchestratorImpl struct {
 	repo                   adapter.ChatRepository
-	memoryLogic            logic2.SessionMemoryLogic
-	rewriteLogic           logic2.QueryRewriteLogic
-	documentQuestionRouter logic2.DocumentQuestionRouteLogic
-	knowledgeRouteLogic    logic.KnowledgeRouteLogic
-	knowledgeLogic         logic.KnowledgeLogic
+	memoryLogic            logic.SessionMemoryLogic
+	rewriteLogic           logic.QueryRewriteLogic
+	documentQuestionRouter logic.DocumentQuestionRouteLogic
+	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
+	lifecycleLogic         doclog.LifecycleLogic
 	tracer                 *trace.ConversationTraceRecorder
 	*option
 }
@@ -62,11 +63,11 @@ type option struct {
 // NewChatPreparationOrchestrator 创建聊天准备编排器实例
 func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	memoryLogic logic2.SessionMemoryLogic,
-	rewriteLogic logic2.QueryRewriteLogic,
-	documentQuestionRouter logic2.DocumentQuestionRouteLogic,
-	knowledgeRoute logic.KnowledgeRouteLogic,
-	knowledgeLogic logic.KnowledgeLogic,
+	memoryLogic logic.SessionMemoryLogic,
+	rewriteLogic logic.QueryRewriteLogic,
+	documentQuestionRouter logic.DocumentQuestionRouteLogic,
+	knowledgeRoute kelog.KnowledgeRouteLogic,
+	lifecycleLogic doclog.LifecycleLogic,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
 		repo:                   repo,
@@ -74,7 +75,7 @@ func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
 		rewriteLogic:           rewriteLogic,
 		documentQuestionRouter: documentQuestionRouter,
 		knowledgeRouteLogic:    knowledgeRoute,
-		knowledgeLogic:         knowledgeLogic,
+		lifecycleLogic:         lifecycleLogic,
 		tracer:                 trace.NewConversationTraceRecorder(repo),
 		option: &option{
 			ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
@@ -624,7 +625,7 @@ func (o *PreparationOrchestratorImpl) selectAutoCandidates(ctx context.Context, 
 // 返回得分最高的前 limit 个候选，理由统一标注为"低置信度时基于文档元数据进行保守扩范围候选"。
 func (o *PreparationOrchestratorImpl) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*klvo.DocumentRouteCandidate {
 	// 拉取全部可检索文档；失败或为空时返回 nil（上游可继续用主文档或混合检索兜底）
-	docs, err := o.knowledgeLogic.ListRetrievableDocuments(ctx)
+	docs, err := o.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("获取可检索文档失败: %v", err)
 		return nil
@@ -822,7 +823,7 @@ func (o *PreparationOrchestratorImpl) extractFallbackTerms(question, rewriteQues
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *rvo.KnowledgeDocument, queryTerms []string) float64 {
+func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *vo2.KnowledgeDocument, queryTerms []string) float64 {
 	content := strings.Join([]string{
 		descriptor.DocumentName,
 		descriptor.KnowledgeScopeCode,
