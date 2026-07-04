@@ -143,21 +143,16 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	publishThinking(convCtx, "证据整理完成，正在基于证据生成回答。")
 
 	// Prompt 装配与预算
-	budgetStage := startTraceStage(
-		ctx, e.tracer, convCtx.Trace,
-		vo.ConversationTraceStageEvidenceBudget,
-		e.Mode().String(),
-		"正在组装证据与 Prompt 预算。",
-		nil,
-	)
+	budgetStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageEvidenceBudget,
+		e.Mode().String(), "正在组装证据与 Prompt 预算。", nil)
 	promptResult, err := e.ragPromptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
 		logx.Errorf("Prompt 组装失败: conversationId=%s, err=%v", convCtx.ConversationId, err)
-		failTraceStage(ctx, e.tracer, budgetStage, "证据预算与 Prompt 组装失败。", err, nil)
+		e.tracer.FailStage(ctx, budgetStage, "证据预算与 Prompt 组装失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return
 	}
-	completeTraceStage(ctx, e.tracer, budgetStage, "证据预算与 Prompt 组装完成。", map[string]any{
+	e.tracer.CompleteStage(ctx, budgetStage, "证据预算与 Prompt 组装完成。", map[string]any{
 		"totalBudget":              promptResult.TotalBudget,
 		"perSubQuestionBudget":     promptResult.PerSubQuestionBudget,
 		"renderedReferenceCount":   promptResult.RenderedReferenceCount,
@@ -168,18 +163,12 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		"userPrompt":               promptResult.UserPrompt,
 	})
 
-	answerStage := startTraceStage(
-		ctx, e.tracer, convCtx.Trace,
-		vo.ConversationTraceStageAnswerGenerate,
-		e.Mode().String(),
-		"正在基于证据生成回答。",
-		nil,
-	)
+	answerStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), "正在基于证据生成回答。", nil)
 
 	streamCh, streamErr := e.chatModel.StreamWithTrace(ctx, "rag_answer", promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
 	if streamErr != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, streamErr)
-		failTraceStage(ctx, e.tracer, answerStage, "答案生成失败。", streamErr, nil)
+		e.tracer.FailStage(ctx, answerStage, "答案生成失败。", streamErr, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return
 	}
@@ -201,7 +190,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		}
 	}
 
-	completeTraceStage(ctx, e.tracer, answerStage, "答案生成完成。", map[string]any{
+	e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
 		"answerLength":        convCtx.AnswerBuffer.Len(),
 	})
