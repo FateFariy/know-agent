@@ -1,4 +1,4 @@
-package chat
+package orchestrator
 
 import (
 	"context"

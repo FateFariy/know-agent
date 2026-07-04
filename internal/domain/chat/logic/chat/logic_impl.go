@@ -481,51 +481,37 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 
 	// 准备停止响应的消息
 	responseMessage := "已停止会话生成"
+	execPlan := convCtx.ExecutionPlan.Load()
+	modeName := ""
+	if execPlan != nil {
+		modeName = execPlan.Mode.Name()
+	}
 
 	// 开始追踪收尾阶段
-	finalizeStage, err := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize, convCtx.ModeName, "正在收尾停止中的会话。", nil)
+	finalizeStage, err := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize, modeName, "正在收尾停止中的会话。", nil)
 	if err != nil {
 		logx.Errorf("开始追踪收尾阶段失败, conversationId=%s, exchangeId=%d, error=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 
-	// 辅助函数：安全发送状态事件
-	safeEmitStatus := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logx.Warnf("发送停止事件 panic: %v", r)
-			}
-		}()
-		// 构造状态事件消息：⏹ + reason
-		statusMsg := "⏹ " + reason
-		// 调用 safeEmit，将 statusMsg 作为事件写入 sink
-		err := support.SafeEmitNext(convCtx.Sink, statusMsg)
-		if err != nil {
-			return
-		}
+	// 构造状态事件消息：⏹ + reason
+	statusMsg := c.streamEventBuilder.StatusWithMetadata("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
+	// 调用 safeEmit，将 statusMsg 作为事件写入 chan
+	if err = support.SafeEmitNext(convCtx.Channel, statusMsg); err != nil {
+		logx.Errorf("发送停止事件失败, conversationId=%s, exchangeId=%d, error=%v",
+			convCtx.ConversationId, convCtx.ExchangeId, err)
+		responseMessage = "会话已停止，停止事件发送失败"
 	}
 
 	// 辅助函数：安全完成 sink
 	safeCompleteSink := func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logx.Warnf("关闭 SSE 流 panic: %v", r)
+				logx.Errorf("关闭 SSE 流 panic: %v", r)
 			}
 		}()
-		safeComplete(convCtx.Sink)
+		support.SafeEmitComplete(convCtx.Channel)
 	}
-
-	// 发送停止事件（如果 panic 或异常则捕获并记录）
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logx.Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, error=%v",
-					convCtx.ConversationId, convCtx.ExchangeId, r)
-				responseMessage = "会话已停止，停止事件发送失败"
-			}
-		}()
-		safeEmitStatus()
-	}()
 
 	// 最终收尾：关闭 sink、落库、清理
 	func() {
@@ -535,11 +521,11 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 			cleanup(convCtx)
 		}()
 
-		// 关闭 sink（原 Java 中的 safeComplete）
+		// 关闭 sink
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logx.Warnf("关闭停止中的 SSE 流失败, conversationId=%s, exchangeId=%d, error=%v",
+					logx.Errorf("关闭停止中的 SSE 流失败, conversationId=%s, exchangeId=%d, error=%v",
 						convCtx.ConversationId, convCtx.ExchangeId, r)
 				}
 			}()
@@ -549,39 +535,40 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		// 刷新追踪运行时统计
 		refreshDebugTraceRuntimeStats(convCtx)
 
+		exchange := &entity.ChatExchange{
+			ID:             convCtx.ExchangeId,
+			ConversationId: convCtx.ConversationId,
+			Question:       convCtx.Question,
+			// Answer:              convCtx.GetAnswer(),
+			ThinkingSteps:       nil,
+			ReferenceList:       nil,
+			RecommendationList:  nil,
+			UsedToolList:        nil,
+			DebugTraceJson:      "",
+			TurnStatus:          0,
+			ErrorMessage:        "",
+			FirstResponseTimeMs: 0,
+			TotalResponseTimeMs: 0,
+		}
 		// 落库完整 exchange 信息
-		err := conversationArchiveStore.CompleteExchange(
-			context.Background(),
-			convCtx.ConversationId,
-			convCtx.ExchangeId,
-			convCtx.GetAnswer(), // answerBuffer 内容
-			snapshotStringList(convCtx.ThinkingSteps),
-			deduplicateReferences(snapshotReferenceList(convCtx.References)),
-			[]interface{}{}, // 空列表对应 Java 的 List.of()
-			snapshotUsedTools(convCtx.UsedTools),
-			convCtx.GetDebugTrace(),
-			ChatTurnStatusStopped,
-			reason,
-			toNullable(convCtx.GetFirstResponseTimeMs()),
-			time.Since(convCtx.StartTime).Milliseconds(),
-		)
+		err = c.repo.CompleteExchange(ctx, exchange)
 		if err != nil {
 			logx.Errorf("停止会话落库失败, conversationId=%s, exchangeId=%d, error=%v",
 				convCtx.ConversationId, convCtx.ExchangeId, err)
 			responseMessage = "会话已停止，收尾落库失败"
-			if convCtx.TraceRecorder != nil && finalizeStage != nil {
-				// TODO: 调用 traceRecorder.FailStage
-				// convCtx.TraceRecorder.FailStage(finalizeStage, "停止态收尾失败。", err.Error(), nil)
+
+			if err = c.tracer.FailStage(ctx, finalizeStage, "停止态收尾失败。", err, nil); err != nil {
+				logx.Errorf("追踪收尾阶段失败, conversationId=%s, exchangeId=%d, error=%v",
+					convCtx.ConversationId, convCtx.ExchangeId, err)
+				return
 			}
 		} else {
-			if convCtx.TraceRecorder != nil && finalizeStage != nil {
-				// TODO: 调用 traceRecorder.CompleteStage
-				// convCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按停止状态收尾。", map[string]interface{}{
-				//     "finalStatus": ChatTurnStatusStopped,
-				//     "reason":      reason,
-				//     "answerLength": len(convCtx.AnswerBuffer),
-				// })
-			}
+			// TODO: 调用 traceRecorder.CompleteStage
+			// convCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按停止状态收尾。", map[string]interface{}{
+			//     "finalStatus": ChatTurnStatusStopped,
+			//     "reason":      reason,
+			//     "answerLength": len(convCtx.AnswerBuffer),
+			// })
 		}
 	}()
 
