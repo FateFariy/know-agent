@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // DocumentRepository 文档数据访问接口
@@ -27,6 +28,9 @@ type DocumentRepository interface {
 
 	// DeleteDocumentRelatedDataById 删除文档关联数据
 	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
+
+	// SelectRetrievableDocuments 查询可检索的文档
+	SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
 
 	// ========== 任务相关 ==========
 
@@ -115,6 +119,9 @@ type DocumentRepository interface {
 
 	// SelectChunkListByParentBlockId 根据父块ID查询块列表
 	SelectChunkListByParentBlockId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error)
+
+	// SelectParentBlocks 根据ID列表查询父级块
+	SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error)
 
 	// ========== 父块相关 ==========
 

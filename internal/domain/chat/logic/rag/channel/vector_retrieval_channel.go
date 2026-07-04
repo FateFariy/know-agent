@@ -3,9 +3,9 @@ package channel
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 

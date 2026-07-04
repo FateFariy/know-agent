@@ -9,8 +9,6 @@ import (
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
-
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 var (
@@ -68,7 +66,7 @@ func (d *DocumentRetrieveFilters) IsEmpty() bool {
 }
 
 // NewDocumentRetrieve 创建文档检索，根据子问题和执行计划构造检索参数，包含查询增强、过滤器和文档/任务范围
-func NewDocumentRetrieve(subQuestion string, plan *vo.ConversationExecutionPlan, topK int) *DocumentRetrieve {
+func NewDocumentRetrieve(subQuestion string, plan *ConversationExecutionPlan, topK int) *DocumentRetrieve {
 	normalizedQuestion := strutil.Trim(subQuestion)
 
 	// 构建查询增强（将导航提示、上下文提示与原问题合并）
@@ -112,7 +110,7 @@ func (d *DocumentRetrieve) ValidSearchable() bool {
 }
 
 // buildQueryAugmentation 构建查询增强，将导航决策提示、历史规划上下文提示与原问题合并，生成更完整的检索查询
-func buildQueryAugmentation(normalizedQuestion string, plan *vo.ConversationExecutionPlan) (string, []string) {
+func buildQueryAugmentation(normalizedQuestion string, plan *ConversationExecutionPlan) (string, []string) {
 	if normalizedQuestion == "" || plan == nil {
 		return "", nil
 	}

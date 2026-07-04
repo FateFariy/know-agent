@@ -18,12 +18,12 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	rvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	kllg "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	rvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -656,7 +656,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 		return
 	}
 	answer := convCtx.AnswerBuffer.String()
-	uniqueReferences := snapshotReferences(convCtx.References)
+	uniqueReferences := convCtx.GetUniqueReferences()
 
 	// 生成推荐追问
 	execPlan := convCtx.ExecutionPlan.Load()

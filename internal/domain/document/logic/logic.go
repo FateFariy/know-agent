@@ -41,6 +41,12 @@ type LifecycleLogic interface {
 
 	// QueryTaskLogs 查询任务日志
 	QueryTaskLogs(ctx context.Context, taskId int64, pageNo, pageSize int) (*entity.DocumentTask, int64, error)
+
+	// ListRetrievableDocuments 获取可检索的文档列表
+	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
+
+	// ElevateToParentBlocks 将子文档提升到父块级别
+	ElevateToParentBlocks(ctx context.Context, childDocuments []*entity.DocumentChunk, maxChars int) ([]*entity.DocumentChunk, error)
 }
 
 // AsyncProcessingLogic 异步处理业务逻辑接口

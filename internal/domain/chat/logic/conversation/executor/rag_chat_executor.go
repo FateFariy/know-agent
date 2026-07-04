@@ -11,24 +11,25 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	vo3 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // RagChatExecutor 知识问答执行器
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
-	ragRetriever       ragvo.RagRetriever
-	ragPromptAssembler ragvo.RagPromptAssembler
+	ragRetriever       vo3.RagRetriever
+	ragPromptAssembler rag.RagPromptAssembler
 	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
 }
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
-	ragRetriever ragvo.RagRetriever,
-	ragPromptAssembler ragvo.RagPromptAssembler,
+	ragRetriever vo3.RagRetriever,
+	ragPromptAssembler rag.RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *RagChatExecutor {
@@ -114,7 +115,7 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 
 // streamFromRetrievalContext 基于检索上下文生成流式回答
 func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCtx *vo.ConversationContext,
-	plan *vo.ConversationExecutionPlan, retrievalCtx *ragvo.RagRetrievalContext) {
+	plan *vo.ConversationExecutionPlan, retrievalCtx *vo3.RagRetrievalContext) {
 	// 先下发思考事件（检索笔记、渠道列表）
 	if retrievalCtx != nil {
 		retrievalCtx.RetrievalNotes.ForEach(func(note string) {

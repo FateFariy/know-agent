@@ -3,9 +3,9 @@ package adapter
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	docentity "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
-	vo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // KnowledgeRepository 领域模型视角下的知识库仓储：提供可检索文档、父级块、知识范围/主题节点、文档画像、路由跟踪等能力
@@ -20,10 +20,10 @@ type KnowledgeRepository interface {
 	SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*docentity.DocumentParentBlock, error)
 
 	// SelectKnowledgeScopeNodes 获取有效的知识范围节点
-	SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error
+	SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error)
 
 	// SelectKnowledgeTopicNodes 获取有效的主题节点
-	SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error
+	SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error)
 
 	// SelectDocumentProfiles 获取构建成功（profileStatus=2）的文档画像
 	SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error)

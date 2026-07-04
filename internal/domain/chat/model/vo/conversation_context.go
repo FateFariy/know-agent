@@ -56,3 +56,11 @@ func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
 func (c *ConversationContext) AddThinkingSteps(steps ...string) {
 	c.ThinkingSteps.AddAll(steps)
 }
+
+func (c *ConversationContext) AddReferences(refs ...*SearchReference) {
+	c.References.AddAll(refs)
+}
+
+func (c *ConversationContext) GetUniqueReferences() []*SearchReference {
+	return c.References.SubList(0, c.References.Size())
+}

@@ -9,9 +9,9 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // ReactAgentExecutor 开放式 Agent 执行器

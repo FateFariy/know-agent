@@ -18,12 +18,12 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	rvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
-	rvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 

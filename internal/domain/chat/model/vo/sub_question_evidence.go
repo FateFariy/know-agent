@@ -1,5 +1,7 @@
 package vo
 
+import "github.com/swiftbit/know-agent/common/utils"
+
 // SubQuestionEvidence 子问题检索证据
 type SubQuestionEvidence struct {
 	SubQuestionIndex       int                        `json:"subQuestionIndex"`       // 子问题索引
@@ -17,4 +19,30 @@ type SubQuestionChannelTrace struct {
 	ChannelName   string `json:"channelName"`   // 渠道名称
 	RecalledCount int    `json:"recalledCount"` // 召回数量
 	AcceptedCount int    `json:"acceptedCount"` // 接受数量
+}
+
+func (s *SubQuestionEvidence) GetChannelTraceMaps() []map[string]any {
+	channelTraces := make([]map[string]any, len(s.ChannelTraces))
+	for i, ct := range s.ChannelTraces {
+		channelTraces[i] = map[string]any{
+			"channelName":   ct.ChannelName,
+			"recalledCount": ct.RecalledCount,
+			"acceptedCount": ct.AcceptedCount,
+		}
+	}
+	return channelTraces
+
+}
+
+func (s *SubQuestionEvidence) GetReferenceMaps() []map[string]any {
+	sqRefs := make([]map[string]any, len(s.References))
+	for i, ref := range s.References {
+		sqRefs[i] = map[string]any{
+			"referenceId":  ref.ReferenceId,
+			"documentName": utils.BlankToDefault(ref.DocumentName, ref.Title),
+			"sectionPath":  ref.SectionPath,
+			"channel":      ref.Channel,
+		}
+	}
+	return sqRefs
 }

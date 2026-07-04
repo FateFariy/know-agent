@@ -1,4 +1,4 @@
-package logic
+package rag
 
 import (
 	"context"
@@ -15,19 +15,19 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/rag/logic/channel"
-	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const rrfK = 60
 
-type RagRetrievalEngine struct {
+type RetrievalEngine struct {
 	channels                  []channel.RetrievalChannel
-	repo                      adapter.RagRepository
+	repo                      adapter.ChatRepository
 	channelTimeout            time.Duration
 	subQuestionTimeout        time.Duration
 	minVectorSimilarity       float64
@@ -40,8 +40,8 @@ type RagRetrievalEngine struct {
 	keywordTopK               int
 }
 
-func NewRagRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.RetrievalChannel, repo adapter.RagRepository) *RagRetrievalEngine {
-	return &RagRetrievalEngine{
+func NewRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.RetrievalChannel, repo adapter.ChatRepository) *RetrievalEngine {
+	return &RetrievalEngine{
 		channels:                  channels,
 		repo:                      repo,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
@@ -57,9 +57,9 @@ func NewRagRetrievalEngine(svcCtx *svc.ServiceContext, channels []channel.Retrie
 	}
 }
 
-var _ vo.RagRetriever = (*RagRetrievalEngine)(nil)
+var _ logic.RagRetriever = (*RetrievalEngine)(nil)
 
-func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.ConversationExecutionPlan, trace *cvo.ConversationTrace) (*vo.RagRetrievalContext, error) {
+func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error) {
 	ragCtx := vo.NewRagRetrievalContext(plan.RetrievalQuestion)
 
 	subQuestions := plan.RetrievalSubQuestions
@@ -79,8 +79,8 @@ func (e *RagRetrievalEngine) Retrieve(ctx context.Context, plan *cvo.Conversatio
 	return ragCtx, nil
 }
 
-func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
-	plan *cvo.ConversationExecutionPlan, trace *cvo.ConversationTrace) []*vo.SubQuestionEvidence {
+func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
+	plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
 	defer cancel()
 
@@ -172,8 +172,8 @@ func (e *RagRetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ra
 
 // retrieveChannelParallel 并行检索单个子问题的所有通道
 // 使用goroutine并发执行各通道检索，通过超时控制防止阻塞，失败自动降级返回空结果
-func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int,
-	subQuestion string, plan *cvo.ConversationExecutionPlan) ([]*vo.RetrievalChannelResult, error) {
+func (e *RetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestionIndex int,
+	subQuestion string, plan *vo.ConversationExecutionPlan) ([]*vo.RetrievalChannelResult, error) {
 	// 创建带超时的上下文，超时时间为通道超时配置
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.channelTimeout)
 	defer cancel()
@@ -220,7 +220,7 @@ func (e *RagRetrievalEngine) retrieveChannelParallel(ctx context.Context, ragCtx
 
 // elevateToParentBlocks 将子文档提升到父块级别，聚合出更完整的证据
 // 流程：按 parentBlockId 分组 → 查询父块 → 聚合分数/通道 → 按分数排序
-func (e *RagRetrievalEngine) elevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
+func (e *RetrievalEngine) elevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
 	if len(childDocuments) == 0 {
 		return nil, nil
 	}
@@ -280,7 +280,7 @@ func (e *RagRetrievalEngine) elevateToParentBlocks(ctx context.Context, childDoc
 }
 
 // buildParentEvidenceDocument 构建父级证据文档
-func (e *RagRetrievalEngine) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
+func (e *RetrievalEngine) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
 	if parentBlock == nil || len(childDocuments) == 0 {
 		return nil
 	}
@@ -322,7 +322,7 @@ func (e *RagRetrievalEngine) buildParentEvidenceDocument(parentBlock *entity.Doc
 }
 
 // applyEvidenceGate 根据通道类型应用不同的分数过滤策略，过滤掉置信度不足的文档
-func (e *RagRetrievalEngine) applyEvidenceGate(result *vo.RetrievalChannelResult) *vo.RetrievalChannelResult {
+func (e *RetrievalEngine) applyEvidenceGate(result *vo.RetrievalChannelResult) *vo.RetrievalChannelResult {
 	if result == nil || len(result.Documents) == 0 {
 		return result
 	}
@@ -358,7 +358,7 @@ type candidateHolder struct {
 
 // fuseByRRF 融合多个通道的候选结果（基于RRF算法）
 // RRF(Reciprocal Rank Fusion)通过合并各通道的排名信息，计算综合分数，实现多通道结果融合
-func (e *RagRetrievalEngine) fuseByRRF(channelResults []*vo.RetrievalChannelResult) []*vo.DocumentChunk {
+func (e *RetrievalEngine) fuseByRRF(channelResults []*vo.RetrievalChannelResult) []*vo.DocumentChunk {
 	var holders []*candidateHolder
 
 	// 遍历所有通道结果，累积计算RRF分数
@@ -382,7 +382,7 @@ func (e *RagRetrievalEngine) fuseByRRF(channelResults []*vo.RetrievalChannelResu
 }
 
 // accumulateRRF 计算文档的RRF分数
-func (e *RagRetrievalEngine) accumulateRRF(channelResult *vo.RetrievalChannelResult) []*candidateHolder {
+func (e *RetrievalEngine) accumulateRRF(channelResult *vo.RetrievalChannelResult) []*candidateHolder {
 	holders := make(map[string]*candidateHolder)
 	for rank, doc := range channelResult.Documents {
 		rrfScore := 1.0 / float64(rrfK+rank+1)
@@ -400,7 +400,7 @@ func (e *RagRetrievalEngine) accumulateRRF(channelResult *vo.RetrievalChannelRes
 	return maputil.Values(holders)
 }
 
-func (e *RagRetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
+func (e *RetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
 	if !e.rerankEnabled || len(candidates) == 0 || e.rerankPostProcessor == nil {
 		return candidates
 	}
@@ -415,7 +415,7 @@ func (e *RagRetrievalEngine) applyRerank(ragCtx *vo.RagRetrievalContext, candida
 }
 
 // assignReferenceIds 为检索证据分配引用ID
-func (e *RagRetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
+func (e *RetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
 	referenceNumber := 1
 	assignedIDs := make(map[string]string)
 
@@ -438,7 +438,7 @@ func (e *RagRetrievalEngine) assignReferenceIds(evidenceList []*vo.SubQuestionEv
 	}
 }
 
-func (e *RagRetrievalEngine) summarizeChannelResults(channelResults []*vo.RetrievalChannelResult) string {
+func (e *RetrievalEngine) summarizeChannelResults(channelResults []*vo.RetrievalChannelResult) string {
 	if len(channelResults) == 0 {
 		return "没有启用任何检索通道"
 	}
@@ -450,7 +450,7 @@ func (e *RagRetrievalEngine) summarizeChannelResults(channelResults []*vo.Retrie
 
 // buildChannelTraces 构建子问题渠道执行追踪
 // 统计每个检索渠道的召回数量（原始结果）和接受数量（过滤后结果），用于追踪检索效果
-func (e *RagRetrievalEngine) buildChannelTraces(rawResults, filteredResults []*vo.RetrievalChannelResult) []*vo.SubQuestionChannelTrace {
+func (e *RetrievalEngine) buildChannelTraces(rawResults, filteredResults []*vo.RetrievalChannelResult) []*vo.SubQuestionChannelTrace {
 	if len(rawResults) == 0 && len(filteredResults) == 0 {
 		return nil
 	}
@@ -483,7 +483,7 @@ func (e *RagRetrievalEngine) buildChannelTraces(rawResults, filteredResults []*v
 }
 
 // recordChannelObservations 记录渠道执行观测数据，包括召回数量、接受数量、分数等
-func (e *RagRetrievalEngine) recordChannelObservations(trace *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalEngine) recordChannelObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -526,7 +526,7 @@ func (e *RagRetrievalEngine) recordChannelObservations(trace *cvo.ConversationTr
 }
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
-func (e *RagRetrievalEngine) recordRetrievalResultObservations(trace *cvo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalEngine) recordRetrievalResultObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -592,7 +592,7 @@ func (e *RagRetrievalEngine) recordRetrievalResultObservations(trace *cvo.Conver
 }
 
 // renderParentEvidenceText 渲染父级证据文本：[父块内容] + [命中子片段]
-func (e *RagRetrievalEngine) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
+func (e *RetrievalEngine) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
 	parentText := strutil.Trim(parentBlock.ParentText)
 
 	// 当父块无内容时，使用首条子文档的内容作为回退

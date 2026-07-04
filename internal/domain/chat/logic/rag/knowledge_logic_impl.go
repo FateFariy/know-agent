@@ -1,4 +1,4 @@
-package logic
+package rag
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 const (

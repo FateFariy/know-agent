@@ -38,7 +38,7 @@ func (c *RagRetrievalContext) IsEmpty() bool {
 
 // FlattenReferences 合并所有子问题的引用
 func (c *RagRetrievalContext) FlattenReferences() []*SearchReference {
-	if c.FlattenedReferences != nil {
+	if len(c.FlattenedReferences) > 0 {
 		return c.FlattenedReferences
 	}
 	var refs []*SearchReference
@@ -60,4 +60,22 @@ func (c *RagRetrievalContext) AddUsedChannel(channel string) {
 	if !c.UsedChannels.Contain(channel) {
 		c.UsedChannels.Add(channel)
 	}
+}
+
+// GetUsedChannels 获取已使用的渠道
+func (c *RagRetrievalContext) GetUsedChannels() []string {
+	size := c.UsedChannels.Size()
+	if size == 0 {
+		return nil
+	}
+	return c.UsedChannels.SubList(0, size)
+}
+
+// GetRetrievalNotes 获取检索笔记
+func (c *RagRetrievalContext) GetRetrievalNotes() []string {
+	size := c.RetrievalNotes.Size()
+	if size == 0 {
+		return nil
+	}
+	return c.RetrievalNotes.SubList(0, size)
 }

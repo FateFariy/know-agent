@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -681,6 +682,69 @@ func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pa
 	task.FillEnumNames()
 
 	return task, total, nil
+}
+
+func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error) {
+	return d.repo.SelectRetrievableDocuments(ctx)
+}
+
+func (d *LifecycleLogicImpl) ElevateToParentBlocks(ctx context.Context, childDocuments []*entity.DocumentChunk, maxChars int) ([]*entity.DocumentChunk, error) {
+	if len(childDocuments) == 0 {
+		return nil, nil
+	}
+
+	// 按 parentBlockId 分组，并收集无法被归类的 childDocument 作为 fallback
+	childGroupsByParent := make(map[int64][]*entity.DocumentChunk, len(childDocuments))
+	fallbackDocuments := make([]*entity.DocumentChunk, 0, len(childDocuments))
+	parentBlockIds := make([]int64, 0, len(childDocuments))
+	for _, childDocument := range childDocuments {
+		parentBlockId := childDocument.ParentBlockId
+		if parentBlockId == 0 {
+			fallbackDocuments = append(fallbackDocuments, childDocument)
+			continue
+		}
+		childGroupsByParent[parentBlockId] = append(childGroupsByParent[parentBlockId], childDocument)
+		if _, exists := childGroupsByParent[parentBlockId]; exists {
+			parentBlockIds = append(parentBlockIds, parentBlockId)
+		}
+	}
+
+	if len(childGroupsByParent) == 0 {
+		return fallbackDocuments, nil
+	}
+
+	// 查询父块
+	parentBlocks, err := d.repo.SelectParentBlocks(ctx, parentBlockIds)
+	if err != nil {
+		return nil, err
+	}
+	parentBlockMap := utils.SliceToMapBy(parentBlocks, func(item *entity.DocumentParentBlock) (int64, *entity.DocumentParentBlock) {
+		return item.ID, item
+	})
+
+	// 构建父级证据文档，或当父块未找到时直接保留子文档
+	elevatedDocuments := make([]*entity.DocumentChunk, 0, len(childGroupsByParent)+len(fallbackDocuments))
+	for parentId, children := range childGroupsByParent {
+		parentBlock, ok := parentBlockMap[parentId]
+		if !ok {
+			elevatedDocuments = append(elevatedDocuments, children...)
+			continue
+		}
+		elevatedDocuments = append(elevatedDocuments, d.buildParentEvidenceDocument(parentBlock, children, maxChars))
+	}
+	elevatedDocuments = append(elevatedDocuments, fallbackDocuments...)
+
+	// 排序（分数降序 → 父块编号升序 → chunkNo 升序）
+	slices.SortFunc(elevatedDocuments, func(a, b *entity.DocumentChunk) int {
+		if a.Score != b.Score {
+			return int(b.Score - a.Score)
+		} else if a.ParentBlockNo != b.ParentBlockNo {
+			return a.ParentBlockNo - b.ParentBlockNo
+		}
+		return a.ChunkNo - b.ChunkNo
+	})
+
+	return elevatedDocuments, nil
 }
 
 // getChunkTaskId 获取文档块任务ID

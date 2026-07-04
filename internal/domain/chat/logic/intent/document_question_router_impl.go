@@ -16,8 +16,8 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 var (
@@ -215,7 +215,7 @@ func (r *DocumentQuestionRouter) Route(ctx context.Context, documentId int64, or
 
 // buildDecision 根据执行模式、动作、章节与检索计划，组装最终的 DocumentNavigationDecision
 func (r *DocumentQuestionRouter) buildDecision(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
-	decision := vo.NewDocumentNavigationDecision()
+	decision := &vo.DocumentNavigationDecision{}
 	decision.ExecutionMode = mode
 	decision.NavigationAction = action
 	decision.RetrievalPlan = retrievalPlan

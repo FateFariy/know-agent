@@ -25,7 +25,7 @@ var ProviderSet = wire.NewSet(
 )
 
 type ServiceContext struct {
-	Config   config.Config
+	Config   *config.Config
 	Validate *validator.Validate
 	Minio    *minio.Client
 	Db       *gorm.DB
@@ -34,7 +34,7 @@ type ServiceContext struct {
 	Emb      embedding.Embedder
 }
 
-func NewServiceContext(c config.Config) *ServiceContext {
+func NewServiceContext(c *config.Config) *ServiceContext {
 	redisClient := common.NewRedisClient(c)
 	return &ServiceContext{
 		Config:   c,
@@ -48,7 +48,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 }
 
 // NewMinioClient 创建 Minio 客户端
-func NewMinioClient(c config.Config) *minio.Client {
+func NewMinioClient(c *config.Config) *minio.Client {
 	endpoint := c.Minio.Endpoint
 	accessKeyID := c.Minio.AccessKeyID
 	accessKey := c.Minio.SecretAccessKey
@@ -69,7 +69,7 @@ func NewRedSync(client *redis.Client) *redsync.Redsync {
 }
 
 // NewArkEmbedding 创建 ark embedding 模型
-func NewArkEmbedding(c config.Config) embedding.Embedder {
+func NewArkEmbedding(c *config.Config) embedding.Embedder {
 	apiType := ark.APITypeText
 	if strings.Contains(c.Embedding.APIType, string(ark.APITypeMultiModal)) {
 		apiType = ark.APITypeMultiModal

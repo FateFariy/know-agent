@@ -7,9 +7,9 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/rag/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // RetrievalChannel 检索通道接口

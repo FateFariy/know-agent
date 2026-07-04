@@ -11,9 +11,10 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // GraphThenEvidenceExecutor 结构图定位后取证执行器
@@ -21,18 +22,18 @@ import (
 // 逻辑：先根据锚点查结构图 → 使用 ragRetriever 以"目标结构 + 问题"为线索检索证据
 // → Prompt 装配 + 模型流式回答
 type GraphThenEvidenceExecutor struct {
-	structureQuerier   ragvo.StructureGraphQuerier
+	structureQuerier   rag.StructureGraphQuerier
 	ragRetriever       ragvo.RagRetriever
-	ragPromptAssembler ragvo.RagPromptAssembler
+	ragPromptAssembler rag.RagPromptAssembler
 	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
 }
 
 // NewGraphThenEvidenceExecutor 构造结构图取证执行器
 func NewGraphThenEvidenceExecutor(
-	structureQuerier ragvo.StructureGraphQuerier,
+	structureQuerier rag.StructureGraphQuerier,
 	ragRetriever ragvo.RagRetriever,
-	ragPromptAssembler ragvo.RagPromptAssembler,
+	ragPromptAssembler rag.RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *GraphThenEvidenceExecutor {

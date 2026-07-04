@@ -43,21 +43,6 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 	}
 }
 
-// SelectRetrievableDocuments 查询可检索的文档
-func (k *KnowledgeRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
-	var documents []*vo.KnowledgeDocument
-	query := k.dbWithContext(ctx).Model(&model.Document{}).
-		Where("index_status = ? AND last_index_task_id IS NOT NULL", dvo.IndexStatusBuildSuccess)
-
-	if len(documentIds) > 0 {
-		query = query.Where("id IN ?", documentIds)
-	}
-	if err := query.Order("update_time DESC, id DESC").Find(&documents).Error; err != nil {
-		return nil, err
-	}
-	return documents, nil
-}
-
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
 	var nodes []*entity.KnowledgeScopeNode
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Find(&nodes).Error; err != nil {
@@ -164,21 +149,6 @@ func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context,
 // 	}
 // 	return result, nil
 // }
-
-// SelectParentBlocks 根据 ID 列表查询父级块
-func (k *KnowledgeRepositoryImpl) SelectParentBlocks(ctx context.Context, parentBlockIDs []int64) ([]*entity.DocumentParentBlock, error) {
-	if len(parentBlockIDs) == 0 {
-		return nil, nil
-	}
-	var parentBlocks []*entity.DocumentParentBlock
-	if err := k.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).
-		Where("id IN ?", parentBlockIDs).
-		Order("parent_no ASC").
-		Find(&parentBlocks).Error; err != nil {
-		return nil, err
-	}
-	return parentBlocks, nil
-}
 
 func computeKeywordScore(terms []string, chunkText, sectionPath string) float64 {
 	if len(terms) == 0 {

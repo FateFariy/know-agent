@@ -4,7 +4,7 @@ import (
 	"github.com/google/wire"
 
 	chatLogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/chat"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	documentLogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	knowledgeLogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
@@ -22,8 +22,8 @@ var ProviderSet = wire.NewSet(
 	documentLogic.NewTextPreProcessLogicImpl,
 	wire.Bind(new(documentLogic.TextPreProcessLogic), new(*documentLogic.TextPreProcessLogicImpl)),
 	documentadapter.NewDocumentPort,
-	chat.NewChatLogic,
-	wire.Bind(new(chatLogic.ChatLogic), new(*chat.LogicImpl)),
+	conversation.NewChatLogic,
+	wire.Bind(new(chatLogic.ChatLogic), new(*conversation.LogicImpl)),
 	knowledgeLogic.NewKnowledgeRouteLogicImpl,
 	wire.Bind(new(knowledgeLogic.KnowledgeRouteLogic), new(*knowledgeLogic.KnowledgeRouteLogicImpl)),
 )

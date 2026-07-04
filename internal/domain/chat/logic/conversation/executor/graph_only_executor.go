@@ -5,9 +5,9 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // GraphOnlyExecutor 结构图直答执行器

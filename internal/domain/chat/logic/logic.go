@@ -87,3 +87,8 @@ type ChatPreparationOrchestratorLogic interface {
 	// Prepare 准备对话执行计划
 	Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error)
 }
+
+// RagRetriever RAG 检索引擎接口
+type RagRetriever interface {
+	Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error)
+}

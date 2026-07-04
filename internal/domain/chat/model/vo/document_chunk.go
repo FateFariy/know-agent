@@ -1,5 +1,7 @@
 package vo
 
+import vo2 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+
 // DocumentKnowledgeMetadataKeys 文档知识元数据键常量
 const (
 	MetaSourceType          = "sourceType"
@@ -67,7 +69,7 @@ type DocumentChunk struct {
 	RerankOriginalIndex string  `json:"rerankOriginalIndex"` // 重排原始索引
 }
 
-func (d *DocumentChunk) FillKnowledge(knowledge *KnowledgeDocument) {
+func (d *DocumentChunk) FillKnowledge(knowledge *vo2.KnowledgeDocument) {
 	if knowledge == nil {
 		return
 	}

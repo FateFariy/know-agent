@@ -6,23 +6,23 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 
+	vo3 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/rag/model/vo"
 )
 
 // KnowledgeLogic 文档知识服务
 type KnowledgeLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
-	ListRetrievableDocuments(ctx context.Context) ([]*vo.KnowledgeDocument, error)
+	ListRetrievableDocuments(ctx context.Context) ([]*vo3.KnowledgeDocument, error)
 
 	// VectorSearch 向量检索
-	VectorSearch(ctx context.Context, request *vo2.DocumentRetrieve) ([]*vo2.DocumentChunk, error)
+	VectorSearch(ctx context.Context, request *vo3.DocumentRetrieve) ([]*vo3.DocumentChunk, error)
 
 	// KeywordSearch 关键词检索
-	KeywordSearch(ctx context.Context, request *vo2.DocumentRetrieve) ([]*vo2.DocumentChunk, error)
+	KeywordSearch(ctx context.Context, request *vo3.DocumentRetrieve) ([]*vo3.DocumentChunk, error)
 
 	// ElevateToParentBlocks 将子文档提升到父块级别
-	ElevateToParentBlocks(ctx context.Context, childDocuments []*vo2.DocumentChunk, maxChars int) ([]*vo2.DocumentChunk, error)
+	ElevateToParentBlocks(ctx context.Context, childDocuments []*vo3.DocumentChunk, maxChars int) ([]*vo3.DocumentChunk, error)
 }
 
 // KnowledgeRouteLogic 知识路由服务接口
