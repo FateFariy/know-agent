@@ -125,8 +125,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	// 合并渠道记录到上下文与调试轨迹
 	chs := retrievalCtx.UsedChannels()
 	convCtx.AddUsedTools(chs...)
-	debugTrace := convCtx.DebugTrace.Load()
-	if debugTrace != nil {
+	if debugTrace := convCtx.DebugTrace.Load(); debugTrace != nil {
 		debugTrace.SetUsedChannels(chs...)
 		debugTrace.SetRetrievalNotes(retrievalCtx.RetrievalNotes()...)
 	}
