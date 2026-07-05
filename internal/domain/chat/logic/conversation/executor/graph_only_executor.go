@@ -3,6 +3,9 @@ package executor
 import (
 	"context"
 
+	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/zeromicro/go-zero/core/logx"
+
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
@@ -11,8 +14,9 @@ import (
 )
 
 // GraphOnlyExecutor 结构图直答执行器
-// 当问题属于纯目录/章节导航类（如"第 3 章有哪些小节"）时，直接查询结构图
-// 并由 GraphAnswerRender 渲染一个纯文本的导航答复
+//
+// 当问题属于纯目录/章节导航类（如 "第 3 章有哪些小节"、"3.2 的上一节是什么"）时，
+// 仅通过结构图查询（父章节 / 兄弟章节 / 子章节），再由 GraphAnswerRender 渲染一个纯文本的导航答复。
 type GraphOnlyExecutor struct {
 	structureQuerier ragvo.StructureGraphQuerier
 	answerRender     ragvo.GraphAnswerRender
@@ -37,56 +41,103 @@ var _ conversation.Executor = (*GraphOnlyExecutor)(nil)
 // Mode 返回 GRAPH_ONLY
 func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGraphOnly }
 
-// Execute 执行结构图查询并渲染答案
+// Execute 执行结构图查询并渲染答案（与 Java GraphOnlyExecutor 对齐）
 func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
 		return nil, nil
 	}
 
-	publishThinking(convCtx, "正在定位对应的文档结构信息。")
-
-	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在查询结构图信息。", nil)
-
-	// 根据导航决策中的锚点查询结构图
 	decision := plan.NavigationDecision
-	var (
-		sectionNodeId int64
-		itemIndex     *int
-		keyword       = plan.OriginalQuestion
-	)
-	if decision != nil {
-		if decision.StructureAnchor != nil {
-			sectionNodeId = decision.StructureAnchor.StructureNodeId
-		}
-		if decision.ItemAnchor != nil && decision.ItemAnchor.ItemIndex > 0 {
-			idx := decision.ItemAnchor.ItemIndex
-			itemIndex = &idx
-			keyword = decision.ItemAnchor.ItemText
-		}
-	}
-	if sectionNodeId == 0 && decision != nil && decision.StructureAnchor != nil {
-		if sec, err := e.structureQuerier.FindBestSection(ctx, plan.SelectedDocumentId, keyword, decision.StructureAnchor.TargetSectionHint); err == nil && sec != nil {
-			sectionNodeId = sec.NodeId
-		}
+	if decision == nil || decision.StructureAnchor == nil || decision.StructureAnchor.StructureNodeId == 0 {
+		logx.Infof("GRAPH_ONLY 执行器直接返回无证据: decisionPresent=%v, structureNodeId=%v",
+			decision != nil,
+			safeStructureNodeId(decision))
+		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
+		return nil, nil
 	}
 
-	// 构建完整结构图结果（包含父章节、子章节、编号项等）
-	graphResult, err := e.structureQuerier.BuildGraphResult(ctx, plan.SelectedDocumentId, sectionNodeId, itemIndex, keyword)
+	publishThinking(convCtx, "正在通过结构图直接查询章节关系。")
+
+	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace,
+		vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在执行结构图查询。", nil)
+
+	documentId := plan.SelectedDocumentId
+	sectionNodeId := decision.StructureAnchor.StructureNodeId
+
+	logx.Infof("GRAPH_ONLY 执行开始: documentId=%v, sectionNodeId=%v, action=%v, navigationSummary=%q",
+		documentId, sectionNodeId, decision.NavigationAction, decision.SummaryText)
+
+	graphResult, err := e.buildGraphResult(ctx, documentId, sectionNodeId, decision)
 	if err != nil {
 		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return nil, err
 	}
 
+	answer := e.answerRender.RenderAnswer(e.Mode(), decision, graphResult)
+
+	logx.Infof("GRAPH_ONLY 执行完成: documentId=%v, sectionNodeId=%v, targetSection=%q, answerLength=%v",
+		documentId, sectionNodeId, sectionDisplayTitle(graphResult.TargetSection), len(answer))
+
 	snapshot := map[string]any{
-		"documentId": plan.SelectedDocumentId,
-		"nodeId":     sectionNodeId,
-		"itemIndex":  utils.PointerOrDefault(itemIndex, 0),
+		"targetSection":   sectionDisplayTitle(graphResult.TargetSection),
+		"parentSection":   sectionDisplayTitle(graphResult.ParentSection),
+		"childCount":      len(graphResult.Children),
+		"previousSibling": sectionDisplayTitle(graphResult.PreviousSibling),
+		"nextSibling":     sectionDisplayTitle(graphResult.NextSibling),
+		"answer":          strutil.Trim(answer),
 	}
 	_ = e.tracer.CompleteStage(ctx, graphStage, "结构图查询完成。", snapshot)
 
-	answer := e.answerRender.RenderAnswer(e.Mode(), decision, graphResult)
-	publishText(convCtx, utils.BlankToDefault(answer, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)))
+	if strutil.IsBlank(answer) {
+		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
+		return nil, nil
+	}
+	publishText(convCtx, answer)
 	return nil, nil
+}
+
+// buildGraphResult 根据导航动作构建结构图查询结果
+//
+// - SECTION_ADJACENCY_LOOKUP：查询目标章节的前后兄弟章节 + 父章节
+// - 其他（默认 CHILD_SECTION_DESCEND）：查询目标章节 + 直接下级章节列表
+func (e *GraphOnlyExecutor) buildGraphResult(
+	ctx context.Context, documentId, sectionNodeId int64, decision *vo.DocumentNavigationDecision,
+) (*ragvo.GraphQueryResult, error) {
+	if decision != nil && decision.NavigationAction == vo.DocumentNavigationActionSectionAdjacencyLookup {
+		siblings, err := e.structureQuerier.FindSectionWithSiblings(ctx, documentId, sectionNodeId)
+		if err != nil {
+			return nil, err
+		}
+		if siblings == nil {
+			return &ragvo.GraphQueryResult{}, nil
+		}
+		return &ragvo.GraphQueryResult{
+			TargetSection:   siblings.Section,
+			ParentSection:   siblings.Parent,
+			PreviousSibling: siblings.PreviousSibling,
+			NextSibling:     siblings.NextSibling,
+		}, nil
+	}
+
+	children, err := e.structureQuerier.FindSectionWithChildren(ctx, documentId, sectionNodeId)
+	if err != nil {
+		return nil, err
+	}
+	if children == nil {
+		return &ragvo.GraphQueryResult{}, nil
+	}
+	return &ragvo.GraphQueryResult{
+		TargetSection: children.Section,
+		Children:      children.Children,
+	}, nil
+}
+
+// sectionDisplayTitle 取章节的展示标题
+func sectionDisplayTitle(section *ragvo.GraphSection) string {
+	if section == nil {
+		return ""
+	}
+	return section.DisplayTitle()
 }

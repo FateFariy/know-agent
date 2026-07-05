@@ -2,8 +2,6 @@ package executor
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	"github.com/zeromicro/go-zero/core/logx"
 
@@ -17,18 +15,18 @@ import (
 // ReactAgentExecutor 开放式 Agent 执行器
 // 当问题跨越单篇文档知识边界时，将问题交由 ReAct Agent 自行决定工具调用与回答组合
 type ReactAgentExecutor struct {
-	reactAgentService ragvo.ReactAgentService
-	tracer            *trace.ConversationTraceRecorder
+	reactAgent ragvo.ReactAgentService
+	tracer     *trace.ConversationTraceRecorder
 }
 
 // NewReactAgentExecutor 构造 ReAct Agent 执行器
 func NewReactAgentExecutor(
-	reactAgentService ragvo.ReactAgentService,
+	reactAgent ragvo.ReactAgentService,
 	tracer *trace.ConversationTraceRecorder,
 ) *ReactAgentExecutor {
 	return &ReactAgentExecutor{
-		reactAgentService: reactAgentService,
-		tracer:            tracer,
+		reactAgent: reactAgent,
+		tracer:     tracer,
 	}
 }
 
@@ -49,7 +47,7 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 	agentStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
 		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
 
-	streamCh, err := e.reactAgentService.Stream(ctx, plan.OriginalQuestion)
+	streamCh, err := e.reactAgent.Stream(ctx, plan.OriginalQuestion)
 	if err != nil {
 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
 		e.tracer.FailStage(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
@@ -57,27 +55,10 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 		return nil, err
 	}
 
-	firstRespDone := false
-	for evt := range streamCh {
-		select {
-		case <-ctx.Done():
-			return nil, nil
-		default:
-			if strings.TrimSpace(evt.Content) == "" {
-				continue
-			}
-			if !firstRespDone {
-				firstRespDone = true
-				convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
-			}
-			publishText(convCtx, evt.Content)
-		}
-	}
-
 	snapshot := map[string]any{
 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
 		"answerLength":        convCtx.AnswerLength(),
 	}
 	_ = e.tracer.CompleteStage(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
-	return nil, nil
+	return streamCh, nil
 }

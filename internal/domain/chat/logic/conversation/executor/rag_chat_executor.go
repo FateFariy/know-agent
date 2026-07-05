@@ -14,16 +14,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// RagPromptAssembler RAG 提示词组装接口
-type RagPromptAssembler interface {
-	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error)
-}
-
 // RagChatExecutor 知识问答执行器
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
 	retriever       logic.RagRetriever
-	promptAssembler RagPromptAssembler
+	promptAssembler conversation.RagPromptAssembler
 	chatModel       logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer          *trace.ConversationTraceRecorder
 }
@@ -31,7 +26,7 @@ type RagChatExecutor struct {
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
 	retriever logic.RagRetriever,
-	ragPromptAssembler RagPromptAssembler,
+	ragPromptAssembler conversation.RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *RagChatExecutor {
@@ -52,9 +47,10 @@ func (e *RagChatExecutor) Mode() vo.ExecutionMode {
 
 // Execute 执行检索 + Prompt 装配 + 模型流式回答
 func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
+	// 加载执行计划，缺失时直接报错
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil, fmt.Errorf("invaild value")
+		return nil, fmt.Errorf("invalid value")
 	}
 
 	if err := publishThinking(convCtx, "正在根据问题规划知识检索范围。"); err != nil {

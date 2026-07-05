@@ -14,3 +14,8 @@ type Executor interface {
 	// Execute 执行回答生成逻辑；事件将写入 convCtx.Channel
 	Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error)
 }
+
+// RagPromptAssembler RAG 提示词组装接口
+type RagPromptAssembler interface {
+	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error)
+}
