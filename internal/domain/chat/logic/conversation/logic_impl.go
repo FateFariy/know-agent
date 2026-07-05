@@ -626,14 +626,34 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	}
 }
 
-// finishSuccessfully 成功完成：发送引用/推荐事件 -> 落库 -> 清理
+// finishSuccessfully 以成功状态完成当前会话交互（exchange）
+//
+// 执行流程：
+//  1. 原子检查 Finalized 标志（CAS：false → true），避免重复收尾
+//  2. defer 中异步刷新会话摘要并执行清理（任何返回路径都会执行）
+//  3. 启动 finalize 与 recommendation 两个追踪阶段（忽略其错误）
+//  4. 生成推荐追问：需要澄清时返回澄清选项，否则由 recommendLogic 生成
+//  5. 向客户端流补发引用事件、推荐事件，并发送流 Complete
+//  6. 刷新 DebugTrace 运行时统计
+//  7. 组装成功态 ChatExchange，调用 completeExchange 落库；根据落库结果完成或标记追踪阶段
 func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
+	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
+
+	// defer 中异步刷新会话摘要 + 执行清理
+	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
+	defer func() {
+		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
+		c.cleanup(ctx, convCtx)
+	}()
+
+	// 从 convCtx 中取出当前答案与去重后的引用列表（供后续发送事件与落库使用）
 	answer := convCtx.Answer()
 	uniqueReferences := convCtx.UniqueReferences()
 
+	// 启动 finalize 与 recommendation 两个追踪阶段（忽略 tracer 错误）
 	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), "正在收尾已完成会话。", nil)
 
@@ -641,6 +661,8 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 		convCtx.ExecutionModeName(), "正在生成推荐追问。", nil)
 
 	// 生成推荐追问
+	// - 若本次交互是澄清（NeedClarification 为真），则直接使用澄清选项作为推荐
+	// - 否则，拉取最近交互记录，由 recommendLogic 基于当前问答与历史生成推荐
 	var recommendations []string
 	if convCtx.NeedClarification() {
 		recommendations = convCtx.ClarificationOptions()
@@ -649,51 +671,59 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 		recommendations = c.recommendLogic.GenerateRecommendations(ctx, convCtx.Question, answer, recentExchanges, convCtx.Trace)
 	}
 
+	// 完成 recommendation 追踪阶段，并写入推荐数量快照
 	snapshot := map[string]any{"recommendationCount": len(recommendations), "recommendations": recommendations}
 	_ = c.tracer.CompleteStage(ctx, recommendationsStage, "推荐追问生成完成。", snapshot)
 
-	// 补发引用/推荐事件
+	// 向客户端流补发引用事件 / 推荐事件，最后发送流 Complete 信号
 	if len(uniqueReferences) > 0 {
 		referencesEvent := c.eventBuilder.ReferencesWithMetadata(uniqueReferences, convCtx.ConversationId, convCtx.ExchangeId)
-		support.SafeEmitNext(convCtx.Channel, referencesEvent)
+		if err := support.SafeEmitNext(convCtx.Channel, referencesEvent); err != nil {
+			Warnf("发送引用事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+		}
 	}
 	if len(recommendations) > 0 {
 		recommendationsEvent := c.eventBuilder.RecommendationsWithMetadata(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
-		support.SafeEmitNext(convCtx.Channel, recommendationsEvent)
+		if err := support.SafeEmitNext(convCtx.Channel, recommendationsEvent); err != nil {
+			Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+		}
 	}
+	support.SafeEmitComplete(convCtx.Channel)
 
-	// 刷新调试轨迹统计
+	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
-	firstResponse := int64(0)
-	if v := convCtx.FirstResponseTimeMs.Load(); v > 0 {
-		firstResponse = v
-	}
+	// 组装成功态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记 finalize 追踪阶段
 	successExchange := &entity.ChatExchange{
 		ID:                  convCtx.ExchangeId,
 		ConversationId:      convCtx.ConversationId,
 		Question:            convCtx.Question,
 		Answer:              answer,
-		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
-		ReferenceList:       toJSONArray(uniqueReferences),
-		RecommendationList:  toJSONArray(recommendations),
-		UsedToolList:        toJSONArray(snapshotUsedTools(convCtx.UsedTools)),
-		DebugTraceJson:      debugTraceJSON(convCtx),
+		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
+		ReferenceList:       common.ToJSONArray(uniqueReferences),
+		RecommendationList:  common.ToJSONArray(recommendations),
+		UsedToolList:        common.ToJSONArray(convCtx.SnapshotUsedTools()),
+		DebugTraceJson:      convCtx.DebugTraceJSON(),
 		TurnStatus:          vo.ChatTurnStatusCompleted,
-		ErrorMessage:        "",
-		FirstResponseTimeMs: firstResponse,
+		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-	if err := c.completeExchange(ctx, successExchange); err != nil {
+	if err := c.completeExchange(ctx, successExchange); err == nil {
+		// 落库成功：完成 finalize 追踪阶段，写入完成快照（含推荐、引用、答案长度）
+		snapshot = map[string]any{
+			"finalStatus":         vo.ConversationTraceStageStateName(vo.ChatTurnStatusCompleted),
+			"recommendationCount": len(recommendations),
+			"recommendations":     recommendations,
+			"referenceCount":      len(uniqueReferences),
+			"answerLength":        len(answer),
+		}
+		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按完成状态收尾。", snapshot)
+	} else {
+		// 落库失败：打印错误日志并标记 finalize 追踪阶段为失败
 		logx.Errorf("成功会话收尾落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
+		_ = c.tracer.FailStage(ctx, finalizeStage, "会话收尾落库失败", err, nil)
 	}
-
-	// 异步刷新会话摘要
-	go func() {
-		defer func() { _ = recover() }()
-		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
-	}()
 }
 
 // finishWithFailure 以失败状态收尾当前会话交互（exchange）。
@@ -733,7 +763,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	}
 	support.SafeEmitComplete(convCtx.Channel)
 
-	// 刷新 DebugTrace 的运行时统计（CPU / 内存 / Goroutine 等）
+	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
 	// 组装失败 ChatExchange（保留已生成的答案/引用/思考链），调用 completeExchange 落库
@@ -754,7 +784,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	if err = c.completeExchange(ctx, failExchange); err == nil {
 		// 落库成功：完成 finalize 追踪阶段，写入失败快照
 		snapshot := map[string]any{
-			"finalStatus":  vo.ChatTurnStatusFailed,
+			"finalStatus":  vo.ConversationTraceStageStateName(vo.ChatTurnStatusFailed),
 			"errorMessage": errorMessage,
 			"answerLength": convCtx.AnswerLength(),
 		}

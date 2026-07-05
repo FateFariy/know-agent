@@ -56,12 +56,9 @@ var conversationTraceStageStateMap = map[int]string{
 	ConversationTraceStageStateSkipped:   "跳过",
 }
 
-func ConversationTraceStageStateFromCode(code int) ConversationTraceStageState {
-	if code == 0 {
-		return ConversationTraceStageStateRunning
+func ConversationTraceStageStateName(code int) string {
+	if v, ok := conversationTraceStageStateMap[code]; ok {
+		return v
 	}
-	if _, ok := conversationTraceStageStateMap[code]; ok {
-		return code
-	}
-	return ConversationTraceStageStateRunning
+	return ""
 }
