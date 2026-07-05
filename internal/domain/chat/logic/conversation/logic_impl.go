@@ -409,14 +409,8 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 		}
 		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
-	go func() {
-		// 激活生成：租约续期 + 执行计划构建
-		go c.activateGeneration(cancelCtx, convCtx)
-		select {
-		case <-ctx.Done():
-			c.stopTask(ctx, convCtx, "客户端已取消请求")
-		}
-	}()
+	go c.activateGeneration(cancelCtx, convCtx)
+
 	return convCtx.Channel, nil
 }
 
@@ -428,12 +422,6 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 // 4) 生成推荐追问（如启用）
 // 执行过程中若触发停止或失败，则走失败/停止分支。
 func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
-	defer func() {
-		if r := recover(); r != nil {
-			logx.Errorf("activateGeneration panic, conversationId=%s, recover=%v", convCtx.ConversationId, r)
-			c.finishWithFailure(ctx, convCtx, fmt.Errorf("执行出现异常: %v", r))
-		}
-	}()
 	if convCtx.Finalized.Load() {
 		return
 	}
@@ -444,34 +432,62 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 		convCtx.ReleaseResources()
 		return
 	}
-
-	// 构建执行计划
-	execPlan, err := c.prepareExecutionPlan(ctx, convCtx)
+	resultCh, err := c.buildConversationExecution(convCtx)(ctx)
 	if err != nil {
-		panic(err)
+		logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+		c.finishWithFailure(ctx, convCtx, fmt.Errorf("执行出现异常: %v", err))
+		return
 	}
-	convCtx.ExecutionPlan.Store(execPlan)
 
-	// 发送执行计划信息（用于前端调试/感知）
-	thinkingEvent = c.eventBuilder.ThinkingWithMetadata("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
-	support.SafeEmitNext(convCtx.Channel, thinkingEvent)
+	for {
+		select {
+		case <-ctx.Done():
+			c.stopTask(ctx, convCtx, "客户端已取消请求")
+			return
+		case chunk, ok := <-resultCh:
+			if !ok {
+				c.finishSuccessfully(ctx, convCtx)
+				return
+			}
+			if err = c.emitModelChunk(convCtx, chunk); err != nil {
+				logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+				c.finishWithFailure(ctx, convCtx, err)
+				return
+			}
+			return
+		}
+	}
 }
 
 // buildConversationExecution 构建对话执行（执行计划构建的外层封装）
-func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
-	return func(ctx context.Context) {
+func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) (<-chan string, error) {
+	return func(ctx context.Context) (<-chan string, error) {
 		// 发送 "正在分析问题上下文" 事件
 		thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		plan, err := c.prepareExecutionPlan(ctx, convCtx)
 		if err != nil {
-			c.finishWithFailure(ctx, convCtx, err)
-			return
+			return nil, err
 		}
 		convCtx.ExecutionPlan.Store(plan)
+
+		// 发送执行计划信息（用于前端调试/感知）
+		thinkingEvent = c.eventBuilder.ThinkingWithMetadata("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
+		if err = support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
+			return nil, err
+		}
+		executor, err := c.executorRegistry.Get(plan.Mode)
+		if err != nil {
+			return nil, err
+		}
+		resultCh, err := executor.Execute(ctx, convCtx)
+		if err != nil {
+			return nil, err
+		}
+		return resultCh, nil
 	}
 }
 
@@ -538,26 +554,21 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 			Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 			return nil, err
 		}
-		// todo 更新上下文
-		// putContextIfNotNull(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_DOCUMENT_ID, execPlan.SelectedDocumentId)
-		// putContextIfNotBlank(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_DOCUMENT_NAME, execPlan.SelectedDocumentName)
-		// putContextIfNotNull(convCtx.RunnerConfig(), ChatContextKeys.SELECTED_TASK_ID, execPlan.SelectedTaskId)
 	}
 
 	debugTrace := vo.NewChatDebugTrace(execPlan)
 	convCtx.DebugTrace.Store(debugTrace)
 	convCtx.ExecutionPlan.Store(execPlan)
-	// todo taskInfo.runnableConfig().context().put(ChatContextKeys.DEBUG_TRACE, taskInfo.debugTrace());
 
 	return execPlan, nil
 }
 
 // emitModelChunk 发出模型输出块（text 事件），并更新首响应时间
-func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
+func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) error {
 	convCtx.WriteAnswerBuffer(chunk)
 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
 	textEvent := c.eventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId)
-	support.SafeEmitNext(convCtx.Channel, textEvent)
+	return support.SafeEmitNext(convCtx.Channel, textEvent)
 }
 
 // stopTask 停止任务：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
