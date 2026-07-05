@@ -31,6 +31,13 @@ func NewChatRepository(svcCtx *svc.ServiceContext) *ChatRepositoryImpl {
 	}
 }
 
+// ========== 对话轮次（Exchange）相关 ==========
+
+// InsertExchange 插入对话记录
+func (r *ChatRepositoryImpl) InsertExchange(ctx context.Context, exchange *entity.ChatExchange) error {
+	return r.dbWithContext(ctx).Create(convert.ToChatExchangeModel(exchange)).Error
+}
+
 // StartExchange 创建对话记录
 func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error) {
 	chatExchange := &entity.ChatExchange{
@@ -43,38 +50,18 @@ func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity
 	}
 	return chatExchange, r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		dialogue.SessionStatus = vo.ChatSessionStatusRunning
-		if err := r.upsertDialogue(ctx, dialogue); err != nil {
+		if err := r.UpsertDialogue(ctx, dialogue); err != nil {
 			return err
 		}
 		return r.dbWithContext(ctx).Create(convert.ToChatExchangeModel(chatExchange)).Error
 	})
 }
 
-// CompleteExchange 完成对话记录
-func (r *ChatRepositoryImpl) CompleteExchange(ctx context.Context, exchange *entity.ChatExchange) error {
-	return r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		updates := map[string]any{
-			"answer":                 exchange.Answer,
-			"thinking_steps":         exchange.ThinkingSteps,
-			"reference_list":         exchange.ReferenceList,
-			"recommendation_list":    exchange.RecommendationList,
-			"used_tool_list":         exchange.UsedToolList,
-			"debug_trace_json":       exchange.DebugTraceJson,
-			"turn_status":            exchange.TurnStatus,
-			"error_message":          exchange.ErrorMessage,
-			"first_response_time_ms": exchange.FirstResponseTimeMs,
-			"total_response_time_ms": exchange.TotalResponseTimeMs,
-		}
-		if err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
-			Where("id = ? AND conversation_id = ?", exchange.ID, exchange.ConversationId).
-			Updates(updates).Error; err != nil {
-			return err
-		}
-
-		return r.dbWithContext(ctx).Model(&model.ChatDialogue{}).
-			Where("conversation_id = ?", exchange.ConversationId).
-			Update("session_status", vo.ChatSessionStatusIdle).Error
-	})
+// UpdateExchangeById 更新对话记录
+func (r *ChatRepositoryImpl) UpdateExchangeById(ctx context.Context, exchange *entity.ChatExchange) error {
+	return r.dbWithContext(ctx).Model(&model.ChatExchange{}).
+		Where("id = ?", exchange.ID).
+		Updates(convert.ToChatExchangeModel(exchange)).Error
 }
 
 // ListExchanges 列出对话的所有交换记录
@@ -121,8 +108,17 @@ func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversati
 	return exchanges, nil
 }
 
-// upsertDialogue 创建或更新会话
-func (r *ChatRepositoryImpl) upsertDialogue(ctx context.Context, dialogue *entity.ChatDialogue) error {
+// ========== 会话（Dialogue）相关 ==========
+
+// UpdateDialogueByConversationId 根据对话ID更新对话记录
+func (r *ChatRepositoryImpl) UpdateDialogueByConversationId(ctx context.Context, dialogue *entity.ChatDialogue) error {
+	return r.dbWithContext(ctx).Model(&model.ChatDialogue{}).
+		Where("conversation_id = ?", dialogue.ConversationId).
+		Updates(convert.ToChatDialogueModel(dialogue)).Error
+}
+
+// UpsertDialogue 创建或更新会话
+func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entity.ChatDialogue) error {
 	var chatDialogue *model.ChatDialogue
 	err := r.dbWithContext(ctx).
 		Where("conversation_id = ?", dialogue.ConversationId).
@@ -161,8 +157,10 @@ func (r *ChatRepositoryImpl) upsertDialogue(ctx context.Context, dialogue *entit
 // RefreshSessionScope 刷新会话范围（更新会话状态、模式、文档选择）
 func (r *ChatRepositoryImpl) RefreshSessionScope(ctx context.Context, dialogue *entity.ChatDialogue) error {
 	dialogue.SessionStatus = vo.ChatSessionStatusRunning
-	return r.upsertDialogue(ctx, dialogue)
+	return r.UpsertDialogue(ctx, dialogue)
 }
+
+// ========== 会话归档与查询 ==========
 
 // SelectSessionRecord 获取会话
 func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
@@ -267,6 +265,42 @@ func (r *ChatRepositoryImpl) DeleteMemorySummary(ctx context.Context, conversati
 	return r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model.ChatMemorySummary{}).Error
 }
 
+// ========== 会话阶段追踪相关 ==========
+
+// InsertStage 创建阶段记录
+func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
+	return r.dbWithContext(ctx).Create(convert.ToChatExchangeTraceStageModel(stage)).Error
+}
+
+// UpdateStageById 更新阶段记录
+func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
+	return r.dbWithContext(ctx).Model(&model.ChatExchangeTraceStage{}).
+		Where("id = ?", stage.ID).
+		Updates(stage).Error
+}
+
+// SelectStages 查询阶段记录
+func (r *ChatRepositoryImpl) SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error) {
+	var stages []*entity.ChatExchangeTraceStage
+	if err := r.dbWithContext(ctx).
+		Model(&model.ChatExchangeTraceStage{}).
+		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
+		Order("stage_order ASC, start_time ASC, id ASC").
+		Find(&stages).Error; err != nil {
+		return nil, err
+	}
+	return stages, nil
+}
+
+// DeleteStage 删除阶段记录
+func (r *ChatRepositoryImpl) DeleteStage(ctx context.Context, conversationId string) error {
+	return r.dbWithContext(ctx).
+		Where("conversation_id = ?", conversationId).
+		Delete(&model.ChatExchangeTraceStage{}).Error
+}
+
+// ========== 内部辅助方法 ==========
+
 // buildListDialoguePageQuery 构建分页查询会话的查询条件
 func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, keyword string, chatMode, latestTurnStatus int) *gorm.DB {
 	query := r.dbWithContext(ctx).Model(&model.ChatDialogue{})
@@ -324,8 +358,8 @@ func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
 	return &vo.ConversationArchiveRecord{
-		ConversationId: dialogue.ConversationId,
-		// ChatMode:             dialogue.ChatMode,
+		ConversationId:       dialogue.ConversationId,
+		ChatMode:             dialogue.ChatMode,
 		Running:              dialogue.SessionStatus == vo.ChatSessionStatusRunning,
 		SelectedDocumentId:   dialogue.SelectedDocumentId,
 		SelectedDocumentName: dialogue.SelectedDocumentName,
@@ -333,38 +367,4 @@ func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, 
 		UpdatedAt:            dialogue.UpdateTime,
 		Exchanges:            chatExchanges,
 	}
-}
-
-// ========== 会话阶段追踪相关 ==========
-
-// InsertStage 创建阶段记录
-func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
-	return r.dbWithContext(ctx).Create(convert.ToChatExchangeTraceStageModel(stage)).Error
-}
-
-// UpdateStageById 更新阶段记录
-func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
-	return r.dbWithContext(ctx).Model(&model.ChatExchangeTraceStage{}).
-		Where("id = ?", stage.ID).
-		Updates(stage).Error
-}
-
-// SelectStages 查询阶段记录
-func (r *ChatRepositoryImpl) SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error) {
-	var stages []*entity.ChatExchangeTraceStage
-	if err := r.dbWithContext(ctx).
-		Model(&model.ChatExchangeTraceStage{}).
-		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
-		Order("stage_order ASC, start_time ASC, id ASC").
-		Find(&stages).Error; err != nil {
-		return nil, err
-	}
-	return stages, nil
-}
-
-// DeleteStage 删除阶段记录
-func (r *ChatRepositoryImpl) DeleteStage(ctx context.Context, conversationId string) error {
-	return r.dbWithContext(ctx).
-		Where("conversation_id = ?", conversationId).
-		Delete(&model.ChatExchangeTraceStage{}).Error
 }

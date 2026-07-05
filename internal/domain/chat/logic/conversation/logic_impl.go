@@ -70,7 +70,11 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 		memoryLogic:       memoryLogic,
 		distributedLock:   distributedLock,
 		options: &options{
-			historyPreviewTurns: svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
+			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
+			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
+			maxModelCallsPerThread: svcCtx.Config.Chat.Agent.MaxModelCallsPerThread,
+			maxToolCallsPerRun:     svcCtx.Config.Chat.Agent.MaxToolCallsPerRun,
+			maxToolCallsPerThread:  svcCtx.Config.Chat.Agent.MaxToolCallsPerThread,
 		},
 	}
 }
@@ -380,8 +384,7 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 
 // bootstrapConversation 启动会话，创建对话记录并注册到运行注册表。若注册失败，说明会话正被其他执行接管，则拒绝。
 func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (<-chan string, error) {
-	dialogue := plan.ConvChatDialogue()
-	exchange, err := c.repo.StartExchange(ctx, dialogue)
+	exchange, err := c.startExchange(ctx, plan)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +602,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		ID:                  convCtx.ExchangeId,
 		ConversationId:      convCtx.ConversationId,
 		Question:            convCtx.Question,
-		Answer:              convCtx.GetAnswerContent(),
+		Answer:              convCtx.Answer(),
 		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
 		ReferenceList:       toJSONArray(snapshotReferences(convCtx.References)),
 		RecommendationList:  toJSONArray([]string{}),
@@ -633,8 +636,8 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
-	answer := convCtx.GetAnswerContent()
-	uniqueReferences := convCtx.GetUniqueReferences()
+	answer := convCtx.Answer()
+	uniqueReferences := convCtx.UniqueReferences()
 
 	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), "正在收尾已完成会话。", nil)
@@ -645,7 +648,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	// 生成推荐追问
 	var recommendations []string
 	if convCtx.NeedClarification() {
-		recommendations = convCtx.GetClarificationOptions()
+		recommendations = convCtx.ClarificationOptions()
 	} else {
 		recentExchanges := c.fetchRecentExchanges(ctx, convCtx.ConversationId, convCtx.ExchangeId)
 		recommendations = c.recommendLogic.GenerateRecommendations(ctx, convCtx.Question, answer, recentExchanges, convCtx.Trace)
@@ -710,6 +713,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	if err := support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
 		Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
+	support.SafeEmitComplete(convCtx.Channel)
 
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
@@ -721,7 +725,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 		ID:                  convCtx.ExchangeId,
 		ConversationId:      convCtx.ConversationId,
 		Question:            convCtx.Question,
-		Answer:              convCtx.GetAnswerContent(),
+		Answer:              convCtx.Answer(),
 		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
 		ReferenceList:       toJSONArray(snapshotReferences(convCtx.References)),
 		RecommendationList:  toJSONArray([]string{}),
@@ -732,9 +736,9 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 		FirstResponseTimeMs: firstResponse,
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-	if dbErr := c.repo.CompleteExchange(ctx, failExchange); dbErr != nil {
+	if err := c.repo.CompleteExchange(ctx, failExchange); err != nil {
 		logx.Errorf("失败会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, dbErr)
+			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 
 	go func() {
@@ -753,13 +757,60 @@ func (c *LogicImpl) refreshDebugTraceRuntimeStats(convCtx *vo.ConversationContex
 	debugTrace.ModelUsageTraces = modelUsageTraces
 	debugTrace.LimitStats = &vo.ChatLimitStats{
 		ModelCallsUsed:        len(modelUsageTraces),
-		ToolCallsUsed:         len(debugTrace.ToolTraces),
-		ModelCallsRunLimit:    32,
-		ToolCallsRunLimit:     32,
-		ModelCallsThreadLimit: 64,
-		ToolCallsThreadLimit:  64,
+		ToolCallsUsed:         len(convCtx.SnapshotUsedTools()),
+		ModelCallsRunLimit:    c.options.maxModelCallsPerRun,
+		ToolCallsRunLimit:     c.options.maxToolCallsPerRun,
+		ModelCallsThreadLimit: c.options.maxModelCallsPerThread,
+		ToolCallsThreadLimit:  c.options.maxToolCallsPerThread,
 	}
 	convCtx.DebugTrace.Store(debugTrace)
+}
+
+// startExchange 开始新一轮会话交互（exchange）
+func (c *LogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan) (*entity.ChatExchange, error) {
+	// 构造对话实体（按 ConversationId 聚合整个会话），状态初始化为 Running
+	dialogue := &entity.ChatDialogue{
+		ConversationId:       plan.ConversationId,
+		Question:             plan.Question,
+		ChatMode:             vo.ChatQueryModeValue(plan.ChatMode),
+		SelectedDocumentId:   plan.SelectedDocumentId,
+		SelectedDocumentName: plan.SelectedDocumentName,
+		SessionStatus:        vo.ChatSessionStatusRunning,
+	}
+	// 构造本轮交互实体，状态 Running（使用雪花 ID 保证全局唯一）
+	chatExchange := &entity.ChatExchange{
+		ID:             utils.GetSnowflakeNextID(),
+		ConversationId: plan.ConversationId,
+		Question:       plan.Question,
+		TurnStatus:     vo.ChatTurnStatusRunning,
+	}
+	// 事务中原子执行：Upsert 对话 + 插入新交互
+	startFn := func(txCtx context.Context) error {
+		// Upsert：若对话记录已存在（同一 ConversationId）则更新，否则插入
+		if err := c.repo.UpsertDialogue(txCtx, dialogue); err != nil {
+			return err
+		}
+		// 插入本轮交互记录
+		return c.repo.InsertExchange(txCtx, chatExchange)
+	}
+	if err := c.repo.Do(ctx, startFn); err != nil {
+		return nil, err
+	}
+	return chatExchange, nil
+}
+
+// completeExchange 完成会话交互（exchange）
+func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
+	completeFn := func(txCtx context.Context) error {
+		// 更新交互记录（含答案、耗时、最终状态等，由调用方已在 exchange 对象中填充）
+		if err := c.repo.UpdateExchangeById(txCtx, exchange); err != nil {
+			return err
+		}
+		// 将对应会话的状态重置为 Idle（释放"运行中"标记）
+		dialogue := &entity.ChatDialogue{SessionStatus: vo.ChatSessionStatusIdle}
+		return c.repo.UpdateDialogueByConversationId(txCtx, dialogue)
+	}
+	return c.repo.Do(ctx, completeFn)
 }
 
 // ---------------------------------------------------------------------------

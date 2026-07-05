@@ -9,7 +9,7 @@ import (
 type ConversationArchiveRecord struct {
 	ConversationId       string
 	Running              bool
-	ChatMode             ChatQueryMode
+	ChatMode             int
 	SelectedDocumentId   int64
 	SelectedDocumentName string
 	CreatedAt            time.Time

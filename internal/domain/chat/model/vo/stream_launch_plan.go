@@ -3,8 +3,6 @@ package vo
 import (
 	"fmt"
 	"time"
-
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 )
 
 var weekdayMap = map[time.Weekday]string{
@@ -35,14 +33,4 @@ func (s *StreamLaunchPlan) FillCurrentDate() {
 	loc, _ := time.LoadLocation(Zone)
 	s.CurrentDate = time.Now().In(loc)
 	s.CurrentDateText = fmt.Sprintf("%s（%s）", s.CurrentDate.Format(time.DateOnly), weekdayMap[s.CurrentDate.Weekday()])
-}
-
-func (s *StreamLaunchPlan) ConvChatDialogue() *entity.ChatDialogue {
-	return &entity.ChatDialogue{
-		ConversationId:       s.ConversationId,
-		Question:             s.Question,
-		ChatMode:             ChatQueryModeValue(s.ChatMode),
-		SelectedDocumentId:   s.SelectedDocumentId,
-		SelectedDocumentName: s.SelectedDocumentName,
-	}
 }

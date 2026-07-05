@@ -204,7 +204,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 
 	snapshot = map[string]any{
 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-		"answerLength":        convCtx.GetAnswerLength(),
+		"answerLength":        convCtx.AnswerLength(),
 	}
 	_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", snapshot)
 	return nil

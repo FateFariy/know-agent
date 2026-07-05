@@ -9,14 +9,16 @@ import (
 
 // ChatRepository 聊天仓储接口
 type ChatRepository interface {
-	// Do 运行一个事务
+	// Do 运行一个事务，事务中执行 fn 函数
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
 
-	// StartExchange 创建对话记录
-	StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error)
+	// ========== 对话轮次（Exchange）相关 ==========
 
-	// CompleteExchange 完成对话记录
-	CompleteExchange(ctx context.Context, exchange *entity.ChatExchange) error
+	// InsertExchange 插入对话记录
+	InsertExchange(ctx context.Context, exchange *entity.ChatExchange) error
+
+	// UpdateExchangeById 根据ID更新对话记录
+	UpdateExchangeById(ctx context.Context, exchange *entity.ChatExchange) error
 
 	// ListExchanges 列出对话的所有记录
 	ListExchanges(ctx context.Context, conversationId string) ([]*entity.ChatExchange, error)
@@ -27,8 +29,18 @@ type ChatRepository interface {
 	// ListRecentExchanges 列出最近的记录
 	ListRecentExchanges(ctx context.Context, conversationId string, limit int) ([]*entity.ChatExchange, error)
 
+	// ========== 会话（Dialogue）相关 ==========
+
+	// UpdateDialogueByConversationId 根据对话ID更新对话记录
+	UpdateDialogueByConversationId(ctx context.Context, dialogue *entity.ChatDialogue) error
+
+	// UpsertDialogue 创建或更新会话
+	UpsertDialogue(ctx context.Context, dialogue *entity.ChatDialogue) error
+
 	// RefreshSessionScope 刷新会话范围（更新会话状态、模式、文档选择）
 	RefreshSessionScope(ctx context.Context, dialogue *entity.ChatDialogue) error
+
+	// ========== 会话归档与查询 ==========
 
 	// SelectSessionRecord 获取会话记录
 	SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)

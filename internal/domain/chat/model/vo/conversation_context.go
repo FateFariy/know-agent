@@ -77,8 +77,8 @@ func (c *ConversationContext) AddUsedTools(tools ...string) {
 	}
 }
 
-// UsedTools 获取已使用的工具列表
-func (c *ConversationContext) UsedTools() []string {
+// SnapshotUsedTools 获取已使用的工具列表的快照
+func (c *ConversationContext) SnapshotUsedTools() []string {
 	return c.usedTools.SubList(0, c.usedTools.Size())
 }
 
