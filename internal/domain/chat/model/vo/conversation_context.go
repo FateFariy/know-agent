@@ -39,7 +39,7 @@ type ConversationContext struct {
 	StartTime           time.Time                               // 开始时间（毫秒精度）
 	FirstResponseTimeMs atomic.Int64                            // 首次响应耗时（毫秒）
 	Finalized           atomic.Bool                             // 是否已完成
-	CancelExecute       context.CancelFunc                      // 资源释放
+	CancelFunc          context.CancelFunc                      // 资源释放
 }
 
 func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
@@ -56,6 +56,15 @@ func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
 		References:           list.NewCopyOnWriteList[*SearchReference](nil),
 		usedTools:            list.NewCopyOnWriteList[string](nil),
 		StartTime:            time.Now(),
+	}
+}
+
+// ReleaseResources 释放资源
+func (c *ConversationContext) ReleaseResources() {
+	cancelFunc := c.CancelFunc
+	if cancelFunc != nil {
+		cancelFunc()
+		c.CancelFunc = nil
 	}
 }
 

@@ -36,6 +36,20 @@ const (
 	ChatTurnStatusStopped                             // 已停止
 )
 
+func ChatTurnStatusName(code int) string {
+	switch code {
+	case ChatTurnStatusRunning:
+		return "进行中"
+	case ChatTurnStatusCompleted:
+		return "已完成"
+	case ChatTurnStatusFailed:
+		return "失败"
+	case ChatTurnStatusStopped:
+		return "已停止"
+	}
+	return ""
+}
+
 // ============================================================
 // ConversationTraceStageState 追踪阶段状态
 // ============================================================
@@ -49,16 +63,16 @@ const (
 	ConversationTraceStageStateSkipped                                          // 跳过
 )
 
-var conversationTraceStageStateMap = map[int]string{
-	ConversationTraceStageStateRunning:   "进行中",
-	ConversationTraceStageStateCompleted: "已完成",
-	ConversationTraceStageStateFailed:    "失败",
-	ConversationTraceStageStateSkipped:   "跳过",
-}
-
 func ConversationTraceStageStateName(code int) string {
-	if v, ok := conversationTraceStageStateMap[code]; ok {
-		return v
+	switch code {
+	case ConversationTraceStageStateRunning:
+		return "进行中"
+	case ConversationTraceStageStateCompleted:
+		return "已完成"
+	case ConversationTraceStageStateFailed:
+		return "失败"
+	case ConversationTraceStageStateSkipped:
+		return "跳过"
 	}
 	return ""
 }
