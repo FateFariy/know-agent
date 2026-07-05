@@ -29,7 +29,7 @@ func NewConversationTraceRecorder(repo adapter.ChatRepository) *ConversationTrac
 func (t *ConversationTraceRecorder) StartStage(ctx context.Context, trace *vo.ConversationTrace, stageCode *vo.ConversationTraceStage,
 	executionMode, summaryText string, snapshot any) (*vo.StageHandle, error) {
 	if trace == nil {
-		return nil, nil
+		return nil, fmt.Errorf("invaild value")
 	}
 	conversationId := trace.ConversationId()
 	stage := &entity.ChatExchangeTraceStage{

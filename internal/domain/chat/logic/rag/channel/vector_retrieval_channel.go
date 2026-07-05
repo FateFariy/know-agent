@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -36,7 +37,7 @@ func (c *VectorRetrievalChannel) Supports(plan *vo.ConversationExecutionPlan) bo
 // 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）
 func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
 	if !query.ValidSearchable() {
-		return nil, nil
+		return nil, fmt.Errorf("invaild value")
 	}
 
 	docs, err := c.vectorDB.SearchByVector(ctx, query)

@@ -17,7 +17,7 @@ type ChatLogic interface {
 	ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error)
 
 	// StopConversation 停止会话
-	StopConversation(ctx context.Context, conversationId string) (*chat.ConversationStopResp, error)
+	StopConversation(ctx context.Context, conversationId string) (bool, string, error)
 
 	// GetSession 获取会话详情
 	GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error)
@@ -29,7 +29,7 @@ type ChatLogic interface {
 	ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error)
 
 	// ResetConversation 重置会话
-	ResetConversation(ctx context.Context, conversationId string) (*chat.ConversationResetResp, error)
+	ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error)
 
 	// RebuildConversationSummary 重建会话摘要
 	RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error)

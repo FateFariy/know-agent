@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cloudwego/eino/schema"
@@ -11,32 +12,36 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
+// RagPromptAssembler RAG 提示词组装接口
+type RagPromptAssembler interface {
+	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error)
+}
+
 // RagChatExecutor 知识问答执行器
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
-	ragRetriever       logic.RagRetriever
-	ragPromptAssembler rag.RagPromptAssembler
-	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
-	tracer             *trace.ConversationTraceRecorder
+	retriever       logic.RagRetriever
+	promptAssembler RagPromptAssembler
+	chatModel       logic.ChatModelImpl[*schema.AgenticMessage]
+	tracer          *trace.ConversationTraceRecorder
 }
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
-	ragRetriever logic.RagRetriever,
-	ragPromptAssembler rag.RagPromptAssembler,
+	retriever logic.RagRetriever,
+	ragPromptAssembler RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *RagChatExecutor {
 	return &RagChatExecutor{
-		ragRetriever:       ragRetriever,
-		ragPromptAssembler: ragPromptAssembler,
-		chatModel:          chatModel,
-		tracer:             tracer,
+		retriever:       retriever,
+		promptAssembler: ragPromptAssembler,
+		chatModel:       chatModel,
+		tracer:          tracer,
 	}
 }
 
@@ -48,111 +53,112 @@ func (e *RagChatExecutor) Mode() vo.ExecutionMode {
 }
 
 // Execute 执行检索 + Prompt 装配 + 模型流式回答
-func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) error {
+func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil
+		return nil, fmt.Errorf("invaild value")
 	}
 
-	publishThinking(convCtx, "正在根据问题规划知识检索范围。")
+	if err := publishThinking(convCtx, "正在根据问题规划知识检索范围。"); err != nil {
+		return nil, err
+	}
 
-	retrieveStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRAGRetrieve, e.Mode().String(), "正在执行双通道混合检索。", nil)
+	retrieveStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRAGRetrieve,
+		e.Mode().String(), "正在执行双通道混合检索。", nil)
 
-	retrievalCtx, err := e.ragRetriever.Retrieve(ctx, plan, convCtx.Trace)
+	retrievalCtx, err := e.retriever.Retrieve(ctx, plan, convCtx.Trace)
 	if err != nil {
 		logx.Errorf("RAG 检索失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
-		if err := e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil); err != nil {
-			logx.Errorf("保存阶段信息失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
-		}
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		_ = e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil)
+		return nil, err
 	}
 
-	if retrievalCtx != nil {
-		subQuestions := make([]map[string]any, len(retrievalCtx.SubQuestionEvidenceList))
-		for i, sq := range retrievalCtx.SubQuestionEvidenceList {
-			subQuestions[i] = map[string]any{
-				"index":                  sq.SubQuestionIndex,
-				"question":               sq.SubQuestion,
-				"referenceCount":         len(sq.References),
-				"documentCount":          len(sq.Documents),
-				"fusedCandidateCount":    sq.FusedCandidateCount,
-				"parentCandidateCount":   sq.ParentCandidateCount,
-				"rerankedCandidateCount": sq.RerankedCandidateCount,
-				"channelTraces":          sq.GetChannelTraceMaps(),
-				"references":             sq.GetReferenceMaps(),
-			}
-		}
-
-		references := retrievalCtx.FlattenReferences()
-		refDetails := make([]map[string]any, len(references))
-		for i, ref := range references {
-			refDetails[i] = map[string]any{
-				"referenceId":  ref.ReferenceId,
-				"documentName": utils.BlankToDefault(ref.DocumentName, ref.Title),
-				"sectionPath":  ref.SectionPath,
-				"channel":      ref.Channel,
-			}
-		}
-
-		snapshot := map[string]any{
-			"retrievalQuestion": retrievalCtx.RetrievalQuestion,
-			"usedChannels":      retrievalCtx.GetUsedChannels(),
-			"retrievalNotes":    retrievalCtx.GetRetrievalNotes(),
-			"referenceCount":    len(references),
-			"subQuestionCount":  len(retrievalCtx.SubQuestionEvidenceList),
-			"subQuestions":      subQuestions,
-			"references":        refDetails,
-		}
-		if err := e.tracer.CompleteStage(ctx, retrieveStage, "RAG 检索完成。", snapshot); err != nil {
-			logx.Errorf("保存阶段信息失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
+	subQuestions := make([]map[string]any, len(retrievalCtx.SubQuestionEvidenceList))
+	for i, sq := range retrievalCtx.SubQuestionEvidenceList {
+		subQuestions[i] = map[string]any{
+			"index":                  sq.SubQuestionIndex,
+			"question":               sq.SubQuestion,
+			"referenceCount":         len(sq.References),
+			"documentCount":          len(sq.Documents),
+			"fusedCandidateCount":    sq.FusedCandidateCount,
+			"parentCandidateCount":   sq.ParentCandidateCount,
+			"rerankedCandidateCount": sq.RerankedCandidateCount,
+			"channelTraces":          sq.GetChannelTraceMaps(),
+			"references":             sq.GetReferenceMaps(),
 		}
 	}
-	e.streamFromRetrievalContext(ctx, convCtx, plan, retrievalCtx)
-	return nil
+
+	references := retrievalCtx.FlattenReferences()
+	refDetails := make([]map[string]any, len(references))
+	for i, ref := range references {
+		refDetails[i] = map[string]any{
+			"referenceId":  ref.ReferenceId,
+			"documentName": utils.BlankToDefault(ref.DocumentName, ref.Title),
+			"sectionPath":  ref.SectionPath,
+			"channel":      ref.Channel,
+		}
+	}
+
+	snapshot := map[string]any{
+		"retrievalQuestion": retrievalCtx.RetrievalQuestion,
+		"usedChannels":      retrievalCtx.UsedChannels(),
+		"retrievalNotes":    retrievalCtx.RetrievalNotes(),
+		"referenceCount":    len(references),
+		"subQuestionCount":  len(retrievalCtx.SubQuestionEvidenceList),
+		"subQuestions":      subQuestions,
+		"references":        refDetails,
+	}
+	_ = e.tracer.CompleteStage(ctx, retrieveStage, "RAG 检索完成。", snapshot)
+
+	return e.streamFromRetrievalContext(ctx, convCtx, plan, retrievalCtx)
 }
 
 // streamFromRetrievalContext 基于检索上下文生成流式回答
 func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCtx *vo.ConversationContext,
-	plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) {
+	plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (<-chan string, error) {
 	// 先下发思考事件（检索笔记、渠道列表）
-	if retrievalCtx != nil {
-		retrievalCtx.RetrievalNotes.ForEach(func(note string) {
-			publishThinking(convCtx, note)
-		})
+	notes := retrievalCtx.RetrievalNotes()
+	for _, note := range notes {
+		if err := publishThinking(convCtx, note); err != nil {
+			return nil, err
+		}
 	}
 
 	// 合并渠道记录到上下文与调试轨迹
-	if retrievalCtx != nil {
-		chs := retrievalCtx.GetUsedChannels()
-		mergeUsedChannels(convCtx, chs)
-	}
+	chs := retrievalCtx.UsedChannels()
+	convCtx.AddUsedTools(chs...)
+	mergeUsedChannels(convCtx, chs)
 
 	// 空证据兜底
-	if retrievalCtx == nil || retrievalCtx.IsEmpty() {
-		publishThinking(convCtx, "当前没有足够证据，直接返回无证据兜底回复。")
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return
+	if retrievalCtx.IsEmpty() {
+		if err := publishThinking(convCtx, "当前没有足够证据，直接返回无证据兜底回复。"); err != nil {
+			return nil, err
+		}
+		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
 	}
 
 	uniqueRefs := flattenRagReferencesSnapshot(retrievalCtx.FlattenReferences())
 	if len(uniqueRefs) > 0 {
-		publishReferences(convCtx, uniqueRefs)
+		if err := publishReferences(convCtx, uniqueRefs); err != nil {
+			return nil, err
+		}
 	}
 
-	publishThinking(convCtx, "证据整理完成，正在基于证据生成回答。")
+	if err := publishThinking(convCtx, "证据整理完成，正在基于证据生成回答。"); err != nil {
+		return nil, err
+	}
 
 	// Prompt 装配与预算
 	budgetStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageEvidenceBudget,
 		e.Mode().String(), "正在组装证据与 Prompt 预算。", nil)
-	promptResult, err := e.ragPromptAssembler.Assemble(ctx, plan, retrievalCtx)
+	promptResult, err := e.promptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
 		logx.Errorf("Prompt 组装失败: conversationId=%s, err=%v", convCtx.ConversationId, err)
-		e.tracer.FailStage(ctx, budgetStage, "证据预算与 Prompt 组装失败。", err, nil)
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return
+		_ = e.tracer.FailStage(ctx, budgetStage, "证据预算与 Prompt 组装失败。", err, nil)
+		return nil, err
 	}
-	e.tracer.CompleteStage(ctx, budgetStage, "证据预算与 Prompt 组装完成。", map[string]any{
+
+	snapshot := map[string]any{
 		"totalBudget":              promptResult.TotalBudget,
 		"perSubQuestionBudget":     promptResult.PerSubQuestionBudget,
 		"renderedReferenceCount":   promptResult.RenderedReferenceCount,
@@ -161,14 +167,15 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		"omittedReferenceDetails":  promptResult.OmittedReferenceDetails,
 		"systemPrompt":             promptResult.SystemPrompt,
 		"userPrompt":               promptResult.UserPrompt,
-	})
+	}
+	_ = e.tracer.CompleteStage(ctx, budgetStage, "证据预算与 Prompt 组装完成。", snapshot)
 
 	answerStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), "正在基于证据生成回答。", nil)
 
-	streamCh, streamErr := e.chatModel.StreamWithTrace(ctx, "rag_answer", promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
-	if streamErr != nil {
-		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, streamErr)
-		e.tracer.FailStage(ctx, answerStage, "答案生成失败。", streamErr, nil)
+	streamCh, err := e.chatModel.StreamWithTrace(ctx, "rag_answer", promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
+	if err != nil {
+		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
+		_ = e.tracer.FailStage(ctx, answerStage, "答案生成失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 		return
 	}

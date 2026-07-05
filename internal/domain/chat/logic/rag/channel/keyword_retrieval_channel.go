@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -35,7 +36,7 @@ func (c *KeywordRetrievalChannel) Supports(plan *vo.ConversationExecutionPlan) b
 // Retrieve 执行关键词检索
 func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
 	if !query.ValidSearchable() {
-		return nil, nil
+		return nil, fmt.Errorf("invaild value")
 	}
 
 	docs, err := c.keywordDB.SearchByKeyword(ctx, query)

@@ -15,6 +15,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -171,7 +172,7 @@ func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversati
 		First(dialogue).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, errorx.ErrSessionNotFound.Format(conversationId)
 		}
 		return nil, err
 	}

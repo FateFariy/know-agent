@@ -38,10 +38,10 @@ var _ conversation.Executor = (*ReactAgentExecutor)(nil)
 func (e *ReactAgentExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeReactAgent }
 
 // Execute 调用 ReAct Agent 流式输出
-func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) error {
+func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil
+		return nil, nil
 	}
 
 	publishThinking(convCtx, "问题涉及多方面信息，交由 ReAct Agent 综合回答。")
@@ -54,14 +54,14 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
 		e.tracer.FailStage(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		return nil, err
 	}
 
 	firstRespDone := false
 	for evt := range streamCh {
 		select {
 		case <-ctx.Done():
-			return nil
+			return nil, nil
 		default:
 			if strings.TrimSpace(evt.Content) == "" {
 				continue
@@ -79,5 +79,5 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 		"answerLength":        convCtx.AnswerLength(),
 	}
 	_ = e.tracer.CompleteStage(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
-	return nil
+	return nil, nil
 }

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
+	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 )
@@ -34,7 +35,7 @@ type ConversationContext struct {
 	answerBuffer        strings.Builder                         // 响应内容缓冲区
 	mu                  sync.Mutex                              // 响应内容缓冲区锁
 	ThinkingSteps       *list.CopyOnWriteList[string]           // 思考步骤列表
-	References          *list.CopyOnWriteList[*SearchReference] // 引用列表
+	references          *list.CopyOnWriteList[*SearchReference] // 引用列表
 	usedTools           *list.CopyOnWriteList[string]           // 已使用的工具集合
 	StartTime           time.Time                               // 开始时间（毫秒精度）
 	FirstResponseTimeMs atomic.Int64                            // 首次响应耗时（毫秒）
@@ -53,7 +54,7 @@ func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
 		CurrentDate:          plan.CurrentDate,
 		CurrentDateText:      plan.CurrentDateText,
 		ThinkingSteps:        list.NewCopyOnWriteList[string](nil),
-		References:           list.NewCopyOnWriteList[*SearchReference](nil),
+		references:           list.NewCopyOnWriteList[*SearchReference](nil),
 		usedTools:            list.NewCopyOnWriteList[string](nil),
 		StartTime:            time.Now(),
 	}
@@ -75,13 +76,13 @@ func (c *ConversationContext) AddThinkingSteps(steps ...string) {
 
 // AddReferences 添加引用
 func (c *ConversationContext) AddReferences(refs ...*SearchReference) {
-	c.References.AddAll(refs)
+	c.references.AddAll(refs)
 }
 
 // AddUsedTools 添加已使用的工具
 func (c *ConversationContext) AddUsedTools(tools ...string) {
 	for _, tool := range tools {
-		if !c.usedTools.Contain(tool) {
+		if !c.usedTools.Contain(tool) && strutil.IsNotBlank(tool) {
 			c.usedTools.Add(tool)
 		}
 	}
@@ -94,7 +95,11 @@ func (c *ConversationContext) SnapshotUsedTools() []string {
 
 // UniqueReferences 获取唯一引用列表
 func (c *ConversationContext) UniqueReferences() []*SearchReference {
-	references := c.References.SubList(0, c.References.Size())
+	size := c.references.Size()
+	if size == 0 {
+		return nil
+	}
+	references := c.references.SubList(0, size)
 	return utils.Distinct(references, func(ref *SearchReference) string {
 		return ref.UniqueKey()
 	})
@@ -102,7 +107,11 @@ func (c *ConversationContext) UniqueReferences() []*SearchReference {
 
 // SnapshotThinkingSteps 获取思考步骤列表的快照
 func (c *ConversationContext) SnapshotThinkingSteps() []string {
-	return c.ThinkingSteps.SubList(0, c.ThinkingSteps.Size())
+	size := c.ThinkingSteps.Size()
+	if size == 0 {
+		return nil
+	}
+	return c.ThinkingSteps.SubList(0, size)
 }
 
 // WriteAnswerBuffer 写入响应内容缓冲区

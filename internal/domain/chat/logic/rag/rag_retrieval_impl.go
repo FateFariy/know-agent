@@ -72,7 +72,7 @@ func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecu
 	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.Documents) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
-		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.RetrievalNotes)
+		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.retrievalNotes)
 
 	e.assignReferenceIds(evidenceList)
 	ragCtx.SubQuestionEvidenceList = evidenceList
@@ -131,8 +131,8 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			finalTopK := min(e.finalTopK, len(rerankedCandidates))
 			finalDocuments := rerankedCandidates[:finalTopK]
 
-			ragCtx.AddRetrievalNotef(fmt.Sprintf("子问题%d检索完成：%s，final=%d",
-				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments)))
+			ragCtx.AddRetrievalNotef("子问题%d检索完成：%s，final=%d",
+				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments))
 
 			// 记录观测数据
 			if trace != nil {

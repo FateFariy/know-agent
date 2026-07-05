@@ -30,10 +30,10 @@ func (e *ClarificationExecutor) Mode() vo.ExecutionMode {
 }
 
 // Execute 下发澄清思考事件 + 澄清话术
-func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) error {
+func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil
+		return nil, nil
 	}
 
 	reply := utils.BlankToDefault(plan.ClarificationReply, "当前我无法稳定判断你想问哪份知识文档，请补充更具体的文档名、主题或关键词。")
@@ -58,7 +58,7 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 	// 记录路由阶段追踪
 	routeStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, e.Mode().Name(), "当前候选存在歧义，先返回澄清问题。", nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	snapshot := map[string]any{
@@ -66,5 +66,5 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 		"clarificationReason":  reason,
 		"clarificationOptions": options,
 	}
-	return e.tracer.CompleteStage(ctx, routeStage, "已返回澄清问题。", snapshot)
+	return nil, e.tracer.CompleteStage(ctx, routeStage, "已返回澄清问题。", snapshot)
 }

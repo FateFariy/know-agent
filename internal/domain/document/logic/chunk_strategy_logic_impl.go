@@ -101,7 +101,7 @@ func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel *chatlogic.
 // 再按"父块优先保留天然大语义单元、子块围绕召回边界精细化"的原则拼接流水线。
 func (s *ChunkStrategyLogicImpl) RecommendStrategy(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
-		return nil, nil
+		return nil, fmt.Errorf("invaild value")
 	}
 
 	reasonList := make([]string, 0)

@@ -8,18 +8,18 @@ import (
 
 // RagRetrievalContext RAG 检索上下文
 type RagRetrievalContext struct {
-	RetrievalQuestion       string                        `json:"retrievalQuestion"`
-	SubQuestionEvidenceList []*SubQuestionEvidence        `json:"subQuestionEvidenceList"`
-	RetrievalNotes          *list.CopyOnWriteList[string] `json:"retrievalNotes"`
-	UsedChannels            *list.CopyOnWriteList[string] `json:"usedChannels"`
-	FlattenedReferences     []*SearchReference            `json:"flattenedReferences"`
+	RetrievalQuestion       string
+	SubQuestionEvidenceList []*SubQuestionEvidence
+	retrievalNotes          *list.CopyOnWriteList[string]
+	usedChannels            *list.CopyOnWriteList[string]
+	FlattenedReferences     []*SearchReference
 }
 
 func NewRagRetrievalContext(retrievalQuestion string) *RagRetrievalContext {
 	return &RagRetrievalContext{
 		RetrievalQuestion: retrievalQuestion,
-		RetrievalNotes:    list.NewCopyOnWriteList([]string{}),
-		UsedChannels:      list.NewCopyOnWriteList([]string{}),
+		retrievalNotes:    list.NewCopyOnWriteList([]string{}),
+		usedChannels:      list.NewCopyOnWriteList([]string{}),
 	}
 }
 
@@ -52,30 +52,30 @@ func (c *RagRetrievalContext) FlattenReferences() []*SearchReference {
 // AddRetrievalNotef 添加检索笔记
 func (c *RagRetrievalContext) AddRetrievalNotef(format string, args ...any) {
 	note := fmt.Sprintf(format, args...)
-	c.RetrievalNotes.Add(note)
+	c.retrievalNotes.Add(note)
 }
 
 // AddUsedChannel 添加已使用的渠道
 func (c *RagRetrievalContext) AddUsedChannel(channel string) {
-	if !c.UsedChannels.Contain(channel) {
-		c.UsedChannels.Add(channel)
+	if !c.usedChannels.Contain(channel) {
+		c.usedChannels.Add(channel)
 	}
 }
 
-// GetUsedChannels 获取已使用的渠道
-func (c *RagRetrievalContext) GetUsedChannels() []string {
-	size := c.UsedChannels.Size()
+// UsedChannels 获取已使用的渠道
+func (c *RagRetrievalContext) UsedChannels() []string {
+	size := c.usedChannels.Size()
 	if size == 0 {
 		return nil
 	}
-	return c.UsedChannels.SubList(0, size)
+	return c.usedChannels.SubList(0, size)
 }
 
-// GetRetrievalNotes 获取检索笔记
-func (c *RagRetrievalContext) GetRetrievalNotes() []string {
-	size := c.RetrievalNotes.Size()
+// RetrievalNotes 获取检索笔记
+func (c *RagRetrievalContext) RetrievalNotes() []string {
+	size := c.retrievalNotes.Size()
 	if size == 0 {
 		return nil
 	}
-	return c.RetrievalNotes.SubList(0, size)
+	return c.retrievalNotes.SubList(0, size)
 }

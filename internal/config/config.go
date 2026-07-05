@@ -158,10 +158,10 @@ type RagConf struct {
 // AgentConf Agent配置
 type AgentConf struct {
 	RecommendationEnabled  bool          `json:",optional,default=true"` // 是否启用推荐追问
-	MaxModelCallsPerRun    int           `json:",optional,default=8"`    // 最大模型调用次数
-	MaxModelCallsPerThread int           `json:",optional,default=40"`   // 最大模型调用线程数
-	MaxToolCallsPerRun     int           `json:",optional,default=6"`    // 最大工具调用次数
-	MaxToolCallsPerThread  int           `json:",optional,default=30"`   // 最大工具调用线程数
+	MaxModelCallsPerRun    int           `json:",optional,default=8"`    // 每次最大模型调用次数
+	MaxModelCallsPerThread int           `json:",optional,default=40"`   // 每次最大模型调用线程数
+	MaxToolCallsPerRun     int           `json:",optional,default=6"`    // 每次最大工具调用次数
+	MaxToolCallsPerThread  int           `json:",optional,default=30"`   // 每次最大工具调用线程数
 	HistoryPreviewTurns    int           `json:",optional,default=4"`    // 预览历史轮次
 	RecommendationTimeout  time.Duration `json:",optional,default=5s"`   // 推荐生成超时时间
 	SystemPrompt           string        `json:",optional"`              // 系统提示

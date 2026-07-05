@@ -38,10 +38,10 @@ var _ conversation.Executor = (*GraphOnlyExecutor)(nil)
 func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGraphOnly }
 
 // Execute 执行结构图查询并渲染答案
-func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) error {
+func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil
+		return nil, nil
 	}
 
 	publishThinking(convCtx, "正在定位对应的文档结构信息。")
@@ -76,7 +76,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 	if err != nil {
 		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		return nil, err
 	}
 
 	snapshot := map[string]any{
@@ -88,5 +88,5 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 
 	answer := e.answerRender.RenderAnswer(e.Mode(), decision, graphResult)
 	publishText(convCtx, utils.BlankToDefault(answer, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)))
-	return nil
+	return nil, nil
 }

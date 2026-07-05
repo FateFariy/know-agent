@@ -20,4 +20,5 @@ var (
 	ErrParentBlockMissing       = common.NewBizError(20015, "当前方案缺少父块流水线，无法生成 Parent-Child 结构")
 	ErrChildBlockMissing        = common.NewBizError(20016, "当前方案缺少子块流水线，无法生成 Parent-Child 结构")
 	ErrDistributedLockNotFound  = common.NewBizError(20017, "分布式锁[%s]不存在")
+	ErrSessionNotFound          = common.NewBizError(20018, "会话不存在: %s")
 )

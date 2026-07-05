@@ -23,7 +23,7 @@ import (
 type GraphThenEvidenceExecutor struct {
 	structureQuerier   rag.StructureGraphQuerier
 	ragRetriever       logic.RagRetriever
-	ragPromptAssembler rag.RagPromptAssembler
+	ragPromptAssembler rag.PromptAssembler
 	chatModel          logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer             *trace.ConversationTraceRecorder
 }
@@ -32,7 +32,7 @@ type GraphThenEvidenceExecutor struct {
 func NewGraphThenEvidenceExecutor(
 	structureQuerier rag.StructureGraphQuerier,
 	ragRetriever logic.RagRetriever,
-	ragPromptAssembler rag.RagPromptAssembler,
+	ragPromptAssembler rag.PromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *GraphThenEvidenceExecutor {
@@ -53,10 +53,10 @@ func (e *GraphThenEvidenceExecutor) Mode() vo.ExecutionMode {
 }
 
 // Execute 执行结构图定位 → 证据检索 → 生成回答
-func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) error {
+func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
-		return nil
+		return nil, nil
 	}
 
 	publishThinking(convCtx, "正在定位目标章节/项，再基于对应内容回答你的问题。")
@@ -96,7 +96,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		logx.Errorf("结构图查询失败: conversationId=%s error=%v", convCtx.ConversationId, err)
 		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		return nil, err
 	}
 	e.tracer.CompleteStage(ctx, graphStage,
 		"结构图定位完成。",
@@ -127,12 +127,12 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		logx.Errorf("RAG 检索失败: conversationId=%s error=%v", convCtx.ConversationId, err)
 		_ = e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		return nil, err
 	}
 	snapshot := map[string]any{
 		"referenceCount":   len(retrievalCtx.FlattenReferences()),
-		"usedChannels":     retrievalCtx.GetUsedChannels(),
-		"retrievalNotes":   retrievalCtx.GetRetrievalNotes(),
+		"usedChannels":     retrievalCtx.UsedChannels(),
+		"retrievalNotes":   retrievalCtx.RetrievalNotes(),
 		"subQuestionCount": len(retrievalCtx.SubQuestionEvidenceList),
 	}
 	_ = e.tracer.CompleteStage(ctx, retrieveStage, "证据检索完成。", snapshot)
@@ -143,13 +143,13 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		publishReferences(convCtx, uniqueRefs)
 	}
 	if retrievalCtx.UsedChannels != nil {
-		mergeUsedChannels(convCtx, retrievalCtx.GetUsedChannels())
+		mergeUsedChannels(convCtx, retrievalCtx.UsedChannels())
 	}
 
 	if retrievalCtx.IsEmpty() {
 		publishThinking(convCtx, "未能在目标章节/项中检索到足够证据，返回兜底回答。")
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil
+		return nil, nil
 	}
 
 	publishThinking(convCtx, "已整理结构图与检索证据，正在生成回答。")
@@ -161,7 +161,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		logx.Errorf("Prompt 组装失败: conversationId=%s err=%v", convCtx.ConversationId, err)
 		_ = e.tracer.FailStage(ctx, budgetStage, "Prompt 组装失败。", err, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return err
+		return nil, err
 	}
 	snapshot = map[string]any{
 		"renderedReferenceCount": promptResult.RenderedReferenceCount,
@@ -182,14 +182,14 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		logx.Errorf("模型流式调用失败: conversationId=%s err=%v", convCtx.ConversationId, streamErr)
 		e.tracer.FailStage(ctx, answerStage, "模型流式调用失败。", streamErr, nil)
 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return streamErr
+		return nil, streamErr
 	}
 
 	firstRespDone := false
 	for chunk := range streamCh {
 		select {
 		case <-ctx.Done():
-			return nil
+			return nil, nil
 		default:
 			if strutil.IsBlank(chunk) {
 				continue
@@ -207,5 +207,5 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		"answerLength":        convCtx.AnswerLength(),
 	}
 	_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", snapshot)
-	return nil
+	return nil, nil
 }

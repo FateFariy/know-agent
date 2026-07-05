@@ -31,7 +31,6 @@ const (
 	chatRunningLeasePrefix        = "conversation:running:"
 	chatRunningLeaseRenewInterval = 10 * time.Second
 	channelBufferSize             = 100
-	defaultHistoryPreviewTurns    = 3
 )
 
 // LogicImpl 聊天业务逻辑实现
@@ -42,6 +41,7 @@ type LogicImpl struct {
 	tracer            *trace.ConversationTraceRecorder
 	eventBuilder      *support.StreamEventBuilder
 	runtimeRegistry   *support.ChatRuntimeRegistry
+	executorRegistry  *ExecutorRegistry
 	lifecycleLogic    doclog.LifecycleLogic
 	recommendLogic    logic.RecommendationLogic
 	memoryLogic       logic.SessionMemoryLogic
@@ -52,6 +52,7 @@ type LogicImpl struct {
 // NewChatLogic 创建聊天逻辑实例
 func NewChatLogic(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
+	executorRegistry *ExecutorRegistry,
 	lifecycleLogic doclog.LifecycleLogic,
 	orchestratorLogic logic.ChatPreparationOrchestratorLogic,
 	promptTempLogic logic.PromptTemplateLogic,
@@ -61,6 +62,7 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 ) *LogicImpl {
 	return &LogicImpl{
 		repo:              repo,
+		executorRegistry:  executorRegistry,
 		orchestratorLogic: orchestratorLogic,
 		promptTempLogic:   promptTempLogic,
 		tracer:            trace.NewConversationTraceRecorder(repo),
@@ -137,13 +139,13 @@ func (c *LogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.K
 }
 
 // StopConversation 停止会话
-func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string) (*chat.ConversationStopResp, error) {
+func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string) (bool, string, error) {
 	convCtx, ok := c.runtimeRegistry.Get(conversationId)
 	if !ok {
-		return &chat.ConversationStopResp{Success: false}, fmt.Errorf("没有找到正在执行的会话")
+		return false, "没有找到正在执行的会话", nil
 	}
-	_ = c.stopTask(ctx, convCtx, "用户已停止生成")
-	return &chat.ConversationStopResp{Success: true}, nil
+	stopTask := c.stopTask(ctx, convCtx, "用户已停止生成")
+	return stopTask.Stopped, stopTask.Message, nil
 }
 
 // GetSession 获取会话详情
@@ -202,14 +204,13 @@ func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string
 			StageCode:     s.StageCode,
 			StageName:     s.StageName,
 			ExecutionMode: s.ExecutionMode,
-			ErrorMessage:  s.ErrorMessage,
+			ErrorMessage:  utils.PointerOrDefault(s.ErrorMessage, ""),
 		})
 	}
 
 	thinking := jsonStrings(matched.ThinkingSteps)
 	var refs []*chat.SearchReferenceResp
 	if len(matched.ReferenceList) > 0 {
-		_ = json.Unmarshal([]byte(matched.ReferenceList), &refs)
 	}
 	recommendations := jsonStrings(matched.RecommendationList)
 	usedTools := jsonStrings(matched.UsedToolList)
@@ -282,23 +283,30 @@ func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSess
 }
 
 // ResetConversation 重置会话：停止并清除所有相关落库数据
-func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string) (*chat.ConversationResetResp, error) {
+func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error) {
+	stopResult := &vo.ConversationStop{}
 	// 停止正在运行的会话
 	if convCtx, ok := c.runtimeRegistry.Get(conversationId); ok {
-		_ = c.stopTask(ctx, convCtx, "会话被重置")
+		stopResult = c.stopTask(ctx, convCtx, "会话被重置")
 	}
 
 	// 删除会话及关联 exchange
-	dialogueCount, _, err := c.repo.DeleteSession(ctx, conversationId)
-	_ = dialogueCount
+	dialogueCount, exchangeCount, err := c.repo.DeleteSession(ctx, conversationId)
 	if err != nil {
-		return &chat.ConversationResetResp{Success: false}, err
+		return nil, err
 	}
 
 	// 删除记忆摘要
 	_ = c.memoryLogic.DeleteConversationSummary(ctx, conversationId)
 
-	return &chat.ConversationResetResp{Success: true}, nil
+	return &vo.ConversationReset{
+		ConversationId:         conversationId,
+		StoppedRunningTask:     stopResult.Stopped,
+		RemovedDialogueCount:   int(dialogueCount),
+		RemovedExchangeCount:   int(exchangeCount),
+		RemovedCheckpointCount: 0,
+		Message:                "会话被重置",
+	}, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
@@ -402,19 +410,12 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
 	go func() {
-		defer func() {
-			// 释放租约
-			if leaseErr := c.distributedLock.Unlock(cancelCtx, convCtx.LeaseKey); leaseErr != nil {
-				Warnf("锁 %s 释放失败: %s", convCtx.LeaseKey, leaseErr.Error())
-			}
-			// 从注册表移除
-			c.runtimeRegistry.Remove(plan.ConversationId, convCtx)
-			// 关闭通道
-			close(convCtx.Channel)
-		}()
-
 		// 激活生成：租约续期 + 执行计划构建
-		c.activateGeneration(cancelCtx, convCtx)
+		go c.activateGeneration(cancelCtx, convCtx)
+		select {
+		case <-ctx.Done():
+			c.stopTask(ctx, convCtx, "客户端已取消请求")
+		}
 	}()
 	return convCtx.Channel, nil
 }
@@ -444,10 +445,6 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 		return
 	}
 
-	// 发送 "正在分析问题上下文" 事件
-	thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
-	support.SafeEmitNext(convCtx.Channel, thinkingEvent)
-
 	// 构建执行计划
 	execPlan, err := c.prepareExecutionPlan(ctx, convCtx)
 	if err != nil {
@@ -458,6 +455,24 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 	// 发送执行计划信息（用于前端调试/感知）
 	thinkingEvent = c.eventBuilder.ThinkingWithMetadata("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
 	support.SafeEmitNext(convCtx.Channel, thinkingEvent)
+}
+
+// buildConversationExecution 构建对话执行（执行计划构建的外层封装）
+func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
+	return func(ctx context.Context) {
+		// 发送 "正在分析问题上下文" 事件
+		thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
+		if err := support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
+			panic(err)
+		}
+
+		plan, err := c.prepareExecutionPlan(ctx, convCtx)
+		if err != nil {
+			c.finishWithFailure(ctx, convCtx, err)
+			return
+		}
+		convCtx.ExecutionPlan.Store(plan)
+	}
 }
 
 // startLeaseRenewal 启动租约续期，若续期失败则自动停止当前会话并终止生成
@@ -537,24 +552,6 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 	return execPlan, nil
 }
 
-// buildConversationExecution 构建对话执行（执行计划构建的外层封装）
-func (c *LogicImpl) buildConversationExecution(ctx context.Context, convCtx *vo.ConversationContext) func(ctx context.Context) {
-	return func(ctx context.Context) {
-		if convCtx.Finalized.Load() {
-			return
-		}
-		thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
-		support.SafeEmitNext(convCtx.Channel, thinkingEvent)
-
-		plan, err := c.prepareExecutionPlan(ctx, convCtx)
-		if err != nil {
-			c.finishWithFailure(ctx, convCtx, err)
-			return
-		}
-		convCtx.ExecutionPlan.Store(plan)
-	}
-}
-
 // emitModelChunk 发出模型输出块（text 事件），并更新首响应时间
 func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
 	convCtx.WriteAnswerBuffer(chunk)
@@ -582,6 +579,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	// defer 中刷新会话摘要 + 执行清理
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
+		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
@@ -592,7 +590,6 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	//     } catch (RuntimeException exception) {
 	//         log.debug("中断 ReactAgent 时出现异常，继续释放资源", exception);
 	//     }
-	convCtx.ReleaseResources()
 	responseMessage := "已停止会话生成"
 	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), "正在收尾停止中的会话。", nil)
@@ -603,7 +600,6 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		responseMessage = "会话已停止，停止事件发送失败"
 	}
-	support.SafeEmitComplete(convCtx.Channel)
 
 	// 刷新调试轨迹统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
@@ -650,6 +646,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	// defer 中刷新会话摘要 + 执行清理
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
+		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
@@ -693,7 +690,6 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 			Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
 	}
-	support.SafeEmitComplete(convCtx.Channel)
 
 	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
@@ -740,6 +736,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	// defer 中刷新会话摘要 + 执行清理
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
+		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
@@ -754,7 +751,6 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	if err = support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
 		Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
-	support.SafeEmitComplete(convCtx.Channel)
 
 	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
@@ -843,11 +839,11 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 	return c.repo.Do(ctx, completeFn)
 }
 
-// cleanup 清理会话运行时资源
+// cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
 func (c *LogicImpl) cleanup(ctx context.Context, convCtx *vo.ConversationContext) {
+	support.SafeEmitComplete(convCtx.Channel)
 	convCtx.ReleaseResources()
-	leaseKey := convCtx.LeaseKey
-	c.unlockConversationLock(ctx, leaseKey)
+	c.unlockConversationLock(ctx, convCtx.LeaseKey)
 	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
 }
 

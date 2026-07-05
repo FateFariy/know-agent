@@ -229,7 +229,7 @@ package conversation
 // 	// 创建对话上下文信息
 // 	convCtx := c.buildConversationCtx(launchPlan, exchange)
 // 	cancelCtx, cancelFunc := context.WithCancel(ctx)
-// 	convCtx.CancelExecute = cancelFunc
+// 	convCtx.CancelFunc = cancelFunc
 //
 // 	// 注册到运行时注册表
 // 	if !c.runtimeRegistry.Register(convCtx) {
@@ -475,9 +475,9 @@ package conversation
 // 	}
 //
 // 	// 释放执行任务
-// 	if execCancel := convCtx.CancelExecute; execCancel != nil {
+// 	if execCancel := convCtx.CancelFunc; execCancel != nil {
 // 		execCancel()
-// 		convCtx.CancelExecute = nil // 避免重复调用
+// 		convCtx.CancelFunc = nil // 避免重复调用
 // 	}
 //
 // 	// 准备停止响应的消息
