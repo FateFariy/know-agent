@@ -19,8 +19,9 @@ type ChatStage = string
 
 const (
 	ChatStageRewrite   ChatStage = "rewrite"
-	ChatStageRetrieval ChatStage = "retrieval"
+	ChatStageRagAnswer ChatStage = "rag_answer"
 	ChatStageSummary   ChatStage = "summary"
+	ChatStageRecommend ChatStage = "recommend"
 )
 
 // ============================================================

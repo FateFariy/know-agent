@@ -72,7 +72,7 @@ func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecu
 	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.Documents) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
-		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.retrievalNotes)
+		plan.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.RetrievalNotes())
 
 	e.assignReferenceIds(evidenceList)
 	ragCtx.SubQuestionEvidenceList = evidenceList

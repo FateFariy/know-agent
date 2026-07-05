@@ -128,9 +128,9 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	return trace
 }
 
-// AddToolTrace 添加工具调用轨迹
-func (t *ChatDebugTrace) AddToolTrace(trace *ChatToolTrace) {
-	t.ToolTraces.Add(trace)
+// AddToolTraces 添加工具调用轨迹
+func (t *ChatDebugTrace) AddToolTraces(traces ...*ChatToolTrace) {
+	t.ToolTraces.AddAll(traces)
 }
 
 // AddModelUsageTrace 添加模型使用轨迹
@@ -141,13 +141,23 @@ func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
 	t.ModelUsageTraces = append(t.ModelUsageTraces, trace)
 }
 
-// AddUsedChannel 添加使用的渠道
-func (t *ChatDebugTrace) AddUsedChannel(channel string) {
-	t.UsedChannels.Add(channel)
+// AddUsedChannels 添加使用的渠道
+func (t *ChatDebugTrace) AddUsedChannels(channels ...string) {
+	t.UsedChannels.AddAll(channels)
 }
 
-func (t *ChatDebugTrace) AddRetrievalNote(note string) {
-	t.RetrievalNotes.Add(note)
+func (t *ChatDebugTrace) SetUsedChannels(channels ...string) {
+	t.UsedChannels.Clear()
+	t.UsedChannels.AddAll(channels)
+}
+
+func (t *ChatDebugTrace) AddRetrievalNotes(notes ...string) {
+	t.RetrievalNotes.AddAll(notes)
+}
+
+func (t *ChatDebugTrace) SetRetrievalNotes(notes ...string) {
+	t.RetrievalNotes.Clear()
+	t.RetrievalNotes.AddAll(notes)
 }
 
 // DocumentNavigationDecision 文档问答路由结果

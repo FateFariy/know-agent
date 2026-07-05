@@ -3,10 +3,8 @@ package executor
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -127,7 +125,11 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	// 合并渠道记录到上下文与调试轨迹
 	chs := retrievalCtx.UsedChannels()
 	convCtx.AddUsedTools(chs...)
-	mergeUsedChannels(convCtx, chs)
+	debugTrace := convCtx.DebugTrace.Load()
+	if debugTrace != nil {
+		debugTrace.SetUsedChannels(chs...)
+		debugTrace.SetRetrievalNotes(retrievalCtx.RetrievalNotes()...)
+	}
 
 	// 空证据兜底
 	if retrievalCtx.IsEmpty() {
@@ -137,9 +139,9 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
 	}
 
-	uniqueRefs := flattenRagReferencesSnapshot(retrievalCtx.FlattenReferences())
-	if len(uniqueRefs) > 0 {
-		if err := publishReferences(convCtx, uniqueRefs); err != nil {
+	references := retrievalCtx.FlattenReferences()
+	if len(references) > 0 {
+		if err := publishReferences(convCtx, references); err != nil {
 			return nil, err
 		}
 	}
@@ -172,33 +174,16 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	answerStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), "正在基于证据生成回答。", nil)
 
-	streamCh, err := e.chatModel.StreamWithTrace(ctx, "rag_answer", promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
+	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		_ = e.tracer.FailStage(ctx, answerStage, "答案生成失败。", err, nil)
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return
+		return nil, err
 	}
-
-	firstRespDone := false
-	for chunk := range streamCh {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if strutil.IsBlank(chunk) {
-				continue
-			}
-			publishText(convCtx, chunk)
-			if !firstRespDone {
-				firstRespDone = true
-				convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
-			}
-		}
-	}
-
-	e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
-		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-		"answerLength":        convCtx.AnswerLength(),
-	})
+	// todo 完成阶段由调用方记录
+	// e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
+	// 	"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
+	// 	"answerLength":        convCtx.AnswerLength(),
+	// })
+	return streamCh, nil
 }
