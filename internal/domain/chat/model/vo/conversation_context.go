@@ -2,6 +2,7 @@ package vo
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -90,6 +91,11 @@ func (c *ConversationContext) UniqueReferences() []*SearchReference {
 	})
 }
 
+// SnapshotThinkingSteps 获取思考步骤列表的快照
+func (c *ConversationContext) SnapshotThinkingSteps() []string {
+	return c.ThinkingSteps.SubList(0, c.ThinkingSteps.Size())
+}
+
 // WriteAnswerBuffer 写入响应内容缓冲区
 func (c *ConversationContext) WriteAnswerBuffer(content string) {
 	c.mu.Lock()
@@ -133,4 +139,17 @@ func (c *ConversationContext) ClarificationOptions() []string {
 		return execPlan.ClarificationOptions
 	}
 	return nil
+}
+
+// DebugTraceJSON 序列化调试轨迹
+func (c *ConversationContext) DebugTraceJSON() string {
+	dt := c.DebugTrace.Load()
+	if dt == nil {
+		return ""
+	}
+	data, err := json.Marshal(dt)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }

@@ -3,8 +3,8 @@ package conversation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -12,6 +12,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/api/chat"
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
@@ -84,16 +85,11 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
-	isSuccessLock := utils.Pointer(false)
 	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
-				if *isSuccessLock {
-					if leaseErr := c.distributedLock.Unlock(ctx, leaseKey); leaseErr != nil {
-						Warnf("分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, leaseErr)
-					}
-				}
+				c.unlockConversationLock(ctx, leaseKey)
 				logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
 					cmd.ConversationId, cmd.Question, err)
 				stream = c.rejectStream(err.Error(), cmd.ConversationId, 0)
@@ -105,7 +101,6 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 	if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
 		panic(fmt.Errorf("该会话当前正在执行中，请稍后再试"))
 	}
-	isSuccessLock = utils.Pointer(true)
 
 	// 构建启动计划
 	plan, err := c.buildLaunchPlan(ctx, cmd)
@@ -401,7 +396,7 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 			TurnStatus:     vo.ChatTurnStatusFailed,
 			ErrorMessage:   "该会话当前正在执行中，请稍后再试",
 		}
-		if err = c.repo.CompleteExchange(ctx, failExchange); err != nil {
+		if err = c.completeExchange(ctx, failExchange); err != nil {
 			logx.Errorf("保存 exchange 失败, conversationId=%s, err=%v", plan.ConversationId, err)
 		}
 		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
@@ -613,7 +608,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		FirstResponseTimeMs: firstResponse,
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-	if err := c.repo.CompleteExchange(ctx, stopExchange); err != nil {
+	if err := c.completeExchange(ctx, stopExchange); err != nil {
 		logx.Errorf("停止会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
@@ -689,7 +684,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 		FirstResponseTimeMs: firstResponse,
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-	if err := c.repo.CompleteExchange(ctx, successExchange); err != nil {
+	if err := c.completeExchange(ctx, successExchange); err != nil {
 		logx.Errorf("成功会话收尾落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
@@ -701,50 +696,75 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	}()
 }
 
-// finishWithFailure 失败收尾
+// finishWithFailure 以失败状态收尾当前会话交互（exchange）。
+//
+// 执行流程：
+//  1. 原子检查 Finalized 标志（CAS：false → true），确保仅首次调用生效，避免重复收尾
+//  2. 打印错误日志
+//  3. defer 中异步刷新会话摘要并执行清理（保证在任何 return 路径都会执行）
+//  4. 启动 finalize 追踪阶段
+//  5. 发送失败事件与流 Complete 到客户端（失败不影响主流程）
+//  6. 刷新 DebugTrace 的运行时统计
+//  7. 组装失败态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记追踪阶段
 func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.ConversationContext, err error) {
+	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
+	// 打印错误日志
 	logx.Errorf("会话执行失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 
+	// defer 中异步刷新会话摘要 + 执行清理
+	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
+	defer func() {
+		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
+		c.cleanup(ctx, convCtx)
+	}()
+
+	// 启动 finalize 追踪阶段（失败时忽略 tracer 错误，不影响主流程）
 	errorMessage := err.Error()
+	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
+		convCtx.ExecutionModeName(), "正在收尾失败会话。", nil)
+
+	// 向失败事件 + 流 Complete 信号；发送失败仅告警
 	errorEvent := c.eventBuilder.ErrorWithMetadata(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)
-	if err := support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
+	if err = support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
 		Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 	support.SafeEmitComplete(convCtx.Channel)
 
+	// 刷新 DebugTrace 的运行时统计（CPU / 内存 / Goroutine 等）
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
-	firstResponse := int64(0)
-	if v := convCtx.FirstResponseTimeMs.Load(); v > 0 {
-		firstResponse = v
-	}
+	// 组装失败 ChatExchange（保留已生成的答案/引用/思考链），调用 completeExchange 落库
 	failExchange := &entity.ChatExchange{
 		ID:                  convCtx.ExchangeId,
 		ConversationId:      convCtx.ConversationId,
 		Question:            convCtx.Question,
 		Answer:              convCtx.Answer(),
-		ThinkingSteps:       toJSONArray(snapshotStrings(convCtx.ThinkingSteps)),
-		ReferenceList:       toJSONArray(snapshotReferences(convCtx.References)),
-		RecommendationList:  toJSONArray([]string{}),
-		UsedToolList:        toJSONArray(snapshotUsedTools(convCtx.UsedTools)),
-		DebugTraceJson:      debugTraceJSON(convCtx),
+		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
+		ReferenceList:       common.ToJSONArray(convCtx.UniqueReferences()),
+		UsedToolList:        common.ToJSONArray(convCtx.SnapshotUsedTools()),
+		DebugTraceJson:      convCtx.DebugTraceJSON(),
 		TurnStatus:          vo.ChatTurnStatusFailed,
 		ErrorMessage:        errorMessage,
-		FirstResponseTimeMs: firstResponse,
+		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-	if err := c.repo.CompleteExchange(ctx, failExchange); err != nil {
+	if err = c.completeExchange(ctx, failExchange); err == nil {
+		// 落库成功：完成 finalize 追踪阶段，写入失败快照
+		snapshot := map[string]any{
+			"finalStatus":  vo.ChatTurnStatusFailed,
+			"errorMessage": errorMessage,
+			"answerLength": convCtx.AnswerLength(),
+		}
+		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按失败状态收尾。", snapshot)
+	} else {
+		// 落库失败：打印错误日志并标记 finalize 追踪阶段为失败
 		logx.Errorf("失败会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
 			convCtx.ConversationId, convCtx.ExchangeId, err)
+		_ = c.tracer.FailStage(ctx, finalizeStage, "失败态收尾失败。", err, nil)
 	}
-
-	go func() {
-		defer func() { _ = recover() }()
-		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
-	}()
 }
 
 // refreshDebugTraceRuntimeStats 刷新调试轨迹中的统计信息
@@ -813,6 +833,26 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 	return c.repo.Do(ctx, completeFn)
 }
 
+// cleanup 清理会话运行时资源
+func (c *LogicImpl) cleanup(ctx context.Context, convCtx *vo.ConversationContext) {
+	cancelFunc := convCtx.CancelExecute
+	if cancelFunc != nil {
+		cancelFunc()
+		convCtx.CancelExecute = nil
+	}
+	leaseKey := convCtx.LeaseKey
+	c.unlockConversationLock(ctx, leaseKey)
+	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
+}
+
+// unlockConversationLock 释放会话运行锁
+func (c *LogicImpl) unlockConversationLock(ctx context.Context, leaseKey string) {
+	err := c.distributedLock.Unlock(ctx, leaseKey)
+	if err != nil && errors.Is(err, errorx.ErrDistributedLockNotFound) {
+		Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 辅助方法（构建上下文、流辅助、JSON 辅助等）
 // ---------------------------------------------------------------------------
@@ -872,73 +912,6 @@ func buildSessionTitle(record *vo.ConversationArchiveRecord, defaultText string)
 		return defaultText[:30]
 	}
 	return defaultText
-}
-
-// snapshotStrings 获取思考步骤的快照（拷贝一份）
-func snapshotStrings(items []string) []string {
-	out := make([]string, len(items))
-	copy(out, items)
-	return out
-}
-
-// snapshotReferences 生成引用快照并按 uniqueKey 去重
-func snapshotReferences(refs []*vo.SearchReference) []*vo.SearchReference {
-	if len(refs) == 0 {
-		return []*vo.SearchReference{}
-	}
-	seen := sync.Map{}
-	out := make([]*vo.SearchReference, 0, len(refs))
-	for _, r := range refs {
-		if r == nil {
-			continue
-		}
-		key := fmt.Sprintf("%d-%d-%s", r.DocumentId, r.ChunkId, r.Snippet)
-		if _, dup := seen.LoadOrStore(key, struct{}{}); dup {
-			continue
-		}
-		out = append(out, r)
-	}
-	return out
-}
-
-// snapshotUsedTools 获取已用工具的快照
-func snapshotUsedTools(used map[string]struct{}) []string {
-	if len(used) == 0 {
-		return []string{}
-	}
-	out := make([]string, 0, len(used))
-	for k := range used {
-		out = append(out, k)
-	}
-	return out
-}
-
-// debugTraceJSON 序列化调试轨迹
-func debugTraceJSON(convCtx *vo.ConversationContext) string {
-	if convCtx == nil {
-		return ""
-	}
-	dt := convCtx.DebugTrace.Load()
-	if dt == nil {
-		return ""
-	}
-	data, err := json.Marshal(dt)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-// toJSONArray 将任意切片序列化为 common.JSONArray 所需的 JSON 数组文本
-func toJSONArray[T any](items []T) []byte {
-	if items == nil {
-		return []byte("[]")
-	}
-	data, err := json.Marshal(items)
-	if err != nil {
-		return []byte("[]")
-	}
-	return data
 }
 
 // jsonStrings 把 common.JSONArray 解析为字符串切片；若失败返回空切片
