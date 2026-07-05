@@ -192,6 +192,6 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-		"answerLength":        convCtx.AnswerBuffer.Len(),
+		"answerLength":        convCtx.AnswerLength(),
 	})
 }

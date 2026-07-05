@@ -27,11 +27,11 @@ const (
 type RecommendationLogicImpl struct {
 	properties     config.RecommendationConf
 	promptTemplate logic.PromptTemplateLogic
-	chatModel      *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	chatModel      *logic.ChatModelImpl[*schema.AgenticMessage]
 }
 
 // NewRecommendationLogicImpl 创建推荐追问逻辑实例
-func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic.PromptTemplateLogic, chatModel *logic.ObservedChatModelImpl[*schema.AgenticMessage]) *RecommendationLogicImpl {
+func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic.PromptTemplateLogic, chatModel *logic.ChatModelImpl[*schema.AgenticMessage]) *RecommendationLogicImpl {
 	return &RecommendationLogicImpl{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,

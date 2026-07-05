@@ -38,3 +38,11 @@ type ConversationExecutionPlan struct {
 	ClarificationReason          string                      // 澄清原因文本
 	NoEvidenceReply              string                      // 无证据回复文本
 }
+
+// ExecutionModeName 获取执行模式名称
+func (p *ConversationExecutionPlan) ExecutionModeName() string {
+	if p.Mode == nil {
+		return ""
+	}
+	return p.Mode.Name()
+}

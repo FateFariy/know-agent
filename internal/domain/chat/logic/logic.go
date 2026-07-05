@@ -23,7 +23,7 @@ type ChatLogic interface {
 	GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error)
 
 	// GetExchangeDetail 获取对话详情
-	GetExchangeDetail(ctx context.Context, conversationId, exchangeId string) (*chat.ConversationExchangeDetailResp, error)
+	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*chat.ConversationExchangeDetailResp, error)
 
 	// ListSessions 获取会话列表
 	ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error)

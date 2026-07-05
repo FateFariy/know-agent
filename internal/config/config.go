@@ -99,6 +99,7 @@ type ChatConf struct {
 	Rewrite               RewriteConf        // 问题改写配置
 	Recommendation        RecommendationConf // 推荐配置
 	Rag                   RagConf            // RAG配置
+	Agent                 AgentConf          // Agent配置
 }
 
 // RecommendationConf 推荐追问配置
@@ -152,6 +153,19 @@ type RagConf struct {
 	KeywordRelativeScoreFloor float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
 	PlanningHistoryMaxChars   int           `json:",optional,default=2000"` // 规划历史最大字符数
 	QuestionHistoryMaxChars   int           `json:",optional,default=1000"` // 问题历史最大字符数
+}
+
+// AgentConf Agent配置
+type AgentConf struct {
+	RecommendationEnabled  bool          `json:",optional,default=true"` // 是否启用推荐追问
+	MaxModelCallsPerRun    int           `json:",optional,default=8"`    // 最大模型调用次数
+	MaxModelCallsPerThread int           `json:",optional,default=40"`   // 最大模型调用线程数
+	MaxToolCallsPerRun     int           `json:",optional,default=6"`    // 最大工具调用次数
+	MaxToolCallsPerThread  int           `json:",optional,default=30"`   // 最大工具调用线程数
+	HistoryPreviewTurns    int           `json:",optional,default=4"`    // 预览历史轮次
+	RecommendationTimeout  time.Duration `json:",optional,default=5s"`   // 推荐生成超时时间
+	SystemPrompt           string        `json:",optional"`              // 系统提示
+	RecommendationPrompt   string        `json:",optional"`              // 推荐追问提示
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {

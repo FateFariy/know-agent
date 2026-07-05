@@ -6,8 +6,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
+
+	"github.com/swiftbit/know-agent/common/utils"
 )
 
 type ConversationContext struct {
@@ -27,10 +30,11 @@ type ConversationContext struct {
 	Trace               *ConversationTrace                      // 追踪记录
 	Channel             chan string                             // 响应流
 	LeaseKey            string                                  // 租约锁键
-	AnswerBuffer        strings.Builder                         // 响应内容缓冲区
+	answerBuffer        strings.Builder                         // 响应内容缓冲区
+	mu                  sync.Mutex                              // 响应内容缓冲区锁
 	ThinkingSteps       *list.CopyOnWriteList[string]           // 思考步骤列表
 	References          *list.CopyOnWriteList[*SearchReference] // 引用列表
-	UsedTools           sync.Map                                // 已使用的工具集合
+	usedTools           *list.CopyOnWriteList[string]           // 已使用的工具集合
 	StartTime           time.Time                               // 开始时间（毫秒精度）
 	FirstResponseTimeMs atomic.Int64                            // 首次响应耗时（毫秒）
 	Finalized           atomic.Bool                             // 是否已完成
@@ -49,18 +53,84 @@ func NewConversationContext(plan *StreamLaunchPlan) *ConversationContext {
 		CurrentDateText:      plan.CurrentDateText,
 		ThinkingSteps:        list.NewCopyOnWriteList[string](nil),
 		References:           list.NewCopyOnWriteList[*SearchReference](nil),
+		usedTools:            list.NewCopyOnWriteList[string](nil),
 		StartTime:            time.Now(),
 	}
 }
 
+// AddThinkingSteps 添加思考步骤
 func (c *ConversationContext) AddThinkingSteps(steps ...string) {
 	c.ThinkingSteps.AddAll(steps)
 }
 
+// AddReferences 添加引用
 func (c *ConversationContext) AddReferences(refs ...*SearchReference) {
 	c.References.AddAll(refs)
 }
 
-func (c *ConversationContext) GetUniqueReferences() []*SearchReference {
-	return c.References.SubList(0, c.References.Size())
+// AddUsedTools 添加已使用的工具
+func (c *ConversationContext) AddUsedTools(tools ...string) {
+	for _, tool := range tools {
+		if !c.usedTools.Contain(tool) {
+			c.usedTools.Add(tool)
+		}
+	}
+}
+
+// UsedTools 获取已使用的工具列表
+func (c *ConversationContext) UsedTools() []string {
+	return c.usedTools.SubList(0, c.usedTools.Size())
+}
+
+// UniqueReferences 获取唯一引用列表
+func (c *ConversationContext) UniqueReferences() []*SearchReference {
+	references := c.References.SubList(0, c.References.Size())
+	return utils.Distinct(references, func(ref *SearchReference) string {
+		return ref.UniqueKey()
+	})
+}
+
+// WriteAnswerBuffer 写入响应内容缓冲区
+func (c *ConversationContext) WriteAnswerBuffer(content string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.answerBuffer.WriteString(content)
+}
+
+// Answer 获取响应内容缓冲区内容
+func (c *ConversationContext) Answer() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.answerBuffer.String()
+}
+
+// AnswerLength 获取响应内容缓冲区长度（字符数）
+func (c *ConversationContext) AnswerLength() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return utf8.RuneCountInString(c.answerBuffer.String())
+}
+
+// ExecutionModeName 获取执行模式名称
+func (c *ConversationContext) ExecutionModeName() string {
+	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
+		return execPlan.ExecutionModeName()
+	}
+	return ""
+}
+
+// NeedClarification 是否需要澄清
+func (c *ConversationContext) NeedClarification() bool {
+	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
+		return execPlan.Mode == ExecutionModeClarification && len(execPlan.ClarificationOptions) > 0
+	}
+	return false
+}
+
+// ClarificationOptions 获取澄清选项
+func (c *ConversationContext) ClarificationOptions() []string {
+	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
+		return execPlan.ClarificationOptions
+	}
+	return nil
 }

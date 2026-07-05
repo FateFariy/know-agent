@@ -39,7 +39,7 @@ var (
 type SummaryCompressionStrategy struct {
 	baseMemoryStrategy
 	repo                      adapter.ChatRepository
-	chatModel                 *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	chatModel                 *logic.ChatModelImpl[*schema.AgenticMessage]
 	promptTemplate            logic.PromptTemplateLogic
 	refreshingConversationIds sync.Map
 	historySummary            config.HistorySummaryConf
@@ -48,7 +48,7 @@ type SummaryCompressionStrategy struct {
 }
 
 // NewSummaryCompressionStrategy 创建摘要压缩策略实例
-func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *logic.ObservedChatModelImpl[*schema.AgenticMessage], promptTemplate logic.PromptTemplateLogic) *SummaryCompressionStrategy {
+func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *logic.ChatModelImpl[*schema.AgenticMessage], promptTemplate logic.PromptTemplateLogic) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
 		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,

@@ -29,14 +29,14 @@ var (
 
 // QueryRewriteLogicImpl 问题改写逻辑实现
 type QueryRewriteLogicImpl struct {
-	chatModel       *logic.ObservedChatModelImpl[*schema.AgenticMessage]
+	chatModel       *logic.ChatModelImpl[*schema.AgenticMessage]
 	promptTemplate  logic.PromptTemplateLogic
 	maxSubQuestions int
 	options         []model.Option
 }
 
 // NewQueryRewriteLogicImpl 创建问题改写逻辑实例
-func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.ObservedChatModelImpl[*schema.AgenticMessage],
+func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
 	promptTemplate logic.PromptTemplateLogic) *QueryRewriteLogicImpl {
 	return &QueryRewriteLogicImpl{
 		chatModel:       chatModel,

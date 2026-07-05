@@ -97,6 +97,9 @@ func (t *ChatDebugTrace) AddToolTrace(trace *ChatToolTrace) {
 
 // AddModelUsageTrace 添加模型使用轨迹
 func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
+	if trace == nil {
+		return
+	}
 	t.ModelUsageTraces = append(t.ModelUsageTraces, trace)
 }
 

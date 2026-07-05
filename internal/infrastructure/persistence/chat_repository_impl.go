@@ -107,7 +107,7 @@ func (r *ChatRepositoryImpl) ListExchangesAfter(ctx context.Context, conversatio
 // ListRecentExchanges 列出最近的记录
 func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversationId string, limit int) ([]*entity.ChatExchange, error) {
 	if limit <= 0 {
-		return []*entity.ChatExchange{}, nil
+		return nil, nil
 	}
 	var exchanges []*entity.ChatExchange
 	err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).

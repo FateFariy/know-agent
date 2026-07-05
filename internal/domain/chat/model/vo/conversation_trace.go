@@ -67,6 +67,7 @@ func NewConversationTrace(conversationId string, exchangeId int64, traceId strin
 	}
 }
 
+// AddModelUsageTrace 添加模型调用轨迹
 func (t *ConversationTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
 	if trace == nil {
 		return
@@ -74,6 +75,12 @@ func (t *ConversationTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
 	t.modelUsageTraces.Add(trace)
 }
 
+// SnapshotModelUsageTraces 获取模型调用轨迹的快照
+func (t *ConversationTrace) SnapshotModelUsageTraces() []*ChatModelUsageTrace {
+	return t.modelUsageTraces.SubList(0, t.modelUsageTraces.Size())
+}
+
+// ConversationId 获取对话ID
 func (t *ConversationTrace) ConversationId() string {
 	return t.conversationId
 }

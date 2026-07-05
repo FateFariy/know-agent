@@ -41,7 +41,7 @@ package conversation
 // 	orchestratorLogic  logic.ChatPreparationOrchestratorLogic
 // 	promptTempLogic    logic.PromptTemplateLogic
 // 	tracer             *trace.ConversationTraceRecorder
-// 	streamEventBuilder *support.StreamEventBuilder
+// 	eventBuilder *support.StreamEventBuilder
 // 	runtimeRegistry    *support.ChatRuntimeRegistry
 // 	knowledgeLogic     kllg.KnowledgeLogic
 // 	distributedLock    adapter.DistributedLock
@@ -56,7 +56,7 @@ package conversation
 // 		orchestratorLogic:  orchestratorLogic,
 // 		promptTempLogic:    promptTempLogic,
 // 		tracer:             trace.NewConversationTraceRecorder(repo),
-// 		streamEventBuilder: &support.StreamEventBuilder{},
+// 		eventBuilder: &support.StreamEventBuilder{},
 // 		runtimeRegistry:    &support.ChatRuntimeRegistry{},
 // 		knowledgeLogic:     knowledgeLogic,
 // 		distributedLock:    distributedLock,
@@ -252,10 +252,10 @@ package conversation
 // }
 //
 // func (c *LogicImpl) executeConversation(convCtx *vo.ConversationContext, stream chan<- string) {
-// 	thinkingMsg := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.EventMetadata)
+// 	thinkingMsg := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.EventMetadata)
 // 	stream <- thinkingMsg
 //
-// 	thinkingMsg = c.streamEventBuilder.ThinkingWithMetadata("正在检索相关知识...", convCtx.EventMetadata)
+// 	thinkingMsg = c.eventBuilder.ThinkingWithMetadata("正在检索相关知识...", convCtx.EventMetadata)
 // 	stream <- thinkingMsg
 //
 // 	time.Sleep(500 * time.Millisecond)
@@ -266,9 +266,9 @@ package conversation
 // 		if end > len(answer) {
 // 			end = len(answer)
 // 		}
-// 		textMsg := c.streamEventBuilder.TextWithMetadata(answer[i:end], convCtx.EventMetadata)
+// 		textMsg := c.eventBuilder.TextWithMetadata(answer[i:end], convCtx.EventMetadata)
 // 		stream <- textMsg
-// 		convCtx.AnswerBuffer.WriteString(answer[i:end])
+// 		convCtx.answerBuffer.WriteString(answer[i:end])
 // 		time.Sleep(100 * time.Millisecond)
 // 	}
 //
@@ -283,14 +283,14 @@ package conversation
 // 			Score:        0.85,
 // 		},
 // 	}
-// 	refMsg := c.streamEventBuilder.ReferencesWithMetadata(references, convCtx.EventMetadata)
+// 	refMsg := c.eventBuilder.ReferencesWithMetadata(references, convCtx.EventMetadata)
 // 	stream <- refMsg
 //
 // 	recommendations := []string{
 // 		"您想了解更多相关信息吗？",
 // 		"是否需要深入探讨这个话题？",
 // 	}
-// 	recMsg := c.streamEventBuilder.RecommendationsWithMetadata(recommendations, convCtx.EventMetadata)
+// 	recMsg := c.eventBuilder.RecommendationsWithMetadata(recommendations, convCtx.EventMetadata)
 // 	stream <- recMsg
 // }
 //
@@ -352,7 +352,7 @@ package conversation
 // func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) {
 // 	return func(ctx context.Context) {
 // 		// 发送“正在分析问题上下文”事件
-// 		metadata := c.streamEventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
+// 		metadata := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
 // 		if err := support.SafeEmitNext(convCtx.Channel, metadata); err != nil {
 // 			panic(err)
 // 		}
@@ -385,10 +385,10 @@ package conversation
 //
 // // emitModelChunk 发送模型输出块
 // func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) {
-// 	convCtx.AnswerBuffer.WriteString(chunk)
+// 	convCtx.answerBuffer.WriteString(chunk)
 // 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
 //
-// 	support.SafeEmitNext(convCtx.Channel, c.streamEventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId))
+// 	support.SafeEmitNext(convCtx.Channel, c.eventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId))
 // }
 //
 // // prepareExecutionPlan 准备执行计划
@@ -580,7 +580,7 @@ package conversation
 // 				// convCtx.TraceRecorder.CompleteStage(finalizeStage, "会话已按停止状态收尾。", map[string]interface{}{
 // 				//     "finalStatus": ChatTurnStatusStopped,
 // 				//     "reason":      reason,
-// 				//     "answerLength": len(convCtx.AnswerBuffer),
+// 				//     "answerLength": len(convCtx.answerBuffer),
 // 				// })
 // 			}
 // 		}
@@ -598,7 +598,7 @@ package conversation
 // 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 // 		return
 // 	}
-// 	anwser := convCtx.AnswerBuffer.String()
+// 	anwser := convCtx.answerBuffer.String()
 // 	uniqueReferences := c.deduplicateReferences(convCtx.References.Snapshot())
 //
 // 	// 追踪收尾阶段
@@ -815,7 +815,7 @@ package conversation
 // func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
 // 	stream := make(chan string, 1)
 // 	defer close(stream)
-// 	stream <- c.streamEventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
+// 	stream <- c.eventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
 // 	return stream
 // }
 //

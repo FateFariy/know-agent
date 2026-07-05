@@ -76,7 +76,7 @@ func (e *ReactAgentExecutor) Execute(ctx context.Context, convCtx *vo.Conversati
 
 	snapshot := map[string]any{
 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-		"answerLength":        convCtx.AnswerBuffer.Len(),
+		"answerLength":        convCtx.AnswerLength(),
 	}
 	_ = e.tracer.CompleteStage(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
 	return nil
