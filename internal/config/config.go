@@ -139,20 +139,23 @@ type RewriteConf struct {
 
 // RagConf RAG配置
 type RagConf struct {
-	Enabled                   bool          `json:",optional,default=true"` // 是否启用RAG
-	RerankEnabled             bool          `json:",optional,default=true"` // 是否启用重排序
-	NoEvidenceReply           string        `json:",optional"`              // 无证据时的回复
-	ChannelTimeout            time.Duration `json:",optional,default=5s"`   // 通道超时时间
-	SubQuestionTimeout        time.Duration `json:",optional,default=12s"`  // 子问题超时时间
-	KeywordTopK               int           `json:",optional,default=8"`    // 关键词检索TopK
-	VectorTopK                int           `json:",optional,default=8"`    // 向量检索TopK
-	CandidateTopK             int           `json:",optional,default=10"`   // 候选项TopK
-	FinalTopK                 int           `json:",optional,default=5"`    // 最终选项TopK
-	ParentEvidenceMaxChars    int           `json:",optional,default=1024"` // 父证据最大字符数
-	MinVectorSimilarity       float64       `json:",optional,default=0.5"`  // 向量相似度阈值
-	KeywordRelativeScoreFloor float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
-	PlanningHistoryMaxChars   int           `json:",optional,default=2000"` // 规划历史最大字符数
-	QuestionHistoryMaxChars   int           `json:",optional,default=1000"` // 问题历史最大字符数
+	Enabled                        bool          `json:",optional,default=true"` // 是否启用RAG
+	RerankEnabled                  bool          `json:",optional,default=true"` // 是否启用重排序
+	NoEvidenceReply                string        `json:",optional"`              // 无证据时的回复
+	SystemPrompt                   string        `json:",optional"`              // 系统提示词
+	ChannelTimeout                 time.Duration `json:",optional,default=5s"`   // 通道超时时间
+	SubQuestionTimeout             time.Duration `json:",optional,default=12s"`  // 子问题超时时间
+	KeywordTopK                    int           `json:",optional,default=8"`    // 关键词检索TopK
+	VectorTopK                     int           `json:",optional,default=8"`    // 向量检索TopK
+	CandidateTopK                  int           `json:",optional,default=10"`   // 候选项TopK
+	FinalTopK                      int           `json:",optional,default=5"`    // 最终选项TopK
+	ParentEvidenceMaxChars         int           `json:",optional,default=1024"` // 父证据最大字符数
+	MinVectorSimilarity            float64       `json:",optional,default=0.5"`  // 向量相似度阈值
+	KeywordRelativeScoreFloor      float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
+	PlanningHistoryMaxChars        int           `json:",optional,default=2000"` // 规划历史最大字符数
+	QuestionHistoryMaxChars        int           `json:",optional,default=1000"` // 问题历史最大字符数
+	TotalEvidenceMaxChars          int           `json:",optional,default=5200"` // 总证据最大字符数
+	PerSubQuestionEvidenceMaxChars int           `json:",optional,default=2200"` // 每个子问题最大字符数
 }
 
 // AgentConf Agent配置

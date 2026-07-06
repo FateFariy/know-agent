@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 )
@@ -85,4 +86,15 @@ func (r *SearchReference) UniqueKey() string {
 		return fmt.Sprintf("WEB:%s", r.Url)
 	}
 	return fmt.Sprintf("%s:%s:%s", utils.BlankToDefault(r.SourceType, "UNKNOWN"), r.Title, r.Snippet)
+}
+
+// ReferenceSummary 生成引用摘要（用于 debug snapshot）
+func (r *SearchReference) ReferenceSummary(suffix string) string {
+	title := utils.BlankToDefault(r.DocumentName, r.Title)
+	path := utils.BlankToDefault(r.SectionPath, r.Url)
+	refID := utils.BlankToDefault(r.ReferenceId, "-")
+	if strutil.IsBlank(path) {
+		return "[" + refID + "] " + title + " | " + suffix
+	}
+	return "[" + refID + "] " + title + " | " + path + " | " + suffix
 }
