@@ -356,6 +356,16 @@ func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.
 	}), nil
 }
 
+// InsertChannelExecutions 插入通道执行记录
+func (r *ChatRepositoryImpl) InsertChannelExecutions(ctx context.Context, executions []*vo.ChatChannelExecution) error {
+	return r.dbWithContext(ctx).Create(convert.ToChatChannelExecutionModelList(executions)).Error
+}
+
+// InsertRetrievalResults 插入检索结果
+func (r *ChatRepositoryImpl) InsertRetrievalResults(ctx context.Context, results []*vo.ChatRetrievalResult) error {
+	return r.dbWithContext(ctx).Create(convert.ToChatRetrievalResultModelList(results)).Error
+}
+
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
 	return &vo.ConversationArchiveRecord{
@@ -364,8 +374,8 @@ func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, 
 		Running:              dialogue.SessionStatus == vo.ChatSessionStatusRunning,
 		SelectedDocumentId:   dialogue.SelectedDocumentId,
 		SelectedDocumentName: dialogue.SelectedDocumentName,
-		CreatedAt:            dialogue.CreateTime,
-		UpdatedAt:            dialogue.UpdateTime,
+		CreatedTime:          dialogue.CreateTime,
+		UpdatedTime:          dialogue.UpdateTime,
 		Exchanges:            chatExchanges,
 	}
 }

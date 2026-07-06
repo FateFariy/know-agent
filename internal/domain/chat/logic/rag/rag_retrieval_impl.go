@@ -15,11 +15,12 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -27,6 +28,7 @@ import (
 const rrfK = 60
 
 type RetrievalImpl struct {
+	repo                      adapter.ChatRepository
 	channels                  []channel.RetrievalChannel
 	documentLogic             doclog.LifecycleLogic
 	channelTimeout            time.Duration
@@ -41,8 +43,9 @@ type RetrievalImpl struct {
 	keywordTopK               int
 }
 
-func NewRetrievalImpl(svcCtx *svc.ServiceContext, channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
+func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
 	return &RetrievalImpl{
+		repo:                      repo,
 		channels:                  channels,
 		documentLogic:             documentLogic,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
@@ -136,10 +139,10 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 
 			// 记录观测数据
 			if trace != nil {
-				if err = e.recordChannelObservations(trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
+				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
 					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
-				if err = e.recordRetrievalResultObservations(trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
+				if err = e.recordRetrievalResultObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
 					Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 			}
@@ -292,7 +295,7 @@ func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocument
 	if err != nil {
 		return nil, err
 	}
-	parentBlockMap := utils.SliceToMapBy(parentBlocks, func(item *entity.DocumentParentBlock) (int64, *entity.DocumentParentBlock) {
+	parentBlockMap := utils.SliceToMapBy(parentBlocks, func(item *den.DocumentParentBlock) (int64, *den.DocumentParentBlock) {
 		return item.ID, item
 	})
 
@@ -322,7 +325,7 @@ func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocument
 }
 
 // buildParentEvidenceDocument 构建父级证据文档
-func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
+func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *den.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
 	if parentBlock == nil || len(childDocuments) == 0 {
 		return nil
 	}
@@ -525,13 +528,13 @@ func (e *RetrievalImpl) buildChannelTraces(rawResults, filteredResults []*vo.Ret
 }
 
 // recordChannelObservations 记录渠道执行观测数据，包括召回数量、接受数量、分数等
-func (e *RetrievalImpl) recordChannelObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
 	if len(rawResults) == 0 {
 		return nil
 	}
 
-	executions := make([]*vo.ChannelExecutionView, 0, len(rawResults))
+	executions := make([]*vo.ChatChannelExecution, 0, len(rawResults))
 	filteredResultsMap := utils.SliceToMapBy(filteredResults, func(r *vo.RetrievalChannelResult) (string, *vo.RetrievalChannelResult) {
 		return r.ChannelName, r
 	})
@@ -541,7 +544,8 @@ func (e *RetrievalImpl) recordChannelObservations(trace *vo.ConversationTrace, s
 
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
-		execution := &vo.ChannelExecutionView{
+		execution := &vo.ChatChannelExecution{
+			ConversationId:   trace.ConversationId(),
 			ExchangeId:       trace.ExchangeId(),
 			TraceId:          trace.TraceId(),
 			SubQuestionIndex: subQuestionIndex,
@@ -562,13 +566,11 @@ func (e *RetrievalImpl) recordChannelObservations(trace *vo.ConversationTrace, s
 		executions = append(executions, execution)
 	}
 
-	// todo 待完善最终保存
-	trace.RecordChannelExecutions(executions)
-	return nil
+	return e.repo.InsertChannelExecutions(ctx, executions)
 }
 
 // recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
-func (e *RetrievalImpl) recordRetrievalResultObservations(trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
+func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
@@ -581,18 +583,19 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(trace *vo.Conversation
 	}
 
 	// 构建通过闸门的文档ID集合
-	gatePassedSet := make(map[string]map[string]bool)
+	gatePassedSet := make(map[string]map[string]int)
 	for _, fr := range filteredResults {
 		for _, doc := range fr.Documents {
-			gatePassedSet[fr.ChannelName][doc.ID] = true
+			gatePassedSet[fr.ChannelName][doc.ID] = 1
 		}
 	}
 
-	results := make([]*vo.RetrievalResultView, 0)
+	results := make([]*vo.ChatRetrievalResult, 0)
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
 		for i, doc := range rawResult.Documents {
-			view := &vo.RetrievalResultView{
+			view := &vo.ChatRetrievalResult{
+				ConversationId:   trace.ConversationId(),
 				ExchangeId:       trace.ExchangeId(),
 				TraceId:          trace.TraceId(),
 				SubQuestionIndex: subQuestionIndex,
@@ -606,10 +609,10 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(trace *vo.Conversation
 
 			// 判断是否被选中
 			if rank, ok := finalRankMap[doc.ID]; ok {
-				view.Selected = true
+				view.IsSelected = 1
 				view.FinalRank = rank
 				view.SelectionReason = "已选入最终 Prompt"
-			} else if !view.GatePassed {
+			} else if view.GatePassed == 0 {
 				// 未通过闸门
 				if vo.RetrievalChannelVector == channelName {
 					view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
@@ -628,13 +631,11 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(trace *vo.Conversation
 		}
 	}
 
-	// todo 待完善最终保存
-	trace.RecordRetrievalResults(results)
-	return nil
+	return e.repo.InsertRetrievalResults(ctx, results)
 }
 
 // renderParentEvidenceText 渲染父级证据文本：[父块内容] + [命中子片段]
-func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *entity.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
+func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *den.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
 	parentText := strutil.Trim(parentBlock.ParentText)
 
 	// 当父块无内容时，使用首条子文档的内容作为回退

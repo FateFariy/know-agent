@@ -167,8 +167,8 @@ func (c *LogicImpl) GetSession(ctx context.Context, conversationId string) (*cha
 		ConversationId: record.ConversationId,
 		Title:          buildSessionTitle(record, latestMessage),
 		LatestMessage:  latestMessage,
-		CreateTime:     record.CreatedAt.Format(time.DateTime),
-		UpdateTime:     record.UpdatedAt.Format(time.DateTime),
+		CreateTime:     record.CreatedTime.Format(time.DateTime),
+		UpdateTime:     record.UpdatedTime.Format(time.DateTime),
 	}, nil
 }
 
@@ -270,8 +270,8 @@ func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSess
 			ConversationId: r.ConversationId,
 			Title:          buildSessionTitle(r, latestMessage),
 			LatestMessage:  latestMessage,
-			CreateTime:     r.CreatedAt.Format(time.DateTime),
-			UpdateTime:     r.UpdatedAt.Format(time.DateTime),
+			CreateTime:     r.CreatedTime.Format(time.DateTime),
+			UpdateTime:     r.UpdatedTime.Format(time.DateTime),
 		})
 	}
 	return &chat.ConversationSessionListResp{

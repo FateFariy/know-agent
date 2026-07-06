@@ -12,7 +12,7 @@ type ConversationArchiveRecord struct {
 	ChatMode             int
 	SelectedDocumentId   int64
 	SelectedDocumentName string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	CreatedTime          time.Time
+	UpdatedTime          time.Time
 	Exchanges            []*entity.ChatExchange
 }

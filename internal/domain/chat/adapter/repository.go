@@ -78,4 +78,12 @@ type ChatRepository interface {
 
 	// DeleteStage 删除阶段记录
 	DeleteStage(ctx context.Context, conversationId string) error
+
+	// ========== 检索结果相关 ==========
+
+	// InsertChannelExecutions 插入渠道执行记录
+	InsertChannelExecutions(ctx context.Context, executions []*vo.ChatChannelExecution) error
+
+	// InsertRetrievalResults 插入检索结果
+	InsertRetrievalResults(ctx context.Context, results []*vo.ChatRetrievalResult) error
 }
