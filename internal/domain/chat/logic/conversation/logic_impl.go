@@ -49,6 +49,8 @@ type LogicImpl struct {
 	options           *options
 }
 
+var _ logic.ChatLogic = (*LogicImpl)(nil)
+
 // NewChatLogic 创建聊天逻辑实例
 func NewChatLogic(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
@@ -334,8 +336,8 @@ func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId stri
 }
 
 // GetChannelExecutions 获取渠道执行结果
-func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.ChannelExecutionResp, error) {
-	return []*chat.ChannelExecutionResp{}, nil
+func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
+	return c.repo.SelectChannelExecutions(ctx, conversationId, exchangeId)
 }
 
 // GetStageBenchmarks 获取阶段基准

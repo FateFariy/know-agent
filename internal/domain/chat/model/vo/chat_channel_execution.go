@@ -6,6 +6,7 @@ import (
 
 // ChatChannelExecution 通道执行记录
 type ChatChannelExecution struct {
+	ID                 int64     `gorm:"column:id"`                   // 主键
 	ConversationId     string    `gorm:"column:conversation_id"`      // 对话ID
 	ExchangeId         int64     `gorm:"column:exchange_id"`          // 交换ID
 	TraceId            string    `gorm:"column:trace_id"`             // 跟踪ID
@@ -24,6 +25,7 @@ type ChatChannelExecution struct {
 	MinScore           float64   `gorm:"column:min_score"`            // 最小分数
 	ConfigSnapshot     string    `gorm:"column:config_snapshot"`      // 配置快照
 	ErrorMessage       string    `gorm:"column:error_message"`        // 错误信息
+	CreateTime         time.Time `gorm:"column:create_time"`          // 创建时间
 }
 
 // SetScores 设置分数统计

@@ -19,7 +19,7 @@ import (
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend .*
+// goverter:extend TimeToString
 // goverter:skipCopySameType
 //
 //go:generate goverter gen .
@@ -61,10 +61,16 @@ type DocumentConverter interface {
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend .*
+// goverter:extend TimeToString ToChatQueryMode
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
+
+	ToRetrievalResultRespList(src []*cvo.ChatRetrievalResult) []*chat.RetrievalResultResp
+	// goverter:map StartTime | TimeToStringMs
+	// goverter:map EndTime | TimeToStringMs
+	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp
+	ToChannelExecutionRespList(src []*cvo.ChatChannelExecution) []*chat.ChannelExecutionResp
 
 	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
 	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
@@ -87,6 +93,10 @@ type KnowledgeConverter interface {
 
 func TimeToString(t time.Time) string {
 	return t.Format(time.DateTime)
+}
+
+func TimeToStringMs(t time.Time) string {
+	return t.Format("2006-01-02 15:04:05.000")
 }
 
 func ToChatQueryMode(name string) cvo.ChatQueryMode {

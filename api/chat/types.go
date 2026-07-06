@@ -4,12 +4,25 @@
 package chat
 
 type ChannelExecutionResp struct {
-	ExecutionId  string `json:"executionId"`  // 执行ID
-	ChannelId    string `json:"channelId"`    // 渠道ID
-	ChannelName  string `json:"channelName"`  // 渠道名称
-	Status       int    `json:"status"`       // 执行状态
-	ErrorMessage string `json:"errorMessage"` // 错误信息
-	CreateTime   string `json:"createTime"`   // 创建时间
+	ID                 int64   `json:"id"`                   // 主键
+	ConversationId     string  `json:"conversationId"`       // 对话ID
+	ExchangeId         int64   `json:"exchange_id"`          // 交换ID
+	TraceId            string  `json:"trace_id"`             // 跟踪ID
+	SubQuestionIndex   int     `json:"sub_question_index"`   // 子问题索引
+	SubQuestion        string  `json:"sub_question"`         // 子问题
+	ChannelType        string  `json:"channel_type"`         // 渠道类型
+	ExecutionState     int     `json:"execution_state"`      // 执行状态
+	StartTime          string  `json:"start_time"`           // 开始时间
+	EndTime            string  `json:"end_time"`             // 结束时间
+	DurationMs         int64   `json:"duration_ms"`          // 执行时长（毫秒）
+	RecalledCount      int     `json:"recalled_count"`       // 召回数量
+	AcceptedCount      int     `json:"accepted_count"`       // 接受数量
+	FinalSelectedCount int     `json:"final_selected_count"` // 最终选中数量
+	AvgScore           float64 `json:"avg_score"`            // 平均分数
+	MaxScore           float64 `json:"max_score"`            // 最大分数
+	MinScore           float64 `json:"min_score"`            // 最小分数
+	ErrorMessage       string  `json:"error_message"`        // 错误信息
+	CreateTime         string  `json:"create_time"`          // 创建时间
 }
 
 type ChatDebugTraceResp struct {

@@ -89,4 +89,7 @@ type ChatRepository interface {
 
 	// SelectRetrievalResults 查询检索结果
 	SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)
+
+	// SelectChannelExecutions 查询渠道执行记录
+	SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
 }
