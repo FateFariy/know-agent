@@ -19,8 +19,8 @@ type ChatLogic interface {
 	// StopConversation 停止会话
 	StopConversation(ctx context.Context, conversationId string) (bool, string, error)
 
-	// GetSession 获取会话详情
-	GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error)
+	// GetSessionDetail 获取会话详情
+	GetSessionDetail(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error)
 
 	// GetExchangeDetail 获取对话详情
 	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*chat.ConversationExchangeDetailResp, error)
@@ -35,7 +35,7 @@ type ChatLogic interface {
 	RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error)
 
 	// GetRetrievalResults 获取检索结果
-	GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.RetrievalResultResp, error)
+	GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)
 
 	// GetChannelExecutions 获取渠道执行结果
 	GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.ChannelExecutionResp, error)

@@ -148,8 +148,8 @@ func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string)
 	return stopTask.Stopped, stopTask.Message, nil
 }
 
-// GetSession 获取会话详情
-func (c *LogicImpl) GetSession(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
+// GetSessionDetail 获取会话详情
+func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
 	record, err := c.repo.SelectSessionRecord(ctx, conversationId)
 	if err != nil {
 		return nil, err
@@ -329,9 +329,8 @@ func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversation
 }
 
 // GetRetrievalResults 获取检索结果
-func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*chat.RetrievalResultResp, error) {
-	// 注：检索结果观测属 domain/rag，此处保留扩展入口，避免耦合过重
-	return []*chat.RetrievalResultResp{}, nil
+func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
+	return c.repo.SelectRetrievalResults(ctx, conversationId, exchangeId)
 }
 
 // GetChannelExecutions 获取渠道执行结果

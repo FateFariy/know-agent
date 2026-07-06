@@ -14,11 +14,11 @@ type ChannelExecutionResp struct {
 
 type ChatDebugTraceResp struct {
 	ExecutionMode                 string                          `json:"executionMode"`                 // 执行模式
-	ChatMode                      int                             `json:"chatMode"`                      // 聊天模式
+	ChatMode                      string                          `json:"chatMode"`                      // 聊天模式
 	OriginalQuestion              string                          `json:"originalQuestion"`              // 原始问题
 	RewriteQuestion               string                          `json:"rewriteQuestion"`               // 重写问题
 	RewriteSubQuestions           []string                        `json:"rewriteSubQuestions"`           // 重写子问题列表
-	RetrievalQuestion             string                          `json:"rewrittenQuestion"`             // 检索问题
+	RetrievalQuestion             string                          `json:"retrievalQuestion"`             // 检索问题
 	AgentQuestion                 string                          `json:"agentQuestion"`                 // Agent问题
 	NavigationDecision            *DocumentNavigationDecisionResp `json:"navigationDecision"`            // 文档导航决策
 	HistorySummary                string                          `json:"historySummary"`                // 历史摘要
@@ -91,7 +91,7 @@ type ChatToolTraceResp struct {
 
 type ConversationExchangeDetailQueryReq struct {
 	ConversationId string `json:"conversationId"` // 会话ID
-	ExchangeId     string `json:"exchangeId"`     // 对话ID
+	ExchangeId     int64  `json:"exchangeId"`     // 对话ID
 }
 
 type ConversationExchangeDetailResp struct {
@@ -114,7 +114,7 @@ type ConversationExchangeResp struct {
 	FirstResponseTimeMs int64                  `json:"firstResponseTimeMs"` // 首次响应时间毫秒
 	TotalResponseTimeMs int64                  `json:"totalResponseTimeMs"` // 总响应时间毫秒
 	CreateTime          string                 `json:"createTime"`          // 创建时间
-	UpdateTime          string                 `json:"updateTime"`          // 更新时间
+	UpdateTime          string                 `json:"updateTime,optional"` // 最后更新时间
 }
 
 type ConversationIdentityReq struct {
@@ -129,37 +129,66 @@ type ConversationItemAnchorResp struct {
 }
 
 type ConversationMemorySummaryResp struct {
-	ConversationId string `json:"conversationId"` // 会话ID
-	Summary        string `json:"summary"`        // 摘要内容
+	ConversationId       string            `json:"conversationId"`       // 会话ID
+	CompressionApplied   bool              `json:"compressionApplied"`   // 是否执行过记忆压缩
+	CoveredExchangeId    int64             `json:"coveredExchangeId"`    // 压缩截止交互ID
+	CoveredExchangeCount int32             `json:"coveredExchangeCount"` // 压缩覆盖交互轮次
+	CompressionCount     int32             `json:"compressionCount"`     // 累计压缩次数
+	SummaryVersion       int32             `json:"summaryVersion"`       // 摘要版本号
+	SummaryText          string            `json:"summaryText"`          // 纯文本摘要
+	SummaryPayload       map[string]string `json:"summaryPayload"`       // 结构化摘要载荷
+	LastSourceEditTime   int64             `json:"lastSourceEditTime"`   // 原始对话最后修改时间戳
+	UpdatedAt            int64             `json:"updatedAt"`            // 摘要更新时间戳
 }
 
 type ConversationResetResp struct {
-	Success bool `json:"success"` // 是否成功
+	ConversationId         string `json:"conversationId"`         // 会话ID
+	Stopped                bool   `json:"stopped"`                // 是否停止
+	RemovedDialogueCount   int    `json:"removedDialogueCount"`   // 移除对话数
+	RemovedExchangeCount   int    `json:"removedExchangeCount"`   // 移除交换数
+	RemovedCheckpointCount int    `json:"removedCheckpointCount"` // 移除检查点数
+	Message                string `json:"message"`                // 消息
 }
 
 type ConversationSessionListReq struct {
-	PageNo   int    `json:"pageNo,optional,default=1"`    // 页码
-	PageSize int    `json:"pageSize,optional,default=10"` // 每页大小
-	Keyword  string `json:"keyword,optional"`             // 关键词
+	PageNo     int    `json:"pageNo,optional,default=1"`    // 页码
+	PageSize   int    `json:"pageSize,optional,default=10"` // 每页大小
+	Keyword    string `json:"keyword,optional"`             // 关键词
+	ChatMode   string `json:"chatMode,optional"`            // 聊天模式过滤
+	TurnStatus string `json:"turnStatus,optional"`          // 对话状态过滤
 }
 
 type ConversationSessionListResp struct {
-	PageNo   int                        `json:"pageNo"`   // 页码
-	PageSize int                        `json:"pageSize"` // 每页大小
-	Total    int64                      `json:"total"`    // 总记录数
-	Records  []*ConversationSessionResp `json:"records"`  // 会话列表
+	PageNo     int                        `json:"pageNo"`     // 页码
+	PageSize   int                        `json:"pageSize"`   // 每页大小
+	TotalSize  int64                      `json:"totalSize"`  // 总记录数
+	TotalPages int64                      `json:"totalPages"` // 总页数
+	Records    []*ConversationSessionResp `json:"records"`    // 会话列表
 }
 
 type ConversationSessionResp struct {
-	ConversationId string `json:"conversationId"` // 会话ID
-	Title          string `json:"title"`          // 会话标题
-	LatestMessage  string `json:"latestMessage"`  // 最新消息
-	CreateTime     string `json:"createTime"`     // 创建时间
-	UpdateTime     string `json:"updateTime"`     // 更新时间
+	ConversationId         string                         `json:"conversationId"`         // 会话唯一标识
+	Running                bool                           `json:"running"`                // 是否正在会话中
+	CheckpointCount        int32                          `json:"checkpointCount"`        // 检查点数量
+	MessageCount           int32                          `json:"messageCount"`           // 消息总数
+	LatestUserMessage      string                         `json:"latestUserMessage"`      // 最新用户提问
+	LatestAssistantMessage string                         `json:"latestAssistantMessage"` // 模型最新回复
+	LatestExchangeId       int64                          `json:"latestExchangeId"`       // 最新一轮交互ID
+	LatestTurnStatus       string                         `json:"latestTurnStatus"`       // 本轮交互状态
+	LatestTurnErrorMessage string                         `json:"latestTurnErrorMessage"` // 本轮交互错误信息
+	ChatMode               string                         `json:"chatMode"`               // 对话查询模式
+	SelectedDocumentId     string                         `json:"selectedDocumentId"`     // 选中文档ID
+	SelectedDocumentName   string                         `json:"selectedDocumentName"`   // 选中文档名称
+	CreatedTime            string                         `json:"createdTime"`            // 创建时间
+	UpdatedTime            string                         `json:"updatedTime"`            // 更新时间
+	Exchanges              []*ConversationExchangeResp    `json:"exchanges"`              // 交互轮次列表
+	MemorySummary          *ConversationMemorySummaryResp `json:"memorySummary"`          // 会话记忆摘要
 }
 
 type ConversationStopResp struct {
-	Success bool `json:"success"` // 是否成功
+	ConversationId string `json:"conversationId"` // 会话ID
+	Stopped        bool   `json:"stopped"`        // 是否停止
+	Message        string `json:"message"`        // 消息
 }
 
 type ConversationStructureAnchorResp struct {
@@ -201,13 +230,16 @@ type DocumentNavigationDecisionResp struct {
 }
 
 type KnowledgeDocumentOptionResp struct {
-	DocumentId   int64  `json:"documentId"`   // 文档ID
-	DocumentName string `json:"documentName"` // 文档名称
+	DocumentId         int64    `json:"documentId"`         // 文档ID
+	DocumentName       string   `json:"documentName"`       // 文档名称
+	KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
+	BusinessCategory   string   `json:"businessCategory"`   // 业务分类
+	DocumentTags       []string `json:"documentTags"`       // 文档标签
 }
 
 type RetrievalObserveReq struct {
 	ConversationId string `json:"conversationId"` // 会话ID
-	ExchangeId     string `json:"exchangeId"`     // 对话ID
+	ExchangeId     int64  `json:"exchangeId"`     // 交互ID
 }
 
 type RetrievalQuestionPlanResp struct {
@@ -216,11 +248,31 @@ type RetrievalQuestionPlanResp struct {
 }
 
 type RetrievalResultResp struct {
-	RetrievalId  int64  `json:"retrievalId"`  // 检索ID
-	DocumentId   int64  `json:"documentId"`   // 文档ID
-	DocumentName string `json:"documentName"` // 文档名称
-	Content      string `json:"content"`      // 检索内容
-	Score        string `json:"score"`        // 相似度分数
+	ID               int64   `json:"id"`               // 主键ID
+	ConversationId   string  `json:"conversationId"`   // 对话ID
+	ExchangeId       int64   `json:"exchangeId"`       // 交互ID
+	TraceId          string  `json:"traceId"`          // 跟踪ID
+	SubQuestionIndex int     `json:"subQuestionIndex"` // 子问题索引
+	SubQuestion      string  `json:"subQuestion"`      // 子问题
+	ChannelType      string  `json:"channelType"`      // 渠道类型
+	ChannelRank      int     `json:"channelRank"`      // 渠道排名
+	RrfRank          int     `json:"rrfRank"`          // RRF排名
+	FinalRank        int     `json:"finalRank"`        // 最终排名
+	OriginalScore    float64 `json:"originalScore"`    // 原始分数
+	RrfScore         float64 `json:"rrfScore"`         // RRF分数
+	RerankScore      float64 `json:"rerankScore"`      // 重排分数
+	GatePassed       int     `json:"gatePassed"`       // 是否通过门控
+	IsElevated       int     `json:"isElevated"`       // 是否升级
+	IsSelected       int     `json:"isSelected"`       // 是否选中
+	SelectionReason  string  `json:"selectionReason"`  // 选中原因
+	ChunkId          int64   `json:"chunkId"`          // 分块ID
+	ChunkNo          int     `json:"chunkNo"`          // 分块序号
+	ParentBlockId    int64   `json:"parentBlockId"`    // 父块ID
+	ParentBlockNo    int     `json:"parentBlockNo"`    // 父块序号
+	SectionPath      string  `json:"sectionPath"`      // 章节路径
+	ChunkTextPreview string  `json:"chunkTextPreview"` // 分块文本预览
+	ChunkCharCount   int     `json:"chunkCharCount"`   // 分块字符数
+	CreateTime       string  `json:"createTime"`       // 创建时间
 }
 
 type SearchReferenceResp struct {

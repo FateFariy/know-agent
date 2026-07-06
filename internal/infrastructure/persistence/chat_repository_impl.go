@@ -366,6 +366,18 @@ func (r *ChatRepositoryImpl) InsertRetrievalResults(ctx context.Context, results
 	return r.dbWithContext(ctx).Create(convert.ToChatRetrievalResultModelList(results)).Error
 }
 
+// SelectRetrievalResults 查询检索结果
+func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
+	var results []*vo.ChatRetrievalResult
+	if err := r.dbWithContext(ctx).
+		Model(&model.ChatRetrievalResult{}).
+		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
+		Find(&results).Error; err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
 	return &vo.ConversationArchiveRecord{

@@ -3,7 +3,6 @@ package chat
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 
@@ -180,14 +179,7 @@ func GetRetrievalResultsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 			return
 		}
 
-		exchangeId, err := strconv.ParseInt(req.ExchangeId, 10, 64)
-		if err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format("exchangeId格式错误"))
-			return
-		}
-
 		resp, err := srv.GetRetrievalResults(r.Context(), &req)
-		_ = exchangeId
 		common.Response(w, resp, "", err)
 	}
 }
@@ -201,14 +193,7 @@ func GetChannelExecutionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 			return
 		}
 
-		exchangeId, err := strconv.ParseInt(req.ExchangeId, 10, 64)
-		if err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format("exchangeId格式错误"))
-			return
-		}
-
 		resp, err := srv.GetChannelExecutions(r.Context(), &req)
-		_ = exchangeId
 		common.Response(w, resp, "", err)
 	}
 }

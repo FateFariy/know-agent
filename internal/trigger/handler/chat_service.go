@@ -35,12 +35,17 @@ func (c *ChatService) GetDocumentOptions(ctx context.Context) ([]*chat.Knowledge
 
 // StopConversation 停止会话
 func (c *ChatService) StopConversation(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationStopResp, error) {
-	return c.l.StopConversation(ctx, req.ConversationId)
+	stopped, message, err := c.l.StopConversation(ctx, req.ConversationId)
+	return &chat.ConversationStopResp{
+		ConversationId: req.ConversationId,
+		Stopped:        stopped,
+		Message:        message,
+	}, err
 }
 
 // GetSessionDetail 获取会话详情
 func (c *ChatService) GetSessionDetail(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationSessionResp, error) {
-	return c.l.GetSession(ctx, req.ConversationId)
+	return c.l.GetSessionDetail(ctx, req.ConversationId)
 }
 
 // GetExchangeDetail 获取对话详情
@@ -65,20 +70,16 @@ func (c *ChatService) RebuildSummary(ctx context.Context, req *chat.Conversation
 
 // GetRetrievalResults 获取检索结果
 func (c *ChatService) GetRetrievalResults(ctx context.Context, req *chat.RetrievalObserveReq) ([]*chat.RetrievalResultResp, error) {
-	exchangeId, err := strconv.ParseInt(req.ExchangeId, 10, 64)
+	results, err := c.l.GetRetrievalResults(ctx, req.ConversationId, req.ExchangeId)
 	if err != nil {
 		return nil, err
 	}
-	return c.l.GetRetrievalResults(ctx, req.ConversationId, exchangeId)
+	return convert.ToRetrievalResultRespList(results), err
 }
 
 // GetChannelExecutions 获取渠道执行结果
 func (c *ChatService) GetChannelExecutions(ctx context.Context, req *chat.RetrievalObserveReq) ([]*chat.ChannelExecutionResp, error) {
-	exchangeId, err := strconv.ParseInt(req.ExchangeId, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return c.l.GetChannelExecutions(ctx, req.ConversationId, exchangeId)
+	return c.l.GetChannelExecutions(ctx, req.ConversationId, req.ExchangeId)
 }
 
 // GetStageBenchmarks 获取阶段基准

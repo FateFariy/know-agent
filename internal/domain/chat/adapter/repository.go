@@ -86,4 +86,7 @@ type ChatRepository interface {
 
 	// InsertRetrievalResults 插入检索结果
 	InsertRetrievalResults(ctx context.Context, results []*vo.ChatRetrievalResult) error
+
+	// SelectRetrievalResults 查询检索结果
+	SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)
 }
