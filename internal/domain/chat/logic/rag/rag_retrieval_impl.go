@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +95,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 	// todo 线程池改造
 	for i, sq := range subQuestions {
 		go func(subQuestionIndex int, subQuestion string) {
+			start := time.Now()
 			channelResults, err := e.retrieveChannelParallel(timeoutCtx, ragCtx, subQuestionIndex, subQuestion, plan)
 			if err != nil {
 				Warnf("子问题检索失败: subQuestionIndex=%d, subQuestion='%v", subQuestionIndex, err)
@@ -139,7 +141,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 
 			// 记录观测数据
 			if trace != nil {
-				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, channelTraces); err != nil {
+				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, start, rawChannelResults, filteredResults, channelTraces); err != nil {
 					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 				if err = e.recordRetrievalResultObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
@@ -361,6 +363,7 @@ func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *den.DocumentPar
 		CanonicalPath:     parentBlock.CanonicalPath,
 		ItemIndex:         parentBlock.ItemIndex,
 		OriginalSnippet:   parentBlock.ParentText,
+		IsElevated:        1,
 		Score:             parentScore,
 		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
 	}
@@ -483,6 +486,7 @@ func (e *RetrievalImpl) assignReferenceIds(evidenceList []*vo.SubQuestionEvidenc
 	}
 }
 
+// summarizeChannelResults 摘要每个检索渠道的文档数量
 func (e *RetrievalImpl) summarizeChannelResults(channelResults []*vo.RetrievalChannelResult) string {
 	if len(channelResults) == 0 {
 		return "没有启用任何检索通道"
@@ -527,14 +531,30 @@ func (e *RetrievalImpl) buildChannelTraces(rawResults, filteredResults []*vo.Ret
 	})
 }
 
-// recordChannelObservations 记录渠道执行观测数据，包括召回数量、接受数量、分数等
+// recordChannelObservations 记录渠道执行观测数据：将原始/过滤结果与追踪信息汇总为 ChatChannelExecution 记录
+//
+// 为每个渠道产出一条观测，字段涵盖：
+//   - 会话/交互/追踪 ID、子问题索引与内容
+//   - 执行起止时间、DurationMs、ExecutionState 状态码
+//   - RecalledCount（原始召回数量）、AcceptedCount（过滤后数量）、FinalSelectedCount（最终选中数量）
+//   - 渠道文档分数（SetScores），从 rawResult 计算得出
+//
+// 执行流程：
+//  1. 空结果快速返回
+//  2. 将过滤结果与渠道追踪记录分别转为 ChannelName → 对象的 map，加速后续 join
+//  3. 遍历原始结果：为每个渠道构建 ChatChannelExecution，补充过滤后/最终选中数量
+//  4. 调用 repo 批量写入数据库
 func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
-	rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
+	start time.Time, rawResults, filteredResults []*vo.RetrievalChannelResult, channelTraces []*vo.SubQuestionChannelTrace) error {
 	if len(rawResults) == 0 {
 		return nil
 	}
 
+	// 结束时间 + 预分配执行列表
+	end := time.Now()
 	executions := make([]*vo.ChatChannelExecution, 0, len(rawResults))
+
+	// 将过滤结果 / 渠道追踪记录转为 map，供按 channelName 快速定位
 	filteredResultsMap := utils.SliceToMapBy(filteredResults, func(r *vo.RetrievalChannelResult) (string, *vo.RetrievalChannelResult) {
 		return r.ChannelName, r
 	})
@@ -542,6 +562,7 @@ func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo
 		return t.ChannelName, t
 	})
 
+	// 遍历每个渠道的原始结果，构建一条观测记录
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
 		execution := &vo.ChatChannelExecution{
@@ -551,49 +572,87 @@ func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo
 			SubQuestionIndex: subQuestionIndex,
 			SubQuestion:      subQuestion,
 			ChannelType:      channelName,
+			StartTime:        start,
+			EndTime:          end,
+			DurationMs:       end.Sub(start).Milliseconds(),
 			ExecutionState:   1,
 			RecalledCount:    len(rawResult.Documents),
 		}
-		// 获取过滤后的结果
+
+		// 从过滤结果补 AcceptedCount（过滤后保留的文档数量）
 		if filteredResult, ok := filteredResultsMap[channelName]; ok {
 			execution.AcceptedCount = len(filteredResult.Documents)
 		}
-		// 获取追踪记录
+		// 从渠道追踪记录补 FinalSelectedCount（最终选入 Prompt 的数量）
 		if trace, ok := channelTracesMap[channelName]; ok {
 			execution.FinalSelectedCount = trace.AcceptedCount
 		}
+
+		// 设置渠道文档分数（由 rawResult.Documents 计算）
 		execution.SetScores(rawResult.Documents)
 		executions = append(executions, execution)
 	}
 
+	// 批量写入数据库
 	return e.repo.InsertChannelExecutions(ctx, executions)
 }
 
-// recordRetrievalResultObservations 记录检索结果观测数据，包括各阶段分数、是否通过闸门、是否被选中等
+// recordRetrievalResultObservations 记录检索结果观测数据：对每个渠道的每个原始文档生成一条 ChatRetrievalResult，
+// 用于追踪在"原始召回 → 过滤/闸门 → 最终选择"全流程中每篇文档的状态与原因。
+//
+// 核心字段：
+//   - ChannelRank：该渠道内原始排名（从 1 起）
+//   - RrfRank：RRF 融合后的排名（按 RRFScore 降序）
+//   - GatePassed：是否通过对应渠道的过滤/闸门（1=通过，0=未通过）
+//   - IsSelected：是否被选入最终 Prompt；FinalRank：在最终 Prompt 中的排名
+//   - SelectionReason：未被选中的原因（闸门过滤/超出 topK/其他），用于离线分析
+//
+// 执行流程：
+//  1. 空结果快速返回
+//  2. 构建最终文档 ID → FinalRank 的映射（保留原始传入顺序，从 1 起编号）
+//  3. 按 RRFScore 降序排序 finalDocuments，再构建 RrfRank 映射（RRF 融合后的排名）
+//  4. 构建"通过闸门"的文档 ID 集合（以渠道名分组）
+//  5. 遍历所有渠道的所有原始文档：
+//     - 填充会话/子问题/渠道/排名等基础信息
+//     - 调用 SetDocumentInfo 写入文档信息（ID/标题/分数等）
+//     - 判定是否被最终选中；未选中则按渠道类型格式化原因
+//  6. 调用 repo 批量写入数据库
 func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
 	}
 
-	// 构建最终文档ID到排名的映射
+	// 基于传入的 finalDocuments 顺序构建 FinalRank 映射（保留调用方的选择顺序，从 1 起编号）
 	finalRankMap := make(map[string]int)
 	for i, doc := range finalDocuments {
 		finalRankMap[doc.ID] = i + 1
 	}
 
-	// 构建通过闸门的文档ID集合
+	// 按 RRFScore 降序排序 finalDocuments，再构建 RrfRank 映射（RRF 融合后的排名）
+	sort.Slice(finalDocuments, func(i, j int) bool {
+		return finalDocuments[i].RRFScore > finalDocuments[j].RRFScore
+	})
+	rrkRankMap := make(map[string]int)
+	for i, doc := range finalDocuments {
+		rrkRankMap[doc.ID] = i + 1
+	}
+
+	// 构建"通过闸门"的文档 ID 集合（按渠道名分组）—— filteredResults 即通过闸门的结果集
 	gatePassedSet := make(map[string]map[string]int)
 	for _, fr := range filteredResults {
 		for _, doc := range fr.Documents {
+			// 按渠道名建立文档 ID → 1 的映射（存在即表示通过）
 			gatePassedSet[fr.ChannelName][doc.ID] = 1
 		}
 	}
 
+	// 遍历每个渠道的每个原始文档，生成 ChatRetrievalResult 观测记录
 	results := make([]*vo.ChatRetrievalResult, 0)
 	for _, rawResult := range rawResults {
 		channelName := rawResult.ChannelName
 		for i, doc := range rawResult.Documents {
+			// 构建基础信息（会话、子问题、渠道、渠道内排名、RRF 排名、闸门通过状态）
 			view := &vo.ChatRetrievalResult{
 				ConversationId:   trace.ConversationId(),
 				ExchangeId:       trace.ExchangeId(),
@@ -602,18 +661,21 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 				SubQuestion:      subQuestion,
 				ChannelType:      channelName,
 				ChannelRank:      i + 1,
+				RrfRank:          rrkRankMap[doc.ID],
 				GatePassed:       gatePassedSet[channelName][doc.ID],
 			}
 
+			// 填充文档元信息（ID / 标题 / 原文摘要 / 原始分数等）
 			view.SetDocumentInfo(doc)
 
-			// 判断是否被选中
+			// 判定是否被选入最终 Prompt；否则写入原因
 			if rank, ok := finalRankMap[doc.ID]; ok {
+				// 已选入最终 Prompt：设置 IsSelected=1 与 FinalRank
 				view.IsSelected = 1
 				view.FinalRank = rank
 				view.SelectionReason = "已选入最终 Prompt"
 			} else if view.GatePassed == 0 {
-				// 未通过闸门
+				// 未通过闸门：按渠道类型格式化原因
 				if vo.RetrievalChannelVector == channelName {
 					view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
 						view.OriginalScore, e.minVectorSimilarity)
@@ -624,13 +686,14 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 					view.SelectionReason = fmt.Sprintf("闸门过滤：分数 %.4f", view.OriginalScore)
 				}
 			} else {
-				// 超出finalTopK限制
+				// 通过了闸门但因超出 finalTopK 限制而未被选中
 				view.SelectionReason = fmt.Sprintf("超出 finalTopK 限制（topK=%d）", e.finalTopK)
 			}
 			results = append(results, view)
 		}
 	}
 
+	// 批量写入数据库
 	return e.repo.InsertRetrievalResults(ctx, results)
 }
 

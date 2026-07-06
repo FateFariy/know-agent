@@ -70,6 +70,8 @@ type ChatConverter interface {
 	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
 	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
 	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
+	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model.ChatRetrievalResult
+	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model.ChatChannelExecution
 }
 
 // goverter:converter

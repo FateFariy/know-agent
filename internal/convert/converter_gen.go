@@ -4,6 +4,8 @@
 package convert
 
 import (
+	"time"
+
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	common "github.com/swiftbit/know-agent/common"
@@ -14,7 +16,6 @@ import (
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
-	"time"
 )
 
 func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
@@ -28,6 +29,16 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 		pVoChatCommand = &voChatCommand
 	}
 	return pVoChatCommand
+}
+func ToChatChannelExecutionModelList(source []*vo.ChatChannelExecution) []*model.ChatChannelExecution {
+	var pModelChatChannelExecutionList []*model.ChatChannelExecution
+	if source != nil {
+		pModelChatChannelExecutionList = make([]*model.ChatChannelExecution, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelChatChannelExecutionList[i] = pEntityChatChannelExecutionToPModelChatChannelExecution(source[i])
+		}
+	}
+	return pModelChatChannelExecutionList
 }
 func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 	var pModelChatDialogue *model.ChatDialogue
@@ -106,8 +117,77 @@ func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemor
 	}
 	return pModelChatMemorySummary
 }
+func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.ChatRetrievalResult {
+	var pModelChatRetrievalResultList []*model.ChatRetrievalResult
+	if source != nil {
+		pModelChatRetrievalResultList = make([]*model.ChatRetrievalResult, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelChatRetrievalResultList[i] = pVoChatRetrievalResultToPModelChatRetrievalResult(source[i])
+		}
+	}
+	return pModelChatRetrievalResultList
+}
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
+}
+func pEntityChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
+	var pModelChatChannelExecution *model.ChatChannelExecution
+	if source != nil {
+		var modelChatChannelExecution model.ChatChannelExecution
+		modelChatChannelExecution.ConversationId = (*source).ConversationId
+		modelChatChannelExecution.ExchangeId = (*source).ExchangeId
+		modelChatChannelExecution.TraceId = (*source).TraceId
+		modelChatChannelExecution.SubQuestionIndex = (*source).SubQuestionIndex
+		modelChatChannelExecution.SubQuestion = (*source).SubQuestion
+		modelChatChannelExecution.ChannelType = (*source).ChannelType
+		modelChatChannelExecution.ExecutionState = (*source).ExecutionState
+		modelChatChannelExecution.StartTime = timeTimeToTimeTime((*source).StartTime)
+		modelChatChannelExecution.EndTime = timeTimeToTimeTime((*source).EndTime)
+		modelChatChannelExecution.DurationMs = (*source).DurationMs
+		modelChatChannelExecution.RecalledCount = (*source).RecalledCount
+		modelChatChannelExecution.AcceptedCount = (*source).AcceptedCount
+		modelChatChannelExecution.FinalSelectedCount = (*source).FinalSelectedCount
+		modelChatChannelExecution.AvgScore = (*source).AvgScore
+		modelChatChannelExecution.MaxScore = (*source).MaxScore
+		modelChatChannelExecution.MinScore = (*source).MinScore
+		modelChatChannelExecution.ConfigSnapshot = (*source).ConfigSnapshot
+		modelChatChannelExecution.ErrorMessage = (*source).ErrorMessage
+		pModelChatChannelExecution = &modelChatChannelExecution
+	}
+	return pModelChatChannelExecution
+}
+func pVoChatRetrievalResultToPModelChatRetrievalResult(source *vo.ChatRetrievalResult) *model.ChatRetrievalResult {
+	var pModelChatRetrievalResult *model.ChatRetrievalResult
+	if source != nil {
+		var modelChatRetrievalResult model.ChatRetrievalResult
+		modelChatRetrievalResult.ConversationId = (*source).ConversationId
+		modelChatRetrievalResult.ExchangeId = (*source).ExchangeId
+		modelChatRetrievalResult.TraceId = (*source).TraceId
+		modelChatRetrievalResult.SubQuestionIndex = (*source).SubQuestionIndex
+		modelChatRetrievalResult.SubQuestion = (*source).SubQuestion
+		modelChatRetrievalResult.ChannelType = (*source).ChannelType
+		modelChatRetrievalResult.ChannelRank = (*source).ChannelRank
+		modelChatRetrievalResult.RrfRank = (*source).RrfRank
+		modelChatRetrievalResult.FinalRank = (*source).FinalRank
+		modelChatRetrievalResult.OriginalScore = (*source).OriginalScore
+		modelChatRetrievalResult.RrfScore = (*source).RrfScore
+		modelChatRetrievalResult.RerankScore = (*source).RerankScore
+		modelChatRetrievalResult.GatePassed = (*source).GatePassed
+		modelChatRetrievalResult.IsElevated = (*source).IsElevated
+		modelChatRetrievalResult.IsSelected = (*source).IsSelected
+		modelChatRetrievalResult.SelectionReason = (*source).SelectionReason
+		modelChatRetrievalResult.DocumentId = (*source).DocumentId
+		modelChatRetrievalResult.DocumentName = (*source).DocumentName
+		modelChatRetrievalResult.ChunkId = (*source).ChunkId
+		modelChatRetrievalResult.ChunkNo = (*source).ChunkNo
+		modelChatRetrievalResult.ParentBlockId = (*source).ParentBlockId
+		modelChatRetrievalResult.ParentBlockNo = (*source).ParentBlockNo
+		modelChatRetrievalResult.SectionPath = (*source).SectionPath
+		modelChatRetrievalResult.ChunkTextPreview = (*source).ChunkTextPreview
+		modelChatRetrievalResult.ChunkCharCount = (*source).ChunkCharCount
+		pModelChatRetrievalResult = &modelChatRetrievalResult
+	}
+	return pModelChatRetrievalResult
 }
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
@@ -670,7 +750,6 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source
 }
-
 func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.KnowledgeRouteTrace {
 	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
 	if source != nil {

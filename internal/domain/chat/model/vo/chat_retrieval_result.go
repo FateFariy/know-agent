@@ -48,7 +48,10 @@ func (v *ChatRetrievalResult) SetDocumentInfo(doc *DocumentChunk) {
 	v.DocumentName = doc.DocumentName
 	v.ChunkId, _ = convertor.ToInt(doc.ID)
 	v.ChunkNo = doc.ChunkNo
+	v.ParentBlockId, _ = convertor.ToInt(doc.ParentBlockId)
+	v.ParentBlockNo = doc.ParentBlockNo
 	v.SectionPath = doc.SectionPath
+	v.IsElevated = doc.IsElevated
 
 	// 设置原始分数
 	v.OriginalScore = doc.Score

@@ -12,17 +12,6 @@ type ConversationTrace struct {
 	exchangeId       int64
 	traceId          string
 	modelUsageTraces *list.CopyOnWriteList[*ChatModelUsageTrace]
-	limitStats       *ChatLimitStats
-	stageCode        *ConversationTraceStage
-	stageLevel       int
-	stageState       ConversationTraceStageState
-	parentStageId    int64
-	summaryText      string
-	executionMode    string
-	errorMessage     string
-	snapshotJson     string
-	durationMs       int64
-	ragObservation   any // RAG检索观测数据，使用any避免循环导入
 }
 
 type StageHandle struct {
@@ -38,7 +27,6 @@ func NewConversationTrace(conversationId string, exchangeId int64, traceId strin
 		exchangeId:       exchangeId,
 		traceId:          traceId,
 		modelUsageTraces: list.NewCopyOnWriteList([]*ChatModelUsageTrace{}),
-		limitStats:       &ChatLimitStats{},
 	}
 }
 

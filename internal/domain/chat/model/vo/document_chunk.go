@@ -62,6 +62,7 @@ type DocumentChunk struct {
 	DocumentTags       string `json:"documentTags"`       // 文档标签
 
 	// ========== 其他来源（RRF/重排/外部工具等） ==========
+	IsElevated       int     `json:"isElevated"`       // 是否提升
 	RRFScore         float64 `json:"rrfScore"`         // RRF分数
 	RerankScore      float64 `json:"rerankScore"`      // 重排分数
 	ParentBlockNo    int     `json:"parentBlockNo"`    // 父块序号
