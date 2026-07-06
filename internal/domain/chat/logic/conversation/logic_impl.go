@@ -348,18 +348,20 @@ func (c *LogicImpl) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchm
 // 内部实现：启动计划 / 启动会话 / 执行激活 / 执行计划 / 收尾
 // ---------------------------------------------------------------------------
 
-// buildLaunchPlan 构建启动计划
+// buildLaunchPlan 构建启动计划：从 ChatCommand 提取问题与对话上下文，生成规范化的 StreamLaunchPlan。
 //
-// 负责规范化：
-//   - conversationId（空则生成 uuid）
-//   - selectedDocument（仅在文档模式下必填且需命中可用文档）
+// 执行流程：
+//  1. 规范化会话 ID：优先使用传入的 conversationId；为空时生成无连字符的 UUID
+//  2. 构建初始计划（问题、会话 ID、聊天模式），并填充当前时间
+//  3. 若命令中指定了文档 ID，则从可检索文档列表中查找并写入文档名与索引任务 ID；缺失则返回错误
 func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
-	// 规范化会话ID
+	// 规范化会话 ID —— 空值时生成 UUID 作为新会话标识
 	conversationId := strutil.Trim(cmd.ConversationId)
 	if conversationId == "" {
 		conversationId = utils.GenerateUUIDWithoutHyphen()
 	}
 
+	// 构建启动计划，填充问题、会话 ID、聊天模式，并写入当前时间
 	plan := &vo.StreamLaunchPlan{
 		Question:       cmd.Question,
 		ConversationId: conversationId,
@@ -367,6 +369,7 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 	}
 	plan.FillCurrentDate()
 
+	// 当命令指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID
 	if cmd.SelectedDocumentId != 0 {
 		documents, err := c.lifecycleLogic.ListRetrievableDocuments(ctx)
 		if err != nil {
@@ -375,6 +378,7 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *dvo.KnowledgeDocument) bool {
 			return doc.DocumentId == cmd.SelectedDocumentId
 		})
+		// 指定的文档不存在或索引不可用，直接返回错误
 		if !ok {
 			return nil, errorx.ErrDocumentIndexUnavailable.Format(cmd.SelectedDocumentId)
 		}
@@ -385,70 +389,100 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 	return plan, nil
 }
 
-// bootstrapConversation 启动会话，创建对话记录并注册到运行注册表。若注册失败，说明会话正被其他执行接管，则拒绝。
+// bootstrapConversation 启动会话：创建本轮 exchange 记录，构建对话上下文，注册到运行注册表，
+// 最后在独立 goroutine 中激活生成逻辑，异步返回客户端可读的流式 channel。
+// 并发控制：注册失败表示会话已在执行中，直接落库为失败状态并拒绝，避免同一会话重复执行。
 func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (<-chan string, error) {
+	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）
 	exchange, err := c.startExchange(ctx, plan)
 	if err != nil {
 		return nil, err
 	}
 
+	// 构建对话上下文，绑定可取消的 context（用于后续终止生成）
 	convCtx := c.buildConversationCtx(plan, exchange)
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	convCtx.CancelFunc = cancelFunc
 
+	// 注册对话上下文到运行注册表；注册失败意味着会话正被其他执行接管
 	if !c.runtimeRegistry.Register(convCtx) {
-		// 已存在正在执行的会话，回写失败状态并拒绝
+		// 已存在正在执行的会话，回写失败状态并拒绝，让客户端稍后重试
 		failExchange := &entity.ChatExchange{
 			ID:             exchange.ID,
 			ConversationId: plan.ConversationId,
 			TurnStatus:     vo.ChatTurnStatusFailed,
 			ErrorMessage:   "该会话当前正在执行中，请稍后再试",
 		}
+		// 完成失败的 exchange
 		if err = c.completeExchange(ctx, failExchange); err != nil {
-			logx.Errorf("保存 exchange 失败, conversationId=%s, err=%v", plan.ConversationId, err)
+			return nil, err
 		}
 		return nil, fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
+
+	// 在独立 goroutine 中激活生成逻辑（不阻塞启动返回）
 	go c.activateGeneration(cancelCtx, convCtx)
 
+	// 返回客户端可读的流式 channel（此时客户端开始接收流事件）
 	return convCtx.Channel, nil
 }
 
-// activateGeneration 激活生成逻辑
+// activateGeneration 激活生成逻辑：在 goroutine 中执行对话的生成、流式下发与收尾工作。
 //
-// 1. 启动租约续期
-// 2. 发送 thinking 事件
-// 3) 构建执行计划（改写 + 路由 + 记忆 + 文档）并写回上下文
-// 4) 生成推荐追问（如启用）
-// 执行过程中若触发停止或失败，则走失败/停止分支。
+// 执行流程：
+//  1. 检查 finalized 快速返回（会话已被取消/终止）
+//  2. 启动租约续期 goroutine，用于周期性延长分布式锁
+//  3. 执行 buildConversationExecution 构建并执行对话生成；失败时走失败收尾
+//  4. 进入 for-select 循环消费执行结果：
+//     - context 被取消 → 调用 stopTask 中止
+//     - resultCh 关闭 → 调用 finishSuccessfully 收尾成功
+//     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
+//
+// 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
 func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
+	// 快速路径：会话已被前置 finalize，直接返回
 	if convCtx.Finalized.Load() {
 		return
 	}
 
-	// 启动租约续期
+	// 启动租约续期 goroutine，用于周期性延长分布式锁
 	go c.startLeaseRenewal(ctx, convCtx)
+
+	// 再次检查 finalize（避免刚启动即被取消，此时直接释放资源并返回）
 	if convCtx.Finalized.Load() {
 		convCtx.ReleaseResources()
 		return
 	}
+
+	// 构建并执行对话生成，返回流式结果 channel
 	resultCh, err := c.buildConversationExecution(convCtx)(ctx)
 	if err != nil {
+		// 构建/执行异常：记录错误日志，走失败收尾逻辑
 		logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		c.finishWithFailure(ctx, convCtx, fmt.Errorf("执行出现异常: %v", err))
 		return
 	}
 
+	// 执行完成后再次检查 finalize（下游在执行期间被取消时）
+	if convCtx.Finalized.Load() {
+		convCtx.ReleaseResources()
+		return
+	}
+
+	// 进入 for-select 循环消费流式结果并下发/收尾
 	for {
 		select {
 		case <-ctx.Done():
+			// 客户端取消请求：调用 stopTask 中止
 			c.stopTask(ctx, convCtx, "客户端已取消请求")
 			return
 		case chunk, ok := <-resultCh:
 			if !ok {
+				// resultCh 被关闭 → 执行器正常结束，走成功收尾
 				c.finishSuccessfully(ctx, convCtx)
 				return
 			}
+			// 收到 chunk：转发给客户端 channel；发送失败则按失败收尾
 			if err = c.emitModelChunk(convCtx, chunk); err != nil {
 				logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 				c.finishWithFailure(ctx, convCtx, err)
@@ -459,35 +493,43 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 	}
 }
 
-// buildConversationExecution 构建对话执行（执行计划构建的外层封装）
+// buildConversationExecution 构建对话执行：执行计划的外层封装。
+//
+// 在闭包中完成：
+//  1. 发送"正在分析问题上下文"的思考事件
+//  2. 调用 prepareExecutionPlan 生成执行计划并写入 convCtx
+//  3. 发送"上下文分析完成，已准备执行计划"的思考事件
+//  4. 通过 executorRegistry 根据 plan.Mode 解析执行器
+//  5. 调用 executor.Execute 进入实际执行逻辑，返回流式结果 channel
 func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) (<-chan string, error) {
 	return func(ctx context.Context) (<-chan string, error) {
-		// 发送 "正在分析问题上下文" 事件
+		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
 		thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
 			return nil, err
 		}
 
+		// 构建执行计划（可能触发路由/改写/子问题分析），并原子写入 convCtx
 		plan, err := c.prepareExecutionPlan(ctx, convCtx)
 		if err != nil {
 			return nil, err
 		}
 		convCtx.ExecutionPlan.Store(plan)
 
-		// 发送执行计划信息（用于前端调试/感知）
+		// 发送"上下文分析完成"的思考事件（前端调试/感知）
 		thinkingEvent = c.eventBuilder.ThinkingWithMetadata("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
 		if err = support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
 			return nil, err
 		}
+
+		// 根据执行计划 Mode 从执行器注册表解析执行器
 		executor, err := c.executorRegistry.Get(plan.Mode)
 		if err != nil {
 			return nil, err
 		}
-		resultCh, err := executor.Execute(ctx, convCtx)
-		if err != nil {
-			return nil, err
-		}
-		return resultCh, nil
+
+		// 调用执行器，返回流式结果 channel（由调用方在 activateGeneration 中消费）
+		return executor.Execute(ctx, convCtx)
 	}
 }
 
@@ -517,10 +559,10 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 
 // prepareExecutionPlan 准备执行计划
 //
-// 1) 调用编排器准备基础计划（改写、路由、历史记忆等）
-// 2) 使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
-// 3) 根据所选文档刷新会话范围（在文档模式下）
-// 4) 初始化调试轨迹
+//	1.调用编排器准备基础计划（改写、路由、历史记忆等）
+//	2.使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
+//	3. 根据所选文档刷新会话范围（在文档模式下）
+//	4. 初始化调试轨迹
 func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
 	execPlan, err := c.orchestratorLogic.Prepare(ctx, convCtx)
 	if err != nil {
@@ -625,8 +667,6 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		}
 		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按停止状态收尾", metadata)
 	} else {
-		logx.Errorf("停止会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
 		responseMessage = "会话已停止，收尾落库失败"
 		_ = c.tracer.FailStage(ctx, finalizeStage, "会话已按停止状态收尾", err, nil)
 	}
@@ -719,9 +759,6 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 		}
 		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按完成状态收尾。", snapshot)
 	} else {
-		// 落库失败：打印错误日志并标记 finalize 追踪阶段为失败
-		logx.Errorf("成功会话收尾落库失败, conversationId=%s, exchangeId=%d, err=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
 		_ = c.tracer.FailStage(ctx, finalizeStage, "会话收尾落库失败", err, nil)
 	}
 }
@@ -777,9 +814,6 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 		}
 		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按失败状态收尾。", snapshot)
 	} else {
-		// 落库失败：打印错误日志并标记 finalize 追踪阶段为失败
-		logx.Errorf("失败会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
-			convCtx.ConversationId, convCtx.ExchangeId, err)
 		_ = c.tracer.FailStage(ctx, finalizeStage, "失败态收尾失败。", err, nil)
 	}
 }
@@ -847,7 +881,12 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 		dialogue := &entity.ChatDialogue{SessionStatus: vo.ChatSessionStatusIdle}
 		return c.repo.UpdateDialogueByConversationId(txCtx, dialogue)
 	}
-	return c.repo.Do(ctx, completeFn)
+	if err := c.repo.Do(ctx, completeFn); err != nil {
+		logx.Errorf("会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
+			exchange.ConversationId, exchange.ID, err)
+		return err
+	}
+	return nil
 }
 
 // cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
@@ -861,7 +900,7 @@ func (c *LogicImpl) cleanup(ctx context.Context, convCtx *vo.ConversationContext
 // unlockConversationLock 释放会话运行锁
 func (c *LogicImpl) unlockConversationLock(ctx context.Context, leaseKey string) {
 	err := c.distributedLock.Unlock(ctx, leaseKey)
-	if err != nil && errors.Is(err, errorx.ErrDistributedLockNotFound) {
+	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}
 }
