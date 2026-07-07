@@ -11,7 +11,7 @@ type Executor interface {
 	// Mode 返回当前执行器对应的执行模式
 	Mode() vo.ExecutionMode
 
-	// Execute 执行回答生成逻辑；事件将写入 convCtx.Channel
+	// Execute 执行回答生成逻辑
 	Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error)
 }
 

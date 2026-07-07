@@ -15,8 +15,9 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -111,7 +112,7 @@ type questionIntentDecision struct {
 // DocumentQuestionRouter 在某个文档内部进行意图判断与章节定位，最终输出导航决策
 type DocumentQuestionRouter struct {
 	chatModel             *logic.ChatModelImpl[*schema.AgenticMessage] // 可选：兜底意图分类用的对话模型
-	structureGraphQuerier vo2.StructureGraphQuerier                    // 结构图谱查询能力
+	structureGraphQuerier graph.StructureGraphQuerier                  // 结构图谱查询能力
 	navigationIndexSvc    NavigationIndexService                       // 可选：章节索引服务；非 nil 时用于章节定位
 	promptTemplateLogic   logic.PromptTemplateLogic                    // 可选：LLM 用的 Prompt 模板渲染
 }
@@ -131,7 +132,7 @@ type NavigationSectionHit struct {
 // NewDocumentQuestionRouter 构造文档问题路由器
 func NewDocumentQuestionRouter(
 	chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
-	structureGraphQuerier vo2.StructureGraphQuerier,
+	structureGraphQuerier graph.StructureGraphQuerier,
 	navigationIndexSvc NavigationIndexService,
 	promptTemplateLogic logic.PromptTemplateLogic,
 ) *DocumentQuestionRouter {

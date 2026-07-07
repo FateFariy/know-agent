@@ -30,6 +30,18 @@ type KeywordDB interface {
 	SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
 
+// CheckPointStore 检查点存储器
+type CheckPointStore interface {
+	// Get 获取检查点
+	Get(ctx context.Context, checkPointID string) ([]byte, bool, error)
+
+	// Set 设置检查点
+	Set(ctx context.Context, checkPointID string, checkPoint []byte) error
+
+	// Count 检查点数量
+	Count(ctx context.Context, checkPointID string) (int64, error)
+}
+
 type RerankOption struct {
 	Model string // 重排序模型
 	TopN  int    // 重排序TopN

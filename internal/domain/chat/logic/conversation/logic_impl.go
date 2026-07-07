@@ -46,7 +46,7 @@ type LogicImpl struct {
 	recommendLogic    logic.RecommendationLogic
 	memoryLogic       logic.SessionMemoryLogic
 	distributedLock   adapter.DistributedLock
-	options           *options
+	*options
 }
 
 var _ logic.ChatLogic = (*LogicImpl)(nil)
@@ -151,34 +151,25 @@ func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string)
 }
 
 // GetSessionDetail 获取会话详情
-func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error) {
+func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
 	record, err := c.repo.SelectSessionRecord(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
-	latestMessage := ""
-	if len(record.Exchanges) > 0 {
-		last := record.Exchanges[len(record.Exchanges)-1]
-		if strutil.IsNotBlank(last.Answer) {
-			latestMessage = last.Answer
-		} else {
-			latestMessage = last.Question
-		}
+	record.MemorySummary, err = c.repo.SelectMemorySummary(ctx, conversationId)
+	if err != nil {
+		return nil, err
 	}
-	return &chat.ConversationSessionResp{
-		ConversationId: record.ConversationId,
-		Title:          buildSessionTitle(record, latestMessage),
-		LatestMessage:  latestMessage,
-		CreateTime:     record.CreatedTime.Format(time.DateTime),
-		UpdateTime:     record.UpdatedTime.Format(time.DateTime),
-	}, nil
+	// todo 检查点待完善
+	record.FillSummaryFields()
+	return record, nil
 }
 
 // GetExchangeDetail 获取对话详情（含阶段追踪）
-func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*chat.ConversationExchangeDetailResp, error) {
+func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error) {
 	exchanges, err := c.repo.ListExchanges(ctx, conversationId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var matched *entity.ChatExchange
 	for _, ex := range exchanges {
@@ -188,7 +179,7 @@ func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string
 		}
 	}
 	if matched == nil {
-		return nil, fmt.Errorf("轮次不存在: %d", exchangeId)
+		return nil, nil, fmt.Errorf("轮次不存在: %d", exchangeId)
 	}
 
 	stages, err := c.repo.SelectStages(ctx, conversationId, exchangeId)

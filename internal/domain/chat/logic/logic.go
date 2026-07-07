@@ -20,10 +20,10 @@ type ChatLogic interface {
 	StopConversation(ctx context.Context, conversationId string) (bool, string, error)
 
 	// GetSessionDetail 获取会话详情
-	GetSessionDetail(ctx context.Context, conversationId string) (*chat.ConversationSessionResp, error)
+	GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)
 
 	// GetExchangeDetail 获取对话详情
-	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*chat.ConversationExchangeDetailResp, error)
+	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error)
 
 	// ListSessions 获取会话列表
 	ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error)
@@ -88,4 +88,27 @@ type ChatPreparationOrchestratorLogic interface {
 // RagRetriever RAG 检索引擎接口
 type RagRetriever interface {
 	Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error)
+}
+
+// StructureGraphQuerier 结构图查询接口
+type StructureGraphQuerier interface {
+	// ListSections 列出指定文档下的所有结构图节点（用于本地短语匹配）
+	ListSections(ctx context.Context, documentId int64) ([]*entity.GraphSection, error)
+
+	FindSectionById(ctx context.Context, documentId int64, nodeId int64) (*entity.GraphSection, error)
+
+	// FindSectionByCode 根据编号（如 1.2.3 / 第 3 节）匹配章节节点
+	FindSectionByCode(ctx context.Context, documentId int64, sectionCode string) (*entity.GraphSection, error)
+
+	// FindBestSection 根据问题文本查找最佳节点；可接受一个可选的 anchor 短语增强
+	FindBestSection(ctx context.Context, documentId int64, question, anchorHint string) (*entity.GraphSection, error)
+
+	// FindSectionWithChildren 根据节点编号查找子节点
+	FindSectionWithChildren(ctx context.Context, documentId int64, sectionNodeId int64) (*entity.GraphSectionWithChildren, error)
+
+	// FindSectionWithSiblings 根据节点编号查找同级节点
+	FindSectionWithSiblings(ctx context.Context, documentId int64, sectionNodeId int64) (*entity.GraphSectionWithSiblings, error)
+
+	// BuildGraphResult 根据节点编号构建结构图结果
+	BuildGraphResult(ctx context.Context, documentId int64, sectionNodeId int64, itemIndex *int, itemKeyword string) (*entity.GraphQueryResult, error)
 }

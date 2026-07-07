@@ -10,25 +10,26 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
+	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // GraphThenEvidenceExecutor 先结构图定位、再读取章节/编号项证据的执行器
 //
 // 适用场景：用户明确指向某个章节或编号项（如"第 3 节第 2 项讲的是什么"），
-// 先由结构图定位目标节点，再由 GraphAnswerRender 把节点文本/编号项渲染成最终答复。
+// 先由结构图定位目标节点，再由 AnswerRender 把节点文本/编号项渲染成最终答复。
 type GraphThenEvidenceExecutor struct {
-	structureQuerier ragvo.StructureGraphQuerier
-	answerRender     ragvo.GraphAnswerRender
+	structureQuerier graph.StructureGraphQuerier
+	answerRender     graph.AnswerRender
 	tracer           *trace.ConversationTraceRecorder
 }
 
 // NewGraphThenEvidenceExecutor 构造"结构图定位后取证"执行器
 func NewGraphThenEvidenceExecutor(
-	structureQuerier ragvo.StructureGraphQuerier,
-	answerRender ragvo.GraphAnswerRender,
+	structureQuerier graph.StructureGraphQuerier,
+	answerRender graph.AnswerRender,
 	tracer *trace.ConversationTraceRecorder,
 ) *GraphThenEvidenceExecutor {
 	return &GraphThenEvidenceExecutor{
