@@ -1,6 +1,10 @@
 package vo
 
-import list "github.com/duke-git/lancet/v2/datastructure/list"
+import (
+	"encoding/json"
+
+	list "github.com/duke-git/lancet/v2/datastructure/list"
+)
 
 // ChatDebugTrace 单轮对话调试轨迹
 type ChatDebugTrace struct {
@@ -28,14 +32,17 @@ type ChatDebugTrace struct {
 	RetrievalSubQuestions           []string                              `json:"subQuestions"`                    // 检索子问题列表（别名：subQuestions）
 	SelectedDocumentId              int64                                 `json:"selectedDocumentId"`              // 选中的文档ID
 	SelectedTaskId                  int64                                 `json:"selectedTaskId"`                  // 选中的任务ID
-	RetrievalNotes                  *list.CopyOnWriteList[string]         `json:"retrievalNotes"`                  // 检索备注列表
-	UsedChannels                    *list.CopyOnWriteList[string]         `json:"usedChannels"`                    // 使用的渠道列表
-	ToolTraces                      *list.CopyOnWriteList[*ChatToolTrace] `json:"toolTraces"`                      // 工具调用轨迹列表
+	RetrievalNotes                  []string                              `json:"retrievalNoteList"`               // 检索备注列表
+	UsedChannels                    []string                              `json:"usedChannels"`                    // 使用的渠道列表
+	ToolTraces                      []*ChatToolTrace                      `json:"toolTraces"`                      // 工具调用轨迹列表
 	ModelUsageTraces                []*ChatModelUsageTrace                `json:"modelUsageTraces"`                // 模型使用轨迹列表
 	LimitStats                      *ChatLimitStats                       `json:"limitStats"`                      // 限制统计
 	RagSystemPrompt                 string                                `json:"ragSystemPrompt"`                 // RAG系统提示词
 	RagUserPrompt                   string                                `json:"ragUserPrompt"`                   // RAG用户提示词
 	NoEvidenceReply                 string                                `json:"noEvidenceReply"`                 // 无证据回复
+	retrievalNotes                  *list.CopyOnWriteList[string]         // 检索备注列表
+	usedChannels                    *list.CopyOnWriteList[string]         // 使用的渠道列表
+	toolTraces                      *list.CopyOnWriteList[*ChatToolTrace] // 工具调用轨迹列表
 }
 
 // ChatLimitStats 单轮对话的调用限制统计
@@ -79,9 +86,9 @@ type ChatToolTrace struct {
 // NewChatDebugTrace 创建新的调试轨迹实例
 func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace := &ChatDebugTrace{
-		RetrievalNotes: list.NewCopyOnWriteList[string](nil),
-		UsedChannels:   list.NewCopyOnWriteList[string](nil),
-		ToolTraces:     list.NewCopyOnWriteList[*ChatToolTrace](nil),
+		retrievalNotes: list.NewCopyOnWriteList[string](nil),
+		usedChannels:   list.NewCopyOnWriteList[string](nil),
+		toolTraces:     list.NewCopyOnWriteList[*ChatToolTrace](nil),
 	}
 	if execPlan == nil {
 		return trace
@@ -130,7 +137,7 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 
 // AddToolTraces 添加工具调用轨迹
 func (t *ChatDebugTrace) AddToolTraces(traces ...*ChatToolTrace) {
-	t.ToolTraces.AddAll(traces)
+	t.toolTraces.AddAll(traces)
 }
 
 // AddModelUsageTrace 添加模型使用轨迹
@@ -143,33 +150,43 @@ func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
 
 // AddUsedChannels 添加使用的渠道
 func (t *ChatDebugTrace) AddUsedChannels(channels ...string) {
-	t.UsedChannels.AddAll(channels)
+	t.usedChannels.AddAll(channels)
 }
 
 func (t *ChatDebugTrace) SetUsedChannels(channels ...string) {
-	t.UsedChannels.Clear()
-	t.UsedChannels.AddAll(channels)
+	t.usedChannels.Clear()
+	t.usedChannels.AddAll(channels)
 }
 
 func (t *ChatDebugTrace) AddRetrievalNotes(notes ...string) {
-	t.RetrievalNotes.AddAll(notes)
+	t.retrievalNotes.AddAll(notes)
 }
 
 func (t *ChatDebugTrace) SetRetrievalNotes(notes ...string) {
-	t.RetrievalNotes.Clear()
-	t.RetrievalNotes.AddAll(notes)
+	t.retrievalNotes.Clear()
+	t.retrievalNotes.AddAll(notes)
+}
+
+// Serialize 序列化调试轨迹
+func (t *ChatDebugTrace) Serialize() string {
+	t.UsedChannels = t.usedChannels.SubList(0, t.usedChannels.Size())
+	t.ToolTraces = t.toolTraces.SubList(0, t.toolTraces.Size())
+	t.RetrievalNotes = t.retrievalNotes.SubList(0, t.retrievalNotes.Size())
+	marshal, _ := json.Marshal(t)
+	return string(marshal)
 }
 
 // DocumentNavigationDecision 文档问答路由结果
 type DocumentNavigationDecision struct {
-	NavigationAction  string                       `json:"navigationAction"`  // 导航动作
-	ExecutionMode     ExecutionMode                `json:"executionMode"`     // 执行模式
+	NavigationAction  string                       `json:"navigationAction"` // 导航动作
+	ExecutionMode     ExecutionMode                // 执行模式
 	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
 	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划
 	SummaryText       string                       `json:"summaryText"`       // 摘要文本
 	QueryContextHints []string                     `json:"queryContextHints"` // 查询上下文提示
 	SoftSectionHints  []string                     `json:"softSectionHints"`  // 软章节提示
+	ExecutionModeName string                       `json:"executionMode"`     // 执行模式
 }
 
 // ConversationStructureAnchor 会话结构锚点

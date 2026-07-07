@@ -1,23 +1,15 @@
 package vo
 
-import "github.com/duke-git/lancet/v2/enum"
-
 // ============================================================
 // ChatQueryMode 提问模式枚举
 // ============================================================
 
-type ChatQueryMode = *enum.Item[int]
+type ChatQueryMode = int
 
 const (
-	DocumentMode     = iota + 1 // 当前文档问答
-	OpenChatMode                // 开放式提问
-	AutoDocumentMode            // 自动知识问答
-)
-
-var (
-	ChatQueryModeDocument     = enum.NewItem(DocumentMode, "document")
-	ChatQueryModeOpenChat     = enum.NewItem(OpenChatMode, "open_chat")
-	ChatQueryModeAutoDocument = enum.NewItem(AutoDocumentMode, "auto_document")
+	ChatQueryModeDocument     = iota + 1 // 当前文档问答
+	ChatQueryModeOpenChat                // 开放式提问
+	ChatQueryModeAutoDocument            // 自动知识问答
 )
 
 func ToChatQueryMode(name string) ChatQueryMode {
@@ -29,13 +21,18 @@ func ToChatQueryMode(name string) ChatQueryMode {
 	case "auto_document":
 		return ChatQueryModeAutoDocument
 	default:
-		return enum.NewItem(-1, "unknown")
+		return 0
 	}
 }
 
-func ChatQueryModeValue(mode ChatQueryMode) int {
-	if mode == nil {
-		return 0
+func ChatQueryModeName(code int) string {
+	switch code {
+	case ChatQueryModeDocument:
+		return "document"
+	case ChatQueryModeOpenChat:
+		return "open_chat"
+	case ChatQueryModeAutoDocument:
+		return "auto_document"
 	}
-	return mode.Value()
+	return ""
 }

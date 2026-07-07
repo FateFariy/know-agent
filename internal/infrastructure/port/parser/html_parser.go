@@ -20,7 +20,7 @@ func (p *HTMLParser) Name() string {
 	return HTML
 }
 
-func (p *HTMLParser) Parse(ctx context.Context, bytesData []byte) (string, error) {
+func (p *HTMLParser) Parse(_ context.Context, bytesData []byte) (string, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bytesData))
 	if err != nil {
 		return string(bytesData), nil

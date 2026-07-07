@@ -218,6 +218,7 @@ func (r *DocumentQuestionRouter) Route(ctx context.Context, documentId int64, or
 func (r *DocumentQuestionRouter) buildDecision(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{}
 	decision.ExecutionMode = mode
+	decision.ExecutionModeName = mode.Name()
 	decision.NavigationAction = action
 	decision.RetrievalPlan = retrievalPlan
 

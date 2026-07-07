@@ -160,7 +160,6 @@ func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string)
 	if err != nil {
 		return nil, err
 	}
-	// todo 检查点待完善
 	record.FillSummaryFields()
 	return record, nil
 }
@@ -193,7 +192,7 @@ func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string
 			continue
 		}
 		stageResps = append(stageResps, &chat.ConversationTraceStageResp{
-			StageId:       s.ID,
+			ID:            s.ID,
 			StageCode:     s.StageCode,
 			StageName:     s.StageName,
 			ExecutionMode: s.ExecutionMode,
@@ -580,7 +579,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 	if execPlan.SelectedDocumentId > 0 && execPlan.SelectedDocumentId != convCtx.SelectedDocumentId {
 		dialogue := &entity.ChatDialogue{
 			ConversationId:       convCtx.ConversationId,
-			ChatMode:             vo.ChatQueryModeValue(execPlan.ChatMode),
+			ChatMode:             execPlan.ChatMode,
 			SelectedDocumentId:   execPlan.SelectedDocumentId,
 			SelectedDocumentName: execPlan.SelectedDocumentName,
 		}
@@ -835,7 +834,7 @@ func (c *LogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       plan.ConversationId,
 		Question:             plan.Question,
-		ChatMode:             vo.ChatQueryModeValue(plan.ChatMode),
+		ChatMode:             plan.ChatMode,
 		SelectedDocumentId:   plan.SelectedDocumentId,
 		SelectedDocumentName: plan.SelectedDocumentName,
 		SessionStatus:        vo.ChatSessionStatusRunning,

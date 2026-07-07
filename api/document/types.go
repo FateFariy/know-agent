@@ -30,8 +30,8 @@ type ConfirmStrategyReq struct {
 }
 
 type ConfirmStrategyResp struct {
+	ID                 int64                     `json:"planId"`             // 方案ID
 	DocumentId         int64                     `json:"documentId"`         // 文档ID
-	PlanId             int64                     `json:"planId"`             // 方案ID
 	PlanVersion        int                       `json:"planVersion"`        // 方案版本
 	StrategyStatus     int                       `json:"strategyStatus"`     // 策略状态
 	StrategyStatusName string                    `json:"strategyStatusName"` // 策略状态描述
@@ -68,7 +68,7 @@ type DocumentChunkItem struct {
 }
 
 type DocumentListItem struct {
-	DocumentId           int64  `json:"documentId"`           // 文档ID
+	ID                   int64  `json:"documentId"`           // 文档ID
 	DocumentName         string `json:"documentName"`         // 文档名称
 	OriginalFileName     string `json:"originalFileName"`     // 原始文件名
 	FileType             int    `json:"fileType"`             // 文件类型
@@ -120,7 +120,7 @@ type DocumentStrategyPipeline struct {
 }
 
 type DocumentStrategyPlan struct {
-	PlanId           int64                     `json:"planId"`           // 方案ID
+	ID               int64                     `json:"planId"`           // 方案ID
 	PlanVersion      int                       `json:"planVersion"`      // 方案版本
 	PlanSource       int                       `json:"planSource"`       // 方案来源
 	PlanSourceName   string                    `json:"planSourceName"`   // 方案来源名称
@@ -201,7 +201,7 @@ type QueryStrategyPlanReq struct {
 }
 
 type QueryStrategyPlanResp struct {
-	DocumentId         int64                 `json:"documentId"`         // 文档ID
+	ID                 int64                 `json:"documentId"`         // 文档ID
 	DocumentName       string                `json:"documentName"`       // 文档名称
 	ParseStatus        int                   `json:"parseStatus"`        // 解析状态
 	ParseStatusName    string                `json:"parseStatusName"`    // 解析状态名
@@ -221,7 +221,7 @@ type QueryTaskLogsReq struct {
 }
 
 type QueryTaskLogsResp struct {
-	TaskId           int64      `json:"taskId"`           // 任务ID
+	ID               int64      `json:"taskId"`           // 任务ID
 	DocumentId       int64      `json:"documentId"`       // 文档ID
 	TaskType         int        `json:"taskType"`         // 任务类型
 	TaskTypeName     string     `json:"taskTypeName"`     // 任务类型名称

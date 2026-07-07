@@ -2,7 +2,6 @@ package vo
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -164,9 +163,5 @@ func (c *ConversationContext) DebugTraceJSON() string {
 	if dt == nil {
 		return ""
 	}
-	data, err := json.Marshal(dt)
-	if err != nil {
-		return ""
-	}
-	return string(data)
+	return dt.Serialize()
 }

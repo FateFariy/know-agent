@@ -5,6 +5,7 @@ import (
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
+	"github.com/swiftbit/know-agent/common"
 	cen "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	dagg "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
@@ -28,19 +29,14 @@ type DocumentConverter interface {
 	FromConfirmStrategyReq(req *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
 
 	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
-	// goverter:map ID DocumentId
 	ToDocumentListItem(src *den.Document) *document.DocumentListItem
 	ToDocumentListItemList(src []*den.Document) []*document.DocumentListItem
-	// goverter:map ID DocumentId
 	ToQueryStrategyPlanResp(src *den.Document) *document.QueryStrategyPlanResp
-	// goverter:map ID PlanId
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
-	// goverter:map ID PlanId
 	ToConfirmStrategyResp(plan *den.DocumentStrategyPlan) *document.ConfirmStrategyResp
 	ToBuildIndexResp(src *dvo.DocumentIndexBuild) *document.BuildIndexResp
 	ToDocumentChunkItemList(src []*den.DocumentChunk) []*document.DocumentChunkItem
 	ToQueryDocumentChunkDetailResp(src *dagg.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp
-	// goverter:map ID TaskId
 	ToQueryTaskLogsResp(src *den.DocumentTask) *document.QueryTaskLogsResp
 
 	ToDocumentModel(src *den.Document) *model.Document
@@ -61,12 +57,13 @@ type DocumentConverter interface {
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString ToChatQueryMode
+// goverter:extend TimeToString ToChatQueryMode ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
 
 	ToRetrievalResultRespList(src []*cvo.ChatRetrievalResult) []*chat.RetrievalResultResp
+	ToConversationSessionResp(src *cvo.ConversationArchiveRecord) *chat.ConversationSessionResp
 	// goverter:map StartTime | TimeToStringMs
 	// goverter:map EndTime | TimeToStringMs
 	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp
@@ -101,4 +98,20 @@ func TimeToStringMs(t time.Time) string {
 
 func ToChatQueryMode(name string) cvo.ChatQueryMode {
 	return cvo.ToChatQueryMode(name)
+}
+
+func ToChatQueryModeName(code int) string {
+	return cvo.ChatQueryModeName(code)
+}
+
+func JsonArrayToStringSlice(src common.JSONArray) []string {
+	return common.JSONArrayTo(src, func(item any) string {
+		return item.(string)
+	})
+}
+
+func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReferenceResp {
+	return common.JSONArrayTo(src, func(item any) *chat.SearchReferenceResp {
+		return item.(*chat.SearchReferenceResp)
+	})
 }

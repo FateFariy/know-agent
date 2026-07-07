@@ -119,7 +119,7 @@ func (o *PreparationOrchestratorImpl) Prepare(ctx context.Context, convCtx *vo.C
 		// 自动文档问答：先做知识路由选文档，再在文档内导航
 		err = o.prepareAutoDocumentMode(ctx, convCtx, execPlan)
 	default:
-		return nil, fmt.Errorf("不支持的聊天模式: %s", convCtx.ChatMode.Name())
+		return nil, fmt.Errorf("不支持的聊天模式: %s", vo.ChatQueryModeName(convCtx.ChatMode))
 	}
 	// 子计划方法失败则直接返回错误
 	if err != nil {
@@ -220,7 +220,7 @@ func (o *PreparationOrchestratorImpl) prepareOpenChat(ctx context.Context, convC
 	}
 	// 写入快照：聊天模式、执行模式、时间信号关键字段
 	snapshot := map[string]any{
-		"chatMode":                     convCtx.ChatMode.String(),
+		"chatMode":                     vo.ChatQueryModeName(convCtx.ChatMode),
 		"executionMode":                vo.ExecutionModeReactAgent.String(),
 		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
 		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
@@ -368,7 +368,7 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 
 	// 构造路由结果快照（执行模式 / 章节提示 / 条目编号 / 摘要文本），写入追踪
 	snapshot := map[string]any{
-		"executionMode":     navigationDecision.ExecutionMode.Name(),
+		"executionMode":     navigationDecision.ExecutionModeName,
 		"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
 		"targetItemIndex":   navigationDecision.ItemAnchor.ItemIndex,
 		"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
@@ -394,7 +394,7 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s, targetSection='%s",
-		convCtx.ConversationId, convCtx.ChatMode.String(), strutil.Trim(convCtx.Question),
+		convCtx.ConversationId, vo.ChatQueryModeName(convCtx.ChatMode), strutil.Trim(convCtx.Question),
 		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
 
 	return nil
@@ -409,7 +409,7 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 //  4. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
 func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
 	// 启动记忆追踪阶段，使用 chatMode 作为执行模式名
-	memoryStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageMemory, convCtx.ChatMode.Name(), "正在装载会话记忆与最近窗口。", nil)
+	memoryStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageMemory, vo.ChatQueryModeName(convCtx.ChatMode), "正在装载会话记忆与最近窗口。", nil)
 	if err != nil {
 		return nil, err
 	}

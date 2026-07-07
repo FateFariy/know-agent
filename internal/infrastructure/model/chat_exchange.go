@@ -9,9 +9,9 @@ type ChatExchange struct {
 	Question            string           `gorm:"column:question"`               // 用户问题
 	Answer              string           `gorm:"column:answer"`                 // 回答内容
 	ThinkingSteps       common.JSONArray `gorm:"column:thinking_steps"`         // 思维步骤
-	ReferenceList       common.JSONArray `gorm:"column:reference_list"`         // 参考列表
-	RecommendationList  common.JSONArray `gorm:"column:recommendation_list"`    // 建议列表
-	UsedToolList        common.JSONArray `gorm:"column:used_tool_list"`         // 工具使用列表
+	References          common.JSONArray `gorm:"column:references"`             // 参考列表
+	Recommendations     common.JSONArray `gorm:"column:recommendations"`        // 建议列表
+	UsedTools           common.JSONArray `gorm:"column:used_tools"`             // 工具使用列表
 	DebugTraceJson      string           `gorm:"column:debug_trace_json"`       // 调试跟踪JSON
 	TurnStatus          int              `gorm:"column:turn_status"`            // 轮次状态
 	ErrorMessage        string           `gorm:"column:error_message"`          // 错误信息

@@ -97,7 +97,7 @@ type (
 	}
 	// 文档列表项
 	DocumentListItem {
-		DocumentId           int64  `json:"documentId"` // 文档ID
+		ID                   int64  `json:"documentId"` // 文档ID
 		DocumentName         string `json:"documentName"` // 文档名称
 		OriginalFileName     string `json:"originalFileName"` // 原始文件名
 		FileType             int    `json:"fileType"` // 文件类型
@@ -133,7 +133,7 @@ type (
 	}
 	// 查询文档策略方案响应
 	QueryStrategyPlanResp {
-		DocumentId         int64                 `json:"documentId"` // 文档ID
+		ID                 int64                 `json:"documentId"` // 文档ID
 		DocumentName       string                `json:"documentName"` // 文档名称
 		ParseStatus        int                   `json:"parseStatus"` // 解析状态
 		ParseStatusName    string                `json:"parseStatusName"` // 解析状态名
@@ -147,7 +147,7 @@ type (
 	}
 	// 文档策略方案信息
 	DocumentStrategyPlan {
-		PlanId           int64                     `json:"planId"` // 方案ID
+		ID               int64                     `json:"planId"` // 方案ID
 		PlanVersion      int                       `json:"planVersion"` // 方案版本
 		PlanSource       int                       `json:"planSource"` // 方案来源
 		PlanSourceName   string                    `json:"planSourceName"` // 方案来源名称
@@ -182,8 +182,8 @@ type (
 	}
 	// 确认文档策略方案响应
 	ConfirmStrategyResp {
+		ID                 int64                     `json:"planId"` // 方案ID
 		DocumentId         int64                     `json:"documentId"` // 文档ID
-		PlanId             int64                     `json:"planId"` // 方案ID
 		PlanVersion        int                       `json:"planVersion"` // 方案版本
 		StrategyStatus     int                       `json:"strategyStatus"` // 策略状态
 		StrategyStatusName string                    `json:"strategyStatusName"` // 策略状态描述
@@ -255,7 +255,7 @@ type (
 	}
 	// 查询任务执行日志响应
 	QueryTaskLogsResp {
-		TaskId           int64      `json:"taskId"` // 任务ID
+		ID               int64      `json:"taskId"` // 任务ID
 		DocumentId       int64      `json:"documentId"` // 文档ID
 		TaskType         int        `json:"taskType"` // 任务类型
 		TaskTypeName     string     `json:"taskTypeName"` // 任务类型名称

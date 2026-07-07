@@ -99,9 +99,9 @@ func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 		modelChatExchange.Question = (*source).Question
 		modelChatExchange.Answer = (*source).Answer
 		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
-		modelChatExchange.ReferenceList = commonJSONArrayToCommonJSONArray((*source).ReferenceList)
-		modelChatExchange.RecommendationList = commonJSONArrayToCommonJSONArray((*source).RecommendationList)
-		modelChatExchange.UsedToolList = commonJSONArrayToCommonJSONArray((*source).UsedToolList)
+		modelChatExchange.References = commonJSONArrayToCommonJSONArray((*source).References)
+		modelChatExchange.Recommendations = commonJSONArrayToCommonJSONArray((*source).Recommendations)
+		modelChatExchange.UsedTools = commonJSONArrayToCommonJSONArray((*source).UsedTools)
 		modelChatExchange.DebugTraceJson = (*source).DebugTraceJson
 		modelChatExchange.TurnStatus = (*source).TurnStatus
 		modelChatExchange.ErrorMessage = (*source).ErrorMessage
@@ -163,6 +163,35 @@ func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.C
 	}
 	return pModelChatRetrievalResultList
 }
+func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.ConversationSessionResp {
+	var pChatConversationSessionResp *chat.ConversationSessionResp
+	if source != nil {
+		var chatConversationSessionResp chat.ConversationSessionResp
+		chatConversationSessionResp.ConversationId = (*source).ConversationId
+		chatConversationSessionResp.Running = (*source).Running
+		chatConversationSessionResp.CheckpointCount = (*source).CheckpointCount
+		chatConversationSessionResp.MessageCount = (*source).MessageCount
+		chatConversationSessionResp.LatestUserMessage = (*source).LatestUserMessage
+		chatConversationSessionResp.LatestAssistantMessage = (*source).LatestAssistantMessage
+		chatConversationSessionResp.LatestExchangeId = (*source).LatestExchangeId
+		chatConversationSessionResp.LatestTurnStatus = (*source).LatestTurnStatus
+		chatConversationSessionResp.LatestTurnErrorMessage = (*source).LatestTurnErrorMessage
+		chatConversationSessionResp.ChatMode = ToChatQueryModeName((*source).ChatMode)
+		chatConversationSessionResp.SelectedDocumentId = (*source).SelectedDocumentId
+		chatConversationSessionResp.SelectedDocumentName = (*source).SelectedDocumentName
+		chatConversationSessionResp.CreatedTime = TimeToString((*source).CreatedTime)
+		chatConversationSessionResp.UpdatedTime = TimeToString((*source).UpdatedTime)
+		if (*source).Exchanges != nil {
+			chatConversationSessionResp.Exchanges = make([]*chat.ConversationExchangeResp, len((*source).Exchanges))
+			for i := 0; i < len((*source).Exchanges); i++ {
+				chatConversationSessionResp.Exchanges[i] = pEntityChatExchangeToPChatConversationExchangeResp((*source).Exchanges[i])
+			}
+		}
+		chatConversationSessionResp.MemorySummary = pEntityChatMemorySummaryToPChatConversationMemorySummaryResp((*source).MemorySummary)
+		pChatConversationSessionResp = &chatConversationSessionResp
+	}
+	return pChatConversationSessionResp
+}
 func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.RetrievalResultResp {
 	var pChatRetrievalResultRespList []*chat.RetrievalResultResp
 	if source != nil {
@@ -175,6 +204,44 @@ func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.Retriev
 }
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
+}
+func pEntityChatExchangeToPChatConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationExchangeResp {
+	var pChatConversationExchangeResp *chat.ConversationExchangeResp
+	if source != nil {
+		var chatConversationExchangeResp chat.ConversationExchangeResp
+		chatConversationExchangeResp.ID = (*source).ID
+		chatConversationExchangeResp.Question = (*source).Question
+		chatConversationExchangeResp.Answer = (*source).Answer
+		chatConversationExchangeResp.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
+		chatConversationExchangeResp.References = JsonArrayToSearchReferences((*source).References)
+		chatConversationExchangeResp.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
+		chatConversationExchangeResp.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
+		chatConversationExchangeResp.DebugTraceJson = (*source).DebugTraceJson
+		chatConversationExchangeResp.TurnStatus = (*source).TurnStatus
+		chatConversationExchangeResp.ErrorMessage = (*source).ErrorMessage
+		chatConversationExchangeResp.FirstResponseTimeMs = (*source).FirstResponseTimeMs
+		chatConversationExchangeResp.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		chatConversationExchangeResp.CreateTime = TimeToString((*source).CreateTime)
+		chatConversationExchangeResp.UpdateTime = TimeToString((*source).UpdateTime)
+		pChatConversationExchangeResp = &chatConversationExchangeResp
+	}
+	return pChatConversationExchangeResp
+}
+func pEntityChatMemorySummaryToPChatConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.ConversationMemorySummaryResp {
+	var pChatConversationMemorySummaryResp *chat.ConversationMemorySummaryResp
+	if source != nil {
+		var chatConversationMemorySummaryResp chat.ConversationMemorySummaryResp
+		chatConversationMemorySummaryResp.ConversationId = (*source).ConversationId
+		chatConversationMemorySummaryResp.IsCompressed = (*source).IsCompressed
+		chatConversationMemorySummaryResp.CoveredExchangeId = (*source).CoveredExchangeId
+		chatConversationMemorySummaryResp.CoveredExchangeCount = (*source).CoveredExchangeCount
+		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
+		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
+		chatConversationMemorySummaryResp.SummaryText = (*source).SummaryText
+		chatConversationMemorySummaryResp.LastSourceUpdateTime = TimeToString((*source).LastSourceUpdateTime)
+		pChatConversationMemorySummaryResp = &chatConversationMemorySummaryResp
+	}
+	return pChatConversationMemorySummaryResp
 }
 func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution
@@ -331,8 +398,8 @@ func ToConfirmStrategyResp(source *entity1.DocumentStrategyPlan) *document.Confi
 	var pDocumentConfirmStrategyResp *document.ConfirmStrategyResp
 	if source != nil {
 		var documentConfirmStrategyResp document.ConfirmStrategyResp
+		documentConfirmStrategyResp.ID = (*source).ID
 		documentConfirmStrategyResp.DocumentId = (*source).DocumentId
-		documentConfirmStrategyResp.PlanId = (*source).ID
 		documentConfirmStrategyResp.PlanVersion = (*source).PlanVersion
 		documentConfirmStrategyResp.Normalized = (*source).Normalized
 		documentConfirmStrategyResp.ParentPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ParentPipeline)
@@ -391,7 +458,7 @@ func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
 		var documentDocumentListItem document.DocumentListItem
-		documentDocumentListItem.DocumentId = (*source).ID
+		documentDocumentListItem.ID = (*source).ID
 		documentDocumentListItem.DocumentName = (*source).DocumentName
 		documentDocumentListItem.OriginalFileName = (*source).OriginalFileName
 		documentDocumentListItem.FileType = (*source).FileType
@@ -509,7 +576,7 @@ func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.Docu
 	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan
 	if source != nil {
 		var documentDocumentStrategyPlan document.DocumentStrategyPlan
-		documentDocumentStrategyPlan.PlanId = (*source).ID
+		documentDocumentStrategyPlan.ID = (*source).ID
 		documentDocumentStrategyPlan.PlanVersion = (*source).PlanVersion
 		documentDocumentStrategyPlan.PlanSource = (*source).PlanSource
 		documentDocumentStrategyPlan.PlanSourceName = (*source).PlanSourceName
@@ -639,7 +706,7 @@ func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPl
 	var pDocumentQueryStrategyPlanResp *document.QueryStrategyPlanResp
 	if source != nil {
 		var documentQueryStrategyPlanResp document.QueryStrategyPlanResp
-		documentQueryStrategyPlanResp.DocumentId = (*source).ID
+		documentQueryStrategyPlanResp.ID = (*source).ID
 		documentQueryStrategyPlanResp.DocumentName = (*source).DocumentName
 		documentQueryStrategyPlanResp.ParseStatus = (*source).ParseStatus
 		documentQueryStrategyPlanResp.ParseStatusName = (*source).ParseStatusName
@@ -659,7 +726,7 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 	var pDocumentQueryTaskLogsResp *document.QueryTaskLogsResp
 	if source != nil {
 		var documentQueryTaskLogsResp document.QueryTaskLogsResp
-		documentQueryTaskLogsResp.TaskId = (*source).ID
+		documentQueryTaskLogsResp.ID = (*source).ID
 		documentQueryTaskLogsResp.DocumentId = (*source).DocumentId
 		documentQueryTaskLogsResp.TaskType = (*source).TaskType
 		documentQueryTaskLogsResp.TaskTypeName = (*source).TaskTypeName
@@ -790,7 +857,6 @@ func pEntityDocumentStructureNodeToPModelDocumentStructureNode(source *entity1.D
 	var pModelDocumentStructureNode *model.DocumentStructureNode
 	if source != nil {
 		var modelDocumentStructureNode model.DocumentStructureNode
-		modelDocumentStructureNode.ID = (*source).ID
 		modelDocumentStructureNode.DocumentId = (*source).DocumentId
 		modelDocumentStructureNode.ParseTaskId = (*source).ParseTaskId
 		modelDocumentStructureNode.NodeNo = (*source).NodeNo
