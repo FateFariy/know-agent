@@ -185,6 +185,19 @@ func ToConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationE
 	}
 	return pChatConversationExchangeResp
 }
+func ToConversationResetResp(source *vo.ConversationReset) *chat.ConversationResetResp {
+	var pChatConversationResetResp *chat.ConversationResetResp
+	if source != nil {
+		var chatConversationResetResp chat.ConversationResetResp
+		chatConversationResetResp.ConversationId = (*source).ConversationId
+		chatConversationResetResp.RemovedDialogueCount = (*source).RemovedDialogueCount
+		chatConversationResetResp.RemovedExchangeCount = (*source).RemovedExchangeCount
+		chatConversationResetResp.RemovedCheckpointCount = (*source).RemovedCheckpointCount
+		chatConversationResetResp.Message = (*source).Message
+		pChatConversationResetResp = &chatConversationResetResp
+	}
+	return pChatConversationResetResp
+}
 func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.ConversationSessionResp {
 	var pChatConversationSessionResp *chat.ConversationSessionResp
 	if source != nil {
@@ -213,6 +226,16 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 		pChatConversationSessionResp = &chatConversationSessionResp
 	}
 	return pChatConversationSessionResp
+}
+func ToConversationSessionRespList(source []*vo.ConversationArchiveRecord) []*chat.ConversationSessionResp {
+	var pChatConversationSessionRespList []*chat.ConversationSessionResp
+	if source != nil {
+		pChatConversationSessionRespList = make([]*chat.ConversationSessionResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pChatConversationSessionRespList[i] = ToConversationSessionResp(source[i])
+		}
+	}
+	return pChatConversationSessionRespList
 }
 func ToConversationStageTraceRespList(source []*entity.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp {
 	var pChatConversationTraceStageRespList []*chat.ConversationTraceStageResp
@@ -940,7 +963,6 @@ func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.Know
 	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
 	if source != nil {
 		var modelKnowledgeRouteTrace model.KnowledgeRouteTrace
-		modelKnowledgeRouteTrace.ID = (*source).ID
 		modelKnowledgeRouteTrace.ConversationId = (*source).ConversationId
 		modelKnowledgeRouteTrace.ExchangeId = (*source).ExchangeId
 		modelKnowledgeRouteTrace.Question = (*source).Question

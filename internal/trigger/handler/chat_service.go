@@ -2,11 +2,11 @@ package handler
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChatService 聊天服务实现
@@ -67,12 +67,26 @@ func (c *ChatService) GetExchangeDetail(ctx context.Context, req *chat.Conversat
 
 // ListSessions 获取会话列表
 func (c *ChatService) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
-	return c.l.ListSessions(ctx, req)
+	records, total, err := c.l.ListSessions(ctx, req.PageNo, req.PageSize, vo.ToChatQueryMode(req.ChatMode), vo.ToChatTurnStatus(req.TurnStatus), req.Keyword)
+	if err != nil {
+		return nil, err
+	}
+	return &chat.ConversationSessionListResp{
+		PageNo:     req.PageNo,
+		PageSize:   req.PageSize,
+		TotalPages: (total + int64(req.PageSize) - 1) / int64(req.PageSize),
+		TotalSize:  total,
+		Records:    convert.ToConversationSessionRespList(records),
+	}, err
 }
 
 // ResetConversation 重置会话
 func (c *ChatService) ResetConversation(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationResetResp, error) {
-	return c.l.ResetConversation(ctx, req.ConversationId)
+	reset, err := c.l.ResetConversation(ctx, req.ConversationId)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToConversationResetResp(reset), err
 }
 
 // RebuildSummary 重建会话摘要

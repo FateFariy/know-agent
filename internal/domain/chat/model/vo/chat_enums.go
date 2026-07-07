@@ -51,6 +51,20 @@ func ChatTurnStatusName(code int) string {
 	return ""
 }
 
+func ToChatTurnStatus(name string) ChatTurnStatus {
+	switch name {
+	case "进行中":
+		return ChatTurnStatusRunning
+	case "已完成":
+		return ChatTurnStatusCompleted
+	case "失败":
+		return ChatTurnStatusFailed
+	case "已停止":
+		return ChatTurnStatusStopped
+	}
+	return 0
+}
+
 // ============================================================
 // ConversationTraceStageState 追踪阶段状态
 // ============================================================
