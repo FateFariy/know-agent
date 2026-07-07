@@ -124,8 +124,8 @@ func (p *TextPreProcessLogicImpl) extractStructureNodes(ctx context.Context, doc
 	signalBatch := p.signalExtractor.Transform(ctx, parsedText, opts...)
 
 	// 歧义消解 — 对信号中的候选项做 LLM 二次判定（若配置/实例可用）
-	resolvedSignals, _ := p.ambiguityResolver.Transform(ctx, documentTitle, signalBatch.ContextLines, signalBatch.Signals, opts...)
-	if resolvedSignals == nil {
+	resolvedSignals, err := p.ambiguityResolver.Transform(ctx, documentTitle, signalBatch.ContextLines, signalBatch.Signals, opts...)
+	if err != nil {
 		resolvedSignals = signalBatch.Signals
 	}
 

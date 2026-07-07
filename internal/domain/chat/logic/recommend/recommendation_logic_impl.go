@@ -2,7 +2,6 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
@@ -99,15 +99,19 @@ func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, q
 	}
 
 	// 解析JSON数组
-	rawList := r.extractJsonArray(content)
+	var result []string
+	if err = utils.Unmarshal(content, &result); err != nil {
+		Warnf("解析推荐问题失败: content=%s, err=%v", content, err)
+		return nil, err
+	}
 
 	// 去重并限制数量
-	rawList = stream.FromSlice(rawList).
+	result = stream.FromSlice(result).
 		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).
 		Map(func(item string) string { return strutil.Trim(item) }).
 		Distinct().Limit(maxRecommendations).ToSlice()
 
-	return rawList, nil
+	return result, nil
 }
 
 // buildRecentContext 构建最近对话上下文
@@ -132,22 +136,6 @@ func (r *RecommendationLogicImpl) buildRecentContext(recentExchanges []*entity.C
 	}
 
 	return strutil.Trim(sb.String())
-}
-
-// extractJsonArray 从内容中提取JSON数组
-func (r *RecommendationLogicImpl) extractJsonArray(content string) []string {
-	start := strings.Index(content, "[")
-	end := strings.LastIndex(content, "]")
-	if start < 0 || end <= start {
-		return nil
-	}
-
-	var result []string
-	if err := json.Unmarshal([]byte(content[start:end+1]), &result); err != nil {
-		Warnf("解析推荐问题失败: content=%s, err=%v", content, err)
-	}
-
-	return result
 }
 
 func Warnf(format string, v ...any) {

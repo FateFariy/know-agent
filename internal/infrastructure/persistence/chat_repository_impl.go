@@ -109,6 +109,21 @@ func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversati
 	return exchanges, nil
 }
 
+// SelectExchangeById 根据ID查询对话记录
+func (r *ChatRepositoryImpl) SelectExchangeById(ctx context.Context, exchangeId int64) (*entity.ChatExchange, error) {
+	var exchange *entity.ChatExchange
+	err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
+		Where("id = ?", exchangeId).
+		First(exchange).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorx.ErrExchangeNotFound.Format(exchangeId)
+		}
+		return nil, err
+	}
+	return exchange, nil
+}
+
 // ========== 会话（Dialogue）相关 ==========
 
 // UpdateDialogueByConversationId 根据对话ID更新对话记录
@@ -177,18 +192,16 @@ func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversati
 		return nil, err
 	}
 
-	var chatExchanges []*entity.ChatExchange
-	if err = r.dbWithContext(ctx).Model(&model.ChatExchange{}).
-		Where("conversation_id = ?", conversationId).
-		Order("create_time ASC, id ASC").Find(&chatExchanges).Error; err != nil {
+	exchanges, err := r.ListExchanges(ctx, conversationId)
+	if err != nil {
 		return nil, err
 	}
 
-	return r.toChatArchiveRecord(dialogue, chatExchanges), nil
+	return r.toChatArchiveRecord(dialogue, exchanges), nil
 }
 
 // ListSessionRecordPage 列出会话记录分页
-func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, keyword string, pageNo, pageSize, chatMode, latestTurnStatus int) ([]*vo.ConversationArchiveRecord, int64, error) {
+func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
 	query := r.buildListDialoguePageQuery(ctx, keyword, chatMode, latestTurnStatus)
 
 	var total int64

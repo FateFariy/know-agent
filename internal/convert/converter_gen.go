@@ -163,6 +163,28 @@ func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.C
 	}
 	return pModelChatRetrievalResultList
 }
+func ToConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationExchangeResp {
+	var pChatConversationExchangeResp *chat.ConversationExchangeResp
+	if source != nil {
+		var chatConversationExchangeResp chat.ConversationExchangeResp
+		chatConversationExchangeResp.ID = (*source).ID
+		chatConversationExchangeResp.Question = (*source).Question
+		chatConversationExchangeResp.Answer = (*source).Answer
+		chatConversationExchangeResp.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
+		chatConversationExchangeResp.References = JsonArrayToSearchReferences((*source).References)
+		chatConversationExchangeResp.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
+		chatConversationExchangeResp.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
+		chatConversationExchangeResp.DebugTraceJson = (*source).DebugTraceJson
+		chatConversationExchangeResp.TurnStatus = (*source).TurnStatus
+		chatConversationExchangeResp.ErrorMessage = (*source).ErrorMessage
+		chatConversationExchangeResp.FirstResponseTimeMs = (*source).FirstResponseTimeMs
+		chatConversationExchangeResp.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		chatConversationExchangeResp.CreateTime = TimeToString((*source).CreateTime)
+		chatConversationExchangeResp.UpdateTime = TimeToString((*source).UpdateTime)
+		pChatConversationExchangeResp = &chatConversationExchangeResp
+	}
+	return pChatConversationExchangeResp
+}
 func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.ConversationSessionResp {
 	var pChatConversationSessionResp *chat.ConversationSessionResp
 	if source != nil {
@@ -184,13 +206,23 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 		if (*source).Exchanges != nil {
 			chatConversationSessionResp.Exchanges = make([]*chat.ConversationExchangeResp, len((*source).Exchanges))
 			for i := 0; i < len((*source).Exchanges); i++ {
-				chatConversationSessionResp.Exchanges[i] = pEntityChatExchangeToPChatConversationExchangeResp((*source).Exchanges[i])
+				chatConversationSessionResp.Exchanges[i] = ToConversationExchangeResp((*source).Exchanges[i])
 			}
 		}
 		chatConversationSessionResp.MemorySummary = pEntityChatMemorySummaryToPChatConversationMemorySummaryResp((*source).MemorySummary)
 		pChatConversationSessionResp = &chatConversationSessionResp
 	}
 	return pChatConversationSessionResp
+}
+func ToConversationStageTraceRespList(source []*entity.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp {
+	var pChatConversationTraceStageRespList []*chat.ConversationTraceStageResp
+	if source != nil {
+		pChatConversationTraceStageRespList = make([]*chat.ConversationTraceStageResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pChatConversationTraceStageRespList[i] = pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source[i])
+		}
+	}
+	return pChatConversationTraceStageRespList
 }
 func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.RetrievalResultResp {
 	var pChatRetrievalResultRespList []*chat.RetrievalResultResp
@@ -205,27 +237,34 @@ func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.Retriev
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
 }
-func pEntityChatExchangeToPChatConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationExchangeResp {
-	var pChatConversationExchangeResp *chat.ConversationExchangeResp
+func pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source *entity.ChatExchangeTraceStage) *chat.ConversationTraceStageResp {
+	var pChatConversationTraceStageResp *chat.ConversationTraceStageResp
 	if source != nil {
-		var chatConversationExchangeResp chat.ConversationExchangeResp
-		chatConversationExchangeResp.ID = (*source).ID
-		chatConversationExchangeResp.Question = (*source).Question
-		chatConversationExchangeResp.Answer = (*source).Answer
-		chatConversationExchangeResp.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
-		chatConversationExchangeResp.References = JsonArrayToSearchReferences((*source).References)
-		chatConversationExchangeResp.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
-		chatConversationExchangeResp.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
-		chatConversationExchangeResp.DebugTraceJson = (*source).DebugTraceJson
-		chatConversationExchangeResp.TurnStatus = (*source).TurnStatus
-		chatConversationExchangeResp.ErrorMessage = (*source).ErrorMessage
-		chatConversationExchangeResp.FirstResponseTimeMs = (*source).FirstResponseTimeMs
-		chatConversationExchangeResp.TotalResponseTimeMs = (*source).TotalResponseTimeMs
-		chatConversationExchangeResp.CreateTime = TimeToString((*source).CreateTime)
-		chatConversationExchangeResp.UpdateTime = TimeToString((*source).UpdateTime)
-		pChatConversationExchangeResp = &chatConversationExchangeResp
+		var chatConversationTraceStageResp chat.ConversationTraceStageResp
+		chatConversationTraceStageResp.ID = (*source).ID
+		chatConversationTraceStageResp.TraceId = (*source).TraceId
+		chatConversationTraceStageResp.StageCode = (*source).StageCode
+		chatConversationTraceStageResp.StageName = (*source).StageName
+		chatConversationTraceStageResp.StageOrder = (*source).StageOrder
+		chatConversationTraceStageResp.StageLevel = (*source).StageLevel
+		chatConversationTraceStageResp.ParentStageId = (*source).ParentStageId
+		chatConversationTraceStageResp.ExecutionMode = (*source).ExecutionMode
+		chatConversationTraceStageResp.StageState = ToChatQueryModeName((*source).StageState)
+		chatConversationTraceStageResp.StartTime = TimeToString((*source).StartTime)
+		chatConversationTraceStageResp.EndTime = TimeToString((*source).EndTime)
+		chatConversationTraceStageResp.DurationMs = (*source).DurationMs
+		if (*source).SummaryText != nil {
+			chatConversationTraceStageResp.SummaryText = *(*source).SummaryText
+		}
+		if (*source).ErrorMessage != nil {
+			chatConversationTraceStageResp.ErrorMessage = *(*source).ErrorMessage
+		}
+		if (*source).SnapshotJson != nil {
+			chatConversationTraceStageResp.SnapshotJson = *(*source).SnapshotJson
+		}
+		pChatConversationTraceStageResp = &chatConversationTraceStageResp
 	}
-	return pChatConversationExchangeResp
+	return pChatConversationTraceStageResp
 }
 func pEntityChatMemorySummaryToPChatConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.ConversationMemorySummaryResp {
 	var pChatConversationMemorySummaryResp *chat.ConversationMemorySummaryResp

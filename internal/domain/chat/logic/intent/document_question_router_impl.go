@@ -2,7 +2,6 @@ package intent
 
 import (
 	"context"
-	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -112,7 +110,7 @@ type questionIntentDecision struct {
 // DocumentQuestionRouter 在某个文档内部进行意图判断与章节定位，最终输出导航决策
 type DocumentQuestionRouter struct {
 	chatModel             *logic.ChatModelImpl[*schema.AgenticMessage] // 可选：兜底意图分类用的对话模型
-	structureGraphQuerier graph.StructureGraphQuerier                  // 结构图谱查询能力
+	structureGraphQuerier logic.StructureGraphQuerier                  // 结构图谱查询能力
 	navigationIndexSvc    NavigationIndexService                       // 可选：章节索引服务；非 nil 时用于章节定位
 	promptTemplateLogic   logic.PromptTemplateLogic                    // 可选：LLM 用的 Prompt 模板渲染
 }
@@ -132,7 +130,7 @@ type NavigationSectionHit struct {
 // NewDocumentQuestionRouter 构造文档问题路由器
 func NewDocumentQuestionRouter(
 	chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
-	structureGraphQuerier graph.StructureGraphQuerier,
+	structureGraphQuerier logic.StructureGraphQuerier,
 	navigationIndexSvc NavigationIndexService,
 	promptTemplateLogic logic.PromptTemplateLogic,
 ) *DocumentQuestionRouter {
@@ -508,9 +506,8 @@ func parseQuestionIntentResult(raw string, localDecision *questionIntentDecision
 	if strutil.IsBlank(raw) {
 		return localDecision
 	}
-	jsonStr := extractJsonObject(raw)
 	var payload llmQuestionIntentPayload
-	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
+	if err := utils.Unmarshal(raw, &payload); err != nil {
 		logx.Errorf("解析文档路由 LLM 输出失败: raw=%q, err=%v", raw, err)
 		return localDecision
 	}
@@ -563,15 +560,6 @@ func resolveModelGraphOnlyAction(rawAction, intentType string) string {
 		return vo.DocumentNavigationActionChildSectionDescend
 	}
 	return ""
-}
-
-// extractJsonObject 从字符串中抽取大括号包裹的 JSON 对象；找不到时回退原文
-func extractJsonObject(raw string) string {
-	trimmed := strutil.Trim(raw)
-	if matched := jsonObjectPattern.FindString(trimmed); matched != "" {
-		return matched
-	}
-	return trimmed
 }
 
 // normalizeConfidence 将模型返回的可能超出 0-1 的置信度规范化到 [0, 1)，再由调用方与阈值比较

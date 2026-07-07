@@ -2,13 +2,11 @@ package transform
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/stream"
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
@@ -88,7 +86,7 @@ func NewAmbiguityResolver(svcCtx *svc.ServiceContext, chatModel chatlogic.ChatMo
 func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string, allLines []string,
 	sourceSignals []*vo.DocumentStructureSignal, opts ...TransformerOption) ([]*vo.DocumentStructureSignal, error) {
 	if len(sourceSignals) == 0 {
-		return nil, nil
+		return sourceSignals, nil
 	}
 
 	// 聚合可选参数（允许调用方覆盖默认值）
@@ -112,7 +110,7 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 	// 构建候选块文本（含行号标记 >> ），用于提示语输入
 	candidateBlocks, err := r.buildCandidateBlocks(ambiguousSignals, allLines)
 	if err != nil {
-		return sourceSignals, err
+		return nil, err
 	}
 
 	// 渲染用户提示：注入文档标题与候选块
@@ -121,17 +119,20 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 		"candidateBlocks": candidateBlocks,
 	})
 	if err != nil {
-		return sourceSignals, err
+		return nil, err
 	}
 
 	// 调用 LLM 获取结构化判定结果
 	content, err := r.chatModel.Generate(ctx, "", userPrompt)
 	if err != nil {
-		return sourceSignals, err
+		return nil, err
 	}
 
-	// 解析 JSON：无有效结果时原路返回
-	results := r.parse(content)
+	// 从 LLM 原始输出中解析结果
+	var results []*vo.DisambiguationResult
+	if err = utils.Unmarshal(content, &results); err != nil {
+		return nil, err
+	}
 	if len(results) == 0 {
 		return sourceSignals, nil
 	}
@@ -202,28 +203,6 @@ func (r *AmbiguityResolver) buildCandidateBlocks(ambiguousSignals []*vo.Document
 	}
 
 	return strings.TrimSpace(sb.String()), nil
-}
-
-// parse 从 LLM 原始输出中解析出 DisambiguationResult 数组
-func (r *AmbiguityResolver) parse(raw string) []*vo.DisambiguationResult {
-	if raw == "" {
-		return nil
-	}
-
-	normalized := strutil.Trim(raw)
-	start := strings.Index(normalized, "[")
-	end := strings.LastIndex(normalized, "]")
-
-	if start < 0 || end <= start {
-		return nil
-	}
-
-	var results []*vo.DisambiguationResult
-	if err := json.Unmarshal([]byte(normalized[start:end+1]), &results); err != nil {
-		return nil
-	}
-
-	return results
 }
 
 // applyResult 将 LLM 消解结果应用到源信号

@@ -23,6 +23,9 @@ type ChatRepository interface {
 	// ListExchanges 列出对话的所有记录
 	ListExchanges(ctx context.Context, conversationId string) ([]*entity.ChatExchange, error)
 
+	// SelectExchangeById 根据ID查询对话记录
+	SelectExchangeById(ctx context.Context, exchangeId int64) (*entity.ChatExchange, error)
+
 	// ListExchangesAfter 列出某个记录之后的记录
 	ListExchangesAfter(ctx context.Context, conversationId string, afterExchangeId int64) ([]*entity.ChatExchange, error)
 
@@ -46,7 +49,7 @@ type ChatRepository interface {
 	SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)
 
 	// ListSessionRecordPage 列出会话记录分页
-	ListSessionRecordPage(ctx context.Context, keyword string, pageNo, pageSize, chatMode, latestTurnStatus int) ([]*vo.ConversationArchiveRecord, int64, error)
+	ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error)
 
 	// DeleteSession 删除会话及所有记录
 	DeleteSession(ctx context.Context, conversationId string) (int64, int64, error)

@@ -26,7 +26,7 @@ type ChatLogic interface {
 	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error)
 
 	// ListSessions 获取会话列表
-	ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error)
+	ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error)
 
 	// ResetConversation 重置会话
 	ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error)

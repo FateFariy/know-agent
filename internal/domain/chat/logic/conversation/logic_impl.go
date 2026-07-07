@@ -156,122 +156,37 @@ func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string)
 	if err != nil {
 		return nil, err
 	}
-	record.MemorySummary, err = c.repo.SelectMemorySummary(ctx, conversationId)
+	record.MemorySummary, err = c.memoryLogic.GetConversationSummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
 	record.FillSummaryFields()
+
 	return record, nil
 }
 
 // GetExchangeDetail 获取对话详情（含阶段追踪）
 func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error) {
-	exchanges, err := c.repo.ListExchanges(ctx, conversationId)
+	exchange, err := c.repo.SelectExchangeById(ctx, exchangeId)
 	if err != nil {
 		return nil, nil, err
-	}
-	var matched *entity.ChatExchange
-	for _, ex := range exchanges {
-		if ex != nil && ex.ID == exchangeId {
-			matched = ex
-			break
-		}
-	}
-	if matched == nil {
-		return nil, nil, fmt.Errorf("轮次不存在: %d", exchangeId)
 	}
 
 	stages, err := c.repo.SelectStages(ctx, conversationId, exchangeId)
 	if err != nil {
-		Warnf("获取阶段追踪失败, conversationId=%s, exchangeId=%d, err=%v", conversationId, exchangeId, err)
-		stages = nil
+		return nil, nil, err
 	}
-	stageResps := make([]*chat.ConversationTraceStageResp, 0, len(stages))
-	for _, s := range stages {
-		if s == nil {
-			continue
-		}
-		stageResps = append(stageResps, &chat.ConversationTraceStageResp{
-			ID:            s.ID,
-			StageCode:     s.StageCode,
-			StageName:     s.StageName,
-			ExecutionMode: s.ExecutionMode,
-			ErrorMessage:  utils.PointerOrDefault(s.ErrorMessage, ""),
-		})
-	}
-
-	thinking := jsonStrings(matched.ThinkingSteps)
-	var refs []*chat.SearchReferenceResp
-	if len(matched.ReferenceList) > 0 {
-	}
-	recommendations := jsonStrings(matched.RecommendationList)
-	usedTools := jsonStrings(matched.UsedToolList)
-
-	return &chat.ConversationExchangeDetailResp{
-		ConversationId: conversationId,
-		Exchange: &chat.ConversationExchangeResp{
-			ExchangeId:          matched.ID,
-			Question:            matched.Question,
-			Answer:              matched.Answer,
-			ThinkingSteps:       thinking,
-			References:          refs,
-			Recommendations:     recommendations,
-			UsedTools:           usedTools,
-			Status:              matched.TurnStatus,
-			ErrorMessage:        matched.ErrorMessage,
-			FirstResponseTimeMs: matched.FirstResponseTimeMs,
-			TotalResponseTimeMs: matched.TotalResponseTimeMs,
-			CreateTime:          matched.CreateTime.Format(time.DateTime),
-			UpdateTime:          matched.UpdateTime.Format(time.DateTime),
-		},
-		StageTraces: stageResps,
-	}, nil
+	return exchange, stages, nil
 }
 
 // ListSessions 获取会话列表（分页）
-func (c *LogicImpl) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
-	pageNo := req.PageNo
-	if pageNo <= 0 {
-		pageNo = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-
-	records, total, err := c.repo.ListSessionRecordPage(ctx, "", pageNo, pageSize, 0, 0)
+func (c *LogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
+	records, total, err := c.repo.ListSessionRecordPage(ctx, pageNo, pageSize, chatMode, latestTurnStatus, keyword)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	result := make([]*chat.ConversationSessionResp, 0, len(records))
-	for _, r := range records {
-		if r == nil {
-			continue
-		}
-		latestMessage := ""
-		if len(r.Exchanges) > 0 {
-			last := r.Exchanges[len(r.Exchanges)-1]
-			if strutil.IsNotBlank(last.Answer) {
-				latestMessage = last.Answer
-			} else {
-				latestMessage = last.Question
-			}
-		}
-		result = append(result, &chat.ConversationSessionResp{
-			ConversationId: r.ConversationId,
-			Title:          buildSessionTitle(r, latestMessage),
-			LatestMessage:  latestMessage,
-			CreateTime:     r.CreatedTime.Format(time.DateTime),
-			UpdateTime:     r.UpdatedTime.Format(time.DateTime),
-		})
-	}
-	return &chat.ConversationSessionListResp{
-		PageNo:   pageNo,
-		PageSize: pageSize,
-		Total:    total,
-		Records:  result,
-	}, nil
+	return records, total, nil
 }
 
 // ResetConversation 重置会话：停止并清除所有相关落库数据
@@ -738,7 +653,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 
 	// 组装成功态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记 finalize 追踪阶段
 	successExchange := c.buildCurrentChatExchange(convCtx, vo.ChatTurnStatusCompleted, "")
-	successExchange.RecommendationList = common.ToJSONArray(recommendations)
+	successExchange.Recommendations = common.ToJSONArray(recommendations)
 	if err := c.completeExchange(ctx, successExchange); err == nil {
 		// 落库成功：完成 finalize 追踪阶段，写入完成快照（含推荐、引用、答案长度）
 		snapshot = map[string]any{
@@ -940,8 +855,8 @@ func (c *LogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, tu
 		Question:            convCtx.Question,
 		Answer:              convCtx.Answer(),
 		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
-		ReferenceList:       common.ToJSONArray(convCtx.UniqueReferences()),
-		UsedToolList:        common.ToJSONArray(convCtx.SnapshotUsedTools()),
+		References:          common.ToJSONArray(convCtx.UniqueReferences()),
+		UsedTools:           common.ToJSONArray(convCtx.SnapshotUsedTools()),
 		DebugTraceJson:      convCtx.DebugTraceJSON(),
 		TurnStatus:          turnStatus,
 		ErrorMessage:        errorMsg,
@@ -973,35 +888,6 @@ func buildSessionTitle(record *vo.ConversationArchiveRecord, defaultText string)
 		return defaultText[:30]
 	}
 	return defaultText
-}
-
-// jsonStrings 把 common.JSONArray 解析为字符串切片；若失败返回空切片
-func jsonStrings(raw any) []string {
-	if raw == nil {
-		return []string{}
-	}
-	switch v := raw.(type) {
-	case []byte:
-		if len(v) == 0 {
-			return []string{}
-		}
-		var out []string
-		if err := json.Unmarshal(v, &out); err == nil {
-			return out
-		}
-		return []string{}
-	case string:
-		if v == "" {
-			return []string{}
-		}
-		var out []string
-		if err := json.Unmarshal([]byte(v), &out); err == nil {
-			return out
-		}
-		return []string{}
-	default:
-		return []string{}
-	}
 }
 
 func Warnf(format string, args ...any) {

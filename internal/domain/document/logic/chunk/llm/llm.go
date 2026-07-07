@@ -2,12 +2,11 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
-	"strings"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
 )
 
@@ -105,14 +104,8 @@ func (s *Strategy) split(ctx context.Context, promptTempName, sourceText string)
 		return nil, err
 	}
 
-	// 从文本中抽取 JSON 数组，并解析其字符串元素
-	startIdx := strings.Index(content, "[")
-	endIdx := strings.LastIndex(content, "]")
-	if startIdx < 0 || endIdx <= startIdx {
-		return nil, nil
-	}
 	result := make([]string, 0)
-	if err = json.Unmarshal([]byte(content[startIdx:endIdx+1]), &result); err != nil {
+	if err = utils.Unmarshal(content, &result); err != nil {
 		return nil, err
 	}
 

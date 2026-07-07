@@ -64,6 +64,10 @@ type ChatConverter interface {
 
 	ToRetrievalResultRespList(src []*cvo.ChatRetrievalResult) []*chat.RetrievalResultResp
 	ToConversationSessionResp(src *cvo.ConversationArchiveRecord) *chat.ConversationSessionResp
+	ToConversationSessionRespList(src []*cvo.ConversationArchiveRecord) []*chat.ConversationSessionResp
+	ToConversationResetResp(src *cvo.ConversationReset) *chat.ConversationResetResp
+	ToConversationExchangeResp(src *cen.ChatExchange) *chat.ConversationExchangeResp
+	ToConversationStageTraceRespList(src []*cen.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp
 	// goverter:map StartTime | TimeToStringMs
 	// goverter:map EndTime | TimeToStringMs
 	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp

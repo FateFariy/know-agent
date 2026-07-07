@@ -44,7 +44,6 @@ func (c *ConversationArchiveRecord) FillSummaryFields() {
 		}
 	}
 
-	// 步骤 2：取最后一条 exchange 作为最新轮次，填充其 ID、状态与错误信息
 	lastExchange := c.Exchanges[len(c.Exchanges)-1]
 	c.LatestExchangeId = lastExchange.ID
 	c.LatestTurnStatus = ChatTurnStatusName(lastExchange.TurnStatus)

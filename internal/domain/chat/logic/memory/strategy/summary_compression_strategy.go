@@ -512,9 +512,8 @@ func (s *SummaryCompressionStrategy) appendBulletSection(builder *strings.Builde
 
 // deserializeSummary 反序列化摘要
 func (s *SummaryCompressionStrategy) deserializeSummary(raw string) *entity.ConversationSummary {
-	raw = extractJsonObject(raw)
 	summary := &entity.ConversationSummary{}
-	if err := json.Unmarshal([]byte(raw), summary); err != nil {
+	if err := utils.Unmarshal(raw, summary); err != nil {
 		logx.Debugf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
 		return nil
 	}
@@ -567,21 +566,6 @@ func isNoiseHint(value string) bool {
 		"什么": true, "哪个": true, "这个": true, "那个": true, "可以": true, "需要": true,
 	}
 	return noiseHints[value]
-}
-
-// extractJsonObject 提取JSON对象
-func extractJsonObject(raw string) string {
-	trimmed := strutil.Trim(raw)
-	if strutil.IsBlank(trimmed) {
-		return trimmed
-	}
-
-	start := strings.Index(trimmed, "{")
-	end := strings.LastIndex(trimmed, "}")
-	if start == -1 || end == -1 || end < start {
-		return trimmed
-	}
-	return trimmed[start : end+1]
 }
 
 // copySummary 复制摘要

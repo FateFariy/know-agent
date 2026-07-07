@@ -45,12 +45,24 @@ func (c *ChatService) StopConversation(ctx context.Context, req *chat.Conversati
 
 // GetSessionDetail 获取会话详情
 func (c *ChatService) GetSessionDetail(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationSessionResp, error) {
-	return c.l.GetSessionDetail(ctx, req.ConversationId)
+	detail, err := c.l.GetSessionDetail(ctx, req.ConversationId)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToConversationSessionResp(detail), err
 }
 
 // GetExchangeDetail 获取对话详情
 func (c *ChatService) GetExchangeDetail(ctx context.Context, req *chat.ConversationExchangeDetailQueryReq) (*chat.ConversationExchangeDetailResp, error) {
-	return c.l.GetExchangeDetail(ctx, req.ConversationId, req.ExchangeId)
+	detail, stages, err := c.l.GetExchangeDetail(ctx, req.ConversationId, req.ExchangeId)
+	if err != nil {
+		return nil, err
+	}
+	return &chat.ConversationExchangeDetailResp{
+		ConversationId: req.ConversationId,
+		Exchange:       convert.ToConversationExchangeResp(detail),
+		StageTraces:    convert.ToConversationStageTraceRespList(stages),
+	}, nil
 }
 
 // ListSessions 获取会话列表
@@ -79,10 +91,15 @@ func (c *ChatService) GetRetrievalResults(ctx context.Context, req *chat.Retriev
 
 // GetChannelExecutions 获取渠道执行结果
 func (c *ChatService) GetChannelExecutions(ctx context.Context, req *chat.RetrievalObserveReq) ([]*chat.ChannelExecutionResp, error) {
-	return c.l.GetChannelExecutions(ctx, req.ConversationId, req.ExchangeId)
+	executions, err := c.l.GetChannelExecutions(ctx, req.ConversationId, req.ExchangeId)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToChannelExecutionRespList(executions), err
 }
 
 // GetStageBenchmarks 获取阶段基准
 func (c *ChatService) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error) {
-	return c.l.GetStageBenchmarks(ctx)
+	// todo 待实现
+	panic("implemented")
 }

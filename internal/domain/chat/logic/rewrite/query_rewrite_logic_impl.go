@@ -2,7 +2,6 @@ package rewrite
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -89,10 +88,15 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	}
 
 	// 解析LLM输出
-	parsed := q.parse(raw)
+	payload := &parsedRewritePayload{}
+	if err = utils.Unmarshal(raw, payload); err != nil {
+		// LLM结果无效，回退到规则改写
+		logx.Errorf("RAG 改写结果不可用，回退到规则改写: question='%s', raw='%s'", question, strutil.Trim(raw))
+		return fallback, nil
+	}
 
 	// 规范化改写结果
-	result := q.normalizeRewriteResult(question, parsed)
+	result := q.normalizeRewriteResult(question, payload)
 	if result != nil && strutil.IsNotBlank(result.RewrittenQuestion) {
 		result.RawModelOutput = raw
 		logx.Infof("RAG 改写完成: question='%s', rewritten='%s', subQuestions=%v",
@@ -199,29 +203,6 @@ func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, 
 	}
 
 	return vo.NewQuestionRewriteResult(rewrite, subQuestions)
-}
-
-// parse 解析改写结果
-func (q *QueryRewriteLogicImpl) parse(raw string) *parsedRewritePayload {
-	if strutil.IsBlank(raw) {
-		return nil
-	}
-	start := strings.Index(raw, "{")
-	end := strings.LastIndex(raw, "}")
-	if start != -1 && end != -1 && end > start {
-		raw = raw[start : end+1]
-	}
-	var payload parsedRewritePayload
-	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-		Warnf("解析问题改写结果失败: raw=%s, err=%v", raw, err)
-		return nil
-	}
-
-	if strutil.IsBlank(payload.Rewrite) {
-		return nil
-	}
-
-	return &payload
 }
 
 // ruleBasedSplit 基于规则(?？；;\n)进行拆分

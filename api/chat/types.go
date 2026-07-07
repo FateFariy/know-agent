@@ -152,7 +152,7 @@ type ConversationTraceStageResp struct {
 	DurationMs    int64  `json:"durationMs"`    // 持续时间毫秒
 	SummaryText   string `json:"summaryText"`   // 摘要文本
 	ErrorMessage  string `json:"errorMessage"`  // 错误信息
-	Snapshot      string `json:"snapshot"`      // 快照数据
+	SnapshotJson  string `json:"snapshot"`      // 快照数据
 }
 
 type KnowledgeDocumentOptionResp struct {
