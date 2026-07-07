@@ -29,3 +29,40 @@ type KeywordDB interface {
 	// SearchByKeyword 基于关键词索引进行检索
 	SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
+
+type RerankOption struct {
+	Model string // 重排序模型
+	TopN  int    // 重排序TopN
+}
+
+type Option func(opt *RerankOption)
+
+func WithModel(model string) Option {
+	return func(opt *RerankOption) {
+		opt.Model = model
+	}
+}
+
+func WithTopN(topN int) Option {
+	return func(opt *RerankOption) {
+		opt.TopN = max(1, topN)
+	}
+}
+
+func GetCommonOptions(base *RerankOption, opts ...Option) *RerankOption {
+	if base == nil {
+		base = &RerankOption{}
+	}
+
+	for _, opt := range opts {
+		opt(base)
+	}
+
+	return base
+}
+
+// Reranker 重排序器
+type Reranker interface {
+	// Process 重排序
+	Process(ctx context.Context, question string, chunks []*vo.DocumentChunk, opts ...Option) ([]*vo.DocumentChunk, error)
+}

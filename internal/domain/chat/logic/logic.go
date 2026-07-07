@@ -39,9 +39,6 @@ type ChatLogic interface {
 
 	// GetChannelExecutions 获取渠道执行结果
 	GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
-
-	// GetStageBenchmarks 获取阶段基准
-	// GetStageBenchmarks(ctx context.Context) ([]*vo.ChatStageBenchmark, error)
 }
 
 // SessionMemoryLogic 会话记忆逻辑接口

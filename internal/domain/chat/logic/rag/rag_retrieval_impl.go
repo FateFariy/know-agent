@@ -30,6 +30,7 @@ const rrfK = 60
 
 type RetrievalImpl struct {
 	repo                      adapter.ChatRepository
+	reranker                  adapter.Reranker
 	channels                  []channel.RetrievalChannel
 	documentLogic             doclog.LifecycleLogic
 	channelTimeout            time.Duration
@@ -44,10 +45,12 @@ type RetrievalImpl struct {
 	keywordTopK               int
 }
 
-func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
+func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker adapter.Reranker,
+	channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
 	return &RetrievalImpl{
 		repo:                      repo,
 		channels:                  channels,
+		reranker:                  reranker,
 		documentLogic:             documentLogic,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
 		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
@@ -131,7 +134,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 				return
 			}
 
-			rerankedCandidates := e.applyRerank(ragCtx, parentSearchDocs, subQuestion)
+			rerankedCandidates := e.applyRerank(ctx, ragCtx, parentSearchDocs, subQuestion)
 
 			finalTopK := min(e.finalTopK, len(rerankedCandidates))
 			finalDocuments := rerankedCandidates[:finalTopK]
@@ -448,13 +451,14 @@ func (e *RetrievalImpl) accumulateRRF(channelResult *vo.RetrievalChannelResult) 
 	return maputil.Values(holders)
 }
 
-func (e *RetrievalImpl) applyRerank(ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
-	if !e.rerankEnabled || len(candidates) == 0 || e.rerankPostProcessor == nil {
+// applyRerank 应用重排序
+func (e *RetrievalImpl) applyRerank(ctx context.Context, ragCtx *vo.RagRetrievalContext, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
+	if !e.rerankEnabled || len(candidates) == 0 || e.reranker == nil {
 		return candidates
 	}
 
 	ragCtx.AddUsedChannel(vo.RetrievalChannelRerank)
-	result, err := e.rerankPostProcessor.Process(subQuestion, candidates)
+	result, err := e.reranker.Process(ctx, subQuestion, candidates)
 	if err != nil {
 		Warnf("重排序处理失败: subQuestion='%s', error=%v", subQuestion, err)
 		return candidates

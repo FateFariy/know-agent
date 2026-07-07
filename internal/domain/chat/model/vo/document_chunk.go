@@ -62,16 +62,17 @@ type DocumentChunk struct {
 	DocumentTags       string `json:"documentTags"`       // 文档标签
 
 	// ========== 其他来源（RRF/重排/外部工具等） ==========
-	IsElevated       int     `json:"isElevated"`       // 是否提升
-	RRFScore         float64 `json:"rrfScore"`         // RRF分数
-	RerankScore      float64 `json:"rerankScore"`      // 重排分数
-	ParentBlockNo    int     `json:"parentBlockNo"`    // 父块序号
-	Title            string  `json:"title"`            // 文档标题
-	Url              string  `json:"url"`              // URL地址
-	ToolName         string  `json:"toolName"`         // 文档工具名称
-	RerankModel      string  `json:"rerankModel"`      // 重排模型
-	RerankQuery      string  `json:"rerankQuery"`      // 重排查询
-	RerankDurationMs string  `json:"rerankDurationMs"` // 重排耗时（毫秒）
+	IsElevated          int     `json:"isElevated"`          // 是否提升
+	RRFScore            float64 `json:"rrfScore"`            // RRF分数
+	RerankScore         float64 `json:"rerankScore"`         // 重排分数
+	ParentBlockNo       int     `json:"parentBlockNo"`       // 父块序号
+	Title               string  `json:"title"`               // 文档标题
+	Url                 string  `json:"url"`                 // URL地址
+	ToolName            string  `json:"toolName"`            // 文档工具名称
+	RerankModel         string  `json:"rerankModel"`         // 重排模型
+	RerankQuery         string  `json:"rerankQuery"`         // 重排查询
+	RerankDurationMs    int64   `json:"rerankDurationMs"`    // 重排耗时（毫秒）
+	RerankOriginalIndex int     `json:"rerankOriginalIndex"` // 重排原始索引
 }
 
 func (d *DocumentChunk) FillKnowledge(knowledge *vo2.KnowledgeDocument) {

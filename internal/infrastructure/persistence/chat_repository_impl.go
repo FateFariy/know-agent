@@ -378,6 +378,18 @@ func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, convers
 	return results, nil
 }
 
+// SelectChannelExecutions 查询渠道执行记录
+func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
+	var executions []*vo.ChatChannelExecution
+	if err := r.dbWithContext(ctx).
+		Model(&model.ChatChannelExecution{}).
+		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
+		Find(&executions).Error; err != nil {
+		return nil, err
+	}
+	return executions, nil
+}
+
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
 	return &vo.ConversationArchiveRecord{

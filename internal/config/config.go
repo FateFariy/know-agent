@@ -156,6 +156,7 @@ type RagConf struct {
 	QuestionHistoryMaxChars        int           `json:",optional,default=1000"` // 问题历史最大字符数
 	TotalEvidenceMaxChars          int           `json:",optional,default=5200"` // 总证据最大字符数
 	PerSubQuestionEvidenceMaxChars int           `json:",optional,default=2200"` // 每个子问题最大字符数
+	Rerank                         RerankConf
 }
 
 // AgentConf Agent配置
@@ -169,6 +170,16 @@ type AgentConf struct {
 	RecommendationTimeout  time.Duration `json:",optional,default=5s"`   // 推荐生成超时时间
 	SystemPrompt           string        `json:",optional"`              // 系统提示
 	RecommendationPrompt   string        `json:",optional"`              // 推荐追问提示
+}
+
+type RerankConf struct {
+	Enabled        bool          `json:",optional,default=true"` // 是否启用重排序
+	URL            string        `json:",optional"`              // 重排序API地址
+	ApiKey         string        `json:",optional"`              // 重排序API密钥
+	Model          string        `json:",optional"`              // 重排序模型
+	TopN           int           `json:",optional,default=5"`    // 重排序TopN
+	ConnectTimeout time.Duration `json:",optional,default=3s"`   // 连接超时时间
+	ReadTimeout    time.Duration `json:",optional,default=6s"`   // 读取超时时间
 }
 
 func (c Config) GetBaseConfig() *common.BaseConfig {
