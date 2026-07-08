@@ -96,43 +96,26 @@ func (k *KnowledgeService) BatchRegenerateDocumentProfile(ctx context.Context, r
 
 // ==================== 主题-文档关联 ====================
 
+// ListTopicDocumentRelation 列表主题文档关联
 func (k *KnowledgeService) ListTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationListReq) ([]*knowledge.TopicDocumentRelationItem, error) {
 	relations, err := k.l.ListTopicDocumentRelations(ctx, req.TopicCode)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*knowledge.TopicDocumentRelationItem, 0, len(relations))
-	for _, r := range relations {
-		result = append(result, &knowledge.TopicDocumentRelationItem{
-			TopicCode:          r.TopicCode,
-			DocumentId:         r.DocumentId,
-			DocumentName:       r.DocumentName,
-			KnowledgeScopeCode: r.KnowledgeScopeCode,
-			KnowledgeScopeName: r.KnowledgeScopeName,
-			BusinessCategory:   r.BusinessCategory,
-			DocumentTags:       r.DocumentTags,
-			RelationScore:      r.RelationScore,
-			RelationSource:     r.RelationSource,
-			Reason:             r.Reason,
-		})
-	}
-	return result, nil
+	return convert.ToKnowledgeTopicDocumentRelationItemList(relations), nil
 }
 
+// SaveTopicDocumentRelation 保存主题文档关联
 func (k *KnowledgeService) SaveTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationSaveReq) (*knowledge.TopicDocumentRelationItem, error) {
-	rel, err := k.l.SaveTopicDocumentRelation(ctx, req.TopicCode, req.DocumentId, req.RelationScore, req.RelationSource, req.Reason)
+	relation := convert.FromKnowledgeTopicDocumentRelationSaveReq(req)
+	relation, err := k.l.SaveTopicDocumentRelation(ctx, relation)
 	if err != nil {
 		return nil, err
 	}
-	return &knowledge.TopicDocumentRelationItem{
-		TopicCode:      rel.TopicCode,
-		DocumentId:     rel.DocumentId,
-		RelationScore:  rel.RelationScore,
-		RelationSource: rel.RelationSource,
-		Reason:         rel.Reason,
-	}, nil
+	return convert.ToKnowledgeTopicDocumentRelationItem(relation), nil
 }
 
+// RemoveTopicDocumentRelation 移除主题文档关联
 func (k *KnowledgeService) RemoveTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationRemoveReq) (bool, error) {
 	return k.l.RemoveTopicDocumentRelation(ctx, req.TopicCode, req.DocumentId)
 }

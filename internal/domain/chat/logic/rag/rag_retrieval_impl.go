@@ -65,7 +65,7 @@ func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, r
 	}
 }
 
-var _ logic.RagRetriever = (*RetrievalImpl)(nil)
+var _ logic.RagRetrieveLogic = (*RetrievalImpl)(nil)
 
 func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error) {
 	ragCtx := vo.NewRagRetrievalContext(plan.RetrievalQuestion)

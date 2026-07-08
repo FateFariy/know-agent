@@ -7,25 +7,12 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	documentvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 )
-
-// TopicDocumentRelationVo 主题-文档关联的视图对象（含文档侧元数据）
-type TopicDocumentRelationVo struct {
-	TopicCode          string
-	DocumentId         int64
-	DocumentName       string
-	KnowledgeScopeCode string
-	KnowledgeScopeName string
-	BusinessCategory   string
-	DocumentTags       string
-	RelationScore      float64
-	RelationSource     string
-	Reason             string
-}
 
 // KnowledgeLogicImpl 知识管理领域实现
 type KnowledgeLogicImpl struct {
@@ -133,68 +120,43 @@ func (k *KnowledgeLogicImpl) BatchRegenerateDocumentProfiles(ctx context.Context
 
 // ============ Topic-Document Relation ============
 
-func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]TopicDocumentRelationVo, error) {
-	if strutil.IsBlank(topicCode) {
-		return nil, nil
-	}
+func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error) {
 	relations, err := k.repo.SelectTopicDocumentRelationsByTopicCode(ctx, strutil.Trim(topicCode))
 	if err != nil {
 		return nil, err
-	}
-	if len(relations) == 0 {
-		return nil, nil
 	}
 	documents, err := k.documentLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		return nil, err
 	}
-	docMap := make(map[int64]*documentvo.KnowledgeDocument, len(documents))
-	for _, d := range documents {
-		docMap[d.DocumentId] = d
-	}
-	result := make([]TopicDocumentRelationVo, 0, len(relations))
+	docMap := utils.SliceToMapBy(documents, func(doc *documentvo.KnowledgeDocument) (int64, *documentvo.KnowledgeDocument) {
+		return doc.DocumentId, doc
+	})
+
 	for _, rel := range relations {
-		vo := TopicDocumentRelationVo{
-			TopicCode:      rel.TopicCode,
-			DocumentId:     rel.DocumentId,
-			RelationScore:  rel.RelationScore,
-			RelationSource: rel.RelationSource,
-			Reason:         rel.Reason,
-		}
 		if doc := docMap[rel.DocumentId]; doc != nil {
-			vo.DocumentName = doc.DocumentName
-			vo.KnowledgeScopeCode = doc.KnowledgeScopeCode
-			vo.KnowledgeScopeName = doc.KnowledgeScopeName
-			vo.BusinessCategory = doc.BusinessCategory
-			vo.DocumentTags = doc.DocumentTags
+			rel.DocumentName = doc.DocumentName
+			rel.KnowledgeScopeCode = doc.KnowledgeScopeCode
+			rel.KnowledgeScopeName = doc.KnowledgeScopeName
+			rel.BusinessCategory = doc.BusinessCategory
+			rel.DocumentTags = doc.DocumentTags
 		}
-		result = append(result, vo)
 	}
-	return result, nil
+	return relations, nil
 }
 
-func (k *KnowledgeLogicImpl) SaveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64, relationScore float64, relationSource, reason string) (*entity.KnowledgeTopicDocumentRelation, error) {
-	if strutil.IsBlank(topicCode) || documentId <= 0 {
-		return nil, errors.New("topicCode 与 documentId 不能为空")
-	}
-	rel := &entity.KnowledgeTopicDocumentRelation{
-		TopicCode:      strutil.Trim(topicCode),
-		DocumentId:     documentId,
-		RelationScore:  relationScore,
-		RelationSource: strutil.Trim(relationSource),
-		Reason:         strutil.Trim(reason),
-	}
-	if err := k.repo.UpsertTopicDocumentRelation(ctx, rel); err != nil {
+// SaveTopicDocumentRelation 保存/更新主题-文档关系
+func (k *KnowledgeLogicImpl) SaveTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) (*entity.KnowledgeTopicDocumentRelation, error) {
+	relation.RelationSource = utils.BlankToDefault(relation.RelationSource, "manual")
+	if err := k.repo.UpsertTopicDocumentRelation(ctx, relation); err != nil {
 		return nil, err
 	}
-	return rel, nil
+	return relation, nil
 }
 
+// RemoveTopicDocumentRelation 删除主题-文档关系
 func (k *KnowledgeLogicImpl) RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) (bool, error) {
-	if strutil.IsBlank(topicCode) || documentId <= 0 {
-		return false, nil
-	}
-	if err := k.repo.RemoveTopicDocumentRelation(ctx, strutil.Trim(topicCode), documentId); err != nil {
+	if err := k.repo.DeleteTopicDocumentRelation(ctx, strutil.Trim(topicCode), documentId); err != nil {
 		return false, err
 	}
 	return true, nil

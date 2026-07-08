@@ -994,6 +994,19 @@ func FromKnowledgeScopeSaveReq(source *knowledge.KnowledgeScopeSaveReq) *entity2
 	}
 	return pEntityKnowledgeScopeNode
 }
+func FromKnowledgeTopicDocumentRelationSaveReq(source *knowledge.TopicDocumentRelationSaveReq) *entity2.KnowledgeTopicDocumentRelation {
+	var pEntityKnowledgeTopicDocumentRelation *entity2.KnowledgeTopicDocumentRelation
+	if source != nil {
+		var entityKnowledgeTopicDocumentRelation entity2.KnowledgeTopicDocumentRelation
+		entityKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
+		entityKnowledgeTopicDocumentRelation.DocumentId = (*source).DocumentId
+		entityKnowledgeTopicDocumentRelation.RelationScore = (*source).RelationScore
+		entityKnowledgeTopicDocumentRelation.RelationSource = NormalizeString((*source).RelationSource)
+		entityKnowledgeTopicDocumentRelation.Reason = NormalizeString((*source).Reason)
+		pEntityKnowledgeTopicDocumentRelation = &entityKnowledgeTopicDocumentRelation
+	}
+	return pEntityKnowledgeTopicDocumentRelation
+}
 func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2.KnowledgeTopicNode {
 	var pEntityKnowledgeTopicNode *entity2.KnowledgeTopicNode
 	if source != nil {
@@ -1108,6 +1121,48 @@ func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.Knowle
 		pModelKnowledgeScopeNode = &modelKnowledgeScopeNode
 	}
 	return pModelKnowledgeScopeNode
+}
+func ToKnowledgeTopicDocumentRelationItem(source *entity2.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationItem {
+	var pKnowledgeTopicDocumentRelationItem *knowledge.TopicDocumentRelationItem
+	if source != nil {
+		var knowledgeTopicDocumentRelationItem knowledge.TopicDocumentRelationItem
+		knowledgeTopicDocumentRelationItem.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeTopicDocumentRelationItem.DocumentId = (*source).DocumentId
+		knowledgeTopicDocumentRelationItem.DocumentName = NormalizeString((*source).DocumentName)
+		knowledgeTopicDocumentRelationItem.KnowledgeScopeCode = NormalizeString((*source).KnowledgeScopeCode)
+		knowledgeTopicDocumentRelationItem.KnowledgeScopeName = NormalizeString((*source).KnowledgeScopeName)
+		knowledgeTopicDocumentRelationItem.BusinessCategory = NormalizeString((*source).BusinessCategory)
+		knowledgeTopicDocumentRelationItem.DocumentTags = NormalizeString((*source).DocumentTags)
+		knowledgeTopicDocumentRelationItem.RelationScore = (*source).RelationScore
+		knowledgeTopicDocumentRelationItem.RelationSource = NormalizeString((*source).RelationSource)
+		knowledgeTopicDocumentRelationItem.Reason = NormalizeString((*source).Reason)
+		pKnowledgeTopicDocumentRelationItem = &knowledgeTopicDocumentRelationItem
+	}
+	return pKnowledgeTopicDocumentRelationItem
+}
+func ToKnowledgeTopicDocumentRelationItemList(source []*entity2.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationItem {
+	var pKnowledgeTopicDocumentRelationItemList []*knowledge.TopicDocumentRelationItem
+	if source != nil {
+		pKnowledgeTopicDocumentRelationItemList = make([]*knowledge.TopicDocumentRelationItem, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeTopicDocumentRelationItemList[i] = ToKnowledgeTopicDocumentRelationItem(source[i])
+		}
+	}
+	return pKnowledgeTopicDocumentRelationItemList
+}
+func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation {
+	var pModelKnowledgeTopicDocumentRelation *model.KnowledgeTopicDocumentRelation
+	if source != nil {
+		var modelKnowledgeTopicDocumentRelation model.KnowledgeTopicDocumentRelation
+		modelKnowledgeTopicDocumentRelation.ID = (*source).ID
+		modelKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
+		modelKnowledgeTopicDocumentRelation.DocumentId = (*source).DocumentId
+		modelKnowledgeTopicDocumentRelation.RelationScore = (*source).RelationScore
+		modelKnowledgeTopicDocumentRelation.RelationSource = NormalizeString((*source).RelationSource)
+		modelKnowledgeTopicDocumentRelation.Reason = NormalizeString((*source).Reason)
+		pModelKnowledgeTopicDocumentRelation = &modelKnowledgeTopicDocumentRelation
+	}
+	return pModelKnowledgeTopicDocumentRelation
 }
 func ToKnowledgeTopicItem(source *entity2.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem {
 	var pKnowledgeKnowledgeTopicItem *knowledge.KnowledgeTopicItem

@@ -61,8 +61,8 @@ type KnowledgeRepository interface {
 	// UpsertTopicDocumentRelation 保存/更新主题-文档关联
 	UpsertTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) error
 
-	// RemoveTopicDocumentRelation 按 topicCode+documentId 删除主题-文档关联
-	RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error
+	// DeleteTopicDocumentRelation 按 topicCode+documentId 删除主题-文档关联
+	DeleteTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error
 
 	// ========== 路由跟踪相关 ==========
 

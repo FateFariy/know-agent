@@ -159,7 +159,7 @@ type (
 		TopDocumentsJson    string `json:"topDocumentsJson"` // 候选文档JSON
 		SelectedDocumentId  int64  `json:"selectedDocumentId"` // 选中的文档ID
 		HitSelectedDocument int    `json:"hitSelectedDocument"` // 是否命中选中文档
-		Confidence          string `json:"confidence"` // 置信度
+		Confidence          float64 `json:"confidence"` // 置信度
 		RouteStatus         string `json:"routeStatus"` // 路由状态
 		ErrorMsg            string `json:"errorMsg"` // 错误信息
 		CreateTime          string `json:"createTime"` // 创建时间
@@ -226,7 +226,7 @@ service knowledge {
 	post /topic/document/save (TopicDocumentRelationSaveReq) returns (TopicDocumentRelationItem)
 
 	@doc "移除主题文档关联"
-	@handler RemoveTopicDocumentRelation
+	@handler DeleteTopicDocumentRelation
 	post /topic/document/remove (TopicDocumentRelationRemoveReq) returns (bool)
 
 	@doc "分页查询知识路由追踪"

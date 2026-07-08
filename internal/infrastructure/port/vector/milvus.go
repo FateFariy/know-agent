@@ -39,7 +39,7 @@ type MilvusVector struct {
 var _ dadapter.VectorDB = (*MilvusVector)(nil)
 var _ cadapter.VectorDB = (*MilvusVector)(nil)
 
-func NewMilvusVector(svcCtx *svc.ServiceContext) dadapter.VectorDB {
+func NewMilvusVector(svcCtx *svc.ServiceContext) *MilvusVector {
 	ctx := context.Background()
 	client, err := milvusclient.New(ctx, &milvusclient.ClientConfig{Address: svcCtx.Config.Milvus.Addr})
 	if err != nil {

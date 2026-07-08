@@ -45,6 +45,7 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 
 // ============ 知识范围节点 ============
 
+// SelectKnowledgeScopeNodes 查询所有知识范围节点
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
 	var nodes []*entity.KnowledgeScopeNode
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).
@@ -55,6 +56,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context)
 	return nodes, nil
 }
 
+// UpsertKnowledgeScopeNode 插入或更新知识范围节点
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
 	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
 	return k.dbWithContext(ctx).
@@ -62,6 +64,7 @@ func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, 
 		Assign(nodeModel).FirstOrCreate(node).Error
 }
 
+// DeleteKnowledgeScopeNode 删除知识范围节点
 func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, scopeCode string) error {
 	if strutil.IsBlank(scopeCode) {
 		return nil
@@ -71,6 +74,7 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, 
 
 // ============ 主题节点 ============
 
+// SelectKnowledgeTopicNodes 查询所有主题节点
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
 	var nodes []*entity.KnowledgeTopicNode
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Find(&nodes).Error; err != nil {
@@ -79,6 +83,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context)
 	return nodes, nil
 }
 
+// SelectKnowledgeTopicNodesByScopeCode 根据知识范围节点查询所有主题节点
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error) {
 	var nodes []*entity.KnowledgeTopicNode
 	builder := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{})
@@ -91,6 +96,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx conte
 	return nodes, nil
 }
 
+// UpsertKnowledgeTopicNode 插入或更新主题节点
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error {
 	nodeModel := convert.ToKnowledgeTopicNodeModel(node)
 	return k.dbWithContext(ctx).
@@ -98,6 +104,7 @@ func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, 
 		Assign(nodeModel).FirstOrCreate(node).Error
 }
 
+// DeleteKnowledgeTopicNode 删除主题节点
 func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, topicCode string) error {
 	if strutil.IsBlank(topicCode) {
 		return nil
@@ -107,6 +114,7 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, 
 
 // ============ 文档画像 ============
 
+// SelectDocumentProfiles 查询所有文档画像
 func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error) {
 	var profiles []*entity.KnowledgeDocumentProfile
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).
@@ -117,6 +125,7 @@ func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([
 	return profiles, nil
 }
 
+// SelectDocumentProfileByDocumentId 根据文档ID查询文档画像
 func (k *KnowledgeRepositoryImpl) SelectDocumentProfileByDocumentId(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
 	profile := new(entity.KnowledgeDocumentProfile)
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", documentId).First(profile).Error; err != nil {
@@ -125,6 +134,7 @@ func (k *KnowledgeRepositoryImpl) SelectDocumentProfileByDocumentId(ctx context.
 	return profile, nil
 }
 
+// UpsertDocumentProfile 插入或更新文档画像
 func (k *KnowledgeRepositoryImpl) UpsertDocumentProfile(ctx context.Context, profile *entity.KnowledgeDocumentProfile) error {
 	if profile == nil {
 		return nil
@@ -132,6 +142,7 @@ func (k *KnowledgeRepositoryImpl) UpsertDocumentProfile(ctx context.Context, pro
 	return k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", profile.DocumentId).Assign(profile).FirstOrCreate(profile).Error
 }
 
+// BatchUpsertDocumentProfiles 批量插入或更新文档画像
 func (k *KnowledgeRepositoryImpl) BatchUpsertDocumentProfiles(ctx context.Context, profiles []*entity.KnowledgeDocumentProfile) error {
 	if len(profiles) == 0 {
 		return nil
@@ -148,6 +159,7 @@ func (k *KnowledgeRepositoryImpl) BatchUpsertDocumentProfiles(ctx context.Contex
 
 // ============ 主题-文档关系 ============
 
+// SelectTopicDocumentRelations 查询所有主题-文档关系
 func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error) {
 	var relations []*entity.KnowledgeTopicDocumentRelation
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Find(&relations).Error; err != nil {
@@ -156,36 +168,41 @@ func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Conte
 	return relations, nil
 }
 
+// SelectTopicDocumentRelationsByTopicCode 根据主题编码查询主题-文档关系
 func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelationsByTopicCode(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error) {
 	var relations []*entity.KnowledgeTopicDocumentRelation
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where("topic_code = ?", topicCode).Find(&relations).Error; err != nil {
+	query := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{})
+	if strutil.IsNotBlank(topicCode) {
+		query = query.Where("topic_code = ?", topicCode)
+	}
+	if err := query.Find(&relations).Error; err != nil {
 		return nil, err
 	}
 	return relations, nil
 }
 
-func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Context, rel *entity.KnowledgeTopicDocumentRelation) error {
-	if rel == nil {
-		return nil
-	}
+// UpsertTopicDocumentRelation 插入或更新主题-文档关系
+func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) error {
+	relModel := convert.ToKnowledgeTopicDocumentRelationModel(relation)
 	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
-		Where("topic_code = ? AND document_id = ?", rel.TopicCode, rel.DocumentId).
-		Assign(rel).FirstOrCreate(rel).Error
+		Where("topic_code = ? AND document_id = ?", relation.TopicCode, relation.DocumentId).
+		Assign(relModel).FirstOrCreate(relation).Error
 }
 
-func (k *KnowledgeRepositoryImpl) RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error {
-	if strutil.IsBlank(topicCode) || documentId <= 0 {
-		return nil
-	}
-	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where("topic_code = ? AND document_id = ?", topicCode, documentId).Delete(nil).Error
+// DeleteTopicDocumentRelation 删除主题-文档关系
+func (k *KnowledgeRepositoryImpl) DeleteTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error {
+	return k.dbWithContext(ctx).Where("topic_code = ? AND document_id = ?", topicCode, documentId).
+		Delete(&model.KnowledgeTopicDocumentRelation{}).Error
 }
 
 // ============ 路由跟踪 ============
 
+// InsertKnowledgeRouteTrace 插入路由跟踪
 func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error {
 	return k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{}).Create(convert.ToKnowledgeRouteTraceModel(trace)).Error
 }
 
+// SelectKnowledgeRouteTracePage 分页查询路由跟踪
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error) {
 	builder := k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{})
 	if strutil.IsNotBlank(conversationId) {

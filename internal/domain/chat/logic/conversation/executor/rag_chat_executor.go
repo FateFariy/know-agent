@@ -17,7 +17,7 @@ import (
 // RagChatExecutor 知识问答执行器
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
-	retriever       logic.RagRetriever
+	retriever       logic.RagRetrieveLogic
 	promptAssembler conversation.RagPromptAssembler
 	chatModel       logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer          *trace.ConversationTraceRecorder
@@ -25,7 +25,7 @@ type RagChatExecutor struct {
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
-	retriever logic.RagRetriever,
+	retriever logic.RagRetrieveLogic,
 	ragPromptAssembler conversation.RagPromptAssembler,
 	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,

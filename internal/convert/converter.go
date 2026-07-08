@@ -30,7 +30,7 @@ import (
 //go:generate goverter gen .
 type DocumentConverter interface {
 	FromUploadDocumentReq(src *document.UploadDocumentReq) *den.Document
-	FromConfirmStrategyReq(req *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
+	FromConfirmStrategyReq(src *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
 
 	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
 	ToDocumentListItem(src *den.Document) *document.DocumentListItem
@@ -95,8 +95,9 @@ type ChatConverter interface {
 // goverter:extend .*
 // goverter:skipCopySameType
 type KnowledgeConverter interface {
-	FromKnowledgeScopeSaveReq(req *knowledge.KnowledgeScopeSaveReq) *klen.KnowledgeScopeNode
-	FromKnowledgeTopicSaveReq(req *knowledge.KnowledgeTopicSaveReq) *klen.KnowledgeTopicNode
+	FromKnowledgeScopeSaveReq(src *knowledge.KnowledgeScopeSaveReq) *klen.KnowledgeScopeNode
+	FromKnowledgeTopicSaveReq(src *knowledge.KnowledgeTopicSaveReq) *klen.KnowledgeTopicNode
+	FromKnowledgeTopicDocumentRelationSaveReq(src *knowledge.TopicDocumentRelationSaveReq) *klen.KnowledgeTopicDocumentRelation
 
 	ToKnowledgeScopeItem(src *klen.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem
 	ToKnowledgeTopicItem(src *klen.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem
@@ -104,12 +105,16 @@ type KnowledgeConverter interface {
 	ToKnowledgeTopicItemList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem
 	// ToDocumentProfileResp(src *klen.DocumentProfile) *knowledge.DocumentProfileResp
 	// ToDocumentProfileItemList(src []*klen.DocumentProfile) []*knowledge.DocumentProfileResp
+
+	ToKnowledgeTopicDocumentRelationItem(src *klen.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationItem
+	ToKnowledgeTopicDocumentRelationItemList(src []*klen.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationItem
 	// goverter:map RouteStatus | ToRouteStatus
 	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
 	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
 
 	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode
 	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model.KnowledgeTopicNode
+	ToKnowledgeTopicDocumentRelationModel(src *klen.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation
 	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 }
 

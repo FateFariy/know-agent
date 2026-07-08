@@ -52,10 +52,10 @@ type KnowledgeLogic interface {
 	BatchRegenerateDocumentProfiles(ctx context.Context, documentIds []int64) ([]*entity.KnowledgeDocumentProfile, error)
 
 	// ListTopicDocumentRelations 查询主题文档关联
-	ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]TopicDocumentRelationVo, error)
+	ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error)
 
 	// SaveTopicDocumentRelation 保存主题文档关联
-	SaveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64, relationScore float64, relationSource, reason string) (*entity.KnowledgeTopicDocumentRelation, error)
+	SaveTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) (*entity.KnowledgeTopicDocumentRelation, error)
 
 	// RemoveTopicDocumentRelation 移除主题文档关联
 	RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) (bool, error)
