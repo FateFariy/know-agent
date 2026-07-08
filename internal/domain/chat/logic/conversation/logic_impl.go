@@ -185,6 +185,10 @@ func (c *LogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode
 	if err != nil {
 		return nil, 0, err
 	}
+	for _, record := range records {
+		record.FillSummaryFields()
+		record.Exchanges = nil
+	}
 
 	return records, total, nil
 }
