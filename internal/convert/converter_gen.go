@@ -185,6 +185,24 @@ func ToConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationE
 	}
 	return pChatConversationExchangeResp
 }
+func ToConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.ConversationMemorySummaryResp {
+	var pChatConversationMemorySummaryResp *chat.ConversationMemorySummaryResp
+	if source != nil {
+		var chatConversationMemorySummaryResp chat.ConversationMemorySummaryResp
+		chatConversationMemorySummaryResp.ConversationId = (*source).ConversationId
+		chatConversationMemorySummaryResp.IsCompressed = (*source).IsCompressed
+		chatConversationMemorySummaryResp.CoveredExchangeId = (*source).CoveredExchangeId
+		chatConversationMemorySummaryResp.CoveredExchangeCount = (*source).CoveredExchangeCount
+		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
+		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
+		chatConversationMemorySummaryResp.SummaryText = (*source).SummaryText
+		chatConversationMemorySummaryResp.SummaryPayload = pEntityConversationSummaryToPChatConversationSummary((*source).SummaryPayload)
+		chatConversationMemorySummaryResp.LastSourceUpdateTime = TimeToString((*source).LastSourceUpdateTime)
+		chatConversationMemorySummaryResp.UpdateTime = TimeToStringMs((*source).UpdateTime)
+		pChatConversationMemorySummaryResp = &chatConversationMemorySummaryResp
+	}
+	return pChatConversationMemorySummaryResp
+}
 func ToConversationResetResp(source *vo.ConversationReset) *chat.ConversationResetResp {
 	var pChatConversationResetResp *chat.ConversationResetResp
 	if source != nil {
@@ -222,7 +240,7 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 				chatConversationSessionResp.Exchanges[i] = ToConversationExchangeResp((*source).Exchanges[i])
 			}
 		}
-		chatConversationSessionResp.MemorySummary = pEntityChatMemorySummaryToPChatConversationMemorySummaryResp((*source).MemorySummary)
+		chatConversationSessionResp.MemorySummary = ToConversationMemorySummaryResp((*source).MemorySummary)
 		pChatConversationSessionResp = &chatConversationSessionResp
 	}
 	return pChatConversationSessionResp
@@ -289,21 +307,20 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source *enti
 	}
 	return pChatConversationTraceStageResp
 }
-func pEntityChatMemorySummaryToPChatConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.ConversationMemorySummaryResp {
-	var pChatConversationMemorySummaryResp *chat.ConversationMemorySummaryResp
+func pEntityConversationSummaryToPChatConversationSummary(source *entity.ConversationSummary) *chat.ConversationSummary {
+	var pChatConversationSummary *chat.ConversationSummary
 	if source != nil {
-		var chatConversationMemorySummaryResp chat.ConversationMemorySummaryResp
-		chatConversationMemorySummaryResp.ConversationId = (*source).ConversationId
-		chatConversationMemorySummaryResp.IsCompressed = (*source).IsCompressed
-		chatConversationMemorySummaryResp.CoveredExchangeId = (*source).CoveredExchangeId
-		chatConversationMemorySummaryResp.CoveredExchangeCount = (*source).CoveredExchangeCount
-		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
-		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
-		chatConversationMemorySummaryResp.SummaryText = (*source).SummaryText
-		chatConversationMemorySummaryResp.LastSourceUpdateTime = TimeToString((*source).LastSourceUpdateTime)
-		pChatConversationMemorySummaryResp = &chatConversationMemorySummaryResp
+		var chatConversationSummary chat.ConversationSummary
+		chatConversationSummary.Summary = (*source).Summary
+		chatConversationSummary.ConversationGoal = (*source).ConversationGoal
+		chatConversationSummary.StableFacts = (*source).StableFacts
+		chatConversationSummary.UserPreferences = (*source).UserPreferences
+		chatConversationSummary.ResolvedPoints = (*source).ResolvedPoints
+		chatConversationSummary.PendingQuestions = (*source).PendingQuestions
+		chatConversationSummary.RetrievalHints = (*source).RetrievalHints
+		pChatConversationSummary = &chatConversationSummary
 	}
-	return pChatConversationMemorySummaryResp
+	return pChatConversationSummary
 }
 func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution

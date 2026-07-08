@@ -91,7 +91,11 @@ func (c *ChatService) ResetConversation(ctx context.Context, req *chat.Conversat
 
 // RebuildSummary 重建会话摘要
 func (c *ChatService) RebuildSummary(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationMemorySummaryResp, error) {
-	return c.l.RebuildConversationSummary(ctx, req.ConversationId)
+	summary, err := c.l.RebuildConversationSummary(ctx, req.ConversationId)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToConversationMemorySummaryResp(summary), nil
 }
 
 // GetRetrievalResults 获取检索结果

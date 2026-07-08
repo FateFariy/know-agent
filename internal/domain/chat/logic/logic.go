@@ -32,7 +32,7 @@ type ChatLogic interface {
 	ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error)
 
 	// RebuildConversationSummary 重建会话摘要
-	RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error)
+	RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)
 
 	// GetRetrievalResults 获取检索结果
 	GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)

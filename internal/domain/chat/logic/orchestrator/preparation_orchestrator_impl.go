@@ -245,7 +245,7 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, c
 	}
 
 	// 记录影子路由（仅用于离线分析，失败只告警）
-	if err := o.knowledgeRouteLogic.RecordShadowRoute(ctx, convCtx.ExchangeId, convCtx.ConversationId, convCtx.SelectedDocumentId, convCtx.Question, execPlan.RewriteQuestion); err != nil {
+	if err := o.knowledgeRouteLogic.RecordShadowRoute(ctx, convCtx.ExchangeId, convCtx.SelectedDocumentId, convCtx.ConversationId, convCtx.Question, execPlan.RewriteQuestion); err != nil {
 		Warnf("记录影子路由失败: %v", err)
 	}
 

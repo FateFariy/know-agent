@@ -95,4 +95,10 @@ type ChatRepository interface {
 
 	// SelectChannelExecutions 查询渠道执行记录
 	SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
+
+	// DeleteRetrievalResultsByConversationId 删除会话所有检索结果
+	DeleteRetrievalResultsByConversationId(ctx context.Context, conversationId string) error
+
+	// DeleteChannelExecutionsByConversationId 删除会话所有渠道执行记录
+	DeleteChannelExecutionsByConversationId(ctx context.Context, conversationId string) error
 }

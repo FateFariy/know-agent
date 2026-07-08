@@ -243,7 +243,7 @@ func (r *DocumentQuestionRouter) buildDecision(mode vo.ExecutionMode, action str
 		}
 	}
 
-	// 从检索计划 + 章节锚点 + 条目锚点 汇总生成 Query 上下文提示与 Summary 文本
+	// 从检索计划 + 章节锚点 + 条目锚点 汇总生成 Query 上下文提示与 SummaryPayload 文本
 	decision.QueryContextHints = buildQueryHints(retrievalPlan, section, itemIndex)
 	decision.SummaryText = buildSummaryText(mode, action, section, itemIndex, reason)
 

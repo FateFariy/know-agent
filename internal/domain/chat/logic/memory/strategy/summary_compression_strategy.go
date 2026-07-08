@@ -149,7 +149,7 @@ func (s *SummaryCompressionStrategy) GetConversationSummary(ctx context.Context,
 	}
 
 	// 反序列化摘要JSON并设置压缩状态
-	summary.Summary = s.readSummary(summary)
+	summary.SummaryPayload = s.readSummary(summary)
 	summary.IsCompressed = strutil.IsNotBlank(summary.SummaryText)
 
 	return summary, nil
@@ -290,8 +290,8 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 
 	// 调用LLM生成合并后的摘要
 	content, err := s.chatModel.GenerateWithTrace(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, trace)
-	newSummary := s.deserializeSummary(content)
-	if newSummary == nil {
+	newSummary, err := s.deserializeSummary(content)
+	if err != nil {
 		return nil, err
 	}
 
@@ -403,8 +403,8 @@ func (s *SummaryCompressionStrategy) readSummary(summaryState *entity.ChatMemory
 	}
 
 	if strutil.IsNotBlank(summaryState.SummaryJson) {
-		summary := s.deserializeSummary(summaryState.SummaryJson)
-		if summary != nil {
+		summary, err := s.deserializeSummary(summaryState.SummaryJson)
+		if err == nil {
 			return s.normalizeSummary(summary)
 		}
 	}
@@ -511,14 +511,14 @@ func (s *SummaryCompressionStrategy) appendBulletSection(builder *strings.Builde
 }
 
 // deserializeSummary 反序列化摘要
-func (s *SummaryCompressionStrategy) deserializeSummary(raw string) *entity.ConversationSummary {
+func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*entity.ConversationSummary, error) {
 	summary := &entity.ConversationSummary{}
 	if err := utils.Unmarshal(raw, summary); err != nil {
 		logx.Debugf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
-		return nil
+		return nil, err
 	}
 
-	return summary
+	return summary, nil
 }
 
 // normalizeSummary 规范化摘要

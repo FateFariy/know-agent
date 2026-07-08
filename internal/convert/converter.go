@@ -68,6 +68,8 @@ type ChatConverter interface {
 	ToConversationResetResp(src *cvo.ConversationReset) *chat.ConversationResetResp
 	ToConversationExchangeResp(src *cen.ChatExchange) *chat.ConversationExchangeResp
 	ToConversationStageTraceRespList(src []*cen.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp
+	// goverter:map UpdateTime | TimeToStringMs
+	ToConversationMemorySummaryResp(src *cen.ChatMemorySummary) *chat.ConversationMemorySummaryResp
 	// goverter:map StartTime | TimeToStringMs
 	// goverter:map EndTime | TimeToStringMs
 	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp

@@ -403,6 +403,20 @@ func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conver
 	return executions, nil
 }
 
+// DeleteRetrievalResultsByConversationId 删除会话所有检索结果
+func (r *ChatRepositoryImpl) DeleteRetrievalResultsByConversationId(ctx context.Context, conversationId string) error {
+	return r.dbWithContext(ctx).
+		Where("conversation_id = ?", conversationId).
+		Delete(&model.ChatRetrievalResult{}).Error
+}
+
+// DeleteChannelExecutionsByConversationId 删除会话所有渠道执行记录
+func (r *ChatRepositoryImpl) DeleteChannelExecutionsByConversationId(ctx context.Context, conversationId string) error {
+	return r.dbWithContext(ctx).
+		Where("conversation_id = ?", conversationId).
+		Delete(&model.ChatChannelExecution{}).Error
+}
+
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
 	return &vo.ConversationArchiveRecord{

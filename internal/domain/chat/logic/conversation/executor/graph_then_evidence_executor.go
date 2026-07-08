@@ -9,10 +9,11 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
-	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -21,14 +22,14 @@ import (
 // 适用场景：用户明确指向某个章节或编号项（如"第 3 节第 2 项讲的是什么"），
 // 先由结构图定位目标节点，再由 AnswerRender 把节点文本/编号项渲染成最终答复。
 type GraphThenEvidenceExecutor struct {
-	structureQuerier graph.StructureGraphQuerier
+	structureQuerier logic.StructureGraphQuerier
 	answerRender     graph.AnswerRender
 	tracer           *trace.ConversationTraceRecorder
 }
 
 // NewGraphThenEvidenceExecutor 构造"结构图定位后取证"执行器
 func NewGraphThenEvidenceExecutor(
-	structureQuerier graph.StructureGraphQuerier,
+	structureQuerier logic.StructureGraphQuerier,
 	answerRender graph.AnswerRender,
 	tracer *trace.ConversationTraceRecorder,
 ) *GraphThenEvidenceExecutor {
@@ -131,7 +132,7 @@ func safeStructureNodeId(decision *vo.DocumentNavigationDecision) int64 {
 }
 
 // displayTitleOf 返回目标章节的展示标题；与 Java GraphSection#displayTitle 对齐
-func displayTitleOf(result *ragvo.GraphQueryResult) string {
+func displayTitleOf(result *entity.GraphQueryResult) string {
 	if result == nil || result.TargetSection == nil {
 		return ""
 	}
@@ -139,7 +140,7 @@ func displayTitleOf(result *ragvo.GraphQueryResult) string {
 }
 
 // targetItemIndexOf 返回目标编号项的索引（以字符串返回，便于日志/快照）
-func targetItemIndexOf(result *ragvo.GraphQueryResult) string {
+func targetItemIndexOf(result *entity.GraphQueryResult) string {
 	if result == nil || result.TargetItem == nil || result.TargetItem.ItemIndex == nil {
 		return ""
 	}
@@ -147,7 +148,7 @@ func targetItemIndexOf(result *ragvo.GraphQueryResult) string {
 }
 
 // matchedItemCountOf 返回命中的编号项数量
-func matchedItemCountOf(result *ragvo.GraphQueryResult) int {
+func matchedItemCountOf(result *entity.GraphQueryResult) int {
 	if result == nil || len(result.MatchedItems) == 0 {
 		return 0
 	}
@@ -158,7 +159,7 @@ func matchedItemCountOf(result *ragvo.GraphQueryResult) int {
 //
 // - 若决策中指定了 itemIndex，则必须存在 targetItem 或 matchedItems
 // - 否则只需要 targetSection 有内容文本 或 存在 matchedItems
-func hasGraphEvidence(result *ragvo.GraphQueryResult, decision *vo.DocumentNavigationDecision) bool {
+func hasGraphEvidence(result *entity.GraphQueryResult, decision *vo.DocumentNavigationDecision) bool {
 	if result == nil || result.TargetSection == nil {
 		return false
 	}

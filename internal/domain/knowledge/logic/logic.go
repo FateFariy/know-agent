@@ -18,7 +18,7 @@ type KnowledgeRouteLogic interface {
 	RecordAutoRoute(ctx context.Context, exchangeId int64, conversationId, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error
 
 	// RecordShadowRoute 记录影子路由结果
-	RecordShadowRoute(ctx context.Context, exchangeId int64, conversationId string, documentId int64, question, rewriteQuestion string) error
+	RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error
 }
 
 func Warnf(format string, v ...any) {

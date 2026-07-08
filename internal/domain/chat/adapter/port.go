@@ -39,7 +39,10 @@ type CheckPointStore interface {
 	Set(ctx context.Context, checkPointID string, checkPoint []byte) error
 
 	// Count 检查点数量
-	Count(ctx context.Context, checkPointID string) (int64, error)
+	Count(ctx context.Context, checkPointID string) (int, error)
+
+	// Delete 删除检查点
+	Delete(ctx context.Context, checkPointID string) (int, error)
 }
 
 type RerankOption struct {

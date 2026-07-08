@@ -46,6 +46,7 @@ type LogicImpl struct {
 	recommendLogic    logic.RecommendationLogic
 	memoryLogic       logic.SessionMemoryLogic
 	distributedLock   adapter.DistributedLock
+	checkPointStore   adapter.CheckPointStore
 	*options
 }
 
@@ -61,6 +62,7 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 	recommendLogic logic.RecommendationLogic,
 	memoryLogic logic.SessionMemoryLogic,
 	distributedLock adapter.DistributedLock,
+	checkPointStore adapter.CheckPointStore,
 ) *LogicImpl {
 	return &LogicImpl{
 		repo:              repo,
@@ -74,6 +76,7 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 		recommendLogic:    recommendLogic,
 		memoryLogic:       memoryLogic,
 		distributedLock:   distributedLock,
+		checkPointStore:   checkPointStore,
 		options: &options{
 			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
 			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
@@ -201,42 +204,56 @@ func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string
 		stopResult = c.stopTask(ctx, convCtx, "会话被重置")
 	}
 
-	// 删除会话及关联 exchange
-	dialogueCount, exchangeCount, err := c.repo.DeleteSession(ctx, conversationId)
+	var dialogueCount, exchangeCount int64
+	var err error
+
+	// 删除记忆摘要
+	if err = c.memoryLogic.DeleteConversationSummary(ctx, conversationId); err != nil {
+		return nil, err
+	}
+	fn := func(txCtx context.Context) error {
+		// 删除会话及关联 exchange
+		dialogueCount, exchangeCount, err = c.repo.DeleteSession(ctx, conversationId)
+		if err != nil {
+			return err
+		}
+		// 删除阶段追踪
+		if err = c.repo.DeleteStage(txCtx, conversationId); err != nil {
+			return err
+		}
+		// 删除检索结果
+		if err = c.repo.DeleteRetrievalResultsByConversationId(txCtx, conversationId); err != nil {
+			return err
+		}
+		// 删除渠道执行记录
+		return c.repo.DeleteChannelExecutionsByConversationId(txCtx, conversationId)
+	}
+	if err = c.repo.Do(ctx, fn); err != nil {
+		return nil, err
+	}
+	// 删除检查点
+	count, err := c.checkPointStore.Delete(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
-
-	// 删除记忆摘要
-	_ = c.memoryLogic.DeleteConversationSummary(ctx, conversationId)
-
 	return &vo.ConversationReset{
 		ConversationId:         conversationId,
 		StoppedRunningTask:     stopResult.Stopped,
 		RemovedDialogueCount:   int(dialogueCount),
 		RemovedExchangeCount:   int(exchangeCount),
-		RemovedCheckpointCount: 0,
-		Message:                "会话被重置",
+		RemovedCheckpointCount: count,
+		Message:                "会话已重置",
 	}, nil
 }
 
 // RebuildConversationSummary 重建会话摘要
-func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*chat.ConversationMemorySummaryResp, error) {
-	sum, err := c.memoryLogic.RebuildConversationSummary(ctx, conversationId)
+func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
+	summary, err := c.memoryLogic.RebuildConversationSummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
-	text := ""
-	if sum != nil {
-		text = sum.SummaryText
-		if text == "" && sum.Summary != nil {
-			text = sum.Summary.Summary
-		}
-	}
-	return &chat.ConversationMemorySummaryResp{
-		ConversationId: conversationId,
-		Summary:        text,
-	}, nil
+
+	return summary, nil
 }
 
 // GetRetrievalResults 获取检索结果
@@ -867,31 +884,6 @@ func (c *LogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, tu
 		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-}
-
-// ---------------------------------------------------------------------------
-// 纯函数/工具方法
-// ---------------------------------------------------------------------------
-
-// buildSessionTitle 为会话构造一个展示标题，取最新问题截断若干字符
-func buildSessionTitle(record *vo.ConversationArchiveRecord, defaultText string) string {
-	if record == nil {
-		return ""
-	}
-	for i := len(record.Exchanges) - 1; i >= 0; i-- {
-		ex := record.Exchanges[i]
-		if ex != nil && strutil.IsNotBlank(ex.Question) {
-			q := ex.Question
-			if len(q) > 30 {
-				return q[:30]
-			}
-			return q
-		}
-	}
-	if len(defaultText) > 30 {
-		return defaultText[:30]
-	}
-	return defaultText
 }
 
 func Warnf(format string, args ...any) {

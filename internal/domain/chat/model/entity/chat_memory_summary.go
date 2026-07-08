@@ -17,7 +17,7 @@ type ChatMemorySummary struct {
 	LastSourceUpdateTime time.Time            `gorm:"column:last_source_update_time"` // 最后源更新时间
 	UpdateTime           time.Time            `gorm:"column:update_time"`             // 更新时间
 	IsCompressed         bool                 `gorm:"-"`                              // 是否已应用历史压缩
-	Summary              *ConversationSummary `gorm:"-"`                              // 会话摘要
+	SummaryPayload       *ConversationSummary `gorm:"-"`                              // 会话摘要
 }
 
 // ConversationSummary 会话摘要

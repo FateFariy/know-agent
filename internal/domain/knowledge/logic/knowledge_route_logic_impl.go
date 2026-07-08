@@ -117,7 +117,7 @@ func (s *KnowledgeRouteLogicImpl) Route(ctx context.Context, question, rewriteQu
 }
 
 // RecordShadowRoute 记录影子路由结果（后台写入不影响主流程）
-func (s *KnowledgeRouteLogicImpl) RecordShadowRoute(ctx context.Context, exchangeId int64, conversationId string, documentId int64, question, rewriteQuestion string) error {
+func (s *KnowledgeRouteLogicImpl) RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error {
 	decision, err := s.Route(ctx, question, rewriteQuestion)
 	if err != nil {
 		Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", conversationId, err)

@@ -14,18 +14,13 @@ const (
 // builder 包级别的流式事件构造器
 var builder = support.StreamEventBuilder{}
 
-// singleValueChan 将给定字符串包装为一个已关闭的带缓冲只读 channel，便于与流式管道拼接。
-// channel 容量为 1，内容立即写入并在函数返回前通过 defer 关闭，接收方可直接读取。
+// singleValueChan 将给定字符串包装为一个已关闭的带缓冲只读 channel，便于与流式管道拼接
 func singleValueChan(content string) <-chan string {
 	ch := make(chan string, 1)
 	defer close(ch)
 	ch <- content
 	return ch
 }
-
-// ========================
-// 流式事件下发辅助
-// ========================
 
 // publishThinking 发布思考事件
 func publishThinking(convCtx *vo.ConversationContext, content string) error {
