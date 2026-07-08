@@ -6,6 +6,7 @@ package convert
 import (
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
+	knowledge "github.com/swiftbit/know-agent/api/knowledge"
 	common "github.com/swiftbit/know-agent/common"
 	entity "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -976,24 +977,149 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source
 }
+func FromKnowledgeScopeSaveReq(source *knowledge.KnowledgeScopeSaveReq) *entity2.KnowledgeScopeNode {
+	var pEntityKnowledgeScopeNode *entity2.KnowledgeScopeNode
+	if source != nil {
+		var entityKnowledgeScopeNode entity2.KnowledgeScopeNode
+		entityKnowledgeScopeNode.ID = (*source).ID
+		entityKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		entityKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
+		entityKnowledgeScopeNode.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		entityKnowledgeScopeNode.Description = NormalizeString((*source).Description)
+		entityKnowledgeScopeNode.Aliases = NormalizeString((*source).Aliases)
+		entityKnowledgeScopeNode.Examples = NormalizeString((*source).Examples)
+		entityKnowledgeScopeNode.SortOrder = (*source).SortOrder
+		entityKnowledgeScopeNode.OperatorId = NormalizeString((*source).OperatorId)
+		pEntityKnowledgeScopeNode = &entityKnowledgeScopeNode
+	}
+	return pEntityKnowledgeScopeNode
+}
+func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2.KnowledgeTopicNode {
+	var pEntityKnowledgeTopicNode *entity2.KnowledgeTopicNode
+	if source != nil {
+		var entityKnowledgeTopicNode entity2.KnowledgeTopicNode
+		entityKnowledgeTopicNode.ID = (*source).ID
+		entityKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
+		entityKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
+		entityKnowledgeTopicNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		entityKnowledgeTopicNode.Description = NormalizeString((*source).Description)
+		entityKnowledgeTopicNode.Aliases = NormalizeString((*source).Aliases)
+		entityKnowledgeTopicNode.Examples = NormalizeString((*source).Examples)
+		entityKnowledgeTopicNode.AnswerShape = NormalizeString((*source).AnswerShape)
+		entityKnowledgeTopicNode.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
+		entityKnowledgeTopicNode.SortOrder = (*source).SortOrder
+		entityKnowledgeTopicNode.OperatorId = NormalizeString((*source).OperatorId)
+		pEntityKnowledgeTopicNode = &entityKnowledgeTopicNode
+	}
+	return pEntityKnowledgeTopicNode
+}
 func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.KnowledgeRouteTrace {
 	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
 	if source != nil {
 		var modelKnowledgeRouteTrace model.KnowledgeRouteTrace
-		modelKnowledgeRouteTrace.ConversationId = (*source).ConversationId
+		modelKnowledgeRouteTrace.ID = (*source).ID
+		modelKnowledgeRouteTrace.ConversationId = NormalizeString((*source).ConversationId)
 		modelKnowledgeRouteTrace.ExchangeId = (*source).ExchangeId
-		modelKnowledgeRouteTrace.Question = (*source).Question
-		modelKnowledgeRouteTrace.RewriteQuestion = (*source).RewriteQuestion
-		modelKnowledgeRouteTrace.Mode = (*source).Mode
-		modelKnowledgeRouteTrace.TopScopesJson = (*source).TopScopesJson
-		modelKnowledgeRouteTrace.TopTopicsJson = (*source).TopTopicsJson
-		modelKnowledgeRouteTrace.TopDocumentsJson = (*source).TopDocumentsJson
+		modelKnowledgeRouteTrace.Question = NormalizeString((*source).Question)
+		modelKnowledgeRouteTrace.RewriteQuestion = NormalizeString((*source).RewriteQuestion)
+		modelKnowledgeRouteTrace.Mode = NormalizeString((*source).Mode)
+		modelKnowledgeRouteTrace.TopScopesJson = NormalizeString((*source).TopScopesJson)
+		modelKnowledgeRouteTrace.TopTopicsJson = NormalizeString((*source).TopTopicsJson)
+		modelKnowledgeRouteTrace.TopDocumentsJson = NormalizeString((*source).TopDocumentsJson)
 		modelKnowledgeRouteTrace.SelectedDocumentId = (*source).SelectedDocumentId
 		modelKnowledgeRouteTrace.HitSelectedDocument = (*source).HitSelectedDocument
 		modelKnowledgeRouteTrace.Confidence = (*source).Confidence
 		modelKnowledgeRouteTrace.RouteStatus = (*source).RouteStatus
-		modelKnowledgeRouteTrace.ErrorMsg = (*source).ErrorMsg
+		modelKnowledgeRouteTrace.ErrorMsg = NormalizeString((*source).ErrorMsg)
 		pModelKnowledgeRouteTrace = &modelKnowledgeRouteTrace
 	}
 	return pModelKnowledgeRouteTrace
+}
+func ToKnowledgeScopeItem(source *entity2.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem {
+	var pKnowledgeKnowledgeScopeItem *knowledge.KnowledgeScopeItem
+	if source != nil {
+		var knowledgeKnowledgeScopeItem knowledge.KnowledgeScopeItem
+		knowledgeKnowledgeScopeItem.ID = (*source).ID
+		knowledgeKnowledgeScopeItem.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeScopeItem.ScopeName = NormalizeString((*source).ScopeName)
+		knowledgeKnowledgeScopeItem.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		knowledgeKnowledgeScopeItem.Description = NormalizeString((*source).Description)
+		knowledgeKnowledgeScopeItem.Aliases = NormalizeString((*source).Aliases)
+		knowledgeKnowledgeScopeItem.Examples = NormalizeString((*source).Examples)
+		knowledgeKnowledgeScopeItem.SortOrder = (*source).SortOrder
+		pKnowledgeKnowledgeScopeItem = &knowledgeKnowledgeScopeItem
+	}
+	return pKnowledgeKnowledgeScopeItem
+}
+func ToKnowledgeScopeItemList(source []*entity2.KnowledgeScopeNode) []*knowledge.KnowledgeScopeItem {
+	var pKnowledgeKnowledgeScopeItemList []*knowledge.KnowledgeScopeItem
+	if source != nil {
+		pKnowledgeKnowledgeScopeItemList = make([]*knowledge.KnowledgeScopeItem, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeKnowledgeScopeItemList[i] = ToKnowledgeScopeItem(source[i])
+		}
+	}
+	return pKnowledgeKnowledgeScopeItemList
+}
+func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.KnowledgeScopeNode {
+	var pModelKnowledgeScopeNode *model.KnowledgeScopeNode
+	if source != nil {
+		var modelKnowledgeScopeNode model.KnowledgeScopeNode
+		modelKnowledgeScopeNode.ID = (*source).ID
+		modelKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		modelKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
+		modelKnowledgeScopeNode.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		modelKnowledgeScopeNode.Description = NormalizeString((*source).Description)
+		modelKnowledgeScopeNode.Aliases = NormalizeString((*source).Aliases)
+		modelKnowledgeScopeNode.Examples = NormalizeString((*source).Examples)
+		modelKnowledgeScopeNode.SortOrder = (*source).SortOrder
+		pModelKnowledgeScopeNode = &modelKnowledgeScopeNode
+	}
+	return pModelKnowledgeScopeNode
+}
+func ToKnowledgeTopicItem(source *entity2.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem {
+	var pKnowledgeKnowledgeTopicItem *knowledge.KnowledgeTopicItem
+	if source != nil {
+		var knowledgeKnowledgeTopicItem knowledge.KnowledgeTopicItem
+		knowledgeKnowledgeTopicItem.ID = (*source).ID
+		knowledgeKnowledgeTopicItem.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeKnowledgeTopicItem.TopicName = NormalizeString((*source).TopicName)
+		knowledgeKnowledgeTopicItem.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeTopicItem.Description = NormalizeString((*source).Description)
+		knowledgeKnowledgeTopicItem.Aliases = NormalizeString((*source).Aliases)
+		knowledgeKnowledgeTopicItem.Examples = NormalizeString((*source).Examples)
+		knowledgeKnowledgeTopicItem.AnswerShape = NormalizeString((*source).AnswerShape)
+		knowledgeKnowledgeTopicItem.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
+		knowledgeKnowledgeTopicItem.SortOrder = (*source).SortOrder
+		pKnowledgeKnowledgeTopicItem = &knowledgeKnowledgeTopicItem
+	}
+	return pKnowledgeKnowledgeTopicItem
+}
+func ToKnowledgeTopicItemList(source []*entity2.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem {
+	var pKnowledgeKnowledgeTopicItemList []*knowledge.KnowledgeTopicItem
+	if source != nil {
+		pKnowledgeKnowledgeTopicItemList = make([]*knowledge.KnowledgeTopicItem, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeKnowledgeTopicItemList[i] = ToKnowledgeTopicItem(source[i])
+		}
+	}
+	return pKnowledgeKnowledgeTopicItemList
+}
+func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.KnowledgeTopicNode {
+	var pModelKnowledgeTopicNode *model.KnowledgeTopicNode
+	if source != nil {
+		var modelKnowledgeTopicNode model.KnowledgeTopicNode
+		modelKnowledgeTopicNode.ID = (*source).ID
+		modelKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
+		modelKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
+		modelKnowledgeTopicNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		modelKnowledgeTopicNode.Description = NormalizeString((*source).Description)
+		modelKnowledgeTopicNode.Aliases = NormalizeString((*source).Aliases)
+		modelKnowledgeTopicNode.Examples = NormalizeString((*source).Examples)
+		modelKnowledgeTopicNode.AnswerShape = NormalizeString((*source).AnswerShape)
+		modelKnowledgeTopicNode.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
+		modelKnowledgeTopicNode.SortOrder = (*source).SortOrder
+		pModelKnowledgeTopicNode = &modelKnowledgeTopicNode
+	}
+	return pModelKnowledgeTopicNode
 }

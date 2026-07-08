@@ -3,8 +3,11 @@ package convert
 import (
 	"time"
 
+	"github.com/duke-git/lancet/v2/strutil"
+
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
+	"github.com/swiftbit/know-agent/api/knowledge"
 	"github.com/swiftbit/know-agent/common"
 	cen "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -91,6 +94,20 @@ type ChatConverter interface {
 // goverter:extend .*
 // goverter:skipCopySameType
 type KnowledgeConverter interface {
+	FromKnowledgeScopeSaveReq(req *knowledge.KnowledgeScopeSaveReq) *klen.KnowledgeScopeNode
+	FromKnowledgeTopicSaveReq(req *knowledge.KnowledgeTopicSaveReq) *klen.KnowledgeTopicNode
+
+	ToKnowledgeScopeItem(src *klen.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem
+	ToKnowledgeTopicItem(src *klen.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem
+	ToKnowledgeScopeItemList(src []*klen.KnowledgeScopeNode) []*knowledge.KnowledgeScopeItem
+	ToKnowledgeTopicItemList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem
+	// ToDocumentProfileResp(src *klen.DocumentProfile) *knowledge.DocumentProfileResp
+	// ToDocumentProfileItemList(src []*klen.DocumentProfile) []*knowledge.DocumentProfileResp
+	// ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
+	// ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
+
+	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode
+	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model.KnowledgeTopicNode
 	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 }
 
@@ -120,4 +137,8 @@ func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReferenceRe
 	return common.JSONArrayTo(src, func(item any) *chat.SearchReferenceResp {
 		return item.(*chat.SearchReferenceResp)
 	})
+}
+
+func NormalizeString(s string) string {
+	return strutil.Trim(s)
 }

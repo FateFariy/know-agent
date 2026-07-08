@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
+	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
@@ -43,7 +44,9 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
 	var nodes []*entity.KnowledgeScopeNode
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Find(&nodes).Error; err != nil {
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).
+		Order("sort_order ASC").
+		Find(&nodes).Error; err != nil {
 		return nil, err
 	}
 	return nodes, nil
@@ -77,6 +80,142 @@ func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Conte
 
 func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error {
 	return k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{}).Create(convert.ToKnowledgeRouteTraceModel(trace)).Error
+}
+
+// ============ Scope CRUD ============
+
+func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
+	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
+	return k.dbWithContext(ctx).
+		Where("scope_code = ?", node.ScopeCode).
+		Assign(nodeModel).FirstOrCreate(node).Error
+}
+
+func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, scopeCode string) error {
+	if strutil.IsBlank(scopeCode) {
+		return nil
+	}
+	return k.dbWithContext(ctx).Where("scope_code = ?", scopeCode).Delete(&model.KnowledgeScopeNode{}).Error
+}
+
+// ============ Topic CRUD ============
+
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error) {
+	var nodes []*entity.KnowledgeTopicNode
+	builder := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{})
+	if !strutil.IsBlank(scopeCode) {
+		builder = builder.Where("scope_code = ?", scopeCode)
+	}
+	if err := builder.Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error {
+	nodeModel := convert.ToKnowledgeTopicNodeModel(node)
+	return k.dbWithContext(ctx).
+		Where("topic_code = ?", node.TopicCode).
+		Assign(nodeModel).FirstOrCreate(node).Error
+}
+
+func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, topicCode string) error {
+	if strutil.IsBlank(topicCode) {
+		return nil
+	}
+	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Where("topic_code = ?", topicCode).Delete(nil).Error
+}
+
+// ============ Document Profile ============
+
+func (k *KnowledgeRepositoryImpl) SelectDocumentProfileByDocumentId(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
+	profile := new(entity.KnowledgeDocumentProfile)
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", documentId).First(profile).Error; err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
+
+func (k *KnowledgeRepositoryImpl) UpsertDocumentProfile(ctx context.Context, profile *entity.KnowledgeDocumentProfile) error {
+	if profile == nil {
+		return nil
+	}
+	return k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", profile.DocumentId).Assign(profile).FirstOrCreate(profile).Error
+}
+
+func (k *KnowledgeRepositoryImpl) BatchUpsertDocumentProfiles(ctx context.Context, profiles []*entity.KnowledgeDocumentProfile) error {
+	if len(profiles) == 0 {
+		return nil
+	}
+	return k.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, p := range profiles {
+			if err := tx.Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", p.DocumentId).Assign(p).FirstOrCreate(p).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ============ Topic-Document Relation ============
+
+func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelationsByTopicCode(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error) {
+	var relations []*entity.KnowledgeTopicDocumentRelation
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where("topic_code = ?", topicCode).Find(&relations).Error; err != nil {
+		return nil, err
+	}
+	return relations, nil
+}
+
+func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Context, rel *entity.KnowledgeTopicDocumentRelation) error {
+	if rel == nil {
+		return nil
+	}
+	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
+		Where("topic_code = ? AND document_id = ?", rel.TopicCode, rel.DocumentId).
+		Assign(rel).FirstOrCreate(rel).Error
+}
+
+func (k *KnowledgeRepositoryImpl) RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error {
+	if strutil.IsBlank(topicCode) || documentId <= 0 {
+		return nil
+	}
+	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where("topic_code = ? AND document_id = ?", topicCode, documentId).Delete(nil).Error
+}
+
+// ============ Route Trace Page ============
+
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Context, conversationId, mode, routeStatus string, pageNo, pageSize int32) ([]*entity.KnowledgeRouteTrace, int64, error) {
+	builder := k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{})
+	if !strutil.IsBlank(conversationId) {
+		builder = builder.Where("conversation_id = ?", conversationId)
+	}
+	if !strutil.IsBlank(mode) {
+		builder = builder.Where("mode = ?", mode)
+	}
+	if !strutil.IsBlank(routeStatus) {
+		builder = builder.Where("route_status = ?", routeStatus)
+	}
+
+	var total int64
+	if err := builder.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if pageNo <= 0 {
+		pageNo = 1
+	}
+	if pageSize <= 0 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	var list []*entity.KnowledgeRouteTrace
+	limit := int(pageSize)
+	offset := (int(pageNo) - 1) * limit
+	if err := builder.Order("id DESC").Limit(limit).Offset(offset).Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
 }
 
 // // SearchByKeyword 关键词检索（按子串打分 + topK 排序）

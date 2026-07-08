@@ -1,0 +1,236 @@
+syntax = "v1"
+
+info (
+	title:   "知识管理服务接口"
+	desc:    "知识范围、知识主题、文档画像、主题文档关联、知识路由追踪"
+	author:  "susu"
+	version: "v1.0.0"
+)
+
+// ==================== 请求类型定义 ====================
+type (
+	// 保存知识范围请求
+	KnowledgeScopeSaveReq {
+		ID              int64  `json:"id,optional"` // 主键ID
+		ScopeCode       string `json:"scopeCode"` // 范围编码
+		ScopeName       string `json:"scopeName"` // 范围名称
+		ParentScopeCode string `json:"parentScopeCode,optional"` // 上级范围编码
+		Description     string `json:"description,optional"` // 描述
+		Aliases         string `json:"aliases,optional"` // 别名
+		Examples        string `json:"examples,optional"` // 示例
+		SortOrder       int    `json:"sortOrder,optional"` // 排序
+		OperatorId      int64  `json:"operatorId,optional"` // 操作人ID
+	}
+	// 删除知识范围请求
+	KnowledgeScopeDeleteReq {
+		ScopeCode  string `json:"scopeCode"` // 范围编码
+		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	}
+	// 保存知识主题请求
+	KnowledgeTopicSaveReq {
+		ID                  int64  `json:"id,optional"` // 主键ID
+		TopicCode           string `json:"topicCode"` // 主题编码
+		TopicName           string `json:"topicName"` // 主题名称
+		ScopeCode           string `json:"scopeCode"` // 所属范围编码
+		Description         string `json:"description,optional"` // 描述
+		Aliases             string `json:"aliases,optional"` // 别名
+		Examples            string `json:"examples,optional"` // 示例
+		AnswerShape         string `json:"answerShape,optional"` // 答复形态
+		ExecutionPreference string `json:"executionPreference,optional"` // 执行偏好
+		SortOrder           int    `json:"sortOrder,optional"` // 排序
+		OperatorId          string `json:"operatorId,optional"` // 操作人ID
+	}
+	// 删除知识主题请求
+	KnowledgeTopicDeleteReq {
+		TopicCode  string `json:"topicCode"` // 主题编码
+		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	}
+	// 查询知识主题列表请求
+	KnowledgeTopicListReq {
+		ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
+	}
+	// 查询文档画像详情请求
+	DocumentProfileDetailReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+	}
+	// 重新生成文档画像请求
+	DocumentProfileRegenerateReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+		OperatorId int64 `json:"operatorId,optional"` // 操作人ID
+	}
+	// 批量重新生成文档画像请求
+	DocumentProfileBatchRegenerateReq {
+		DocumentIds []int64 `json:"documentIds"` // 文档ID列表
+		OperatorId  int64   `json:"operatorId,optional"` // 操作人ID
+	}
+	// 查询主题文档关联列表请求
+	TopicDocumentRelationListReq {
+		TopicCode string `json:"topicCode"` // 主题编码
+	}
+	// 保存主题文档关联请求
+	TopicDocumentRelationSaveReq {
+		TopicCode      string  `json:"topicCode"` // 主题编码
+		DocumentId     int64   `json:"documentId"` // 文档ID
+		RelationScore  float64 `json:"relationScore,optional"` // 关联分数
+		RelationSource string  `json:"relationSource,optional"` // 关联来源
+		Reason         string  `json:"reason,optional"` // 理由
+		OperatorId     int64   `json:"operatorId,optional"` // 操作人ID
+	}
+	// 移除主题文档关联请求
+	TopicDocumentRelationRemoveReq {
+		TopicCode  string `json:"topicCode"` // 主题编码
+		DocumentId int64  `json:"documentId"` // 文档ID
+		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	}
+	// 分页查询知识路由追踪请求
+	KnowledgeRouteTracePageReq {
+		ConversationId string `json:"conversationId,optional"` // 会话ID
+		Mode           string `json:"mode,optional"` // 模式
+		RouteStatus    string `json:"routeStatus,optional"` // 路由状态
+		PageNo         int32  `json:"pageNo,optional,default=1"` // 页码
+		PageSize       int32  `json:"pageSize,optional,default=10"` // 每页大小
+	}
+)
+
+// ==================== 响应类型定义 ====================
+type (
+	// 知识范围项
+	KnowledgeScopeItem {
+		ID              int64  `json:"id"` // 主键ID
+		ScopeCode       string `json:"scopeCode"` // 范围编码
+		ScopeName       string `json:"scopeName"` // 范围名称
+		ParentScopeCode string `json:"parentScopeCode"` // 上级范围编码
+		Description     string `json:"description"` // 描述
+		Aliases         string `json:"aliases"` // 别名
+		Examples        string `json:"examples"` // 示例
+		SortOrder       int    `json:"sortOrder"` // 排序
+	}
+	// 知识主题项
+	KnowledgeTopicItem {
+		ID                  int64  `json:"id"` // 主键ID
+		TopicCode           string `json:"topicCode"` // 主题编码
+		TopicName           string `json:"topicName"` // 主题名称
+		ScopeCode           string `json:"scopeCode"` // 所属范围编码
+		Description         string `json:"description"` // 描述
+		Aliases             string `json:"aliases"` // 别名
+		Examples            string `json:"examples"` // 示例
+		AnswerShape         string `json:"answerShape"` // 答复形态
+		ExecutionPreference string `json:"executionPreference"` // 执行偏好
+		SortOrder           int    `json:"sortOrder"` // 排序
+	}
+	// 文档画像信息
+	DocumentProfileResp {
+		DocumentId           int64  `json:"documentId"` // 文档ID
+		DocumentSummary      string `json:"documentSummary"` // 文档摘要
+		DocumentType         string `json:"documentType"` // 文档类型
+		CoreTopics           string `json:"coreTopics"` // 核心主题
+		ExampleQuestions     string `json:"exampleQuestions"` // 示例问题
+		GraphFriendly        string `json:"graphFriendly"` // 是否支持结构图
+		SupportsGraphOutline string `json:"supportsGraphOutline"` // 是否支持图纲
+		SupportsItemLookup   string `json:"supportsItemLookup"` // 是否支持条目检索
+		SupportsGraphAssist  string `json:"supportsGraphAssist"` // 是否支持图辅助
+		ProfileSource        string `json:"profileSource"` // 画像来源
+		ProfileStatus        string `json:"profileStatus"` // 画像状态
+		ErrorMsg             string `json:"errorMsg"` // 错误信息
+	}
+	// 主题文档关联项
+	TopicDocumentRelationItem {
+		TopicCode          string  `json:"topicCode"` // 主题编码
+		DocumentId         int64   `json:"documentId"` // 文档ID
+		DocumentName       string  `json:"documentName"` // 文档名称
+		KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围编码
+		KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
+		BusinessCategory   string  `json:"businessCategory"` // 业务分类
+		DocumentTags       string  `json:"documentTags"` // 文档标签
+		RelationScore      float64 `json:"relationScore"` // 关联分数
+		RelationSource     string  `json:"relationSource"` // 关联来源
+		Reason             string  `json:"reason"` // 理由
+	}
+	// 知识路由追踪列表项
+	KnowledgeRouteTraceItem {
+		ID                  int64  `json:"id"` // 主键ID
+		ConversationId      string `json:"conversationId"` // 会话ID
+		ExchangeId          int64  `json:"exchangeId"` // 轮次ID
+		Question            string `json:"question"` // 用户提问
+		RewriteQuestion     string `json:"rewriteQuestion"` // 改写后的问题
+		Mode                string `json:"mode"` // 模式
+		TopScopesJson       string `json:"topScopesJson"` // 候选范围JSON
+		TopTopicsJson       string `json:"topTopicsJson"` // 候选主题JSON
+		TopDocumentsJson    string `json:"topDocumentsJson"` // 候选文档JSON
+		SelectedDocumentId  int64  `json:"selectedDocumentId"` // 选中的文档ID
+		HitSelectedDocument string `json:"hitSelectedDocument"` // 是否命中选中文档
+		Confidence          string `json:"confidence"` // 置信度
+		RouteStatus         string `json:"routeStatus"` // 路由状态
+		ErrorMsg            string `json:"errorMsg"` // 错误信息
+		CreateTime          string `json:"createTime"` // 创建时间
+	}
+	// 分页查询知识路由追踪响应
+	KnowledgeRouteTracePageResp {
+		PageNo     int32                      `json:"pageNo"` // 页码
+		PageSize   int32                      `json:"pageSize"` // 每页大小
+		TotalSize  int64                      `json:"totalSize"` // 总条数
+		TotalPages int32                      `json:"totalPages"` // 总页数
+		Records    []*KnowledgeRouteTraceItem `json:"records"` // 列表数据
+	}
+)
+
+// ==================== 知识管理服务 ====================
+@server (
+	group:  knowledge
+	desc:   "知识管理服务"
+	prefix: /manage/knowledge
+)
+service knowledge {
+	@doc "保存知识范围节点"
+	@handler SaveKnowledgeScope
+	post /scope/save (KnowledgeScopeSaveReq) returns (KnowledgeScopeItem)
+
+	@doc "删除知识范围节点"
+	@handler DeleteKnowledgeScope
+	post /scope/delete (KnowledgeScopeDeleteReq) returns (bool)
+
+	@doc "查询知识范围列表"
+	@handler ListKnowledgeScope
+	post /scope/list returns ([]*KnowledgeScopeItem)
+
+	@doc "保存知识主题节点"
+	@handler SaveKnowledgeTopic
+	post /topic/save (KnowledgeTopicSaveReq) returns (KnowledgeTopicItem)
+
+	@doc "删除知识主题节点"
+	@handler DeleteKnowledgeTopic
+	post /topic/delete (KnowledgeTopicDeleteReq) returns (bool)
+
+	@doc "查询知识主题列表"
+	@handler ListKnowledgeTopic
+	post /topic/list (KnowledgeTopicListReq) returns ([]*KnowledgeTopicItem)
+
+	@doc "查询文档画像详情"
+	@handler GetDocumentProfile
+	post /document/profile/detail (DocumentProfileDetailReq) returns (DocumentProfileResp)
+
+	@doc "重新生成文档画像"
+	@handler RegenerateDocumentProfile
+	post /document/profile/regenerate (DocumentProfileRegenerateReq) returns (DocumentProfileResp)
+
+	@doc "批量重新生成文档画像"
+	@handler BatchRegenerateDocumentProfile
+	post /document/profile/batch/regenerate (DocumentProfileBatchRegenerateReq) returns ([]*DocumentProfileResp)
+
+	@doc "查询主题文档关联"
+	@handler ListTopicDocumentRelation
+	post /topic/document/list (TopicDocumentRelationListReq) returns ([]*TopicDocumentRelationItem)
+
+	@doc "保存主题文档关联"
+	@handler SaveTopicDocumentRelation
+	post /topic/document/save (TopicDocumentRelationSaveReq) returns (TopicDocumentRelationItem)
+
+	@doc "移除主题文档关联"
+	@handler RemoveTopicDocumentRelation
+	post /topic/document/remove (TopicDocumentRelationRemoveReq) returns (bool)
+
+	@doc "分页查询知识路由追踪"
+	@handler QueryKnowledgeRouteTracePage
+	post /route/trace/page/query (KnowledgeRouteTracePageReq) returns (KnowledgeRouteTracePageResp)
+}
+

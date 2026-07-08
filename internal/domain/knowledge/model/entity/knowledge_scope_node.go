@@ -10,4 +10,5 @@ type KnowledgeScopeNode struct {
 	Aliases         string `gorm:"column:aliases"`           // 别名
 	Examples        string `gorm:"column:examples"`          // 示例
 	SortOrder       int    `gorm:"column:sort_order"`        // 排序顺序
+	OperatorId      string `gorm:"column:-"`                 // 操作员ID
 }
