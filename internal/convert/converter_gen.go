@@ -1013,6 +1013,38 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	}
 	return pEntityKnowledgeTopicNode
 }
+func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
+	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem
+	if source != nil {
+		var knowledgeKnowledgeRouteTraceItem knowledge.KnowledgeRouteTraceItem
+		knowledgeKnowledgeRouteTraceItem.ID = (*source).ID
+		knowledgeKnowledgeRouteTraceItem.ConversationId = NormalizeString((*source).ConversationId)
+		knowledgeKnowledgeRouteTraceItem.ExchangeId = (*source).ExchangeId
+		knowledgeKnowledgeRouteTraceItem.Question = NormalizeString((*source).Question)
+		knowledgeKnowledgeRouteTraceItem.RewriteQuestion = NormalizeString((*source).RewriteQuestion)
+		knowledgeKnowledgeRouteTraceItem.Mode = NormalizeString((*source).Mode)
+		knowledgeKnowledgeRouteTraceItem.TopScopesJson = NormalizeString((*source).TopScopesJson)
+		knowledgeKnowledgeRouteTraceItem.TopTopicsJson = NormalizeString((*source).TopTopicsJson)
+		knowledgeKnowledgeRouteTraceItem.TopDocumentsJson = NormalizeString((*source).TopDocumentsJson)
+		knowledgeKnowledgeRouteTraceItem.SelectedDocumentId = (*source).SelectedDocumentId
+		knowledgeKnowledgeRouteTraceItem.HitSelectedDocument = (*source).HitSelectedDocument
+		knowledgeKnowledgeRouteTraceItem.Confidence = (*source).Confidence
+		knowledgeKnowledgeRouteTraceItem.RouteStatus = ToRouteStatus((*source).RouteStatus)
+		knowledgeKnowledgeRouteTraceItem.ErrorMsg = NormalizeString((*source).ErrorMsg)
+		pKnowledgeKnowledgeRouteTraceItem = &knowledgeKnowledgeRouteTraceItem
+	}
+	return pKnowledgeKnowledgeRouteTraceItem
+}
+func ToKnowledgeRouteTraceItemList(source []*entity2.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem {
+	var pKnowledgeKnowledgeRouteTraceItemList []*knowledge.KnowledgeRouteTraceItem
+	if source != nil {
+		pKnowledgeKnowledgeRouteTraceItemList = make([]*knowledge.KnowledgeRouteTraceItem, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeKnowledgeRouteTraceItemList[i] = ToKnowledgeRouteTraceItem(source[i])
+		}
+	}
+	return pKnowledgeKnowledgeRouteTraceItemList
+}
 func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.KnowledgeRouteTrace {
 	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
 	if source != nil {

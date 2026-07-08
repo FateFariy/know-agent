@@ -3,7 +3,7 @@ package common
 import "fmt"
 
 var (
-	ErrParm = NewBizError(10001, "参数错误：%s")
+	ErrInvalidParam = NewBizError(10001, "参数错误：%s")
 )
 
 type BizError struct {

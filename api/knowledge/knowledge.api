@@ -19,12 +19,12 @@ type (
 		Aliases         string `json:"aliases,optional"` // 别名
 		Examples        string `json:"examples,optional"` // 示例
 		SortOrder       int    `json:"sortOrder,optional"` // 排序
-		OperatorId      int64  `json:"operatorId,optional"` // 操作人ID
+		OperatorId      string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 删除知识范围请求
 	KnowledgeScopeDeleteReq {
 		ScopeCode  string `json:"scopeCode"` // 范围编码
-		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 保存知识主题请求
 	KnowledgeTopicSaveReq {
@@ -43,7 +43,7 @@ type (
 	// 删除知识主题请求
 	KnowledgeTopicDeleteReq {
 		TopicCode  string `json:"topicCode"` // 主题编码
-		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 查询知识主题列表请求
 	KnowledgeTopicListReq {
@@ -55,13 +55,13 @@ type (
 	}
 	// 重新生成文档画像请求
 	DocumentProfileRegenerateReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
-		OperatorId int64 `json:"operatorId,optional"` // 操作人ID
+		DocumentId int64  `json:"documentId"` // 文档ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 批量重新生成文档画像请求
 	DocumentProfileBatchRegenerateReq {
 		DocumentIds []int64 `json:"documentIds"` // 文档ID列表
-		OperatorId  int64   `json:"operatorId,optional"` // 操作人ID
+		OperatorId  string  `json:"operatorId,optional"` // 操作人ID
 	}
 	// 查询主题文档关联列表请求
 	TopicDocumentRelationListReq {
@@ -74,21 +74,21 @@ type (
 		RelationScore  float64 `json:"relationScore,optional"` // 关联分数
 		RelationSource string  `json:"relationSource,optional"` // 关联来源
 		Reason         string  `json:"reason,optional"` // 理由
-		OperatorId     int64   `json:"operatorId,optional"` // 操作人ID
+		OperatorId     string  `json:"operatorId,optional"` // 操作人ID
 	}
 	// 移除主题文档关联请求
 	TopicDocumentRelationRemoveReq {
 		TopicCode  string `json:"topicCode"` // 主题编码
 		DocumentId int64  `json:"documentId"` // 文档ID
-		OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 分页查询知识路由追踪请求
 	KnowledgeRouteTracePageReq {
 		ConversationId string `json:"conversationId,optional"` // 会话ID
 		Mode           string `json:"mode,optional"` // 模式
-		RouteStatus    string `json:"routeStatus,optional"` // 路由状态
-		PageNo         int32  `json:"pageNo,optional,default=1"` // 页码
-		PageSize       int32  `json:"pageSize,optional,default=10"` // 每页大小
+		RouteStatus    int    `json:"routeStatus,optional"` // 路由状态
+		PageNo         int    `json:"pageNo,optional,default=1"` // 页码
+		PageSize       int    `json:"pageSize,optional,default=10"` // 每页大小
 	}
 )
 
@@ -158,7 +158,7 @@ type (
 		TopTopicsJson       string `json:"topTopicsJson"` // 候选主题JSON
 		TopDocumentsJson    string `json:"topDocumentsJson"` // 候选文档JSON
 		SelectedDocumentId  int64  `json:"selectedDocumentId"` // 选中的文档ID
-		HitSelectedDocument string `json:"hitSelectedDocument"` // 是否命中选中文档
+		HitSelectedDocument int    `json:"hitSelectedDocument"` // 是否命中选中文档
 		Confidence          string `json:"confidence"` // 置信度
 		RouteStatus         string `json:"routeStatus"` // 路由状态
 		ErrorMsg            string `json:"errorMsg"` // 错误信息
@@ -166,10 +166,10 @@ type (
 	}
 	// 分页查询知识路由追踪响应
 	KnowledgeRouteTracePageResp {
-		PageNo     int32                      `json:"pageNo"` // 页码
-		PageSize   int32                      `json:"pageSize"` // 每页大小
+		PageNo     int                        `json:"pageNo"` // 页码
+		PageSize   int                        `json:"pageSize"` // 每页大小
 		TotalSize  int64                      `json:"totalSize"` // 总条数
-		TotalPages int32                      `json:"totalPages"` // 总页数
+		TotalPages int                        `json:"totalPages"` // 总页数
 		Records    []*KnowledgeRouteTraceItem `json:"records"` // 列表数据
 	}
 )

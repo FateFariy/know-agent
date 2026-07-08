@@ -2,7 +2,7 @@ package entity
 
 // KnowledgeRouteTrace 知识路由跟踪记录
 type KnowledgeRouteTrace struct {
-	ID                  int64   `gorm:"column:id"`                    //  主键
+	ID                  int64   `gorm:"column:id"`                    // 主键
 	ConversationId      string  `gorm:"column:conversation_id"`       // 会话ID
 	ExchangeId          int64   `gorm:"column:exchange_id"`           // 交互ID
 	Question            string  `gorm:"column:question"`              // 问题

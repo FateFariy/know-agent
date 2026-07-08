@@ -61,7 +61,7 @@ type KnowledgeLogic interface {
 	RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) (bool, error)
 
 	// QueryRouteTracePage 分页查询知识路由追踪
-	QueryRouteTracePage(ctx context.Context, conversationId, mode, routeStatus string, pageNo, pageSize int32) ([]*entity.KnowledgeRouteTrace, int64, error)
+	QueryRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error)
 }
 
 func Warnf(format string, v ...any) {

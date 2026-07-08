@@ -15,6 +15,7 @@ import (
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
@@ -103,8 +104,9 @@ type KnowledgeConverter interface {
 	ToKnowledgeTopicItemList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem
 	// ToDocumentProfileResp(src *klen.DocumentProfile) *knowledge.DocumentProfileResp
 	// ToDocumentProfileItemList(src []*klen.DocumentProfile) []*knowledge.DocumentProfileResp
-	// ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
-	// ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
+	// goverter:map RouteStatus | ToRouteStatus
+	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
+	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
 
 	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode
 	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model.KnowledgeTopicNode
@@ -137,6 +139,10 @@ func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReferenceRe
 	return common.JSONArrayTo(src, func(item any) *chat.SearchReferenceResp {
 		return item.(*chat.SearchReferenceResp)
 	})
+}
+
+func ToRouteStatus(code int) string {
+	return klvo.RouteStatusName(code)
 }
 
 func NormalizeString(s string) string {

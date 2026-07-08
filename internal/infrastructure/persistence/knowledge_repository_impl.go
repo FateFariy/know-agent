@@ -8,6 +8,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 	"gorm.io/gorm"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
@@ -42,6 +43,8 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 	}
 }
 
+// ============ 知识范围节点 ============
+
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
 	var nodes []*entity.KnowledgeScopeNode
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).
@@ -51,38 +54,6 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context)
 	}
 	return nodes, nil
 }
-
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
-	var nodes []*entity.KnowledgeTopicNode
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Find(&nodes).Error; err != nil {
-		return nil, err
-	}
-	return nodes, nil
-}
-
-func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error) {
-	var profiles []*entity.KnowledgeDocumentProfile
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).
-		Where("profile_status = ?", 2).
-		Find(&profiles).Error; err != nil {
-		return nil, err
-	}
-	return profiles, nil
-}
-
-func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error) {
-	var relations []*entity.KnowledgeTopicDocumentRelation
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Find(&relations).Error; err != nil {
-		return nil, err
-	}
-	return relations, nil
-}
-
-func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error {
-	return k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{}).Create(convert.ToKnowledgeRouteTraceModel(trace)).Error
-}
-
-// ============ Scope CRUD ============
 
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
 	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
@@ -98,7 +69,15 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, 
 	return k.dbWithContext(ctx).Where("scope_code = ?", scopeCode).Delete(&model.KnowledgeScopeNode{}).Error
 }
 
-// ============ Topic CRUD ============
+// ============ 主题节点 ============
+
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
+	var nodes []*entity.KnowledgeTopicNode
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
 
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error) {
 	var nodes []*entity.KnowledgeTopicNode
@@ -126,7 +105,17 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, 
 	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Where("topic_code = ?", topicCode).Delete(nil).Error
 }
 
-// ============ Document Profile ============
+// ============ 文档画像 ============
+
+func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error) {
+	var profiles []*entity.KnowledgeDocumentProfile
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).
+		Where("profile_status = ?", 2).
+		Find(&profiles).Error; err != nil {
+		return nil, err
+	}
+	return profiles, nil
+}
 
 func (k *KnowledgeRepositoryImpl) SelectDocumentProfileByDocumentId(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
 	profile := new(entity.KnowledgeDocumentProfile)
@@ -157,7 +146,15 @@ func (k *KnowledgeRepositoryImpl) BatchUpsertDocumentProfiles(ctx context.Contex
 	})
 }
 
-// ============ Topic-Document Relation ============
+// ============ 主题-文档关系 ============
+
+func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error) {
+	var relations []*entity.KnowledgeTopicDocumentRelation
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Find(&relations).Error; err != nil {
+		return nil, err
+	}
+	return relations, nil
+}
 
 func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelationsByTopicCode(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error) {
 	var relations []*entity.KnowledgeTopicDocumentRelation
@@ -183,17 +180,21 @@ func (k *KnowledgeRepositoryImpl) RemoveTopicDocumentRelation(ctx context.Contex
 	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where("topic_code = ? AND document_id = ?", topicCode, documentId).Delete(nil).Error
 }
 
-// ============ Route Trace Page ============
+// ============ 路由跟踪 ============
 
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Context, conversationId, mode, routeStatus string, pageNo, pageSize int32) ([]*entity.KnowledgeRouteTrace, int64, error) {
+func (k *KnowledgeRepositoryImpl) InsertKnowledgeRouteTrace(ctx context.Context, trace *entity.KnowledgeRouteTrace) error {
+	return k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{}).Create(convert.ToKnowledgeRouteTraceModel(trace)).Error
+}
+
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error) {
 	builder := k.dbWithContext(ctx).Model(&model.KnowledgeRouteTrace{})
-	if !strutil.IsBlank(conversationId) {
+	if strutil.IsNotBlank(conversationId) {
 		builder = builder.Where("conversation_id = ?", conversationId)
 	}
-	if !strutil.IsBlank(mode) {
+	if strutil.IsNotBlank(mode) {
 		builder = builder.Where("mode = ?", mode)
 	}
-	if !strutil.IsBlank(routeStatus) {
+	if routeStatus > 0 {
 		builder = builder.Where("route_status = ?", routeStatus)
 	}
 
@@ -201,25 +202,17 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Cont
 	if err := builder.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-
-	if pageNo <= 0 {
-		pageNo = 1
-	}
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = 20
-	}
-
 	var list []*entity.KnowledgeRouteTrace
-	limit := int(pageSize)
-	offset := (int(pageNo) - 1) * limit
-	if err := builder.Order("id DESC").Limit(limit).Offset(offset).Find(&list).Error; err != nil {
+	if err := builder.Scopes(utils.Paginate(pageNo, pageSize)).Order("id DESC").Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
 }
 
+// ============ 内部辅助函数 ============
+
 // // SearchByKeyword 关键词检索（按子串打分 + topK 排序）
-// // 当前以“SQL + 简单关键词权重”的形式实现；生产环境建议替换为 BM25/外部索引。
+// // 当前以"SQL + 简单关键词权重"的形式实现；生产环境建议替换为 BM25/外部索引。
 // func (k *KnowledgeRepositoryImpl) SearchByKeyword(ctx context.Context, query string, documentIDs, taskIDs []int64, topK int, filters *vo2.DocumentRetrieveFilters) ([]*data.EmbeddingChunk, error) {
 // 	if len(documentIDs) == 0 || len(taskIDs) == 0 || strutil.IsBlank(query) {
 // 		return nil, nil

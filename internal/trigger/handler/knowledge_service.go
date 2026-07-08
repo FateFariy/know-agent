@@ -2,12 +2,12 @@ package handler
 
 import (
 	"context"
-	"strconv"
+
+	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/knowledge"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 )
 
 // KnowledgeService 知识管理 HTTP 服务
@@ -34,7 +34,7 @@ func (k *KnowledgeService) SaveKnowledgeScope(ctx context.Context, req *knowledg
 }
 
 func (k *KnowledgeService) DeleteKnowledgeScope(ctx context.Context, req *knowledge.KnowledgeScopeDeleteReq) (bool, error) {
-	return k.l.DeleteScope(ctx, req.ScopeCode)
+	return k.l.DeleteScope(ctx, strutil.Trim(req.ScopeCode))
 }
 
 func (k *KnowledgeService) ListKnowledgeScope(ctx context.Context) ([]*knowledge.KnowledgeScopeItem, error) {
@@ -57,11 +57,11 @@ func (k *KnowledgeService) SaveKnowledgeTopic(ctx context.Context, req *knowledg
 }
 
 func (k *KnowledgeService) DeleteKnowledgeTopic(ctx context.Context, req *knowledge.KnowledgeTopicDeleteReq) (bool, error) {
-	return k.l.DeleteTopic(ctx, req.TopicCode)
+	return k.l.DeleteTopic(ctx, strutil.Trim(req.TopicCode))
 }
 
 func (k *KnowledgeService) ListKnowledgeTopic(ctx context.Context, req *knowledge.KnowledgeTopicListReq) ([]*knowledge.KnowledgeTopicItem, error) {
-	nodes, err := k.l.ListTopics(ctx, req.ScopeCode)
+	nodes, err := k.l.ListTopics(ctx, strutil.Trim(req.ScopeCode))
 	if err != nil {
 		return nil, err
 	}
@@ -144,112 +144,13 @@ func (k *KnowledgeService) QueryKnowledgeRouteTracePage(ctx context.Context, req
 	if err != nil {
 		return nil, err
 	}
-	items := make([]*knowledge.KnowledgeRouteTraceItem, 0, len(traces))
-	for _, t := range traces {
-		items = append(items, toKnowledgeRouteTraceItem(t))
-	}
-	totalPages := int32((total + int64(req.PageSize) - 1) / int64(req.PageSize))
+	result := convert.ToKnowledgeRouteTraceItemList(traces)
+	totalPages := (total + int64(req.PageSize) - 1) / int64(req.PageSize)
 	return &knowledge.KnowledgeRouteTracePageResp{
 		PageNo:     req.PageNo,
 		PageSize:   req.PageSize,
 		TotalSize:  total,
-		TotalPages: totalPages,
-		Records:    items,
+		TotalPages: int(totalPages),
+		Records:    result,
 	}, nil
-}
-
-// ==================== 转换函数 ====================
-
-func toKnowledgeScopeItem(n *entity.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem {
-	if n == nil {
-		return nil
-	}
-	return &knowledge.KnowledgeScopeItem{
-		Id:              int64ToString(n.ID),
-		ScopeCode:       n.ScopeCode,
-		ScopeName:       n.ScopeName,
-		ParentScopeCode: n.ParentScopeCode,
-		Description:     n.Description,
-		Aliases:         n.Aliases,
-		Examples:        n.Examples,
-		SortOrder:       int32(n.SortOrder),
-	}
-}
-
-func toKnowledgeTopicItem(n *entity.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem {
-	if n == nil {
-		return nil
-	}
-	return &knowledge.KnowledgeTopicItem{
-		Id:                  int64ToString(n.ID),
-		TopicCode:           n.TopicCode,
-		TopicName:           n.TopicName,
-		ScopeCode:           n.ScopeCode,
-		Description:         n.Description,
-		Aliases:             n.Aliases,
-		Examples:            n.Examples,
-		AnswerShape:         n.AnswerShape,
-		ExecutionPreference: n.ExecutionPreference,
-		SortOrder:           int32(n.SortOrder),
-	}
-}
-
-func toDocumentProfileResp(p *entity.KnowledgeDocumentProfile) *knowledge.DocumentProfileResp {
-	if p == nil {
-		return nil
-	}
-	return &knowledge.DocumentProfileResp{
-		DocumentId:           p.DocumentId,
-		DocumentSummary:      p.DocumentSummary,
-		DocumentType:         p.DocumentType,
-		CoreTopics:           p.CoreTopics,
-		ExampleQuestions:     p.ExampleQuestions,
-		GraphFriendly:        logic.RouteStatusName(p.ProfileStatus),
-		SupportsGraphOutline: logic.RouteStatusName(p.ProfileStatus),
-		SupportsItemLookup:   logic.RouteStatusName(p.ProfileStatus),
-		SupportsGraphAssist:  logic.RouteStatusName(p.ProfileStatus),
-		ProfileSource:        "MANUAL",
-		ProfileStatus:        logic.RouteStatusName(p.ProfileStatus),
-	}
-}
-
-func toKnowledgeRouteTraceItem(t *entity.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
-	if t == nil {
-		return nil
-	}
-	return &knowledge.KnowledgeRouteTraceItem{
-		Id:                  t.ID,
-		ConversationId:      t.ConversationId,
-		ExchangeId:          t.ExchangeId,
-		Question:            t.Question,
-		RewriteQuestion:     t.RewriteQuestion,
-		Mode:                t.Mode,
-		TopScopesJson:       t.TopScopesJson,
-		TopTopicsJson:       t.TopTopicsJson,
-		TopDocumentsJson:    t.TopDocumentsJson,
-		SelectedDocumentId:  t.SelectedDocumentId,
-		HitSelectedDocument: logic.RouteStatusHitFlag(t.HitSelectedDocument),
-		Confidence:          float64ToPctString(t.Confidence),
-		RouteStatus:         logic.RouteStatusName(t.RouteStatus),
-		ErrorMsg:            t.ErrorMsg,
-	}
-}
-
-// ========= 通用工具 =========
-
-func int64ToString(v int64) string {
-	if v == 0 {
-		return ""
-	}
-	return strconv.FormatInt(v, 10)
-}
-
-func float64ToPctString(v float64) string {
-	if v <= 0 {
-		return ""
-	}
-	if v <= 1 {
-		return strconv.FormatFloat(v*100, 'f', 2, 64) + "%"
-	}
-	return strconv.FormatFloat(v, 'f', 2, 64)
 }

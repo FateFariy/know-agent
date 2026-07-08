@@ -51,7 +51,7 @@ func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ChatReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -91,7 +91,7 @@ func StopConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -105,7 +105,7 @@ func GetSessionDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Ha
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -119,7 +119,7 @@ func GetExchangeDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationExchangeDetailQueryReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -133,7 +133,7 @@ func ListSessionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Handle
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationSessionListReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -147,7 +147,7 @@ func ResetConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -161,7 +161,7 @@ func RebuildSummaryHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -175,7 +175,7 @@ func GetRetrievalResultsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RetrievalObserveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -189,7 +189,7 @@ func GetChannelExecutionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RetrievalObserveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrParm.Format(err.Error()))
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 

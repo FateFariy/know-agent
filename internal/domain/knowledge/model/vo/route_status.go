@@ -18,3 +18,16 @@ func RouteStatusCode(name string) int {
 		return 3
 	}
 }
+
+func RouteStatusName(code int) string {
+	switch code {
+	case 1:
+		return RouteStatusSuccess
+	case 2:
+		return RouteStatusLowConfidence
+	case 3:
+		return RouteStatusFailed
+	default:
+		return ""
+	}
+}
