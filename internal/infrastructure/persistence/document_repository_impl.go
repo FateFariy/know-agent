@@ -469,6 +469,17 @@ func (d *DocumentRepositoryImpl) DeleteProfileByDocumentId(ctx context.Context, 
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentProfile{}).Error
 }
 
+// SelectDocumentProfiles 查询所有文档属性
+func (d *DocumentRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.DocumentProfile, error) {
+	var profiles []*entity.DocumentProfile
+	if err := d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
+		Where("profile_status = ?", 2).
+		Find(&profiles).Error; err != nil {
+		return nil, err
+	}
+	return profiles, nil
+}
+
 // ========== 话题关联相关 ==========
 
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联

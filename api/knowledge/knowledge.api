@@ -119,21 +119,21 @@ type (
 	}
 	// 知识路由追踪列表项
 	KnowledgeRouteTraceItem {
-		ID                  int64  `json:"id"` // 主键ID
-		ConversationId      string `json:"conversationId"` // 会话ID
-		ExchangeId          int64  `json:"exchangeId"` // 轮次ID
-		Question            string `json:"question"` // 用户提问
-		RewriteQuestion     string `json:"rewriteQuestion"` // 改写后的问题
-		Mode                string `json:"mode"` // 模式
-		TopScopesJson       string `json:"topScopesJson"` // 候选范围JSON
-		TopTopicsJson       string `json:"topTopicsJson"` // 候选主题JSON
-		TopDocumentsJson    string `json:"topDocumentsJson"` // 候选文档JSON
-		SelectedDocumentId  int64  `json:"selectedDocumentId"` // 选中的文档ID
-		HitSelectedDocument int    `json:"hitSelectedDocument"` // 是否命中选中文档
+		ID                  int64   `json:"id"` // 主键ID
+		ConversationId      string  `json:"conversationId"` // 会话ID
+		ExchangeId          int64   `json:"exchangeId"` // 轮次ID
+		Question            string  `json:"question"` // 用户提问
+		RewriteQuestion     string  `json:"rewriteQuestion"` // 改写后的问题
+		Mode                string  `json:"mode"` // 模式
+		TopScopesJson       string  `json:"topScopesJson"` // 候选范围JSON
+		TopTopicsJson       string  `json:"topTopicsJson"` // 候选主题JSON
+		TopDocumentsJson    string  `json:"topDocumentsJson"` // 候选文档JSON
+		SelectedDocumentId  int64   `json:"selectedDocumentId"` // 选中的文档ID
+		HitSelectedDocument int     `json:"hitSelectedDocument"` // 是否命中选中文档
 		Confidence          float64 `json:"confidence"` // 置信度
-		RouteStatus         string `json:"routeStatus"` // 路由状态
-		ErrorMsg            string `json:"errorMsg"` // 错误信息
-		CreateTime          string `json:"createTime"` // 创建时间
+		RouteStatus         string  `json:"routeStatus"` // 路由状态
+		ErrorMsg            string  `json:"errorMsg"` // 错误信息
+		CreateTime          string  `json:"createTime"` // 创建时间
 	}
 	// 分页查询知识路由追踪响应
 	KnowledgeRouteTracePageResp {

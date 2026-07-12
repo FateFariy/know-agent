@@ -39,7 +39,7 @@ type KnowledgeRouteTracePageResp struct {
 
 type KnowledgeScopeDeleteReq struct {
 	ScopeCode  string `json:"scopeCode"`           // 范围编码
-	OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
 type KnowledgeScopeItem struct {
@@ -67,7 +67,7 @@ type KnowledgeScopeSaveReq struct {
 
 type KnowledgeTopicDeleteReq struct {
 	TopicCode  string `json:"topicCode"`           // 主题编码
-	OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
 type KnowledgeTopicItem struct {
@@ -121,7 +121,7 @@ type TopicDocumentRelationListReq struct {
 type TopicDocumentRelationRemoveReq struct {
 	TopicCode  string `json:"topicCode"`           // 主题编码
 	DocumentId int64  `json:"documentId"`          // 文档ID
-	OperatorId int64  `json:"operatorId,optional"` // 操作人ID
+	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
 type TopicDocumentRelationSaveReq struct {
@@ -130,5 +130,5 @@ type TopicDocumentRelationSaveReq struct {
 	RelationScore  float64 `json:"relationScore,optional"`  // 关联分数
 	RelationSource string  `json:"relationSource,optional"` // 关联来源
 	Reason         string  `json:"reason,optional"`         // 理由
-	OperatorId     int64   `json:"operatorId,optional"`     // 操作人ID
+	OperatorId     string  `json:"operatorId,optional"`     // 操作人ID
 }

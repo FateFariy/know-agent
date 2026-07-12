@@ -34,24 +34,26 @@ var (
 //	HandleParseRoute → 解析路由（文件解析 + 结构节点 + 策略推荐）
 //	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库）
 type AsyncProcessingLogicImpl struct {
-	repo          adapter.DocumentRepository
-	port          *adapter.DocumentPort
-	registry      parse.Registry
-	strategyLogic ChunkStrategyLogic
-	structureNode StructureNodeLogic
-	textPreProc   TextPreProcessLogic
+	repo           adapter.DocumentRepository
+	port           *adapter.DocumentPort
+	registry       parse.Registry
+	strategyLogic  ChunkStrategyLogic
+	structureLogic StructureNodeLogic
+	textLogic      TextPreProcessLogic
+	profileLogic   ProfileLogic
 }
 
 // NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
 func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry parse.Registry,
-	strategyLogic ChunkStrategyLogic, structureNode StructureNodeLogic, textPreProc TextPreProcessLogic) *AsyncProcessingLogicImpl {
+	strategyLogic ChunkStrategyLogic, structureLogic StructureNodeLogic, textLogic TextPreProcessLogic, profileLogic ProfileLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
-		repo:          repo,
-		port:          port,
-		registry:      registry,
-		strategyLogic: strategyLogic,
-		structureNode: structureNode,
-		textPreProc:   textPreProc,
+		repo:           repo,
+		port:           port,
+		registry:       registry,
+		strategyLogic:  strategyLogic,
+		structureLogic: structureLogic,
+		textLogic:      textLogic,
+		profileLogic:   profileLogic,
 	}
 }
 
@@ -127,7 +129,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		panic(err)
 	}
 	// 调用文本预处理逻辑
-	analysisResult, err := d.textPreProc.PreProcess(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
+	analysisResult, err := d.textLogic.PreProcess(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
 	if err != nil {
 		panic(err)
 	}
@@ -139,7 +141,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	}
 
 	// 基于解析文本构建并写入文档结构节点（供结构切块策略使用）
-	structureNodes, err := d.structureNode.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
+	structureNodes, err := d.structureLogic.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
 	if err != nil {
 		panic(err)
 	}
@@ -148,7 +150,10 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		panic(err)
 	}
 
-	// todo documentProfileService.generateProfile(documentId, analysisResult, structureNodes);
+	// 生成文档画像
+	if _, err = d.profileLogic.GenerateProfile(ctx, documentId, analysisResult, structureNodes); err != nil {
+		return err
+	}
 
 	// 写入"文档解析完成"日志（附带字符数/段落/结构节点数量等统计信息）
 	parseFinishDetail, _ := json.Marshal(map[string]any{

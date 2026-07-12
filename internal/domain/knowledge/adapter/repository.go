@@ -36,20 +36,6 @@ type KnowledgeRepository interface {
 	// DeleteKnowledgeTopicNode 按 topicCode 删除主题节点
 	DeleteKnowledgeTopicNode(ctx context.Context, topicCode string) error
 
-	// ========== 文档画像相关 ==========
-
-	// SelectDocumentProfiles 获取构建成功的文档画像
-	SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error)
-
-	// SelectDocumentProfileByDocumentId 根据文档ID获取画像
-	SelectDocumentProfileByDocumentId(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error)
-
-	// UpsertDocumentProfile 保存/更新文档画像
-	UpsertDocumentProfile(ctx context.Context, profile *entity.KnowledgeDocumentProfile) error
-
-	// BatchUpsertDocumentProfiles 批量保存/更新文档画像
-	BatchUpsertDocumentProfiles(ctx context.Context, profiles []*entity.KnowledgeDocumentProfile) error
-
 	// ========== 主题-文档关系相关 ==========
 
 	// SelectTopicDocumentRelations 获取主题-文档映射关系

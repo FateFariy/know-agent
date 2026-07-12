@@ -16,6 +16,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	documentLogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
@@ -43,8 +44,9 @@ var (
 
 // KnowledgeRouteLogicImpl 知识路由服务实现：负责根据问题/改写问题匹配 scope/topic/document
 type KnowledgeRouteLogicImpl struct {
-	repo          adapter.KnowledgeRepository
-	documentLogic documentLogic.LifecycleLogic
+	repo           adapter.KnowledgeRepository
+	lifecycleLogic documentLogic.LifecycleLogic
+	profileLogic   documentLogic.ProfileLogic
 	*options
 }
 
@@ -56,15 +58,16 @@ type options struct {
 type Option func(*options)
 
 // NewKnowledgeRouteLogicImpl 创建路由服务实例
-func NewKnowledgeRouteLogicImpl(repo adapter.KnowledgeRepository, documentLogic documentLogic.LifecycleLogic, opts ...Option) *KnowledgeRouteLogicImpl {
+func NewKnowledgeRouteLogicImpl(repo adapter.KnowledgeRepository, lifecycleLogic documentLogic.LifecycleLogic, profileLogic documentLogic.ProfileLogic, opts ...Option) *KnowledgeRouteLogicImpl {
 	base := new(options)
 	for _, opt := range opts {
 		opt(base)
 	}
 	return &KnowledgeRouteLogicImpl{
-		repo:          repo,
-		documentLogic: documentLogic,
-		options:       base,
+		repo:           repo,
+		lifecycleLogic: lifecycleLogic,
+		profileLogic:   profileLogic,
+		options:        base,
 	}
 }
 
@@ -279,7 +282,7 @@ func (s *KnowledgeRouteLogicImpl) rankScopes(ctx context.Context, q *routeQueryC
 
 // deriveScopesFromDocuments 当没有配置 scope 节点时，从文档元数据派生粗略的 scope 候选
 func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context, q *routeQueryContext) []*vo.ScopeRouteCandidate {
-	docs, err := s.documentLogic.ListRetrievableDocuments(ctx)
+	docs, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("查询可检索文档失败: %v", err)
 		return nil
@@ -362,12 +365,12 @@ func (s *KnowledgeRouteLogicImpl) rankTopics(ctx context.Context, q *routeQueryC
 
 // deriveTopicsFromProfiles 当 topic 节点未配置时，按文档画像的 CoreTopics 派生主题候选
 func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, q *routeQueryContext, preferredScopes map[string]struct{}) []*vo.TopicRouteCandidate {
-	profiles, err := s.repo.SelectDocumentProfiles(ctx)
+	profiles, err := s.profileLogic.GetAllProfiles(ctx)
 	if err != nil {
 		Warnf("查询文档画像失败: %v", err)
 		return nil
 	}
-	docs, err := s.documentLogic.ListRetrievableDocuments(ctx)
+	docs, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("查询可检索文档失败: %v", err)
 	}
@@ -410,7 +413,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 
 // rankDocuments 对文档进行打分，并将 top-score 的文档返回
 func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQueryContext, scopeCandidates []*vo.ScopeRouteCandidate, topicCandidates []*vo.TopicRouteCandidate) []*vo.DocumentRouteCandidate {
-	documents, err := s.documentLogic.ListRetrievableDocuments(ctx)
+	documents, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		Warnf("查询可检索文档失败: %v", err)
 		return nil
@@ -418,11 +421,11 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 	if len(documents) == 0 {
 		return nil
 	}
-	profiles, err := s.repo.SelectDocumentProfiles(ctx)
+	profiles, err := s.profileLogic.GetAllProfiles(ctx)
 	if err != nil {
 		Warnf("查询文档画像失败: %v", err)
 	}
-	profileByDoc := make(map[int64]*entity.KnowledgeDocumentProfile, len(profiles))
+	profileByDoc := make(map[int64]*den.DocumentProfile, len(profiles))
 	for _, p := range profiles {
 		profileByDoc[p.DocumentId] = p
 	}
@@ -500,7 +503,7 @@ func (s *KnowledgeRouteLogicImpl) rankDocuments(ctx context.Context, q *routeQue
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
-func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *dvo.KnowledgeDocument, profile *entity.KnowledgeDocumentProfile) string {
+func (s *KnowledgeRouteLogicImpl) buildDocumentRouteText(doc *dvo.KnowledgeDocument, profile *den.DocumentProfile) string {
 	if profile == nil {
 		return utils.JoinNonBlank(" ", doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}

@@ -74,38 +74,6 @@ func (k *KnowledgeLogicImpl) ListTopics(ctx context.Context, scopeCode string) (
 	return nodes, nil
 }
 
-// ============ Document Profile ============
-
-func (k *KnowledgeLogicImpl) GetDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
-	return k.repo.SelectDocumentProfileByDocumentId(ctx, documentId)
-}
-
-func (k *KnowledgeLogicImpl) RegenerateDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
-	// 此处仅执行画像的写入/更新操作；真正的“重新生成”由上游的异步 pipeline 完成
-	profile := &entity.KnowledgeDocumentProfile{
-		DocumentId:    documentId,
-		ProfileStatus: 1, // 标记为生成中
-	}
-	if err := k.repo.UpsertDocumentProfile(ctx, profile); err != nil {
-		return nil, err
-	}
-	return profile, nil
-}
-
-func (k *KnowledgeLogicImpl) BatchRegenerateDocumentProfiles(ctx context.Context, documentIds []int64) ([]*entity.KnowledgeDocumentProfile, error) {
-	profiles := make([]*entity.KnowledgeDocumentProfile, 0, len(documentIds))
-	for _, id := range documentIds {
-		if id <= 0 {
-			continue
-		}
-		profiles = append(profiles, &entity.KnowledgeDocumentProfile{DocumentId: id, ProfileStatus: 1})
-	}
-	if err := k.repo.BatchUpsertDocumentProfiles(ctx, profiles); err != nil {
-		return nil, err
-	}
-	return profiles, nil
-}
-
 // ============ Topic-Document Relation ============
 
 func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error) {

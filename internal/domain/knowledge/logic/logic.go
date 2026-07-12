@@ -42,15 +42,6 @@ type KnowledgeLogic interface {
 	// ListTopics 查询主题列表（支持按 scopeCode 过滤）
 	ListTopics(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error)
 
-	// GetDocumentProfile 获取文档画像
-	GetDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error)
-
-	// RegenerateDocumentProfile 重新生成文档画像
-	RegenerateDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error)
-
-	// BatchRegenerateDocumentProfiles 批量重新生成文档画像
-	BatchRegenerateDocumentProfiles(ctx context.Context, documentIds []int64) ([]*entity.KnowledgeDocumentProfile, error)
-
 	// ListTopicDocumentRelations 查询主题文档关联
 	ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error)
 

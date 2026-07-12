@@ -25,7 +25,6 @@ var (
 	stepReferencePattern           = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)              // "第几步"，用于结构图定位取证
 	ordinalReferencePattern        = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*([条点项个])`)       // 第几条/点/项/个
 	quotedTextPattern              = regexp.MustCompile(`[“"']([^”"']{2,40})[”"']`)                 // 引号包裹的标题短语
-	jsonObjectPattern              = regexp.MustCompile(`\{[\s\S]*}`)                               // 从任意文本中抽取 JSON 对象，兼容模型漂移
 	normalizePattern               = regexp.MustCompile(`[\s>\` + "`" + `*#_\\-，,。；;：:（）()“”\"']+`) // 中文标点符号
 	querySplitPattern              = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)                  // 中文分隔符
 )

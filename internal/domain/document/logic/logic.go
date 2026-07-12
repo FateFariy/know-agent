@@ -95,6 +95,9 @@ type ProfileLogic interface {
 	// GenerateProfile 根据分析结果生成/更新文档画像
 	GenerateProfile(ctx context.Context, documentId int64, analysisResult *vo.DocumentAnalysisResult, structureNodes []*entity.DocumentStructureNode) (*entity.DocumentProfile, error)
 
+	// GetAllProfiles 获取所有画像
+	GetAllProfiles(ctx context.Context) ([]*entity.DocumentProfile, error)
+
 	// GetProfileByDocumentId 根据文档ID获取画像
 	GetProfileByDocumentId(ctx context.Context, documentId int64) (*entity.DocumentProfile, error)
 

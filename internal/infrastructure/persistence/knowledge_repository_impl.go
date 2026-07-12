@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
-	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
@@ -59,9 +58,11 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context)
 // UpsertKnowledgeScopeNode 插入或更新知识范围节点
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
 	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
-	return k.dbWithContext(ctx).
-		Where("scope_code = ?", node.ScopeCode).
-		Assign(nodeModel).FirstOrCreate(node).Error
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Where("scope_code = ?", node.ScopeCode).First(node).Error; err != nil {
+		return err
+	}
+	nodeModel.ID = node.ID
+	return k.dbWithContext(ctx).Save(nodeModel).Error
 }
 
 // DeleteKnowledgeScopeNode 删除知识范围节点
@@ -95,9 +96,13 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx conte
 // UpsertKnowledgeTopicNode 插入或更新主题节点
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error {
 	nodeModel := convert.ToKnowledgeTopicNodeModel(node)
-	return k.dbWithContext(ctx).
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).
 		Where("topic_code = ?", node.TopicCode).
-		Assign(nodeModel).FirstOrCreate(node).Error
+		First(node).Error; err != nil {
+		return err
+	}
+	nodeModel.ID = node.ID
+	return k.dbWithContext(ctx).Save(nodeModel).Error
 }
 
 // DeleteKnowledgeTopicNode 删除主题节点
@@ -106,51 +111,6 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, 
 		return nil
 	}
 	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Where("topic_code = ?", topicCode).Delete(nil).Error
-}
-
-// ============ 文档画像 ============
-
-// SelectDocumentProfiles 查询所有文档画像
-func (k *KnowledgeRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]*entity.KnowledgeDocumentProfile, error) {
-	var profiles []*entity.KnowledgeDocumentProfile
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).
-		Where("profile_status = ?", 2).
-		Find(&profiles).Error; err != nil {
-		return nil, err
-	}
-	return profiles, nil
-}
-
-// SelectDocumentProfileByDocumentId 根据文档ID查询文档画像
-func (k *KnowledgeRepositoryImpl) SelectDocumentProfileByDocumentId(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
-	profile := new(entity.KnowledgeDocumentProfile)
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", documentId).First(profile).Error; err != nil {
-		return nil, err
-	}
-	return profile, nil
-}
-
-// UpsertDocumentProfile 插入或更新文档画像
-func (k *KnowledgeRepositoryImpl) UpsertDocumentProfile(ctx context.Context, profile *entity.KnowledgeDocumentProfile) error {
-	if profile == nil {
-		return nil
-	}
-	return k.dbWithContext(ctx).Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", profile.DocumentId).Assign(profile).FirstOrCreate(profile).Error
-}
-
-// BatchUpsertDocumentProfiles 批量插入或更新文档画像
-func (k *KnowledgeRepositoryImpl) BatchUpsertDocumentProfiles(ctx context.Context, profiles []*entity.KnowledgeDocumentProfile) error {
-	if len(profiles) == 0 {
-		return nil
-	}
-	return k.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, p := range profiles {
-			if err := tx.Model(&model.KnowledgeDocumentProfile{}).Where("document_id = ?", p.DocumentId).Assign(p).FirstOrCreate(p).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 // ============ 主题-文档关系 ============
@@ -180,9 +140,13 @@ func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelationsByTopicCode(ctx co
 // UpsertTopicDocumentRelation 插入或更新主题-文档关系
 func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) error {
 	relModel := convert.ToKnowledgeTopicDocumentRelationModel(relation)
-	return k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
 		Where("topic_code = ? AND document_id = ?", relation.TopicCode, relation.DocumentId).
-		Assign(relModel).FirstOrCreate(relation).Error
+		First(relation).Error; err != nil {
+		return err
+	}
+	relModel.ID = relation.ID
+	return k.dbWithContext(ctx).Save(relModel).Error
 }
 
 // DeleteTopicDocumentRelation 删除主题-文档关系
