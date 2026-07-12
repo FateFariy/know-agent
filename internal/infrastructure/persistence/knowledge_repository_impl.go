@@ -76,18 +76,14 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, 
 
 // SelectKnowledgeTopicNodes 查询所有主题节点
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
-	var nodes []*entity.KnowledgeTopicNode
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Find(&nodes).Error; err != nil {
-		return nil, err
-	}
-	return nodes, nil
+	return k.SelectKnowledgeTopicNodesByScopeCode(ctx, "")
 }
 
 // SelectKnowledgeTopicNodesByScopeCode 根据知识范围节点查询所有主题节点
 func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error) {
 	var nodes []*entity.KnowledgeTopicNode
-	builder := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{})
-	if !strutil.IsBlank(scopeCode) {
+	builder := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Order("sort_order ASC")
+	if strutil.IsNotBlank(scopeCode) {
 		builder = builder.Where("scope_code = ?", scopeCode)
 	}
 	if err := builder.Find(&nodes).Error; err != nil {

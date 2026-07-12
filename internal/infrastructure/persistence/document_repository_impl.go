@@ -437,8 +437,44 @@ func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context
 
 // InsertProfile 插入文档属性
 func (d *DocumentRepositoryImpl) InsertProfile(ctx context.Context, profile *entity.DocumentProfile) error {
-	// TODO implement me
-	panic("implement me")
+	if profile == nil {
+		return nil
+	}
+	return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).Create(profile).Error
+}
+
+// SelectProfileByDocumentId 根据文档ID查询文档属性
+func (d *DocumentRepositoryImpl) SelectProfileByDocumentId(ctx context.Context, documentId int64) (*entity.DocumentProfile, error) {
+	profile := new(entity.DocumentProfile)
+	err := d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
+		Where("document_id = ?", documentId).
+		Order("id DESC").
+		First(profile).Error
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return profile, err
+}
+
+// UpsertProfile 创建或更新文档属性
+func (d *DocumentRepositoryImpl) UpsertProfile(ctx context.Context, profile *entity.DocumentProfile) error {
+	if profile == nil {
+		return nil
+	}
+	existing, err := d.SelectProfileByDocumentId(ctx, profile.DocumentId)
+	if err != nil {
+		return err
+	}
+	if existing == nil || existing.ID == 0 {
+		if profile.ID == 0 {
+			profile.ID = utils.GetSnowflakeNextID()
+		}
+		return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).Create(profile).Error
+	}
+	profile.ID = existing.ID
+	return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
+		Where("id = ?", existing.ID).
+		Updates(profile).Error
 }
 
 // DeleteProfileByDocumentId 根据文档ID删除文档属性

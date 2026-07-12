@@ -89,3 +89,18 @@ type TextPreProcessLogic interface {
 	// PreProcess 文本预处理
 	PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error)
 }
+
+// ProfileLogic 文档画像业务逻辑接口
+type ProfileLogic interface {
+	// GenerateProfile 根据分析结果生成/更新文档画像
+	GenerateProfile(ctx context.Context, documentId int64, analysisResult *vo.DocumentAnalysisResult, structureNodes []*entity.DocumentStructureNode) (*entity.DocumentProfile, error)
+
+	// GetProfileByDocumentId 根据文档ID获取画像
+	GetProfileByDocumentId(ctx context.Context, documentId int64) (*entity.DocumentProfile, error)
+
+	// RegenerateProfile 重新生成文档画像（读取已解析文本与结构节点）
+	RegenerateProfile(ctx context.Context, documentId int64) (*entity.DocumentProfile, error)
+
+	// BatchRegenerateProfiles 批量重新生成文档画像
+	BatchRegenerateProfiles(ctx context.Context, documentIds []int64) ([]*entity.DocumentProfile, error)
+}
