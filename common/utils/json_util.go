@@ -52,3 +52,12 @@ func extractJson(raw, str1, str2 string) string {
 	}
 	return trimmed[start : end+1]
 }
+
+// ToCompactJSON 将任意切片序列化为紧凑 JSON
+func ToCompactJSON[T any](v []T) string {
+	data, err := json.Marshal(v)
+	if err != nil || len(data) == 0 || string(data) == "null" {
+		return "[]"
+	}
+	return string(data)
+}

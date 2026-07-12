@@ -159,8 +159,8 @@ type DocumentRepository interface {
 	// SelectProfileByDocumentId 根据文档ID查询文档属性
 	SelectProfileByDocumentId(ctx context.Context, documentId int64) (*entity.DocumentProfile, error)
 
-	// UpsertProfile 创建或更新文档属性
-	UpsertProfile(ctx context.Context, profile *entity.DocumentProfile) error
+	// SaveProfile 创建或更新文档属性
+	SaveProfile(ctx context.Context, profile *entity.DocumentProfile) error
 
 	// DeleteProfileByDocumentId 根据文档ID删除属性
 	DeleteProfileByDocumentId(ctx context.Context, documentId int64) error

@@ -216,3 +216,35 @@ func InferDocumentType(combinedText string, supportsItemLookup bool) string {
 	}
 	return DocTypeIntro
 }
+
+func ExampleQuestion(docType, topic string) string {
+	switch docType {
+	case DocTypeTroubleshoot:
+		return topic + "的可能原因有哪些？"
+	case DocTypeManual:
+		return topic + "的步骤是什么？"
+	case DocTypeRule:
+		return topic + "有哪些规则？"
+	default:
+		return topic + "是什么意思？"
+	}
+}
+
+// InferBusinessCategory 推断业务分类
+func InferBusinessCategory(docType DocumentType, parsedText string) string {
+	switch docType {
+	case DocTypeTroubleshoot:
+		return "故障排查"
+	case DocTypeRule:
+		return "规则"
+	case DocTypeSpec:
+		return "规格说明"
+	case DocTypeManual:
+		if strutil.ContainsAny(parsedText, []string{"步骤", "操作", "部署"}) {
+			return "操作手册"
+		}
+		return "手册"
+	default:
+		return "介绍"
+	}
+}

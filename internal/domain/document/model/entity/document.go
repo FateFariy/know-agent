@@ -1,8 +1,12 @@
 package entity
 
 import (
+	"strings"
 	"time"
 
+	"github.com/duke-git/lancet/v2/strutil"
+
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -49,6 +53,7 @@ type Document struct {
 	PlanReady            bool      `gorm:"-"`                            // 方案是否就绪
 }
 
+// FillEnumNames 填充枚举名称
 func (d *Document) FillEnumNames() {
 	d.FileTypeName = vo.FileTypeName(d.FileType)
 	d.ParseStatusName = vo.ParseStatusName(d.ParseStatus)
@@ -56,10 +61,22 @@ func (d *Document) FillEnumNames() {
 	d.IndexStatusName = vo.IndexStatusName(d.IndexStatus)
 }
 
+// FillLatestTaskInfo 填充最新任务信息
 func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
 	d.LatestTaskId = task.ID
 	d.LatestTaskType = task.TaskType
 	d.LatestTaskTypeName = vo.TaskTypeName(task.TaskType)
 	d.LatestTaskStatus = task.TaskStatus
 	d.LatestTaskStatusName = vo.TaskStatusName(task.TaskStatus)
+}
+
+// FillDocumentTags 填充文档标签，逗号分隔
+func (d *Document) FillDocumentTags(knowledgeScopeCode, documentType string, coreTopics []string) {
+	tags := strings.Split(d.DocumentTags, ",")
+	tags = append(tags, knowledgeScopeCode, documentType)
+	tags = append(tags, utils.LimitSlice(coreTopics, 4)...)
+	filterLimit := utils.DistinctFilterLimit(tags, 8, func(tag string) (string, bool) {
+		return strutil.Trim(tag), strutil.IsNotBlank(tag)
+	})
+	d.DocumentTags = strings.Join(filterLimit, ",")
 }

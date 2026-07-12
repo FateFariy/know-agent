@@ -49,20 +49,6 @@ type (
 	KnowledgeTopicListReq {
 		ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
 	}
-	// 查询文档画像详情请求
-	DocumentProfileDetailReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
-	}
-	// 重新生成文档画像请求
-	DocumentProfileRegenerateReq {
-		DocumentId int64  `json:"documentId"` // 文档ID
-		OperatorId string `json:"operatorId,optional"` // 操作人ID
-	}
-	// 批量重新生成文档画像请求
-	DocumentProfileBatchRegenerateReq {
-		DocumentIds []int64 `json:"documentIds"` // 文档ID列表
-		OperatorId  string  `json:"operatorId,optional"` // 操作人ID
-	}
 	// 查询主题文档关联列表请求
 	TopicDocumentRelationListReq {
 		TopicCode string `json:"topicCode"` // 主题编码
@@ -117,21 +103,6 @@ type (
 		AnswerShape         string `json:"answerShape"` // 答复形态
 		ExecutionPreference string `json:"executionPreference"` // 执行偏好
 		SortOrder           int    `json:"sortOrder"` // 排序
-	}
-	// 文档画像信息
-	DocumentProfileResp {
-		DocumentId           int64  `json:"documentId"` // 文档ID
-		DocumentSummary      string `json:"documentSummary"` // 文档摘要
-		DocumentType         string `json:"documentType"` // 文档类型
-		CoreTopics           string `json:"coreTopics"` // 核心主题
-		ExampleQuestions     string `json:"exampleQuestions"` // 示例问题
-		GraphFriendly        string `json:"graphFriendly"` // 是否支持结构图
-		SupportsGraphOutline string `json:"supportsGraphOutline"` // 是否支持图纲
-		SupportsItemLookup   string `json:"supportsItemLookup"` // 是否支持条目检索
-		SupportsGraphAssist  string `json:"supportsGraphAssist"` // 是否支持图辅助
-		ProfileSource        string `json:"profileSource"` // 画像来源
-		ProfileStatus        string `json:"profileStatus"` // 画像状态
-		ErrorMsg             string `json:"errorMsg"` // 错误信息
 	}
 	// 主题文档关联项
 	TopicDocumentRelationItem {
@@ -204,18 +175,6 @@ service knowledge {
 	@doc "查询知识主题列表"
 	@handler ListKnowledgeTopic
 	post /topic/list (KnowledgeTopicListReq) returns ([]*KnowledgeTopicItem)
-
-	@doc "查询文档画像详情"
-	@handler GetDocumentProfile
-	post /document/profile/detail (DocumentProfileDetailReq) returns (DocumentProfileResp)
-
-	@doc "重新生成文档画像"
-	@handler RegenerateDocumentProfile
-	post /document/profile/regenerate (DocumentProfileRegenerateReq) returns (DocumentProfileResp)
-
-	@doc "批量重新生成文档画像"
-	@handler BatchRegenerateDocumentProfile
-	post /document/profile/batch/regenerate (DocumentProfileBatchRegenerateReq) returns ([]*DocumentProfileResp)
 
 	@doc "查询主题文档关联"
 	@handler ListTopicDocumentRelation

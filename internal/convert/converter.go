@@ -42,8 +42,11 @@ type DocumentConverter interface {
 	ToDocumentChunkItemList(src []*den.DocumentChunk) []*document.DocumentChunkItem
 	ToQueryDocumentChunkDetailResp(src *dagg.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp
 	ToQueryTaskLogsResp(src *den.DocumentTask) *document.QueryTaskLogsResp
+	ToDocumentProfileResp(src *den.DocumentProfile) *document.DocumentProfileResp
+	ToDocumentProfileRespList(src []*den.DocumentProfile) []*document.DocumentProfileResp
 
 	ToDocumentModel(src *den.Document) *model.Document
+	ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
 	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
 	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan

@@ -75,6 +75,20 @@ type (
 		PageNo   int   `json:"pageNo,optional,default=1"` // 页码
 		PageSize int   `json:"pageSize,optional,default=10"` // 每页大小
 	}
+	// 查询文档画像详情请求
+	DocumentProfileDetailReq {
+		DocumentId int64 `json:"documentId"` // 文档ID
+	}
+	// 重新生成文档画像请求
+	DocumentProfileRegenerateReq {
+		DocumentId int64  `json:"documentId"` // 文档ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
+	}
+	// 批量重新生成文档画像请求
+	DocumentProfileBatchRegenerateReq {
+		DocumentIds []int64 `json:"documentIds"` // 文档ID列表
+		OperatorId  string  `json:"operatorId,optional"` // 操作人ID
+	}
 )
 
 // ==================== 响应类型定义 ====================
@@ -284,6 +298,21 @@ type (
 		DetailJson    string `json:"detailJson"` // 详细JSON数据
 		CreateTime    string `json:"createTime"` // 创建时间
 	}
+	// 文档画像信息
+	DocumentProfileResp {
+        DocumentId           int64  `json:"documentId"`           // 文档ID
+        DocumentSummary      string `json:"documentSummary"`      // 文档摘要
+        DocumentType         string `json:"documentType"`         // 文档类型
+        CoreTopics           string `json:"coreTopics"`           // 核心主题
+        ExampleQuestions     string `json:"exampleQuestions"`     // 示例问题
+        GraphFriendly        int    `json:"graphFriendly"`        // 是否支持结构图
+        SupportsGraphOutline int    `json:"supportsGraphOutline"` // 是否支持图纲
+        SupportsItemLookup   int    `json:"supportsItemLookup"`   // 是否支持条目检索
+        SupportsGraphAssist  int    `json:"supportsGraphAssist"`  // 是否支持图辅助
+        ProfileSource        string `json:"profileSource"`        // 画像来源
+        ProfileStatus        int    `json:"profileStatus"`        // 画像状态
+        ErrorMsg             string `json:"errorMsg"`             // 错误信息
+	}
 )
 
 // ==================== 文档管理服务 ====================
@@ -332,5 +361,17 @@ service document {
 	@doc "查询任务执行日志"
 	@handler QueryTaskLogs
 	post /task/log/query (QueryTaskLogsReq) returns (QueryTaskLogsResp)
+
+	@doc "查询文档画像详情"
+	@handler GetDocumentProfile
+	post /profile/detail (DocumentProfileDetailReq) returns (DocumentProfileResp)
+
+	@doc "重新生成文档画像"
+	@handler RegenerateDocumentProfile
+	post /profile/regenerate (DocumentProfileRegenerateReq) returns (DocumentProfileResp)
+
+	@doc "批量重新生成文档画像"
+	@handler BatchRegenerateDocumentProfile
+	post /profile/batch/regenerate (DocumentProfileBatchRegenerateReq) returns ([]*DocumentProfileResp)
 }
 

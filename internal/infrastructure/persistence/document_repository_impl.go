@@ -450,31 +450,18 @@ func (d *DocumentRepositoryImpl) SelectProfileByDocumentId(ctx context.Context, 
 		Where("document_id = ?", documentId).
 		Order("id DESC").
 		First(profile).Error
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return profile, nil
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorx.ErrDocumentProfileNotFound
+		}
+		return nil, err
 	}
-	return profile, err
+	return profile, nil
 }
 
-// UpsertProfile 创建或更新文档属性
-func (d *DocumentRepositoryImpl) UpsertProfile(ctx context.Context, profile *entity.DocumentProfile) error {
-	if profile == nil {
-		return nil
-	}
-	existing, err := d.SelectProfileByDocumentId(ctx, profile.DocumentId)
-	if err != nil {
-		return err
-	}
-	if existing == nil || existing.ID == 0 {
-		if profile.ID == 0 {
-			profile.ID = utils.GetSnowflakeNextID()
-		}
-		return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).Create(profile).Error
-	}
-	profile.ID = existing.ID
-	return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
-		Where("id = ?", existing.ID).
-		Updates(profile).Error
+// SaveProfile 创建或更新文档属性
+func (d *DocumentRepositoryImpl) SaveProfile(ctx context.Context, profile *entity.DocumentProfile) error {
+	return d.dbWithContext(ctx).Save(convert.ToDocumentProfileModel(profile)).Error
 }
 
 // DeleteProfileByDocumentId 根据文档ID删除文档属性

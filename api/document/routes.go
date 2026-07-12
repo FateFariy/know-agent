@@ -64,6 +64,21 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 				Path:    "/task/log/query",
 				Handler: QueryTaskLogsHandler(svcCtx, srv),
 			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/profile/detail",
+				Handler: GetDocumentProfileHandler(svcCtx, srv),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/profile/regenerate",
+				Handler: RegenerateDocumentProfileHandler(svcCtx, srv),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "/profile/batch/regenerate",
+				Handler: BatchRegenerateDocumentProfileHandler(svcCtx, srv),
+			},
 		},
 		rest.WithPrefix("/manage/document"),
 	)

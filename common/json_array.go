@@ -17,7 +17,7 @@ func (j *JSONArray) Value() (driver.Value, error) {
 }
 
 // Scan 实现 sql.Scanner 接口
-func (j *JSONArray) Scan(value interface{}) error {
+func (j *JSONArray) Scan(value any) error {
 	if value == nil {
 		*j = nil
 		return nil

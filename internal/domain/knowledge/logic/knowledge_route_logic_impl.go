@@ -742,8 +742,8 @@ func (s *KnowledgeRouteLogicImpl) buildTrace(exchangeId int64, conversationId, q
 	trace.Confidence = decision.Confidence
 	trace.RouteStatus = vo.RouteStatusCode(decision.RouteStatus)
 	trace.ErrorMsg = strutil.Trim(decision.Reason)
-	trace.TopScopes = decision.Scopes
-	trace.TopTopics = utils.ToCompactJSON(decision.Topics)
-	trace.TopDocuments = utils.ToCompactJSON(decision.Documents)
+	trace.TopScopesJson = utils.ToCompactJSON(decision.Scopes)
+	trace.TopTopicsJson = utils.ToCompactJSON(decision.Topics)
+	trace.TopDocumentsJson = utils.ToCompactJSON(decision.Documents)
 	return trace
 }

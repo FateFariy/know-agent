@@ -46,21 +46,6 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/document/profile/detail",
-				Handler: GetDocumentProfileHandler(svcCtx, srv),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/document/profile/regenerate",
-				Handler: RegenerateDocumentProfileHandler(svcCtx, srv),
-			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/document/profile/batch/regenerate",
-				Handler: BatchRegenerateDocumentProfileHandler(svcCtx, srv),
-			},
-			{
-				Method:  http.MethodPost,
 				Path:    "/topic/document/list",
 				Handler: ListTopicDocumentRelationHandler(svcCtx, srv),
 			},

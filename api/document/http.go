@@ -41,6 +41,15 @@ type HTTPServer interface {
 
 	// QueryTaskLogs 查询任务日志
 	QueryTaskLogs(ctx context.Context, req *QueryTaskLogsReq) (*QueryTaskLogsResp, error)
+
+	// GetDocumentProfile 查询文档画像详情
+	GetDocumentProfile(ctx context.Context, req *DocumentProfileDetailReq) (*DocumentProfileResp, error)
+
+	// RegenerateDocumentProfile 重新生成文档画像
+	RegenerateDocumentProfile(ctx context.Context, req *DocumentProfileRegenerateReq) (*DocumentProfileResp, error)
+
+	// BatchRegenerateDocumentProfile 批量重新生成文档画像
+	BatchRegenerateDocumentProfile(ctx context.Context, req *DocumentProfileBatchRegenerateReq) ([]*DocumentProfileResp, error)
 }
 
 // UploadDocumentHandler 上传文档
@@ -186,6 +195,48 @@ func QueryTaskLogsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Handl
 		}
 
 		resp, err := srv.QueryTaskLogs(r.Context(), &req)
+		common.Response(w, resp, "", err)
+	}
+}
+
+// GetDocumentProfileHandler 查询文档画像详情
+func GetDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req DocumentProfileDetailReq
+		if err := httpx.Parse(r, &req); err != nil {
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			return
+		}
+
+		resp, err := srv.GetDocumentProfile(r.Context(), &req)
+		common.Response(w, resp, "", err)
+	}
+}
+
+// RegenerateDocumentProfileHandler 重新生成文档画像
+func RegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req DocumentProfileRegenerateReq
+		if err := httpx.Parse(r, &req); err != nil {
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			return
+		}
+
+		resp, err := srv.RegenerateDocumentProfile(r.Context(), &req)
+		common.Response(w, resp, "", err)
+	}
+}
+
+// BatchRegenerateDocumentProfileHandler 批量重新生成文档画像
+func BatchRegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req DocumentProfileBatchRegenerateReq
+		if err := httpx.Parse(r, &req); err != nil {
+			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			return
+		}
+
+		resp, err := srv.BatchRegenerateDocumentProfile(r.Context(), &req)
 		common.Response(w, resp, "", err)
 	}
 }

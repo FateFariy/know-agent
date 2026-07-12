@@ -29,15 +29,6 @@ type HTTPServer interface {
 	// ListKnowledgeTopic 查询知识主题列表
 	ListKnowledgeTopic(ctx context.Context, req *KnowledgeTopicListReq) ([]*KnowledgeTopicItem, error)
 
-	// GetDocumentProfile 查询文档画像详情
-	GetDocumentProfile(ctx context.Context, req *DocumentProfileDetailReq) (*DocumentProfileResp, error)
-
-	// RegenerateDocumentProfile 重新生成文档画像
-	RegenerateDocumentProfile(ctx context.Context, req *DocumentProfileRegenerateReq) (*DocumentProfileResp, error)
-
-	// BatchRegenerateDocumentProfile 批量重新生成文档画像
-	BatchRegenerateDocumentProfile(ctx context.Context, req *DocumentProfileBatchRegenerateReq) ([]*DocumentProfileResp, error)
-
 	// ListTopicDocumentRelation 查询主题文档关联
 	ListTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationListReq) ([]*TopicDocumentRelationItem, error)
 
@@ -125,48 +116,6 @@ func ListKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 		}
 
 		resp, err := srv.ListKnowledgeTopic(r.Context(), &req)
-		common.Response(w, resp, "", err)
-	}
-}
-
-// GetDocumentProfileHandler 查询文档画像详情
-func GetDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req DocumentProfileDetailReq
-		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
-			return
-		}
-
-		resp, err := srv.GetDocumentProfile(r.Context(), &req)
-		common.Response(w, resp, "", err)
-	}
-}
-
-// RegenerateDocumentProfileHandler 重新生成文档画像
-func RegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req DocumentProfileRegenerateReq
-		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
-			return
-		}
-
-		resp, err := srv.RegenerateDocumentProfile(r.Context(), &req)
-		common.Response(w, resp, "", err)
-	}
-}
-
-// BatchRegenerateDocumentProfileHandler 批量重新生成文档画像
-func BatchRegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req DocumentProfileBatchRegenerateReq
-		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
-			return
-		}
-
-		resp, err := srv.BatchRegenerateDocumentProfile(r.Context(), &req)
 		common.Response(w, resp, "", err)
 	}
 }

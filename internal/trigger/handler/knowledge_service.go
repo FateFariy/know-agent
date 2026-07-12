@@ -68,32 +68,6 @@ func (k *KnowledgeService) ListKnowledgeTopic(ctx context.Context, req *knowledg
 	return convert.ToKnowledgeTopicItemList(nodes), nil
 }
 
-// ==================== 文档画像 ====================
-
-func (k *KnowledgeService) GetDocumentProfile(ctx context.Context, req *knowledge.DocumentProfileDetailReq) (*knowledge.DocumentProfileResp, error) {
-	profile, err := k.l.GetDocumentProfile(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-	return convert.ToDocumentProfileResp(profile), nil
-}
-
-func (k *KnowledgeService) RegenerateDocumentProfile(ctx context.Context, req *knowledge.DocumentProfileRegenerateReq) (*knowledge.DocumentProfileResp, error) {
-	profile, err := k.l.RegenerateDocumentProfile(ctx, req.DocumentId)
-	if err != nil {
-		return nil, err
-	}
-	return convert.ToDocumentProfileResp(profile), nil
-}
-
-func (k *KnowledgeService) BatchRegenerateDocumentProfile(ctx context.Context, req *knowledge.DocumentProfileBatchRegenerateReq) ([]*knowledge.DocumentProfileResp, error) {
-	profiles, err := k.l.BatchRegenerateDocumentProfiles(ctx, req.DocumentIds)
-	if err != nil {
-		return nil, err
-	}
-	return convert.ToDocumentProfileItemList(profiles), nil
-}
-
 // ==================== 主题-文档关联 ====================
 
 // ListTopicDocumentRelation 列表主题文档关联

@@ -3,35 +3,6 @@
 
 package knowledge
 
-type DocumentProfileBatchRegenerateReq struct {
-	DocumentIds []int64 `json:"documentIds"`         // 文档ID列表
-	OperatorId  int64   `json:"operatorId,optional"` // 操作人ID
-}
-
-type DocumentProfileDetailReq struct {
-	DocumentId int64 `json:"documentId"` // 文档ID
-}
-
-type DocumentProfileRegenerateReq struct {
-	DocumentId int64 `json:"documentId"`          // 文档ID
-	OperatorId int64 `json:"operatorId,optional"` // 操作人ID
-}
-
-type DocumentProfileResp struct {
-	DocumentId           int64  `json:"documentId"`           // 文档ID
-	DocumentSummary      string `json:"documentSummary"`      // 文档摘要
-	DocumentType         string `json:"documentType"`         // 文档类型
-	CoreTopics           string `json:"coreTopics"`           // 核心主题
-	ExampleQuestions     string `json:"exampleQuestions"`     // 示例问题
-	GraphFriendly        string `json:"graphFriendly"`        // 是否支持结构图
-	SupportsGraphOutline string `json:"supportsGraphOutline"` // 是否支持图纲
-	SupportsItemLookup   string `json:"supportsItemLookup"`   // 是否支持条目检索
-	SupportsGraphAssist  string `json:"supportsGraphAssist"`  // 是否支持图辅助
-	ProfileSource        string `json:"profileSource"`        // 画像来源
-	ProfileStatus        string `json:"profileStatus"`        // 画像状态
-	ErrorMsg             string `json:"errorMsg"`             // 错误信息
-}
-
 type KnowledgeRouteTraceItem struct {
 	ID                  int64   `json:"id"`                  // 主键ID
 	ConversationId      string  `json:"conversationId"`      // 会话ID

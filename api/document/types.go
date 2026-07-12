@@ -40,6 +40,35 @@ type ConfirmStrategyResp struct {
 	ChildPipeline      *DocumentStrategyPipeline `json:"childPipeline"`      // 子块流水线
 }
 
+type DocumentProfileBatchRegenerateReq struct {
+	DocumentIds []int64 `json:"documentIds"`         // 文档ID列表
+	OperatorId  int64   `json:"operatorId,optional"` // 操作人ID
+}
+
+type DocumentProfileDetailReq struct {
+	DocumentId int64 `json:"documentId"` // 文档ID
+}
+
+type DocumentProfileRegenerateReq struct {
+	DocumentId int64 `json:"documentId"`          // 文档ID
+	OperatorId int64 `json:"operatorId,optional"` // 操作人ID
+}
+
+type DocumentProfileResp struct {
+	DocumentId           int64  `json:"documentId"`           // 文档ID
+	DocumentSummary      string `json:"documentSummary"`      // 文档摘要
+	DocumentType         string `json:"documentType"`         // 文档类型
+	CoreTopics           string `json:"coreTopics"`           // 核心主题
+	ExampleQuestions     string `json:"exampleQuestions"`     // 示例问题
+	GraphFriendly        int    `json:"graphFriendly"`        // 是否支持结构图
+	SupportsGraphOutline int    `json:"supportsGraphOutline"` // 是否支持图纲
+	SupportsItemLookup   int    `json:"supportsItemLookup"`   // 是否支持条目检索
+	SupportsGraphAssist  int    `json:"supportsGraphAssist"`  // 是否支持图辅助
+	ProfileSource        string `json:"profileSource"`        // 画像来源
+	ProfileStatus        int    `json:"profileStatus"`        // 画像状态
+	ErrorMsg             string `json:"errorMsg"`             // 错误信息
+}
+
 type DeleteDocumentReq struct {
 	DocumentId int64 `json:"documentId"` // 文档ID
 }

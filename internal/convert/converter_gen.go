@@ -652,6 +652,60 @@ func ToDocumentParentBlockModelList(source []*entity1.DocumentParentBlock) []*mo
 	}
 	return pModelDocumentParentBlockList
 }
+func ToDocumentProfileModel(source *entity1.DocumentProfile) *model.DocumentProfile {
+	var pModelDocumentProfile *model.DocumentProfile
+	if source != nil {
+		var modelDocumentProfile model.DocumentProfile
+		modelDocumentProfile.ID = (*source).ID
+		modelDocumentProfile.DocumentId = (*source).DocumentId
+		modelDocumentProfile.ProfileVersion = (*source).ProfileVersion
+		modelDocumentProfile.DocumentSummary = (*source).DocumentSummary
+		modelDocumentProfile.DocumentType = (*source).DocumentType
+		modelDocumentProfile.CoreTopics = (*source).CoreTopics
+		modelDocumentProfile.ExampleQuestions = (*source).ExampleQuestions
+		modelDocumentProfile.GraphFriendly = (*source).GraphFriendly
+		modelDocumentProfile.SupportsGraphOutline = (*source).SupportsGraphOutline
+		modelDocumentProfile.SupportsItemLookup = (*source).SupportsItemLookup
+		modelDocumentProfile.SupportsGraphAssist = (*source).SupportsGraphAssist
+		modelDocumentProfile.ProfileSource = (*source).ProfileSource
+		modelDocumentProfile.ProfileStatus = (*source).ProfileStatus
+		modelDocumentProfile.ErrorMsg = (*source).ErrorMsg
+		pModelDocumentProfile = &modelDocumentProfile
+	}
+	return pModelDocumentProfile
+}
+func ToDocumentProfileResp(source *entity1.DocumentProfile) *document.DocumentProfileResp {
+	var pDocumentDocumentProfileResp *document.DocumentProfileResp
+	if source != nil {
+		var documentDocumentProfileResp document.DocumentProfileResp
+		documentDocumentProfileResp.DocumentId = (*source).DocumentId
+		documentDocumentProfileResp.DocumentSummary = (*source).DocumentSummary
+		documentDocumentProfileResp.DocumentType = (*source).DocumentType
+		documentDocumentProfileResp.CoreTopics = (*source).CoreTopics
+		documentDocumentProfileResp.ExampleQuestions = (*source).ExampleQuestions
+		documentDocumentProfileResp.GraphFriendly = (*source).GraphFriendly
+		documentDocumentProfileResp.SupportsGraphOutline = (*source).SupportsGraphOutline
+		documentDocumentProfileResp.SupportsItemLookup = (*source).SupportsItemLookup
+		documentDocumentProfileResp.SupportsGraphAssist = (*source).SupportsGraphAssist
+		documentDocumentProfileResp.ProfileSource = (*source).ProfileSource
+		documentDocumentProfileResp.ProfileStatus = (*source).ProfileStatus
+		if (*source).ErrorMsg != nil {
+			documentDocumentProfileResp.ErrorMsg = *(*source).ErrorMsg
+		}
+		pDocumentDocumentProfileResp = &documentDocumentProfileResp
+	}
+	return pDocumentDocumentProfileResp
+}
+func ToDocumentProfileRespList(source []*entity1.DocumentProfile) []*document.DocumentProfileResp {
+	var pDocumentDocumentProfileRespList []*document.DocumentProfileResp
+	if source != nil {
+		pDocumentDocumentProfileRespList = make([]*document.DocumentProfileResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pDocumentDocumentProfileRespList[i] = ToDocumentProfileResp(source[i])
+		}
+	}
+	return pDocumentDocumentProfileRespList
+}
 func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.DocumentStrategyPlan {
 	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan
 	if source != nil {
