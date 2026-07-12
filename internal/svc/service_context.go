@@ -4,8 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/cloudwego/eino-ext/components/embedding/ark"
+	arkemb "github.com/cloudwego/eino-ext/components/embedding/ark"
+	"github.com/cloudwego/eino-ext/components/model/agenticark"
 	"github.com/cloudwego/eino/components/embedding"
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
@@ -22,32 +25,37 @@ import (
 
 var ProviderSet = wire.NewSet(
 	NewServiceContext,
-	NewRedSync,
-	NewArkEmbedding,
-	NewMinioClient,
+	NewDB,
 )
 
 type ServiceContext struct {
-	Config   *config.Config
-	Validate *validator.Validate
-	Minio    *minio.Client
-	Db       *gorm.DB
-	Rdb      *redis.Client
-	RedSync  *redsync.Redsync
-	Emb      embedding.Embedder
+	Config    *config.Config
+	Validate  *validator.Validate
+	Minio     *minio.Client
+	Db        *gorm.DB
+	Rdb       *redis.Client
+	RedSync   *redsync.Redsync
+	Emb       embedding.Embedder
+	ChatModel model.BaseModel[*schema.AgenticMessage]
 }
 
-func NewServiceContext(c *config.Config) *ServiceContext {
+func NewServiceContext(c *config.Config, db *gorm.DB) *ServiceContext {
 	redisClient := common.NewRedisClient(c)
 	return &ServiceContext{
-		Config:   c,
-		Validate: common.NewValidator(),
-		Rdb:      redisClient,
-		Db:       common.NewDb(c),
-		Minio:    NewMinioClient(c),
-		RedSync:  NewRedSync(redisClient),
-		Emb:      NewArkEmbedding(c),
+		Config:    c,
+		Validate:  common.NewValidator(),
+		Rdb:       redisClient,
+		Db:        db,
+		Minio:     NewMinioClient(c),
+		RedSync:   NewRedSync(redisClient),
+		Emb:       NewArkEmbedding(c),
+		ChatModel: NewArkChatModel(c),
 	}
+}
+
+// NewDB 创建 gorm DB 连接（从公共配置中解析）。
+func NewDB(c *config.Config) *gorm.DB {
+	return common.NewDb(c)
 }
 
 // NewMinioClient 创建 Minio 客户端
@@ -73,11 +81,11 @@ func NewRedSync(client *redis.Client) *redsync.Redsync {
 
 // NewArkEmbedding 创建 ark embedding 模型
 func NewArkEmbedding(c *config.Config) embedding.Embedder {
-	apiType := ark.APITypeText
-	if strings.Contains(c.Embedding.APIType, string(ark.APITypeMultiModal)) {
-		apiType = ark.APITypeMultiModal
+	apiType := arkemb.APITypeText
+	if strings.Contains(c.Embedding.APIType, string(arkemb.APITypeMultiModal)) {
+		apiType = arkemb.APITypeMultiModal
 	}
-	emb, err := ark.NewEmbedder(context.TODO(), &ark.EmbeddingConfig{
+	emb, err := arkemb.NewEmbedder(context.TODO(), &arkemb.EmbeddingConfig{
 		APIKey:     c.Embedding.APIKey,
 		Model:      c.Embedding.Model,
 		APIType:    utils.Pointer(apiType),
@@ -87,4 +95,19 @@ func NewArkEmbedding(c *config.Config) embedding.Embedder {
 		panic(err)
 	}
 	return emb
+}
+
+func NewArkChatModel(c *config.Config) *agenticark.Model {
+	llmConf := c.ChatModel["ark"]
+	chatModel, err := agenticark.New(context.TODO(), &agenticark.Config{
+		APIKey:      llmConf.ApiKey,
+		Model:       llmConf.Model,
+		MaxTokens:   utils.Pointer(llmConf.MaxTokens),
+		Temperature: utils.Pointer(llmConf.Temperature),
+		TopP:        utils.Pointer(llmConf.TopP),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return chatModel
 }

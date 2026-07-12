@@ -2,9 +2,7 @@ package adapter
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"sync/atomic"
 	"testing"
 
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
@@ -13,6 +11,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 func TestIndex(t *testing.T) {
@@ -78,17 +77,7 @@ func TestIndex(t *testing.T) {
 }
 
 func TestQuery(t *testing.T) {
-	var ap atomic.Pointer[string]
-	val := "test"
-	ap.Store(&val)
-	log.Println(toCompactJSON(ap.Load()))
-}
-
-// toCompactJSON 将任意切片序列化为紧凑 JSON
-func toCompactJSON(v any) string {
-	data, err := json.Marshal(v)
-	if err != nil || len(data) == 0 || string(data) == "null" {
-		return "[]"
-	}
-	return string(data)
+	debugTrace := vo.NewChatDebugTrace(nil)
+	debugTrace.AddUsedChannels("embedding")
+	log.Println(debugTrace.Serialize())
 }

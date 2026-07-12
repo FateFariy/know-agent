@@ -3,8 +3,11 @@ package domain
 import (
 	"github.com/google/wire"
 
+	chatadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
@@ -19,6 +22,7 @@ import (
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	knowledgelogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 )
 
 var ProviderSet = wire.NewSet(
@@ -45,14 +49,27 @@ var chatProviderSet = wire.NewSet(
 	intent.NewDocumentQuestionRouterImpl,
 	wire.Bind(new(chatlogic.DocumentQuestionRouteLogic), new(*intent.DocumentQuestionRouterImpl)),
 	chatlogic.NewChatModelImpl,
+	graph.NewDefaultStructureGraphQuerier,
+	wire.Bind(new(chatlogic.StructureGraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
+	intent.NewDefaultNavigationIndexService,
+	wire.Bind(new(intent.NavigationIndexService), new(*intent.DefaultNavigationIndexService)),
+	graph.NewDefaultAnswerRender,
+	wire.Bind(new(graph.AnswerRender), new(*graph.DefaultAnswerRender)),
 	rag.NewPromptBuilder,
 	channel.NewKeywordRetrievalChannel,
-	wire.Bind(new(rag.RetrievalChannel), new(*channel.KeywordRetrievalChannel)),
 	channel.NewVectorRetrievalChannel,
-	wire.Bind(new(rag.RetrievalChannel), new(*channel.VectorRetrievalChannel)),
 	strategy.NewSummaryCompressionStrategy,
 	wire.Bind(new(memory.Strategy), new(*strategy.SummaryCompressionStrategy)),
 	trace.NewConversationTraceRecorder,
+	executor.NewRagChatExecutor,
+	executor.NewGraphOnlyExecutor,
+	executor.NewGraphThenEvidenceExecutor,
+	executor.NewClarificationExecutor,
+	NewExecutorRegistry,
+	check.NewMemoryCheckPointStore,
+	wire.Bind(new(chatadapter.CheckPointStore), new(*check.MemoryCheckPointStore)),
+	NewRetrievalChannels,
+	wire.Bind(new(conversation.RagPromptAssembler), new(*rag.PromptBuilder)),
 )
 
 var documentProviderSet = wire.NewSet(
@@ -80,4 +97,25 @@ var knowledgeProviderSet = wire.NewSet(
 	wire.Bind(new(knowledgelogic.KnowledgeRouteLogic), new(*knowledgelogic.KnowledgeRouteLogicImpl)),
 	knowledgelogic.NewKnowledgeLogicImpl,
 	wire.Bind(new(knowledgelogic.KnowledgeLogic), new(*knowledgelogic.KnowledgeLogicImpl)),
+	ProvideKnowledgeOptions,
 )
+
+// NewExecutorRegistry 组合四种 executor 为执行器注册表。
+func NewExecutorRegistry(
+	rag *executor.RagChatExecutor,
+	graphOnly *executor.GraphOnlyExecutor,
+	graphThen *executor.GraphThenEvidenceExecutor,
+	clarification *executor.ClarificationExecutor,
+) *conversation.ExecutorRegistry {
+	return conversation.NewExecutorRegistry(rag, graphOnly, graphThen, clarification)
+}
+
+// ProvideKnowledgeOptions 提供知识路由的可选项（目前为空），
+// 供 NewKnowledgeRouteLogicImpl 消费。
+func ProvideKnowledgeOptions() []knowledgelogic.Option {
+	return nil
+}
+
+func NewRetrievalChannels(ch1 *channel.VectorRetrievalChannel, ch2 *channel.KeywordRetrievalChannel) []rag.RetrievalChannel {
+	return []rag.RetrievalChannel{ch1, ch2}
+}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	errorx "github.com/swiftbit/know-agent/internal/error"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type RedisMutexLock struct {
@@ -18,9 +19,9 @@ type RedisMutexLock struct {
 
 var _ adapter.DistributedLock = (*RedisMutexLock)(nil)
 
-func NewRedisMutexLock(redSync *redsync.Redsync) *RedisMutexLock {
+func NewRedisMutexLock(svcCtx *svc.ServiceContext) *RedisMutexLock {
 	return &RedisMutexLock{
-		redSync: redSync,
+		redSync: svcCtx.RedSync,
 	}
 }
 

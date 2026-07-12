@@ -41,7 +41,7 @@ type PreparationOrchestratorImpl struct {
 	repo                   adapter.ChatRepository
 	memoryLogic            logic.SessionMemoryLogic
 	rewriteLogic           logic.QueryRewriteLogic
-	documentQuestionRouter logic.IntentRecognitionLogic
+	documentQuestionRouter logic.DocumentQuestionRouteLogic
 	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
 	lifecycleLogic         doclog.LifecycleLogic
 	tracer                 *trace.ConversationTraceRecorder
@@ -65,7 +65,7 @@ func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	memoryLogic logic.SessionMemoryLogic,
 	rewriteLogic logic.QueryRewriteLogic,
-	documentQuestionRouter logic.IntentRecognitionLogic,
+	documentQuestionRouter logic.DocumentQuestionRouteLogic,
 	knowledgeRoute kelog.KnowledgeRouteLogic,
 	lifecycleLogic doclog.LifecycleLogic,
 ) *PreparationOrchestratorImpl {

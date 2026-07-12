@@ -182,6 +182,6 @@ type RerankConf struct {
 	ReadTimeout    time.Duration `json:",optional,default=6s"`   // 读取超时时间
 }
 
-func (c Config) GetBaseConfig() *common.BaseConfig {
+func (c *Config) GetBaseConfig() *common.BaseConfig {
 	return &c.BaseConfig
 }

@@ -14,8 +14,8 @@ var configFile = flag.String("f", "etc/config-dev.yaml", "the config file")
 func main() {
 	flag.Parse()
 
-	var c config.Config
-	conf.MustLoad(*configFile, &c)
+	var c *config.Config
+	conf.MustLoad(*configFile, c)
 
 	server := WireApp(c)
 	defer server.HTTP.Stop()

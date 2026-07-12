@@ -169,6 +169,7 @@ require (
 	github.com/nikolalohinski/gonja v1.5.3 // indirect
 	github.com/nikolalohinski/gonja/v2 v2.3.1 // indirect
 	github.com/ollama/ollama v0.6.5 // indirect
+	github.com/openai/openai-go/v3 v3.41.0 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opensearch-project/opensearch-go/v4 v4.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
@@ -201,6 +202,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect

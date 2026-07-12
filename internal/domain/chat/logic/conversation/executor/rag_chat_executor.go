@@ -19,7 +19,7 @@ import (
 type RagChatExecutor struct {
 	retriever       logic.RagRetrieveLogic
 	promptAssembler conversation.RagPromptAssembler
-	chatModel       logic.ChatModelImpl[*schema.AgenticMessage]
+	chatModel       *logic.ChatModelImpl[*schema.AgenticMessage]
 	tracer          *trace.ConversationTraceRecorder
 }
 
@@ -27,7 +27,7 @@ type RagChatExecutor struct {
 func NewRagChatExecutor(
 	retriever logic.RagRetrieveLogic,
 	ragPromptAssembler conversation.RagPromptAssembler,
-	chatModel logic.ChatModelImpl[*schema.AgenticMessage],
+	chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
 	tracer *trace.ConversationTraceRecorder,
 ) *RagChatExecutor {
 	return &RagChatExecutor{

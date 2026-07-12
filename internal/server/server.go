@@ -21,7 +21,7 @@ func NewServer(HTTP *rest.Server) *Server {
 	return &Server{HTTP: HTTP}
 }
 
-func NewHTTPServer(c config.Config, svcCtx *svc.ServiceContext, docSrv document.HTTPServer, chatSrv chat.HTTPServer, knowledgeSrv knowledge.HTTPServer) *rest.Server {
+func NewHTTPServer(c *config.Config, svcCtx *svc.ServiceContext, docSrv document.HTTPServer, chatSrv chat.HTTPServer, knowledgeSrv knowledge.HTTPServer) *rest.Server {
 	server := rest.MustNewServer(c.Http)
 	document.RegisterHandlers(server, svcCtx, docSrv)
 	chat.RegisterHandlers(server, svcCtx, chatSrv)

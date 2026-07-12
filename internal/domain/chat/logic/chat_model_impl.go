@@ -28,11 +28,11 @@ type ChatModelImpl[M adk.MessageType] struct {
 	defaultOptions *model.Options
 }
 
-// NewChatModelImpl 创建可观测聊天模型实例
-func NewChatModelImpl[M adk.MessageType](svcCtx *svc.ServiceContext, chatModel model.BaseModel[M]) *ChatModelImpl[M] {
-	conf := svcCtx.Config.ChatModel[resolveProvider(chatModel)]
-	return &ChatModelImpl[M]{
-		chatModel: chatModel,
+// NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
+func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.AgenticMessage] {
+	conf := svcCtx.Config.ChatModel[resolveProvider(svcCtx.ChatModel)]
+	return &ChatModelImpl[*schema.AgenticMessage]{
+		chatModel: svcCtx.ChatModel,
 		config:    conf,
 		defaultOptions: &model.Options{
 			Model:       &conf.Model,

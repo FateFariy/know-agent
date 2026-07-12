@@ -127,12 +127,8 @@ type NavigationSectionHit struct {
 }
 
 // NewDocumentQuestionRouterImpl 构造文档问题路由器
-func NewDocumentQuestionRouterImpl(
-	chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
-	structureGraphQuerier logic.StructureGraphQuerier,
-	navigationIndexSvc NavigationIndexService,
-	promptTemplateLogic logic.PromptTemplateLogic,
-) *DocumentQuestionRouterImpl {
+func NewDocumentQuestionRouterImpl(chatModel *logic.ChatModelImpl[*schema.AgenticMessage], structureGraphQuerier logic.StructureGraphQuerier,
+	navigationIndexSvc NavigationIndexService, promptTemplateLogic logic.PromptTemplateLogic) *DocumentQuestionRouterImpl {
 	return &DocumentQuestionRouterImpl{
 		chatModel:             chatModel,
 		structureGraphQuerier: structureGraphQuerier,

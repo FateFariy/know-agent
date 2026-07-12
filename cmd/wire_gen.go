@@ -7,13 +7,33 @@
 package main
 
 import (
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/orchestrator"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic"
+	logic2 "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	logic3 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/keyword"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/lock"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/mq"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/reranker"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/storage"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/vector"
 	"github.com/swiftbit/know-agent/internal/server"
 	"github.com/swiftbit/know-agent/internal/svc"
 	"github.com/swiftbit/know-agent/internal/trigger/handler"
@@ -22,26 +42,54 @@ import (
 // Injectors from wire.go:
 
 //go:generate wire gen ./wire.go
-func WireApp(c config.Config) *server.Server {
-	validate := common.NewValidator()
-	serviceContext := svc.NewServiceContext(c, validate)
+func WireApp(c *config.Config) *server.Server {
+	db := svc.NewDB(c)
+	serviceContext := svc.NewServiceContext(c, db)
 	minioStorage := storage.NewMinioStorage(serviceContext)
 	mockMessageProducer := mq.NewMockMessageProducer()
-	documentPort := adapter.NewDocumentPort(minioStorage, mockMessageProducer)
-	commonConfig := provideCommonConfig(c)
-	db := common.NewDb(commonConfig)
-	client := common.NewRedisClient(commonConfig)
-	cache := common.NewRedisCache(commonConfig)
-	documentRepositoryImpl := persistence.NewDocumentRepository(db, client, cache)
-	documentLifecycleLogicImpl := logic.NewDocumentLifecycleLogicImpl(serviceContext, documentPort, documentRepositoryImpl)
-	documentService := handler.NewDocumentService(documentLifecycleLogicImpl)
-	restServer := server.NewHTTPServer(c, serviceContext, documentService)
+	milvusVector := vector.NewMilvusVector(serviceContext)
+	keywordDB := keyword.NewKeywordDB(serviceContext)
+	documentPort := adapter.NewDocumentPort(minioStorage, mockMessageProducer, milvusVector, keywordDB)
+	documentRepositoryImpl := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
+	chatModelImpl := logic.NewChatModelImpl(serviceContext)
+	templateLogicImpl := prompt.NewPromptTemplateLogicImpl()
+	structureNodeLogicImpl := logic2.NewStructureNodeLogicImpl(documentRepositoryImpl)
+	chunkStrategyLogicImpl := logic2.NewChunkStrategyLogicImpl(serviceContext, chatModelImpl, templateLogicImpl, structureNodeLogicImpl)
+	lifecycleLogicImpl := logic2.NewLifecycleLogicImpl(serviceContext, documentPort, documentRepositoryImpl, chunkStrategyLogicImpl)
+	profileLogicImpl := logic2.NewProfileLogicImpl(documentRepositoryImpl, documentPort)
+	documentService := handler.NewDocumentService(lifecycleLogicImpl, profileLogicImpl)
+	chatRepositoryImpl := persistence.NewChatRepository(serviceContext)
+	dashScope := reranker.NewDashScope(serviceContext)
+	vectorRetrievalChannel := channel.NewVectorRetrievalChannel(serviceContext, milvusVector)
+	keywordRetrievalChannel := channel.NewKeywordRetrievalChannel(serviceContext, keywordDB)
+	v := domain.NewRetrievalChannels(vectorRetrievalChannel, keywordRetrievalChannel)
+	retrievalImpl := rag.NewRetrievalImpl(serviceContext, chatRepositoryImpl, dashScope, v, lifecycleLogicImpl)
+	promptBuilder := rag.NewPromptBuilder(serviceContext, templateLogicImpl)
+	conversationTraceRecorder := trace.NewConversationTraceRecorder(chatRepositoryImpl)
+	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptBuilder, chatModelImpl, conversationTraceRecorder)
+	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(db)
+	defaultAnswerRender := graph.NewDefaultAnswerRender()
+	graphOnlyExecutor := executor.NewGraphOnlyExecutor(defaultStructureGraphQuerier, defaultAnswerRender, conversationTraceRecorder)
+	graphThenEvidenceExecutor := executor.NewGraphThenEvidenceExecutor(defaultStructureGraphQuerier, defaultAnswerRender, conversationTraceRecorder)
+	clarificationExecutor := executor.NewClarificationExecutor(conversationTraceRecorder)
+	executorRegistry := domain.NewExecutorRegistry(ragChatExecutor, graphOnlyExecutor, graphThenEvidenceExecutor, clarificationExecutor)
+	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, templateLogicImpl)
+	sessionMemoryLogicImpl := memory.NewSessionMemoryLogicImpl(summaryCompressionStrategy)
+	queryRewriteLogicImpl := rewrite.NewQueryRewriteLogicImpl(serviceContext, chatModelImpl, templateLogicImpl)
+	defaultNavigationIndexService := intent.NewDefaultNavigationIndexService()
+	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateLogicImpl)
+	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
+	v2 := domain.ProvideKnowledgeOptions()
+	knowledgeRouteLogicImpl := logic3.NewKnowledgeRouteLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
+	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriteLogicImpl, documentQuestionRouterImpl, knowledgeRouteLogicImpl, lifecycleLogicImpl)
+	recommendationLogicImpl := recommend.NewRecommendationLogicImpl(serviceContext, templateLogicImpl, chatModelImpl)
+	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
+	memoryCheckPointStore := check.NewMemoryCheckPointStore()
+	logicImpl := conversation.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateLogicImpl, recommendationLogicImpl, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
+	chatService := handler.NewChatService(logicImpl)
+	knowledgeLogicImpl := logic3.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
+	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
+	restServer := server.NewHTTPServer(c, serviceContext, documentService, chatService, knowledgeService)
 	serverServer := server.NewServer(restServer)
 	return serverServer
-}
-
-// wire.go:
-
-func provideCommonConfig(c config.Config) common.Config {
-	return c
 }
