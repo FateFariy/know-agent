@@ -2,6 +2,8 @@ package vo
 
 import (
 	"path/filepath"
+
+	"github.com/duke-git/lancet/v2/strutil"
 )
 
 // ============================================================
@@ -181,4 +183,36 @@ func DocumentChunkSourceTypeName(sourceType DocumentChunkSourceType) string {
 	default:
 		return "未知"
 	}
+}
+
+type DocumentType = string
+
+// 文档类型
+const (
+	DocTypeFAQ          DocumentType = "faq"             // 常见问题
+	DocTypeTroubleshoot DocumentType = "troubleshooting" // 故障排除
+	DocTypeRule         DocumentType = "rule"            // 规则
+	DocTypeSpec         DocumentType = "spec"            // 规范
+	DocTypeManual       DocumentType = "manual"          // 手册
+	DocTypeIntro        DocumentType = "intro"           // 介绍
+)
+
+// InferDocumentType 推断文档类型
+func InferDocumentType(combinedText string, supportsItemLookup bool) string {
+	if strutil.ContainsAny(combinedText, []string{"faq", "常见问题"}) {
+		return DocTypeFAQ
+	}
+	if strutil.ContainsAny(combinedText, []string{"故障", "排查", "检查顺序"}) {
+		return DocTypeTroubleshoot
+	}
+	if strutil.ContainsAny(combinedText, []string{"规则", "制度"}) {
+		return DocTypeRule
+	}
+	if strutil.ContainsAny(combinedText, []string{"规格", "参数"}) {
+		return DocTypeSpec
+	}
+	if supportsItemLookup || strutil.ContainsAny(combinedText, []string{"手册", "指南", "部署"}) {
+		return DocTypeManual
+	}
+	return DocTypeIntro
 }

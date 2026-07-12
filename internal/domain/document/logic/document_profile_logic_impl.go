@@ -2,18 +2,19 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/zeromicro/go-zero/core/logx"
+
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // ProfileLogicImpl 文档画像逻辑实现
@@ -29,7 +30,7 @@ func NewProfileLogicImpl(repo adapter.DocumentRepository, port *adapter.Document
 	return &ProfileLogicImpl{repo: repo, port: port}
 }
 
-// 画像状态常量（与 Java 端对齐）
+// 画像状态常量
 const (
 	profileStatusSuccess = 2
 	profileSourceAuto    = "auto"
@@ -72,16 +73,10 @@ func (p *ProfileLogicImpl) GenerateProfile(ctx context.Context, documentId int64
 	if err != nil {
 		return nil, err
 	}
-	if document == nil {
-		return nil, errors.New("文档不存在")
-	}
 
 	parsedText := ""
 	if analysisResult != nil {
-		parsedText = defaultIfBlank(strutil.Trim(analysisResult.ParsedText), "")
-	}
-	if structureNodes == nil {
-		structureNodes = []*entity.DocumentStructureNode{}
+		parsedText = strutil.Trim(analysisResult.ParsedText)
 	}
 
 	draft := p.buildDraft(document, parsedText, structureNodes)
@@ -95,8 +90,8 @@ func (p *ProfileLogicImpl) GenerateProfile(ctx context.Context, documentId int64
 		DocumentId:           documentId,
 		DocumentSummary:      draft.documentSummary,
 		DocumentType:         draft.documentType,
-		CoreTopics:           joinJSONLikeArray(draft.coreTopics),
-		ExampleQuestions:     joinJSONLikeArray(draft.exampleQuestions),
+		CoreTopics:           utils.ToCompactJSON(draft.coreTopics),
+		ExampleQuestions:     utils.ToCompactJSON(draft.exampleQuestions),
 		GraphFriendly:        boolToInt(draft.graphFriendly),
 		SupportsGraphOutline: boolToInt(draft.supportsGraphOutline),
 		SupportsItemLookup:   boolToInt(draft.supportsItemLookup),
@@ -104,7 +99,7 @@ func (p *ProfileLogicImpl) GenerateProfile(ctx context.Context, documentId int64
 		ProfileSource:        profileSourceAuto,
 		ProfileStatus:        profileStatusSuccess,
 	}
-	if existing == nil || existing.ID == 0 {
+	if existing.ID == 0 {
 		profile.ID = utils.GetSnowflakeNextID()
 		profile.ProfileVersion = 1
 	} else {
@@ -116,7 +111,7 @@ func (p *ProfileLogicImpl) GenerateProfile(ctx context.Context, documentId int64
 		return nil, err
 	}
 
-	if err = p.backfillDocumentMetadata(ctx, document, draft); err != nil {
+	if err = p.repo.UpdateDocumentById(ctx, document); err != nil {
 		logx.Errorf("backfill document metadata failed: documentId=%d, err=%v", documentId, err)
 	}
 	logx.Infof("文档画像生成完成: documentId=%d, documentType=%s, graphFriendly=%v, supportsItemLookup=%v, scopeCode=%s, businessCategory=%s, tags=%s",
@@ -179,7 +174,7 @@ func (p *ProfileLogicImpl) BatchRegenerateProfiles(ctx context.Context, document
 
 // ==================== 内部实现：构建画像草稿 ====================
 
-// profileDraft 画像草稿（与 Java DocumentProfileDraft record 对应）
+// profileDraft 画像草稿
 type profileDraft struct {
 	documentSummary      string
 	documentType         string
@@ -209,7 +204,8 @@ func (p *ProfileLogicImpl) buildDraft(document *entity.Document, parsedText stri
 	}
 	supportsGraphOutline := len(sectionTitles) >= 2
 	graphFriendly := supportsItemLookup || supportsGraphOutline
-	documentType := p.inferDocumentType(document, parsedText, sectionTitles, supportsItemLookup)
+	combined := combinedText(document, parsedText, sectionTitles)
+	documentType := vo.InferDocumentType(combined, supportsItemLookup)
 	coreTopics := p.buildCoreTopics(document, sectionTitles)
 	exampleQuestions := p.buildExampleQuestions(documentType, coreTopics)
 	summary := p.buildSummary(document, sectionTitles, parsedText)
@@ -234,7 +230,7 @@ func (p *ProfileLogicImpl) buildDraft(document *entity.Document, parsedText stri
 }
 
 // backfillDocumentMetadata 将草稿中的关键字段回填到文档主表（仅在原字段为空时）
-func (p *ProfileLogicImpl) backfillDocumentMetadata(ctx context.Context, document *entity.Document, draft *profileDraft) error {
+func (p *ProfileLogicImpl) backfillDocumentMetadata(document *entity.Document, draft *profileDraft) error {
 	if document == nil || draft == nil {
 		return nil
 	}
@@ -273,14 +269,11 @@ func (p *ProfileLogicImpl) extractSectionTitles(structureNodes []*entity.Documen
 			continue
 		}
 		title := strutil.Trim(node.Title)
-		if strutil.IsBlank(title) {
-			continue
+		_, ok := seen[title]
+		if title != "" && !ok {
+			seen[title] = struct{}{}
+			result = append(result, title)
 		}
-		if _, ok := seen[title]; ok {
-			continue
-		}
-		seen[title] = struct{}{}
-		result = append(result, title)
 		if len(result) >= 8 {
 			break
 		}
@@ -311,32 +304,12 @@ func (p *ProfileLogicImpl) inferDocumentType(document *entity.Document, parsedTe
 
 // buildCoreTopics 构建核心话题
 func (p *ProfileLogicImpl) buildCoreTopics(document *entity.Document, sectionTitles []string) []string {
-	seen := make(map[string]struct{})
-	result := make([]string, 0, 6)
-	for i, title := range sectionTitles {
-		if i >= 6 {
-			break
-		}
-		topic := stripSectionCode(title)
-		if strutil.IsBlank(topic) {
-			continue
-		}
-		if _, ok := seen[topic]; ok {
-			continue
-		}
-		seen[topic] = struct{}{}
-		result = append(result, topic)
-	}
-	fileTopic := stripFileExtension(strutil.Trim(document.DocumentName))
-	if strutil.IsNotBlank(fileTopic) {
-		if _, ok := seen[fileTopic]; !ok {
-			if len(result) >= 6 {
-				result = append(result[:5], fileTopic)
-			} else {
-				result = append(result, fileTopic)
-			}
-		}
-	}
+	fileName := strutil.Trim(document.DocumentName)
+	fileTopic := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+	sectionTitles = append(sectionTitles, fileTopic)
+	result := utils.DistinctAndLimit(sectionTitles, 6, func(title string) string {
+		return stripSectionCode(title)
+	})
 	return result
 }
 
@@ -372,13 +345,10 @@ func (p *ProfileLogicImpl) buildExampleQuestions(documentType string, coreTopics
 func (p *ProfileLogicImpl) buildSummary(document *entity.Document, sectionTitles []string, parsedText string) string {
 	var builder strings.Builder
 	builder.WriteString("文档《")
-	builder.WriteString(strutil.DefaultIfBlank(strutil.Trim(document.DocumentName), "未命名文档"))
+	builder.WriteString(utils.BlankToDefault(strutil.Trim(document.DocumentName), "未命名文档"))
 	builder.WriteString("》")
 	if len(sectionTitles) > 0 {
-		limit := len(sectionTitles)
-		if limit > 4 {
-			limit = 4
-		}
+		limit := max(len(sectionTitles), 4)
 		builder.WriteString("主要涵盖：")
 		builder.WriteString(strings.Join(sectionTitles[:limit], "、"))
 		builder.WriteString("。")
@@ -457,14 +427,11 @@ func (p *ProfileLogicImpl) buildDocumentTags(document *entity.Document, knowledg
 	if strutil.IsNotBlank(document.DocumentTags) {
 		for _, t := range strings.Split(document.DocumentTags, ",") {
 			normalized := strutil.Trim(t)
-			if strutil.IsBlank(normalized) {
-				continue
+			_, ok := seen[normalized]
+			if normalized != "" && !ok {
+				seen[normalized] = struct{}{}
+				result = append(result, normalized)
 			}
-			if _, ok := seen[normalized]; ok {
-				continue
-			}
-			seen[normalized] = struct{}{}
-			result = append(result, normalized)
 			if len(result) >= 8 {
 				break
 			}
@@ -499,13 +466,13 @@ func (p *ProfileLogicImpl) buildDocumentTags(document *entity.Document, knowledg
 
 func combinedText(document *entity.Document, parsedText string, sectionTitles []string) string {
 	var builder strings.Builder
-	builder.WriteString(defaultIfBlank(strutil.Trim(document.DocumentName), ""))
+	builder.WriteString(strutil.Trim(document.DocumentName))
 	builder.WriteString(" ")
-	builder.WriteString(defaultIfBlank(strutil.Trim(document.OriginalFileName), ""))
+	builder.WriteString(strutil.Trim(document.OriginalFileName))
 	builder.WriteString(" ")
 	builder.WriteString(strings.Join(sectionTitles, " "))
 	builder.WriteString(" ")
-	builder.WriteString(defaultIfBlank(strutil.Trim(parsedText), ""))
+	builder.WriteString(strutil.Trim(parsedText))
 	return strings.ToLower(builder.String())
 }
 
@@ -521,35 +488,10 @@ func containsAny(text string, values ...string) bool {
 
 func stripSectionCode(title string) string {
 	normalized := strutil.Trim(title)
-	if strutil.IsBlank(normalized) {
+	if normalized == "" {
 		return normalized
 	}
 	return strutil.Trim(sectionCodePrefixRegexp.ReplaceAllString(normalized, ""))
-}
-
-func stripFileExtension(fileName string) string {
-	normalized := strutil.Trim(fileName)
-	if strutil.IsBlank(normalized) {
-		return normalized
-	}
-	idx := strings.LastIndex(normalized, ".")
-	if idx > 0 {
-		return normalized[:idx]
-	}
-	return normalized
-}
-
-// joinJSONLikeArray 序列化为 JSON 数组字符串（与 Java 端 "["x","y"]" 格式对齐）
-func joinJSONLikeArray(values []string) string {
-	if len(values) == 0 {
-		return "[]"
-	}
-	// 使用 json.Marshal 保证转义正确性
-	data, err := json.Marshal(values)
-	if err != nil {
-		return "[]"
-	}
-	return string(data)
 }
 
 func boolToInt(v bool) int {
@@ -557,11 +499,4 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
-}
-
-func defaultIfBlank(value, defaultValue string) string {
-	if strutil.IsBlank(value) {
-		return defaultValue
-	}
-	return value
 }

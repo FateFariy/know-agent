@@ -1,11 +1,5 @@
 package entity
 
-import (
-	"gorm.io/gorm"
-
-	"github.com/swiftbit/know-agent/common/utils"
-)
-
 // KnowledgeRouteTrace 知识路由追踪实体
 type KnowledgeRouteTrace struct {
 	ID                  int64   `gorm:"column:id;primaryKey"`         // 主键ID
@@ -25,12 +19,4 @@ type KnowledgeRouteTrace struct {
 	Confidence          float64 `gorm:"column:confidence"`            // 置信度
 	RouteStatus         int     `gorm:"column:route_status"`          // 路由状态
 	ErrorMsg            string  `gorm:"column:error_msg"`             // 错误信息
-}
-
-func (m *KnowledgeRouteTrace) BeforeCreate(tx *gorm.DB) error {
-	if m.ID == 0 {
-		m.ID = utils.GetSnowflakeNextID()
-	}
-	m.Deleted = 1
-	return nil
 }

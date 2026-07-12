@@ -2,7 +2,6 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -743,17 +742,8 @@ func (s *KnowledgeRouteLogicImpl) buildTrace(exchangeId int64, conversationId, q
 	trace.Confidence = decision.Confidence
 	trace.RouteStatus = vo.RouteStatusCode(decision.RouteStatus)
 	trace.ErrorMsg = strutil.Trim(decision.Reason)
-	trace.TopScopesJson = toCompactJSON(decision.Scopes)
-	trace.TopTopicsJson = toCompactJSON(decision.Topics)
-	trace.TopDocumentsJson = toCompactJSON(decision.Documents)
+	trace.TopScopes = decision.Scopes
+	trace.TopTopics = utils.ToCompactJSON(decision.Topics)
+	trace.TopDocuments = utils.ToCompactJSON(decision.Documents)
 	return trace
-}
-
-// toCompactJSON 将任意切片序列化为紧凑 JSON
-func toCompactJSON(v any) string {
-	data, err := json.Marshal(v)
-	if err != nil || len(data) == 0 || string(data) == "null" {
-		return "[]"
-	}
-	return string(data)
 }

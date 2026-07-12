@@ -445,13 +445,13 @@ func (d *DocumentRepositoryImpl) InsertProfile(ctx context.Context, profile *ent
 
 // SelectProfileByDocumentId 根据文档ID查询文档属性
 func (d *DocumentRepositoryImpl) SelectProfileByDocumentId(ctx context.Context, documentId int64) (*entity.DocumentProfile, error) {
-	profile := new(entity.DocumentProfile)
+	profile := &entity.DocumentProfile{}
 	err := d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
 		Where("document_id = ?", documentId).
 		Order("id DESC").
 		First(profile).Error
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+		return profile, nil
 	}
 	return profile, err
 }

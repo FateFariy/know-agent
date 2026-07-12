@@ -41,6 +41,8 @@ var documentProviderSet = wire.NewSet(
 	wire.Bind(new(documentlogic.ChunkStrategyLogic), new(*documentlogic.ChunkStrategyLogicImpl)),
 	documentlogic.NewTextPreProcessLogicImpl,
 	wire.Bind(new(documentlogic.TextPreProcessLogic), new(*documentlogic.TextPreProcessLogicImpl)),
+	documentlogic.NewProfileLogicImpl,
+	wire.Bind(new(documentlogic.ProfileLogic), new(*documentlogic.ProfileLogicImpl)),
 	documentadapter.NewDocumentPort,
 )
 

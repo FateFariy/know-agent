@@ -2,8 +2,6 @@ package logic
 
 import (
 	"context"
-	"errors"
-	"sort"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -73,23 +71,16 @@ func (k *KnowledgeLogicImpl) ListTopics(ctx context.Context, scopeCode string) (
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(nodes, func(i, j int) bool { return nodes[i].SortOrder < nodes[j].SortOrder })
 	return nodes, nil
 }
 
 // ============ Document Profile ============
 
 func (k *KnowledgeLogicImpl) GetDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
-	if documentId <= 0 {
-		return nil, errors.New("documentId 非法")
-	}
 	return k.repo.SelectDocumentProfileByDocumentId(ctx, documentId)
 }
 
 func (k *KnowledgeLogicImpl) RegenerateDocumentProfile(ctx context.Context, documentId int64) (*entity.KnowledgeDocumentProfile, error) {
-	if documentId <= 0 {
-		return nil, errors.New("documentId 非法")
-	}
 	// 此处仅执行画像的写入/更新操作；真正的“重新生成”由上游的异步 pipeline 完成
 	profile := &entity.KnowledgeDocumentProfile{
 		DocumentId:    documentId,
@@ -102,9 +93,6 @@ func (k *KnowledgeLogicImpl) RegenerateDocumentProfile(ctx context.Context, docu
 }
 
 func (k *KnowledgeLogicImpl) BatchRegenerateDocumentProfiles(ctx context.Context, documentIds []int64) ([]*entity.KnowledgeDocumentProfile, error) {
-	if len(documentIds) == 0 {
-		return nil, errors.New("documentIds 不能为空")
-	}
 	profiles := make([]*entity.KnowledgeDocumentProfile, 0, len(documentIds))
 	for _, id := range documentIds {
 		if id <= 0 {
