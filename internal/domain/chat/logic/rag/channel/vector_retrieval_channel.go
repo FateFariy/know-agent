@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zeromicro/go-zero/core/logx"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -14,7 +17,7 @@ type VectorRetrievalChannel struct {
 	vectorDB adapter.VectorDB
 }
 
-var _ RetrievalChannel = (*VectorRetrievalChannel)(nil)
+var _ rag.RetrievalChannel = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
 func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, vectorDB adapter.VectorDB) *VectorRetrievalChannel {
@@ -42,7 +45,7 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, query *vo.Documen
 
 	docs, err := c.vectorDB.SearchByVector(ctx, query)
 	if err != nil {
-		Warnf("向量检索失败: question='%s', error=%v", query.Question, err)
+		logx.Errorf("向量检索失败: question='%s', error=%v", query.Question, err)
 		return nil, err
 	}
 

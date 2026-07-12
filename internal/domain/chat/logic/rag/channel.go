@@ -1,10 +1,7 @@
-package channel
+package rag
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -19,8 +16,4 @@ type RetrievalChannel interface {
 
 	// Retrieve 根据子问题检索
 	Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error)
-}
-
-func Warnf(format string, v ...any) {
-	logx.Alert(fmt.Sprintf(format, v...))
 }

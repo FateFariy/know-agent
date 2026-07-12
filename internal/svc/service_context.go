@@ -22,6 +22,9 @@ import (
 
 var ProviderSet = wire.NewSet(
 	NewServiceContext,
+	NewRedSync,
+	NewArkEmbedding,
+	NewMinioClient,
 )
 
 type ServiceContext struct {

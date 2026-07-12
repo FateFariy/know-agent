@@ -13,8 +13,8 @@ type SessionMemoryLogicImpl struct {
 	memoryStrategy Strategy
 }
 
-// NewSessionMemoryLogic 创建会话记忆逻辑实例
-func NewSessionMemoryLogic(memoryStrategy Strategy) *SessionMemoryLogicImpl {
+// NewSessionMemoryLogicImpl 创建会话记忆逻辑实例
+func NewSessionMemoryLogicImpl(memoryStrategy Strategy) *SessionMemoryLogicImpl {
 	return &SessionMemoryLogicImpl{
 		memoryStrategy: memoryStrategy,
 	}

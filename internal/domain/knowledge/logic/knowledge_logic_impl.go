@@ -14,13 +14,12 @@ import (
 
 // KnowledgeLogicImpl 知识管理领域实现
 type KnowledgeLogicImpl struct {
-	repo          adapter.KnowledgeRepository
-	documentLogic documentlogic.LifecycleLogic
+	repo           adapter.KnowledgeRepository
+	lifecycleLogic documentlogic.LifecycleLogic
 }
 
-// NewKnowledgeLogic 构造函数
-func NewKnowledgeLogic(repo adapter.KnowledgeRepository, documentLogic documentlogic.LifecycleLogic) *KnowledgeLogicImpl {
-	return &KnowledgeLogicImpl{repo: repo, documentLogic: documentLogic}
+func NewKnowledgeLogicImpl(repo adapter.KnowledgeRepository, lifecycleLogic documentlogic.LifecycleLogic) *KnowledgeLogicImpl {
+	return &KnowledgeLogicImpl{repo: repo, lifecycleLogic: lifecycleLogic}
 }
 
 // ============ Scope ============
@@ -81,7 +80,7 @@ func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, top
 	if err != nil {
 		return nil, err
 	}
-	documents, err := k.documentLogic.ListRetrievableDocuments(ctx)
+	documents, err := k.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -41,7 +41,7 @@ type PreparationOrchestratorImpl struct {
 	repo                   adapter.ChatRepository
 	memoryLogic            logic.SessionMemoryLogic
 	rewriteLogic           logic.QueryRewriteLogic
-	documentQuestionRouter logic.DocumentQuestionRouteLogic
+	documentQuestionRouter logic.IntentRecognitionLogic
 	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
 	lifecycleLogic         doclog.LifecycleLogic
 	tracer                 *trace.ConversationTraceRecorder
@@ -60,12 +60,12 @@ type option struct {
 	thinking                bool    // 是否启用思考过程
 }
 
-// NewChatPreparationOrchestrator 创建聊天准备编排器实例
-func NewChatPreparationOrchestrator(svcCtx *svc.ServiceContext,
+// NewChatPreparationOrchestratorImpl 创建聊天准备编排器实例
+func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	memoryLogic logic.SessionMemoryLogic,
 	rewriteLogic logic.QueryRewriteLogic,
-	documentQuestionRouter logic.DocumentQuestionRouteLogic,
+	documentQuestionRouter logic.IntentRecognitionLogic,
 	knowledgeRoute kelog.KnowledgeRouteLogic,
 	lifecycleLogic doclog.LifecycleLogic,
 ) *PreparationOrchestratorImpl {

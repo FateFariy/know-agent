@@ -18,7 +18,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -31,7 +30,7 @@ const rrfK = 60
 type RetrievalImpl struct {
 	repo                      adapter.ChatRepository
 	reranker                  adapter.Reranker
-	channels                  []channel.RetrievalChannel
+	channels                  []RetrievalChannel
 	documentLogic             doclog.LifecycleLogic
 	channelTimeout            time.Duration
 	subQuestionTimeout        time.Duration
@@ -46,7 +45,7 @@ type RetrievalImpl struct {
 }
 
 func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker adapter.Reranker,
-	channels []channel.RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
+	channels []RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
 	return &RetrievalImpl{
 		repo:                      repo,
 		channels:                  channels,
@@ -193,7 +192,7 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 	defer cancel()
 
 	// 过滤出当前计划支持的通道（无通道直接返回空，让上游继续）
-	channels := slice.Filter(e.channels, func(_ int, item channel.RetrievalChannel) bool { return item.Supports(plan) })
+	channels := slice.Filter(e.channels, func(_ int, item RetrievalChannel) bool { return item.Supports(plan) })
 	if len(channels) == 0 {
 		return nil, nil
 	}
@@ -204,7 +203,7 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 
 	// 为每个通道启动一个 goroutine 并行执行检索
 	for _, ch := range channels {
-		go func(ch channel.RetrievalChannel) {
+		go func(ch RetrievalChannel) {
 			// 组装文档检索对象（传入子问题、执行计划、向量 topK）
 			documentRetrieve := vo.NewDocumentRetrieve(subQuestion, plan, e.vectorTopK)
 			// 调用 retrieveChannel（实际执行：加载文档元数据 → 调用通道检索 → 回填知识库信息）
@@ -244,7 +243,7 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 //  1. 加载 DocumentIds 对应的全部可检索文档，并按 DocumentId 索引为 map
 //  2. 调用通道的 Retrieve 接口执行实际检索
 //  3. 将返回的每个文档根据 DocumentId 从 map 中回填知识信息（名称、范围、标签等）
-func (e *RetrievalImpl) retrieveChannel(ctx context.Context, ch channel.RetrievalChannel, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
+func (e *RetrievalImpl) retrieveChannel(ctx context.Context, ch RetrievalChannel, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
 	// 按查询中的文档元信息
 	documents, err := e.documentLogic.ListRetrievableDocuments(ctx, query.DocumentIds...)
 	if err != nil {

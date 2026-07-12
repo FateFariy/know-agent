@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zeromicro/go-zero/core/logx"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -14,7 +17,7 @@ type KeywordRetrievalChannel struct {
 	keywordDB adapter.KeywordDB
 }
 
-var _ RetrievalChannel = (*KeywordRetrievalChannel)(nil)
+var _ rag.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
 func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, keywordDB adapter.KeywordDB) *KeywordRetrievalChannel {
@@ -41,7 +44,7 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.Docume
 
 	docs, err := c.keywordDB.SearchByKeyword(ctx, query)
 	if err != nil {
-		Warnf("关键词检索失败: question='%s', error=%v", query.Question, err)
+		logx.Errorf("关键词检索失败: question='%s', error=%v", query.Question, err)
 		return nil, err
 	}
 
