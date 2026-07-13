@@ -10,16 +10,16 @@ import (
 type DocumentPort struct {
 	Storage
 	MessageProducer
-	VectorDB
-	KeywordDB
+	VectorRetriever
+	KeywordRetriever
 }
 
-func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorDB, keywordSearch KeywordDB) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorRetriever, keywordSearch KeywordRetriever) *DocumentPort {
 	return &DocumentPort{
-		Storage:         storage,
-		MessageProducer: messageProducer,
-		VectorDB:        vectorDB,
-		KeywordDB:       keywordSearch,
+		Storage:          storage,
+		MessageProducer:  messageProducer,
+		VectorRetriever:  vectorDB,
+		KeywordRetriever: keywordSearch,
 	}
 }
 
@@ -44,7 +44,7 @@ type MessageProducer interface {
 	Send(ctx context.Context, topic, key string, message any) error
 }
 
-type VectorDB interface {
+type VectorRetriever interface {
 	// Vectorize 向量化块
 	Vectorize(ctx context.Context, chunks []*entity.DocumentChunk) error
 
@@ -52,7 +52,7 @@ type VectorDB interface {
 	DeleteVectorByDocumentId(ctx context.Context, documentId int64) error
 }
 
-type KeywordDB interface {
+type KeywordRetriever interface {
 	// IndexChunks 索引块
 	IndexChunks(ctx context.Context, chunks []*entity.DocumentChunk) error
 

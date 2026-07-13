@@ -14,13 +14,13 @@ import (
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	vectorDB adapter.VectorDB
+	vectorDB adapter.VectorRetriever
 }
 
 var _ rag.RetrievalChannel = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
-func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, vectorDB adapter.VectorDB) *VectorRetrievalChannel {
+func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, vectorDB adapter.VectorRetriever) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
 		vectorDB: vectorDB,
 	}

@@ -36,8 +36,8 @@ type MilvusVector struct {
 	collection string
 }
 
-var _ dadapter.VectorDB = (*MilvusVector)(nil)
-var _ cadapter.VectorDB = (*MilvusVector)(nil)
+var _ dadapter.VectorRetriever = (*MilvusVector)(nil)
+var _ cadapter.VectorRetriever = (*MilvusVector)(nil)
 
 func NewMilvusVector(svcCtx *svc.ServiceContext) *MilvusVector {
 	ctx := context.Background()

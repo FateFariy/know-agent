@@ -131,7 +131,7 @@ func safeStructureNodeId(decision *vo.DocumentNavigationDecision) int64 {
 	return decision.StructureAnchor.StructureNodeId
 }
 
-// displayTitleOf 返回目标章节的展示标题；与 Java GraphSection#displayTitle 对齐
+// displayTitleOf 返回目标章节的展示标题
 func displayTitleOf(result *entity.GraphQueryResult) string {
 	if result == nil || result.TargetSection == nil {
 		return ""
@@ -155,7 +155,7 @@ func matchedItemCountOf(result *entity.GraphQueryResult) int {
 	return len(result.MatchedItems)
 }
 
-// hasGraphEvidence 判断结构图结果是否满足证据要求（与 Java 对齐）
+// hasGraphEvidence 判断结构图结果是否满足证据要求
 //
 // - 若决策中指定了 itemIndex，则必须存在 targetItem 或 matchedItems
 // - 否则只需要 targetSection 有内容文本 或 存在 matchedItems

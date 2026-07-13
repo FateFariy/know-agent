@@ -32,16 +32,15 @@ func NormalizeComparableTitle(text string) string {
 }
 
 // LooksLikePlainHeading 启发式判断一行是否像「朴素标题」（无编号/无符号的纯文字标题）
-/*
-  判断要点：
-  1. 文本非空且字符数 ≤ maxPlainHeadingChars
-  2. 不以句末标点结尾（排除完整句子）
-  3. 不含 http(s):// 前缀（排除链接行）
-  4. 不以 | 开头或结尾（排除表格行）
-  5. 不是纯分割线
-  6. 上下文判断：前后至少一侧有空行，且下一行看起来像正文内容
-  7. 名词性特征：不含内部中英文逗号/分号/句号等
-*/
+//
+// 判断要点：
+//  1. 文本非空且字符数 ≤ maxPlainHeadingChars
+//  2. 不以句末标点结尾（排除完整句子）
+//  3. 不含 http(s):// 前缀（排除链接行）
+//  4. 不以 | 开头或结尾（排除表格行）
+//  5. 不是纯分割线
+//  6. 上下文判断：前后至少一侧有空行，且下一行看起来像正文内容
+//  7. 名词性特征：不含内部中英文逗号/分号/句号等
 func LooksLikePlainHeading(lineContext *vo.LineContext, text string, maxPlainHeadingChars int) bool {
 	normalized := strutil.Trim(text)
 	if normalized == "" {

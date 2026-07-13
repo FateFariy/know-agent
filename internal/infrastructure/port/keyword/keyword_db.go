@@ -19,8 +19,8 @@ type KeywordDB struct {
 	db *gorm.DB
 }
 
-var _ dadapter.KeywordDB = (*KeywordDB)(nil)
-var _ cadapter.KeywordDB = (*KeywordDB)(nil)
+var _ dadapter.KeywordRetriever = (*KeywordDB)(nil)
+var _ cadapter.KeywordRetriever = (*KeywordDB)(nil)
 
 func NewKeywordDB(svcCtx *svc.ServiceContext) *KeywordDB {
 	return &KeywordDB{db: svcCtx.Db}

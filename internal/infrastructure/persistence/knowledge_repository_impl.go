@@ -225,7 +225,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Cont
 // 		return nil, nil
 // 	}
 //
-// 	// 步骤 3：关键词分数计算（与 Java keywordWeight + sectionKeywordWeight 对齐）
+// 	// 步骤 3：关键词分数计算
 // 	terms := extractKeywordTerms(query)
 // 	if len(terms) == 0 {
 // 		return nil, nil

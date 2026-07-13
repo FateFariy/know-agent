@@ -1,6 +1,10 @@
 package entity
 
-import "github.com/duke-git/lancet/v2/strutil"
+import (
+	"github.com/duke-git/lancet/v2/strutil"
+
+	"github.com/swiftbit/know-agent/common/utils"
+)
 
 // GraphSection 结构图节点基本信息
 type GraphSection struct {
@@ -33,11 +37,25 @@ func (s *GraphSection) DisplayTitle() string {
 
 // GraphItem 结构图编号项
 type GraphItem struct {
-	NodeId    int64  `json:"nodeId"`
-	NodeNo    string `json:"nodeNo"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	ItemIndex *int   `json:"itemIndex"`
+	NodeId            int64  // 节点ID
+	DocumentId        int64  // 文档ID
+	ParseTaskId       int64  // 解析任务ID
+	NodeNo            int    // 节点编号
+	NodeType          string // 节点类型
+	SectionNodeId     int64  // 节点所属章节ID
+	PrevSiblingNodeId int64  // 前一个兄弟节点ID
+	NextSiblingNodeId int64  // 后一个兄弟节点ID
+	Title             string // 节点标题
+	AnchorText        string // 节点锚点文本
+	SectionPath       string // 节点所属章节路径
+	CanonicalPath     string // 节点所属章节路径（规范路径）
+	ContentText       string // 节点内容文本
+	ItemIndex         int    // 节点编号索引
+}
+
+// DisplayText 返回节点的展示文本
+func (i *GraphItem) DisplayText() string {
+	return utils.BlankToDefault(i.ContentText, utils.BlankToDefault(i.AnchorText, i.Title))
 }
 
 // GraphSectionWithChildren 包含目标节点及其子节点的查询结果

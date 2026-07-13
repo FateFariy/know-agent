@@ -35,13 +35,12 @@ func (d *TableRowDetector) Detect(detCtx *DetectorContext, text string, opts ...
 }
 
 // isTableRow 判断是否为表格行
-/*
- 判断条件（满足任一）：
- 1. 以 | 开头且以 | 结尾（Markdown 表格行）
- 2. 包含制表符 \t（制表符分隔表格）
- 3. 用 | 分割后至少有3列（多列表格）
- 4. 符合表格分割线模式（如：|---|----|）
-*/
+//
+// 判断条件（满足任一）：
+//  1. 以 | 开头且以 | 结尾（Markdown 表格行）
+//  2. 包含制表符 \t（制表符分隔表格）
+//  3. 用 | 分割后至少有3列（多列表格）
+//  4. 符合表格分割线模式（如：|---|----|）
 func (d *TableRowDetector) isTableRow(text string) bool {
 	if strings.HasPrefix(text, "|") && strings.HasSuffix(text, "|") {
 		return true

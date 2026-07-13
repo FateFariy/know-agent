@@ -22,14 +22,14 @@ import (
 
 type DocumentRepositoryImpl struct {
 	rdb     *redis.Client
-	vdb     adapter.VectorDB
+	vdb     adapter.VectorRetriever
 	storage adapter.Storage
 	*transactionManager
 }
 
 var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
-func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorDB) *DocumentRepositoryImpl {
+func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorRetriever) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
 		transactionManager: &transactionManager{db: svcCtx.Db},
 		rdb:                svcCtx.Rdb,

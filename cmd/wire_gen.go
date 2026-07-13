@@ -43,8 +43,7 @@ import (
 
 //go:generate wire gen ./wire.go
 func WireApp(c *config.Config) *server.Server {
-	db := svc.NewDB(c)
-	serviceContext := svc.NewServiceContext(c, db)
+	serviceContext := svc.NewServiceContext(c)
 	minioStorage := storage.NewMinioStorage(serviceContext)
 	mockMessageProducer := mq.NewMockMessageProducer()
 	milvusVector := vector.NewMilvusVector(serviceContext)
@@ -67,7 +66,7 @@ func WireApp(c *config.Config) *server.Server {
 	promptBuilder := rag.NewPromptBuilder(serviceContext, templateLogicImpl)
 	conversationTraceRecorder := trace.NewConversationTraceRecorder(chatRepositoryImpl)
 	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptBuilder, chatModelImpl, conversationTraceRecorder)
-	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(db)
+	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(serviceContext)
 	defaultAnswerRender := graph.NewDefaultAnswerRender()
 	graphOnlyExecutor := executor.NewGraphOnlyExecutor(defaultStructureGraphQuerier, defaultAnswerRender, conversationTraceRecorder)
 	graphThenEvidenceExecutor := executor.NewGraphThenEvidenceExecutor(defaultStructureGraphQuerier, defaultAnswerRender, conversationTraceRecorder)

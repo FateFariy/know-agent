@@ -10,10 +10,9 @@ import (
 )
 
 // decimalHeadingPattern 数字编号标题模式（如：1.1、1.1.1）
-/*
-  要求至少包含一个小数点
-  捕获组1：编号（如：1.1.1），捕获组2：标题文本
-*/
+//
+// 要求至少包含一个小数点
+// 捕获组1：编号（如：1.1.1），捕获组2：标题文本
 var decimalHeadingPattern = regexp.MustCompile(`^(\d+(?:\.\d+)+)\s*[、.]?\s*(.+)$`)
 
 // DecimalHeadingDetector 数字编号标题检测器, 检测带小数点的层级编号标题（1.1、1.1.1）

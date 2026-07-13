@@ -26,11 +26,8 @@ type GraphOnlyExecutor struct {
 }
 
 // NewGraphOnlyExecutor 构造结构图直答执行器
-func NewGraphOnlyExecutor(
-	structureQuerier logic.StructureGraphQuerier,
-	answerRender graph.AnswerRender,
-	tracer *trace.ConversationTraceRecorder,
-) *GraphOnlyExecutor {
+func NewGraphOnlyExecutor(structureQuerier logic.StructureGraphQuerier, answerRender graph.AnswerRender,
+	tracer *trace.ConversationTraceRecorder) *GraphOnlyExecutor {
 	return &GraphOnlyExecutor{
 		structureQuerier: structureQuerier,
 		answerRender:     answerRender,
@@ -43,7 +40,7 @@ var _ conversation.Executor = (*GraphOnlyExecutor)(nil)
 // Mode 返回 GRAPH_ONLY
 func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGraphOnly }
 
-// Execute 执行结构图查询并渲染答案（与 Java GraphOnlyExecutor 对齐）
+// Execute 执行结构图查询并渲染答案
 func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
@@ -53,16 +50,16 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 	decision := plan.NavigationDecision
 	if decision == nil || decision.StructureAnchor == nil || decision.StructureAnchor.StructureNodeId == 0 {
 		logx.Infof("GRAPH_ONLY 执行器直接返回无证据: decisionPresent=%v, structureNodeId=%v",
-			decision != nil,
-			safeStructureNodeId(decision))
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, nil
+			decision != nil, safeStructureNodeId(decision))
+		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
 	}
 
-	publishThinking(convCtx, "正在通过结构图直接查询章节关系。")
+	if err := publishThinking(convCtx, "正在通过结构图直接查询章节关系。"); err != nil {
+		return nil, err
+	}
 
-	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace,
-		vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在执行结构图查询。", nil)
+	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageGraphQuery,
+		e.Mode().String(), "正在执行结构图查询。", nil)
 
 	documentId := plan.SelectedDocumentId
 	sectionNodeId := decision.StructureAnchor.StructureNodeId
@@ -104,9 +101,8 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 //
 // - SECTION_ADJACENCY_LOOKUP：查询目标章节的前后兄弟章节 + 父章节
 // - 其他（默认 CHILD_SECTION_DESCEND）：查询目标章节 + 直接下级章节列表
-func (e *GraphOnlyExecutor) buildGraphResult(
-	ctx context.Context, documentId, sectionNodeId int64, decision *vo.DocumentNavigationDecision,
-) (*ragvo.GraphQueryResult, error) {
+func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, sectionNodeId int64,
+	decision *vo.DocumentNavigationDecision) (*ragvo.GraphQueryResult, error) {
 	if decision != nil && decision.NavigationAction == vo.DocumentNavigationActionSectionAdjacencyLookup {
 		siblings, err := e.structureQuerier.FindSectionWithSiblings(ctx, documentId, sectionNodeId)
 		if err != nil {

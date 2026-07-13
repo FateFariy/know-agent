@@ -57,16 +57,16 @@ func NewSignalExtractor() *SignalExtractor {
 }
 
 // Transform 从原始文本中抽取结构信号
-/*
-  整体流程：
-  1. 解析可选参数，规范化文档标题
-  2. 将 text 切分为逻辑行（处理显式步骤内联切分等）
-  3. 统计行频率，用于启发式判断「反复出现的模板行」
-  4. 若存在文档标题，则以最高置信度输出一个 DocumentTitle 信号
-  5. 逐行调用检测器链 classify，生成标题/正文/候选标题信号
-  6. 汇总规范化文本作为上下文并返回批量信号
-  返回：批量结构信号，供后续聚合使用
-*/
+//
+// 整体流程：
+//  1. 解析可选参数，规范化文档标题
+//  2. 将 text 切分为逻辑行（处理显式步骤内联切分等）
+//  3. 统计行频率，用于启发式判断「反复出现的模板行」
+//  4. 若存在文档标题，则以最高置信度输出一个 DocumentTitle 信号
+//  5. 逐行调用检测器链 classify，生成标题/正文/候选标题信号
+//  6. 汇总规范化文本作为上下文并返回批量信号
+//
+// 返回：批量结构信号，供后续聚合使用
 func (e *SignalExtractor) Transform(ctx context.Context, text string, opts ...TransformerOption) *vo.DocumentStructureSignalBatch {
 	// 聚合可选参数
 	opt := GetTransformerImplSpecificOptions[extractorOption](&extractorOption{}, opts...)
@@ -108,13 +108,13 @@ func (e *SignalExtractor) Transform(ctx context.Context, text string, opts ...Tr
 }
 
 // classify 对单个逻辑行进行结构分类：先运行检测器链，再做朴素标题兜底，最后回归正文
-/*
-  判定顺序：
-  1. 尝试由 detectorsManager 的显式检测器识别（编号标题/列表/引用等）
-  2. 若检测器未命中，且行分类器也未判定为标题，则按「上下文 + 字符特征」判断是否为朴素标题候选
-  3. 其余情况统一标记为正文 Body
-  返回：单个结构信号（已携带行号/原始文本/缩进级别）
-*/
+//
+// 判定顺序：
+//  1. 尝试由 detectorsManager 的显式检测器识别（编号标题/列表/引用等）
+//  2. 若检测器未命中，且行分类器也未判定为标题，则按「上下文 + 字符特征」判断是否为朴素标题候选
+//  3. 其余情况统一标记为正文 Body
+//
+// 返回：单个结构信号（已携带行号/原始文本/缩进级别）
 func (e *SignalExtractor) classify(detCtx *signal.DetectorContext, logicalLines []*vo.DocumentStructureLogicalLine, index int) *vo.DocumentStructureSignal {
 	logicalLine := logicalLines[index]
 	lineNo := logicalLine.LogicalLineNo
@@ -166,13 +166,13 @@ func (e *SignalExtractor) classify(detCtx *signal.DetectorContext, logicalLines 
 }
 
 // buildLogicalLines 将原始文本切分为逻辑行
-/*
-  策略：
-  1. 按 \n 切出物理行，保留首尾空格的原始行用于 indent 计算
-  2. 对每个物理行尝试按「显式步骤边界」进一步拆分，使「第1步:...第2步:...」拆成多个逻辑段
-  3. 每个段单独编号为逻辑行，便于后续按段生成结构信号
-  返回：按出现顺序排列的逻辑行切片
-*/
+
+// 策略：
+//  1. 按 \n 切出物理行，保留首尾空格的原始行用于 indent 计算
+//  2. 对每个物理行尝试按「显式步骤边界」进一步拆分，使「第1步:...第2步:...」拆成多个逻辑段
+//  3. 每个段单独编号为逻辑行，便于后续按段生成结构信号
+//
+// 返回：按出现顺序排列的逻辑行切片
 func (e *SignalExtractor) buildLogicalLines(parsedText string) []*vo.DocumentStructureLogicalLine {
 	if parsedText == "" {
 		return nil
@@ -269,12 +269,11 @@ func (e *SignalExtractor) buildContext(logicalLines []*vo.DocumentStructureLogic
 }
 
 // splitInlineSegments 对单个物理行进行内联切分
-/*
-  规则：
-  1. 空行 → 不切分（返回 nil 表示作为原始空行处理）
-  2. 以 # | > 开头，或为纯分隔行 → 不切分，整体保留（视为 Markdown 结构）
-  3. 其他 → 按「第N步 / 步骤N」等显式步骤边界切分，每个片段返回一个段
-*/
+//
+// 规则：
+//  1. 空行 → 不切分（返回 nil 表示作为原始空行处理）
+//  2. 以 # | > 开头，或为纯分隔行 → 不切分，整体保留（视为 Markdown 结构）
+//  3. 其他 → 按「第N步 / 步骤N」等显式步骤边界切分，每个片段返回一个段
 func (e *SignalExtractor) splitInlineSegments(rawLine string) []string {
 	trimmed := strutil.Trim(rawLine)
 	if trimmed == "" {

@@ -1,11 +1,12 @@
 package graph
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -22,52 +23,136 @@ func NewDefaultAnswerRender() *DefaultAnswerRender {
 
 var _ AnswerRender = (*DefaultAnswerRender)(nil)
 
+// RenderAnswer 渲染图谱回答
 func (r *DefaultAnswerRender) RenderAnswer(mode vo.ExecutionMode, decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
-	if decision == nil || result == nil {
-		return "没有查询到匹配的章节信息。"
+	if result == nil || result.TargetSection == nil {
+		return ""
 	}
-	parts := make([]string, 0, 4)
-	switch mode {
-	case vo.ExecutionModeGraphOnly:
-		title := safeTitle(result.TargetSection)
-		parts = append(parts, "你询问的内容位于章节 "+title+"。")
-		if len(result.Children) > 0 {
-			parts = append(parts, "该章节包含 "+strconv.Itoa(len(result.Children))+" 个子章节，可供进一步查阅。")
-		}
-		if strutil.IsNotBlank(decision.StructureAnchor.TargetSectionHint) {
-			parts = append(parts, "相关提示："+decision.StructureAnchor.TargetSectionHint)
-		}
-	case vo.ExecutionModeGraphThenEvidence:
-		title := safeTitle(result.TargetSection)
-		parts = append(parts, "基于章节 "+title+" 的上下文，我将为你检索证据信息。")
-		if decision.ItemAnchor != nil && decision.ItemAnchor.ItemIndex > 0 {
-			parts = append(parts, "聚焦第 "+strconv.Itoa(decision.ItemAnchor.ItemIndex)+" 项内容。")
-		}
-	case vo.ExecutionModeRetrieval:
-		title := safeTitle(result.TargetSection)
-		if strutil.IsNotBlank(title) {
-			parts = append(parts, "检索到相关章节 "+title+"，已为你整理相关证据。")
-		} else {
-			parts = append(parts, "根据你的问题，正在从相关文档中检索证据。")
-		}
-	default:
-		parts = append(parts, "根据你的查询，正在从文档中查找相关章节与证据。")
+	if mode != nil && mode.Value() == vo.ExecutionModeGraphThenEvidence.Value() {
+		return r.renderGraphThenEvidence(decision, result)
 	}
-	return strings.Join(parts, " ")
+	return r.renderGraphOnly(decision, result)
 }
 
-func safeTitle(s *entity.GraphSection) string {
-	if s == nil {
-		return "未知章节"
+// renderGraphOnly 图谱直答模式
+func (r *DefaultAnswerRender) renderGraphOnly(decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
+	var action string
+	var question string
+	if decision != nil {
+		action = decision.NavigationAction
+		if decision.RetrievalPlan != nil {
+			question = decision.RetrievalPlan.RetrievalQuestion
+		}
 	}
-	if strutil.IsNotBlank(s.CanonicalPath) {
-		return s.CanonicalPath
+	if action == vo.DocumentNavigationActionSectionAdjacencyLookup || r.asksAdjacency(question) {
+		return r.renderAdjacency(result)
 	}
-	if strutil.IsNotBlank(s.NodeCode) && strutil.IsNotBlank(s.Title) {
-		return s.NodeCode + " " + s.Title
+	if r.asksChildren(question) || len(result.Children) > 0 {
+		return r.renderChildren(result.TargetSection, result.Children)
 	}
-	if strutil.IsNotBlank(s.Title) {
-		return s.Title
+	return result.TargetSection.DisplayTitle()
+}
+
+// renderGraphThenEvidence 图谱定位后取证模式
+func (r *DefaultAnswerRender) renderGraphThenEvidence(decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
+	if result.TargetItem != nil {
+		item := result.TargetItem
+		return fmt.Sprintf("“%s”中的第%d步是：%s", result.TargetSection.DisplayTitle(), item.ItemIndex, item.DisplayText())
 	}
-	return "未知章节"
+	if len(result.MatchedItems) > 0 {
+		var builder strings.Builder
+		builder.WriteString("在“")
+		builder.WriteString(result.TargetSection.DisplayTitle())
+		builder.WriteString("”中命中了以下步骤：")
+		for _, item := range result.MatchedItems {
+			builder.WriteString("\n")
+			builder.WriteString(r.formatItem(item))
+		}
+		return builder.String()
+	}
+	targetSection := result.TargetSection
+	if strutil.IsNotBlank(targetSection.ContentText) {
+		return "“" + targetSection.DisplayTitle() + "”中的相关内容如下：\n" + strutil.Trim(targetSection.ContentText)
+	}
+	return targetSection.DisplayTitle()
+}
+
+// renderAdjacency 渲染相邻关系（父章节、上一节、下一节）
+func (r *DefaultAnswerRender) renderAdjacency(result *entity.GraphQueryResult) string {
+	var builder strings.Builder
+	targetSection := result.TargetSection
+	parentSection := result.ParentSection
+	builder.WriteString("目标章节是：“")
+	builder.WriteString(targetSection.DisplayTitle())
+	builder.WriteString("”。")
+	if parentSection != nil {
+		builder.WriteString("\n它属于：“")
+		builder.WriteString(parentSection.DisplayTitle())
+		builder.WriteString("”。")
+	}
+	builder.WriteString("\n上一节：")
+	builder.WriteString(r.formatSectionOrFallback(result.PreviousSibling))
+	builder.WriteString("\n下一节：")
+	builder.WriteString(r.formatSectionOrFallback(result.NextSibling))
+	return builder.String()
+}
+
+// renderChildren 渲染子章节列表
+func (r *DefaultAnswerRender) renderChildren(targetSection *entity.GraphSection, children []*entity.GraphSection) string {
+	var builder strings.Builder
+	builder.WriteString("“")
+	builder.WriteString(targetSection.DisplayTitle())
+	builder.WriteString("”包含以下章节：")
+	if len(children) == 0 {
+		builder.WriteString("\n未找到直接子章节。")
+		return builder.String()
+	}
+	for _, child := range children {
+		builder.WriteString("\n- ")
+		builder.WriteString(child.DisplayTitle())
+	}
+	return builder.String()
+}
+
+// formatItem 格式化步骤项
+func (r *DefaultAnswerRender) formatItem(item *entity.GraphItem) string {
+	if item == nil {
+		return ""
+	}
+	if item.ItemIndex > 0 {
+		return fmt.Sprintf("第%d步：%s", item.ItemIndex, item.DisplayText())
+	}
+	return item.DisplayText()
+}
+
+// formatItemIndex 格式化步骤索引
+func (r *DefaultAnswerRender) formatItemIndex(idx *int) string {
+	if idx == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *idx)
+}
+
+// formatSectionOrFallback 格式化章节或返回默认值
+func (r *DefaultAnswerRender) formatSectionOrFallback(section *entity.GraphSection) string {
+	if section == nil {
+		return "未找到相邻章节"
+	}
+	return "“" + section.DisplayTitle() + "”"
+}
+
+// asksAdjacency 判断问题是否询问相邻关系
+func (r *DefaultAnswerRender) asksAdjacency(question string) bool {
+	if strutil.IsBlank(question) {
+		return false
+	}
+	return strutil.ContainsAny(question, []string{"上一节", "下一节", "前一节", "属于哪个章节"})
+}
+
+// asksChildren 判断问题是否询问子章节
+func (r *DefaultAnswerRender) asksChildren(question string) bool {
+	if strutil.IsBlank(question) {
+		return false
+	}
+	return strutil.ContainsAny(question, []string{"包含哪些章节", "都包含哪些章节", "有哪些小节", "有哪些章节"})
 }

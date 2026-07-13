@@ -14,13 +14,13 @@ import (
 
 // KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
-	keywordDB adapter.KeywordDB
+	keywordDB adapter.KeywordRetriever
 }
 
 var _ rag.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, keywordDB adapter.KeywordDB) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, keywordDB adapter.KeywordRetriever) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
 		keywordDB: keywordDB,
 	}

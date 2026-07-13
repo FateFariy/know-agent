@@ -11,6 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	docent "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // DefaultStructureGraphQuerier 默认结构图查询器。
@@ -20,8 +21,10 @@ type DefaultStructureGraphQuerier struct {
 }
 
 // NewDefaultStructureGraphQuerier 创建默认结构图查询器。
-func NewDefaultStructureGraphQuerier(db *gorm.DB) *DefaultStructureGraphQuerier {
-	return &DefaultStructureGraphQuerier{db: db}
+func NewDefaultStructureGraphQuerier(svcCtx *svc.ServiceContext) *DefaultStructureGraphQuerier {
+	return &DefaultStructureGraphQuerier{
+		db: svcCtx.Db,
+	}
 }
 
 var _ logic.StructureGraphQuerier = (*DefaultStructureGraphQuerier)(nil)

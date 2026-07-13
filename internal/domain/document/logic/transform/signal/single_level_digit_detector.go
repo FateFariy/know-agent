@@ -11,10 +11,9 @@ import (
 )
 
 // singleLevelDigitPattern 单层数字编号模式（如：1. 标题、1、标题）
-/*
-  注意：带小数点的多层编号（1.1、1.1.1）由 DecimalHeadingDetector 处理
-  捕获组1：数字，捕获组2：内容
-*/
+//
+// 注意：带小数点的多层编号（1.1、1.1.1）由 DecimalHeadingDetector 处理
+// 捕获组1：数字，捕获组2：内容
 var singleLevelDigitPattern = regexp.MustCompile(`^(\d+)\s*[、.]\s*(.+)$`)
 
 // SingleLevelDigitDetector 单层数字编号检测器, 检测单层数字编号（1.、1、），通过上下文分析判断是标题还是列表项，优先级 Order=100
@@ -23,13 +22,12 @@ type SingleLevelDigitDetector struct {
 }
 
 // Detect 检测单层数字编号
-/*
- 通过上下文分析判断是标题还是列表项：
- 1. 相邻行有连续编号 → 列表项
- 2. 前一行以冒号结尾（列表引导语）→ 列表项
- 3. 满足标题特征（孤立、名词性、长度适中）→ 标题（置信度较低）
- 4. 其他情况 → 列表项
-*/
+//
+// 通过上下文分析判断是标题还是列表项：
+//  1. 相邻行有连续编号 → 列表项
+//  2. 前一行以冒号结尾（列表引导语）→ 列表项
+//  3. 满足标题特征（孤立、名词性、长度适中）→ 标题（置信度较低）
+//  4. 其他情况 → 列表项
 func (d *SingleLevelDigitDetector) Detect(detCtx *DetectorContext, text string, opts ...DetectorOption) *vo.DocumentStructureSignal {
 	if text == "" {
 		return nil

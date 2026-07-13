@@ -28,17 +28,16 @@ func NewTreeValidator() *TreeValidator {
 }
 
 // Transform 执行整棵草稿树的规范化与修复流程，最终返回按节点编号排序的候选节点列表。
-/*
-  处理步骤：
-  1. 构建 NodeNo -> Draft 的映射表，过滤无效条目
-  2. 折叠与文档标题重复的合成章节（消除冗余顶层节点）
-  3. 依据 NumericPath 修复章节层级关系
-  4. 校正无效/非法的父节点引用
-  5. 依据最新层级重新计算各节点的深度
-  6. 重建 CanonicalPath / SectionPath（显示路径）
-  7. 重建兄弟节点之间的双向链表指针
-  8. 将 Draft 转换为 Candidate 并按 NodeNo 排序返回
-*/
+//
+// 处理步骤：
+//  1. 构建 NodeNo -> Draft 的映射表，过滤无效条目
+//  2. 折叠与文档标题重复的合成章节（消除冗余顶层节点）
+//  3. 依据 NumericPath 修复章节层级关系
+//  4. 校正无效/非法的父节点引用
+//  5. 依据最新层级重新计算各节点的深度
+//  6. 重建 CanonicalPath / SectionPath（显示路径）
+//  7. 重建兄弟节点之间的双向链表指针
+//  8. 将 Draft 转换为 Candidate 并按 NodeNo 排序返回
 func (v *TreeValidator) Transform(documentTitle string, drafts []*vo.DocumentStructureNodeDraft, opts ...TransformerOption) []*vo.DocumentStructureNodeCandidate {
 	if len(drafts) == 0 {
 		return nil
@@ -80,12 +79,11 @@ func (v *TreeValidator) Transform(documentTitle string, drafts []*vo.DocumentStr
 }
 
 // collapseSyntheticTitleSection 折叠与文档标题重复的合成章节节点，避免文档标题被重复作为一级章节。
-/*
-  处理步骤：
-  1. 规范化文档标题；若为空则直接返回
-  2. 查找一个满足以下条件的重复节点：是章节、父节点为根(1)、且拥有非空 NodeCode
-  3. 将该重复节点的所有子节点挂到根节点，然后删除该重复节点
-*/
+//
+// 处理步骤：
+//  1. 规范化文档标题；若为空则直接返回
+//  2. 查找一个满足以下条件的重复节点：是章节、父节点为根(1)、且拥有非空 NodeCode
+//  3. 将该重复节点的所有子节点挂到根节点，然后删除该重复节点
 func (v *TreeValidator) collapseSyntheticTitleSection(documentTitle string, draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	// 规范化文档标题（去除大小写/空白差异用于等值比较）
 	normalizedTitle := support.NormalizeComparableTitle(documentTitle)
@@ -121,14 +119,13 @@ func (v *TreeValidator) collapseSyntheticTitleSection(documentTitle string, draf
 }
 
 // repairNumberedHierarchy 基于 NumericPath（例如 [1,2,3]）重新推断章节之间的父子关系。
-/*
-  处理步骤：
-  1. 建立 "数字路径键 -> 节点编号" 的索引，便于 O(1) 查找父级
-  2. 重新为每个章节赋值父节点：
-    - 长度为 1 → 根节点
-    - 否则尝试定位直接父节点（前缀路径）
-    - 找不到直接父节点时，退回到对应一级章节作为父节点
-*/
+//
+// 处理步骤：
+//  1. 建立 "数字路径键 -> 节点编号" 的索引，便于 O(1) 查找父级
+//  2. 重新为每个章节赋值父节点：
+//     - 长度为 1 → 根节点
+//     - 否则尝试定位直接父节点（前缀路径）
+//     - 找不到直接父节点时，退回到对应一级章节作为父节点
 func (v *TreeValidator) repairNumberedHierarchy(draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	// 构建数字路径键 → 节点编号映射（仅章节类型参与）
 	numericPathMap := make(map[string]int)
@@ -176,12 +173,11 @@ func (v *TreeValidator) repairNumberedHierarchy(draftMap map[int]*vo.DocumentStr
 }
 
 // repairInvalidParents 修复无效的父子关系：确保章节节点不会挂到列表类节点下、且所有节点都有合法的父节点。
-/*
-  处理步骤：
-  1. 跳过根节点（NodeNo==1）
-  2. 如果当前父节点存在但"章节挂到列表类节点"下这种非法结构，则上提一层
-  3. 如果父节点不存在，则默认挂到根节点
-*/
+
+// 处理步骤：
+//  1. 跳过根节点（NodeNo==1）
+//  2. 如果当前父节点存在但"章节挂到列表类节点"下这种非法结构，则上提一层
+//  3. 如果父节点不存在，则默认挂到根节点
 func (v *TreeValidator) repairInvalidParents(draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	for _, draft := range draftMap {
 		// 根节点无需处理
@@ -202,11 +198,10 @@ func (v *TreeValidator) repairInvalidParents(draftMap map[int]*vo.DocumentStruct
 }
 
 // recomputeDepths 依据最新的父节点关系重新计算每个节点的深度（Depth）。
-/*
-  处理步骤：
-  1. 根节点深度固定为 0
-  2. 按节点编号排序后依次计算其他节点的深度：父节点 Depth + 1；父节点不存在则默认为 1
-*/
+//
+// 处理步骤：
+//  1. 根节点深度固定为 0
+//  2. 按节点编号排序后依次计算其他节点的深度：父节点 Depth + 1；父节点不存在则默认为 1
 func (v *TreeValidator) recomputeDepths(draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	// 根节点深度固定为 0
 	root := draftMap[1]
@@ -224,12 +219,11 @@ func (v *TreeValidator) recomputeDepths(draftMap map[int]*vo.DocumentStructureNo
 }
 
 // rebuildPaths 重建每个节点的 CanonicalPath（规范化 URL 路径）与 SectionPath（可读的章节显示路径）。
-/*
-  处理步骤：
-  1. 根节点固定为 "/document"，章节显示路径为空
-  2. 其他节点从父节点继承路径，并附加由 buildPathSegment 生成的段落
-  3. 章节类型节点会同时更新显示路径（使用 " > " 连接父章节路径与当前标题）
-*/
+//
+// 处理步骤：
+//  1. 根节点固定为 "/document"，章节显示路径为空
+//  2. 其他节点从父节点继承路径，并附加由 buildPathSegment 生成的段落
+//  3. 章节类型节点会同时更新显示路径（使用 " > " 连接父章节路径与当前标题）
 func (v *TreeValidator) rebuildPaths(draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	for _, draft := range draftMap {
 		// 根节点特殊处理
@@ -258,12 +252,11 @@ func (v *TreeValidator) rebuildPaths(draftMap map[int]*vo.DocumentStructureNodeD
 }
 
 // rebuildSiblingLinks 重建兄弟节点间的双向指针（PrevSiblingNodeNo / NextSiblingNodeNo）
-/*
-  处理步骤：
-  1. 按父节点分组，收集所有子节点
-  2. 每组兄弟节点按 LineNo（原文行号）排序以保持文档顺序
-  3. 遍历每个兄弟列表，设置前驱与后继的节点编号
-*/
+//
+// 处理步骤：
+//  1. 按父节点分组，收集所有子节点
+//  2. 每组兄弟节点按 LineNo（原文行号）排序以保持文档顺序
+//  3. 遍历每个兄弟列表，设置前驱与后继的节点编号
 func (v *TreeValidator) rebuildSiblingLinks(draftMap map[int]*vo.DocumentStructureNodeDraft) {
 	// 按父节点分组所有非根节点
 	childrenByParent := make(map[int][]*vo.DocumentStructureNodeDraft)
@@ -298,12 +291,11 @@ func (v *TreeValidator) joinSectionPath(parentSectionPath, currentTitle string) 
 }
 
 // buildPathSegment 为当前节点生成用于 URL/路径的片段（slug）。
-/*
-  策略优先级：
-  1. 列表类节点且有 ItemIndex → "item-N"
-  2. 拥有非空 NodeCode → slug(code)
-  3. 其他情况 → slug(displayTitle)
-*/
+//
+// 策略优先级：
+//  1. 列表类节点且有 ItemIndex → "item-N"
+//  2. 拥有非空 NodeCode → slug(code)
+//  3. 其他情况 → slug(displayTitle)
 func (v *TreeValidator) buildPathSegment(draft *vo.DocumentStructureNodeDraft) string {
 	// 列表项优先使用序号
 	if draft.IsListLike() {

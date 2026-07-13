@@ -177,12 +177,11 @@ func (s *ChunkStrategyLogicImpl) RecommendStrategy(ctx context.Context, document
 }
 
 // NormalizeSteps 将用户提交的策略类型标准化为可执行的步骤列表，保留已有的用户配置
-/*
-  处理步骤：
-  1. 标准化父/子流水线的策略类型（过滤未知/重复类型）
-  2. 以流水线类型 + 策略类型为键，构建 baseStep 查找表
-  3. 分别构建父/子块的标准化步骤
-*/
+//
+// 处理步骤：
+//  1. 标准化父/子流水线的策略类型（过滤未知/重复类型）
+//  2. 以流水线类型 + 策略类型为键，构建 baseStep 查找表
+//  3. 分别构建父/子块的标准化步骤
 func (s *ChunkStrategyLogicImpl) NormalizeSteps(ctx context.Context, baseSteps []*entity.DocumentStrategyStep,
 	parentStrategyTypes []int, childStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error) {
 
@@ -650,12 +649,11 @@ func (s *ChunkStrategyLogicImpl) cleanupParentBlockList(blocks []*vo.ParentBlock
 }
 
 // applyLlmChunking 大模型智能切块
-/*
- 策略：
-  1. LLM 未启用 → 回退到语义切块
-  2. 输入超长 → 先用递归切块切到 llmMaxChars 以下
-  3. 逐项调用 LLM；失败或无产出 → 回退到语义切块补全
-*/
+//
+// 策略：
+//  1. LLM 未启用 → 回退到语义切块
+//  2. 输入超长 → 先用递归切块切到 llmMaxChars 以下
+//  3. 逐项调用 LLM；失败或无产出 → 回退到语义切块补全
 func (s *ChunkStrategyLogicImpl) applyLlmChunking(ctx context.Context, input *chunk.TextBlock, pipeType string, extraOpts ...chunk.Option) []*chunk.TextBlock {
 	var outputs []*chunk.TextBlock
 	var err error

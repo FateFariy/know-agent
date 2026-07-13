@@ -11,10 +11,9 @@ import (
 )
 
 // chineseOutlinePattern 中文大纲编号模式（如：一、标题、二. 标题）
-/*
-  支持一~百的中文数字，后缀为顿号或点号
-  捕获组1：中文数字，捕获组2：内容
-*/
+//
+// 支持一~百的中文数字，后缀为顿号或点号
+// 捕获组1：中文数字，捕获组2：内容
 var chineseOutlinePattern = regexp.MustCompile(`^([一二三四五六七八九十百]+)[、.]\s*(.+)$`)
 
 // ChineseOutlineDetector 中文大纲编号检测器, 检测中文数字编号（一、二、三、），通过上下文分析判断是标题还是列表项，优先级 Order=110
@@ -23,13 +22,12 @@ type ChineseOutlineDetector struct {
 }
 
 // Detect 检测中文大纲编号
-/*
- 通过上下文分析判断是标题还是列表项：
- 1. 相邻行有连续编号 → 列表项
- 2. 前一行以冒号结尾（列表引导语）→ 列表项
- 3. 满足标题特征（孤立、名词性、长度适中）→ 标题（置信度较低）
- 4. 其他情况 → 列表项
-*/
+//
+// 通过上下文分析判断是标题还是列表项：
+//  1. 相邻行有连续编号 → 列表项
+//  2. 前一行以冒号结尾（列表引导语）→ 列表项
+//  3. 满足标题特征（孤立、名词性、长度适中）→ 标题（置信度较低）
+//  4. 其他情况 → 列表项
 func (d *ChineseOutlineDetector) Detect(detCtx *DetectorContext, text string, opts ...DetectorOption) *vo.DocumentStructureSignal {
 	if text == "" {
 		return nil

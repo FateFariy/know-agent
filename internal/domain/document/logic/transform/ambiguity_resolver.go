@@ -74,15 +74,16 @@ func NewAmbiguityResolver(svcCtx *svc.ServiceContext, chatModel chatlogic.ChatMo
 }
 
 // Transform 对信号进行 LLM 二义性消解
-/* 整体流程：
-   1. 若没有信号或未启用 LLM 消解 → 直接原路返回
-   2. 筛选「处于目标置信度区间 + 被标记为 ambiguous」的信号，且单次最多处理 maxAmbiguousSignalsPerCall 条
-   3. 为每个候选信号构建上下文窗口（前后若干行），渲染为提示语所需的 candidateBlocks
-   4. 组装用户提示并调用 LLM 生成结构化结果
-   5. 解析 LLM 返回的 JSON 数组，按 LineNo 建立行号→结果的映射
-   6. 遍历原信号，将命中的消解结果回填（kind、levelHint、置信度等）
-   返回：处理后的信号切片（顺序与 sourceSignals 一致）+ 错误
-*/
+//
+// 整体流程：
+//  1. 若没有信号或未启用 LLM 消解 → 直接原路返回
+//  2. 筛选「处于目标置信度区间 + 被标记为 ambiguous」的信号，且单次最多处理 maxAmbiguousSignalsPerCall 条
+//  3. 为每个候选信号构建上下文窗口（前后若干行），渲染为提示语所需的 candidateBlocks
+//  4. 组装用户提示并调用 LLM 生成结构化结果
+//  5. 解析 LLM 返回的 JSON 数组，按 LineNo 建立行号→结果的映射
+//  6. 遍历原信号，将命中的消解结果回填（kind、levelHint、置信度等）
+//
+// 返回：处理后的信号切片（顺序与 sourceSignals 一致）+ 错误
 func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string, allLines []string,
 	sourceSignals []*vo.DocumentStructureSignal, opts ...TransformerOption) ([]*vo.DocumentStructureSignal, error) {
 	if len(sourceSignals) == 0 {
@@ -154,13 +155,13 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 }
 
 // buildCandidateBlocks 为每个 ambiguous 信号构造上下文窗口候选文本块
-/*
-  构造策略：
-  - 以 signal.LineNo 作为目标行，向前/向后各取 contextWindowLines 行
-  - 目标行前缀使用 >> 标记，其他行使用 3 个空格，便于 LLM 定位
-  - 每个信号渲染为一个候选块（包含初始 kind、title、code 等）
-  返回：拼接好的完整候选块文本
-*/
+//
+// 构造策略：
+//   - 以 signal.LineNo 作为目标行，向前/向后各取 contextWindowLines 行
+//   - 目标行前缀使用 >> 标记，其他行使用 3 个空格，便于 LLM 定位
+//   - 每个信号渲染为一个候选块（包含初始 kind、title、code 等）
+//
+// 返回：拼接好的完整候选块文本
 func (r *AmbiguityResolver) buildCandidateBlocks(ambiguousSignals []*vo.DocumentStructureSignal, allLines []string) (string, error) {
 	var sb strings.Builder
 

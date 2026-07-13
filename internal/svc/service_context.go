@@ -23,10 +23,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/config"
 )
 
-var ProviderSet = wire.NewSet(
-	NewServiceContext,
-	NewDB,
-)
+var ProviderSet = wire.NewSet(NewServiceContext)
 
 type ServiceContext struct {
 	Config    *config.Config
@@ -39,23 +36,18 @@ type ServiceContext struct {
 	ChatModel model.BaseModel[*schema.AgenticMessage]
 }
 
-func NewServiceContext(c *config.Config, db *gorm.DB) *ServiceContext {
+func NewServiceContext(c *config.Config) *ServiceContext {
 	redisClient := common.NewRedisClient(c)
 	return &ServiceContext{
 		Config:    c,
 		Validate:  common.NewValidator(),
 		Rdb:       redisClient,
-		Db:        db,
+		Db:        common.NewDb(c),
 		Minio:     NewMinioClient(c),
 		RedSync:   NewRedSync(redisClient),
 		Emb:       NewArkEmbedding(c),
 		ChatModel: NewArkChatModel(c),
 	}
-}
-
-// NewDB 创建 gorm DB 连接（从公共配置中解析）。
-func NewDB(c *config.Config) *gorm.DB {
-	return common.NewDb(c)
 }
 
 // NewMinioClient 创建 Minio 客户端
