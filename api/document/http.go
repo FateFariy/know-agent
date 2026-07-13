@@ -21,6 +21,9 @@ type HTTPServer interface {
 	// QueryDocumentDetail 查询文档详情
 	QueryDocumentDetail(ctx context.Context, req *QueryDocumentDetailReq) (*DocumentListItem, error)
 
+	// GetDocumentOptions 获取知识文档选项
+	GetDocumentOptions(ctx context.Context) ([]*KnowledgeDocumentOptionResp, error)
+
 	// DeleteDocument 删除文档
 	DeleteDocument(ctx context.Context, req *DeleteDocumentReq) (*DeleteDocumentResp, error)
 
@@ -97,6 +100,14 @@ func QueryDocumentDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 		}
 
 		resp, err := srv.QueryDocumentDetail(r.Context(), &req)
+		common.Response(w, resp, "", err)
+	}
+}
+
+// GetDocumentOptionsHandler 获取知识文档选项
+func GetDocumentOptionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resp, err := srv.GetDocumentOptions(r.Context())
 		common.Response(w, resp, "", err)
 	}
 }

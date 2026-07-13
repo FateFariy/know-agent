@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strings"
 	"time"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -24,7 +25,7 @@ import (
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString
+// goverter:extend TimeToString StringToStringSlice
 // goverter:skipCopySameType
 //
 //go:generate goverter gen .
@@ -35,6 +36,7 @@ type DocumentConverter interface {
 	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
 	ToDocumentListItem(src *den.Document) *document.DocumentListItem
 	ToDocumentListItemList(src []*den.Document) []*document.DocumentListItem
+	ToKnowledgeDocumentOptionRespList(src []*dvo.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp
 	ToQueryStrategyPlanResp(src *den.Document) *document.QueryStrategyPlanResp
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToConfirmStrategyResp(plan *den.DocumentStrategyPlan) *document.ConfirmStrategyResp
@@ -141,6 +143,10 @@ func JsonArrayToStringSlice(src common.JSONArray) []string {
 	return common.JSONArrayTo(src, func(item any) string {
 		return item.(string)
 	})
+}
+
+func StringToStringSlice(src string) []string {
+	return strings.Split(src, ",")
 }
 
 func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReferenceResp {

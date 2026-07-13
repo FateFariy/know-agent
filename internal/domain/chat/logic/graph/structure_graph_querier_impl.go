@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -14,8 +15,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// DefaultStructureGraphQuerier 默认结构图查询器。
-// 直接从 document_structure_node 读取章节节点，供文档问答路由器使用。
+// DefaultStructureGraphQuerier 默认结构图查询器
+// 直接从 document_structure_node 读取章节节点，供文档问答路由器使用
 type DefaultStructureGraphQuerier struct {
 	db *gorm.DB
 }
@@ -60,7 +61,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionById(ctx context.Context, docu
 		Where("document_id = ? AND node_id = ?", documentId, nodeId).
 		First(&r).Error
 	if err != nil {
-		if err != gorm.ErrRecordNotFound {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			logx.Errorf("FindSectionById 失败, documentId=%d, nodeId=%d, err=%v", documentId, nodeId, err)
 		}
 		return nil, err
@@ -176,7 +177,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionWithSiblings(ctx context.Conte
 	found := false
 	for _, r := range rows {
 		gs := toGraphSection(r)
-		if r.NodeId == sectionNodeId {
+		if r.ID == sectionNodeId {
 			found = true
 			continue
 		}
@@ -194,7 +195,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionWithSiblings(ctx context.Conte
 	}, nil
 }
 
-func (q *DefaultStructureGraphQuerier) BuildGraphResult(ctx context.Context, documentId, sectionNodeId int64, itemIndex *int, itemKeyword string) (*entity.GraphQueryResult, error) {
+func (q *DefaultStructureGraphQuerier) BuildGraphResult(ctx context.Context, documentId, sectionNodeId int64, itemIndex int, itemKeyword string) (*entity.GraphQueryResult, error) {
 	withChildren, err := q.FindSectionWithChildren(ctx, documentId, sectionNodeId)
 	if err != nil {
 		return nil, err
@@ -203,9 +204,7 @@ func (q *DefaultStructureGraphQuerier) BuildGraphResult(ctx context.Context, doc
 	if err != nil {
 		return nil, err
 	}
-	result := &entity.GraphQueryResult{
-		ItemIndex: itemIndex,
-	}
+	result := &entity.GraphQueryResult{}
 	if withChildren != nil {
 		result.TargetSection = withChildren.Section
 		result.Children = withChildren.Children
@@ -226,7 +225,7 @@ func toGraphSection(r *docent.DocumentStructureNode) *entity.GraphSection {
 		return nil
 	}
 	return &entity.GraphSection{
-		NodeId:       r.NodeId,
+		NodeId:       r.ID,
 		DocumentId:   r.DocumentId,
 		ParentNodeId: r.ParentNodeId,
 		NodeCode:     r.NodeCode,

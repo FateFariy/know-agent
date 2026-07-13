@@ -3,7 +3,6 @@ package logic
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -12,9 +11,6 @@ import (
 type ChatLogic interface {
 	// OpenConversationStream 打开会话流
 	OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string
-
-	// ListKnowledgeDocumentOptions 获取知识文档选项列表
-	ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error)
 
 	// StopConversation 停止会话
 	StopConversation(ctx context.Context, conversationId string) (bool, string, error)

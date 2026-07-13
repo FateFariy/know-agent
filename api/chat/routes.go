@@ -19,11 +19,6 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 			},
 			{
 				Method:  http.MethodPost,
-				Path:    "/document/options",
-				Handler: GetDocumentOptionsHandler(svcCtx, srv),
-			},
-			{
-				Method:  http.MethodPost,
 				Path:    "/session/stop",
 				Handler: StopConversationHandler(svcCtx, srv),
 			},

@@ -184,7 +184,7 @@ service knowledge {
 	@handler SaveTopicDocumentRelation
 	post /topic/document/save (TopicDocumentRelationSaveReq) returns (TopicDocumentRelationItem)
 
-	@doc "移除主题文档关联"
+	@doc "删除主题文档关联"
 	@handler DeleteTopicDocumentRelation
 	post /topic/document/remove (TopicDocumentRelationRemoveReq) returns (bool)
 

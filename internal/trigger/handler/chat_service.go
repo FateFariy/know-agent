@@ -28,11 +28,6 @@ func (c *ChatService) StreamChat(ctx context.Context, req *chat.ChatReq) <-chan 
 	return c.l.OpenConversationStream(ctx, convert.FromChatReq(req))
 }
 
-// GetDocumentOptions 获取知识文档选项
-func (c *ChatService) GetDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
-	return c.l.ListKnowledgeDocumentOptions(ctx)
-}
-
 // StopConversation 停止会话
 func (c *ChatService) StopConversation(ctx context.Context, req *chat.ConversationIdentityReq) (*chat.ConversationStopResp, error) {
 	stopped, message, err := c.l.StopConversation(ctx, req.ConversationId)

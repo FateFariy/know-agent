@@ -155,14 +155,6 @@ type ConversationTraceStageResp struct {
 	SnapshotJson  string `json:"snapshot"`      // 快照数据
 }
 
-type KnowledgeDocumentOptionResp struct {
-	DocumentId         int64    `json:"documentId"`         // 文档ID
-	DocumentName       string   `json:"documentName"`       // 文档名称
-	KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
-	BusinessCategory   string   `json:"businessCategory"`   // 业务分类
-	DocumentTags       []string `json:"documentTags"`       // 文档标签
-}
-
 type RetrievalObserveReq struct {
 	ConversationId string `json:"conversationId"` // 会话ID
 	ExchangeId     int64  `json:"exchangeId"`     // 对话ID

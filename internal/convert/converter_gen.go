@@ -822,6 +822,16 @@ func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 	}
 	return pModelDocumentTask
 }
+func ToKnowledgeDocumentOptionRespList(source []*vo1.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp {
+	var pDocumentKnowledgeDocumentOptionRespList []*document.KnowledgeDocumentOptionResp
+	if source != nil {
+		pDocumentKnowledgeDocumentOptionRespList = make([]*document.KnowledgeDocumentOptionResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pDocumentKnowledgeDocumentOptionRespList[i] = pEntityDocumentToPDocumentKnowledgeDocumentOptionResp(source[i])
+		}
+	}
+	return pDocumentKnowledgeDocumentOptionRespList
+}
 func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
 	if source != nil {
@@ -1027,6 +1037,18 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 		pDocumentTaskLog = &documentTaskLog
 	}
 	return pDocumentTaskLog
+}
+func pEntityDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.KnowledgeDocument) *document.KnowledgeDocumentOptionResp {
+	var pDocumentKnowledgeDocumentOptionResp *document.KnowledgeDocumentOptionResp
+	if source != nil {
+		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp
+		documentKnowledgeDocumentOptionResp.DocumentName = (*source).DocumentName
+		documentKnowledgeDocumentOptionResp.KnowledgeScopeName = (*source).KnowledgeScopeName
+		documentKnowledgeDocumentOptionResp.BusinessCategory = (*source).BusinessCategory
+		documentKnowledgeDocumentOptionResp.DocumentTags = StringToStringSlice((*source).DocumentTags)
+		pDocumentKnowledgeDocumentOptionResp = &documentKnowledgeDocumentOptionResp
+	}
+	return pDocumentKnowledgeDocumentOptionResp
 }
 func timeTimeToTimeTime2(source time.Time) time.Time {
 	return source

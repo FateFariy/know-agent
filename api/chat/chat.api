@@ -42,14 +42,6 @@ type (
 
 // ==================== 响应类型定义 ====================
 type (
-	// 知识文档选项
-	KnowledgeDocumentOptionResp {
-		DocumentId         int64    `json:"documentId"` // 文档ID
-		DocumentName       string   `json:"documentName"` // 文档名称
-		KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
-		BusinessCategory   string   `json:"businessCategory"` // 业务分类
-		DocumentTags       []string `json:"documentTags"` // 文档标签
-	}
 	// 会话响应
 	ConversationSessionResp {
 		ConversationId         string                         `json:"conversationId"` // 会话唯一标识
@@ -244,10 +236,6 @@ service chat {
 	@doc "流式聊天"
 	@handler StreamChat
 	post /stream (ChatReq)
-
-	@doc "获取知识文档选项"
-	@handler GetDocumentOptions
-	post /document/options returns ([]KnowledgeDocumentOptionResp)
 
 	@doc "停止会话"
 	@handler StopConversation

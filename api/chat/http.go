@@ -15,9 +15,6 @@ type HTTPServer interface {
 	// StreamChat 流式聊天
 	StreamChat(ctx context.Context, req *ChatReq) <-chan string
 
-	// GetDocumentOptions 获取知识文档选项
-	GetDocumentOptions(ctx context.Context) ([]*KnowledgeDocumentOptionResp, error)
-
 	// StopConversation 停止会话
 	StopConversation(ctx context.Context, req *ConversationIdentityReq) (*ConversationStopResp, error)
 
@@ -72,14 +69,6 @@ func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 				w.(http.Flusher).Flush()
 			}
 		}
-	}
-}
-
-// GetDocumentOptionsHandler 获取知识文档选项
-func GetDocumentOptionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		resp, err := srv.GetDocumentOptions(r.Context())
-		common.Response(w, resp, "", err)
 	}
 }
 

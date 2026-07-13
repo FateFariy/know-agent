@@ -50,6 +50,15 @@ func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document
 	return convert.ToDocumentListItem(detail), err
 }
 
+// GetDocumentOptions 获取知识文档选项
+func (d *DocumentService) GetDocumentOptions(ctx context.Context) ([]*document.KnowledgeDocumentOptionResp, error) {
+	options, err := d.lifeCycleLogic.ListRetrievableDocuments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToKnowledgeDocumentOptionRespList(options), nil
+}
+
 // DeleteDocument 删除文档
 func (d *DocumentService) DeleteDocument(ctx context.Context, req *document.DeleteDocumentReq) (*document.DeleteDocumentResp, error) {
 	documentName, err := d.lifeCycleLogic.DeleteDocument(ctx, req.DocumentId)

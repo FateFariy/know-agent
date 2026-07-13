@@ -29,6 +29,14 @@ type ConfirmStrategyReq struct {
 	ChildSteps  []*StrategyStepItem `json:"childSteps"`          // 子块步骤
 }
 
+type KnowledgeDocumentOptionResp struct {
+	DocumentId         int64    `json:"documentId"`         // 文档ID
+	DocumentName       string   `json:"documentName"`       // 文档名称
+	KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
+	BusinessCategory   string   `json:"businessCategory"`   // 业务分类
+	DocumentTags       []string `json:"documentTags"`       // 文档标签
+}
+
 type ConfirmStrategyResp struct {
 	ID                 int64                     `json:"planId"`             // 方案ID
 	DocumentId         int64                     `json:"documentId"`         // 文档ID

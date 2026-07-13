@@ -11,7 +11,6 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
@@ -122,25 +121,6 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 	}
 
 	return
-}
-
-// ListKnowledgeDocumentOptions 获取知识文档选项列表
-func (c *LogicImpl) ListKnowledgeDocumentOptions(ctx context.Context) ([]*chat.KnowledgeDocumentOptionResp, error) {
-	docs, err := c.lifecycleLogic.ListRetrievableDocuments(ctx)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]*chat.KnowledgeDocumentOptionResp, 0, len(docs))
-	for _, doc := range docs {
-		if doc == nil {
-			continue
-		}
-		result = append(result, &chat.KnowledgeDocumentOptionResp{
-			DocumentId:   doc.DocumentId,
-			DocumentName: doc.DocumentName,
-		})
-	}
-	return result, nil
 }
 
 // StopConversation 停止会话
@@ -264,11 +244,6 @@ func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId stri
 // GetChannelExecutions 获取渠道执行结果
 func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
 	return c.repo.SelectChannelExecutions(ctx, conversationId, exchangeId)
-}
-
-// GetStageBenchmarks 获取阶段基准
-func (c *LogicImpl) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error) {
-	return []*chat.StageBenchmarkResp{}, nil
 }
 
 // ---------------------------------------------------------------------------
