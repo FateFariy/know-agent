@@ -221,8 +221,3 @@ type SearchReferenceResp struct {
 	KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围代码
 	KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
 }
-
-type StageBenchmarkResp struct {
-	StageName string `json:"stageName"` // 阶段名称
-	Benchmark string `json:"benchmark"` // 基准值
-}

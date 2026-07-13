@@ -15,7 +15,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -183,7 +183,7 @@ func (r *DocumentQuestionRouterImpl) Route(ctx context.Context, documentId int64
 
 	// 分支 C：分析型 / 目录型 / 带有结构线索的问题，以及其余普通文档问题
 	// 若存在结构线索则尝试定位章节作为软提示（辅助混合检索），否则完全交给向量/关键词混合检索
-	var assistedSection *vo2.GraphSection
+	var assistedSection *entity.GraphSection
 	needsStructureAssistedRetrieval := questionIntent.analytic || questionIntent.outline || itemIndex != nil || questionIntent.structureHint
 	if needsStructureAssistedRetrieval {
 		assistedSection = r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
@@ -208,7 +208,7 @@ func (r *DocumentQuestionRouterImpl) Route(ctx context.Context, documentId int64
 // ============================================================
 
 // buildDecision 根据执行模式、动作、章节与检索计划，组装最终的 DocumentNavigationDecision
-func (r *DocumentQuestionRouterImpl) buildDecision(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
+func (r *DocumentQuestionRouterImpl) buildDecision(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{}
 	decision.ExecutionMode = mode
 	decision.ExecutionModeName = mode.Name()
@@ -575,7 +575,7 @@ func normalizeConfidence(confidence float64) float64 {
 //  2. 通过可选章节索引服务（navigationIndexSvc）检索 → 依赖外部索引
 //  3. 从问题中抽取短语，对文档内章节本地打分匹配 → 纯本地策略
 //  4. 回退到图谱服务的 FindBestSection（一般基于向量/关键词检索）→ 最终兜底
-func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *vo2.GraphSection {
+func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 步骤 0：入参/依赖校验 — 无 documentId 或无结构图谱查询器时直接放弃
 	if documentId == 0 || r.structureGraphQuerier == nil {
 		return nil
@@ -607,7 +607,7 @@ func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documen
 
 // resolveBySectionCode 从问题文本中抽取章节编号（小数编号 / 中文 "第X章"）后通过图谱定位。
 // 抽取顺序：先小数编号（如 "1.2"），再中文编号（如 "第3章"）；任一命中即返回。
-func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *vo2.GraphSection {
+func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 合并原始与改写问题，提高命中概率
 	combined := strutil.Trim(originalQuestion) + " " + strutil.Trim(rewrittenQuestion)
 
@@ -641,7 +641,7 @@ func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, d
 // resolveByLocalStructure 用从问题中抽取的短语对文档内章节打分，返回分数最高且 >= 45 的章节。
 // 打分策略：每个章节的 Title / SectionPath / AnchorText / ContentText 分别与短语做包含匹配，
 // 取所有短语中最高分值作为该章节得分（命中路径/标题优先于命中锚点/正文）。
-func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context, documentId int64, phrases []string) *vo2.GraphSection {
+func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context, documentId int64, phrases []string) *entity.GraphSection {
 	// 无候选短语 → 无法打分，直接返回
 	if len(phrases) == 0 {
 		return nil
@@ -653,7 +653,7 @@ func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context
 	}
 
 	// 遍历章节，维护最高得分章节；阈值 45 为经验值（命中正文的最低加分即 45），用于过滤噪声
-	var bestSection *vo2.GraphSection
+	var bestSection *entity.GraphSection
 	bestScore := 0.0
 	for _, s := range sections {
 		score := scoreSection(s, phrases)
@@ -667,7 +667,7 @@ func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context
 
 // resolveByNavigationIndex 通过可选的章节索引服务定位节点，命中时将最高分数节点转化为图谱章节。
 // 注：索引服务可能未配置（navigationIndexSvc 为 nil），该函数在此场景下直接返回 nil。
-func (r *DocumentQuestionRouterImpl) resolveByNavigationIndex(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *vo2.GraphSection {
+func (r *DocumentQuestionRouterImpl) resolveByNavigationIndex(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 依赖校验：索引服务或图谱服务未配置则跳过此策略
 	if r.navigationIndexSvc == nil || r.structureGraphQuerier == nil {
 		return nil
@@ -750,7 +750,7 @@ func (r *DocumentQuestionRouterImpl) buildSectionPhrases(originalQuestion, rewri
 // scoreSection 对单个章节按标题 / 显示路径 / 锚点文本 / 正文叠加打分。
 // 评分规则：对每个候选短语在章节的四个字段中做 "包含匹配"，取最高得分作为章节分数。
 // 基础分 + 短语长度的线性加权；路径/标题权重最高，正文最低（正文匹配噪声较大）。
-func scoreSection(section *vo2.GraphSection, phrases []string) float64 {
+func scoreSection(section *entity.GraphSection, phrases []string) float64 {
 	// 空章节或无短语，直接返回 0
 	if section == nil || len(phrases) == 0 {
 		return 0
@@ -988,7 +988,7 @@ func detectFacet(question string) string {
 }
 
 // buildQueryHints 从检索计划 + 章节锚点 + 条目锚点组装 Query 上下文提示（上限 10 条）
-func buildQueryHints(retrievalPlan *vo.RetrievalQuestionPlan, section *vo2.GraphSection, itemIndex *int) []string {
+func buildQueryHints(retrievalPlan *vo.RetrievalQuestionPlan, section *entity.GraphSection, itemIndex *int) []string {
 	seen := make(map[string]bool)
 	hints := make([]string, 0, 10)
 	add := func(h string) {
@@ -1042,7 +1042,7 @@ func splitRoughTerms(question string) []string {
 }
 
 // buildSummaryText 根据模式、动作、章节、条目、理由生成一行可读性强的摘要
-func buildSummaryText(mode vo.ExecutionMode, action string, section *vo2.GraphSection, itemIndex *int, reason string) string {
+func buildSummaryText(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, reason string) string {
 	sectionTitle := safeDisplayTitle(section)
 	itemIndexStr := ""
 	if itemIndex != nil {
@@ -1051,7 +1051,7 @@ func buildSummaryText(mode vo.ExecutionMode, action string, section *vo2.GraphSe
 	return "mode=" + mode.Name() + "; action=" + action + "; section=" + sectionTitle + "; itemIndex=" + itemIndexStr + "; reason=" + strutil.Trim(reason)
 }
 
-func safeDisplayTitle(section *vo2.GraphSection) string {
+func safeDisplayTitle(section *entity.GraphSection) string {
 	if section == nil {
 		return ""
 	}

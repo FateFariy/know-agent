@@ -232,11 +232,6 @@ type (
 		ErrorMessage       string  `json:"errorMessage"` // 错误信息
 		CreateTime         string  `json:"createTime"` // 创建时间
 	}
-	// 阶段基准响应
-	StageBenchmarkResp {
-		StageName string `json:"stageName"` // 阶段名称
-		Benchmark string `json:"benchmark"` // 基准值
-	}
 )
 
 // ==================== 聊天服务 ====================
@@ -285,9 +280,5 @@ service chat {
 	@doc "获取渠道执行结果"
 	@handler GetChannelExecutions
 	post /exchange/channel/executions (RetrievalObserveReq) returns ([]ChannelExecutionResp)
-
-	@doc "获取阶段基准"
-	@handler GetStageBenchmarks
-	post /stage/benchmarks returns ([]StageBenchmarkResp)
 }
 

@@ -14,10 +14,10 @@ var configFile = flag.String("f", "etc/config-dev.yaml", "the config file")
 func main() {
 	flag.Parse()
 
-	var c *config.Config
-	conf.MustLoad(*configFile, c)
+	var c config.Config
+	conf.MustLoad(*configFile, &c)
 
-	server := WireApp(c)
+	server := WireApp(&c)
 	defer server.HTTP.Stop()
 
 	fmt.Printf("Starting HTTP server at %s:%d...\n", c.Http.Host, c.Http.Port)

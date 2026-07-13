@@ -1,0 +1,2261 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "文档管理服务接口",
+    "version": "v1.0.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/manage/document/chunk/detail/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询单个文档chunk详情",
+        "operationId": "documentQueryDocumentChunkDetail",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId",
+                "chunkId"
+              ],
+              "properties": {
+                "chunkId": {
+                  "description": "块ID",
+                  "type": "integer"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "chunk": {
+                  "description": "当前分片信息",
+                  "type": "object",
+                  "required": [
+                    "chunkId",
+                    "parentBlockId",
+                    "parentBlockNo",
+                    "parentChildCount",
+                    "parentStartChunkNo",
+                    "parentEndChunkNo",
+                    "chunkNo",
+                    "sectionPath",
+                    "sourceType",
+                    "sourceTypeName",
+                    "charCount",
+                    "tokenCount",
+                    "vectorStatus",
+                    "vectorStatusName",
+                    "chunkText"
+                  ],
+                  "properties": {
+                    "charCount": {
+                      "description": "字符数量",
+                      "type": "integer"
+                    },
+                    "chunkId": {
+                      "description": "分片ID",
+                      "type": "integer"
+                    },
+                    "chunkNo": {
+                      "description": "当前分片编号",
+                      "type": "integer"
+                    },
+                    "chunkText": {
+                      "description": "分片文本内容",
+                      "type": "string"
+                    },
+                    "parentBlockId": {
+                      "description": "父块ID",
+                      "type": "integer"
+                    },
+                    "parentBlockNo": {
+                      "description": "父块编号",
+                      "type": "integer"
+                    },
+                    "parentChildCount": {
+                      "description": "父块下子分片总数",
+                      "type": "integer"
+                    },
+                    "parentEndChunkNo": {
+                      "description": "父块结束分片号",
+                      "type": "integer"
+                    },
+                    "parentStartChunkNo": {
+                      "description": "父块起始分片号",
+                      "type": "integer"
+                    },
+                    "sectionPath": {
+                      "description": "章节路径",
+                      "type": "string"
+                    },
+                    "sourceType": {
+                      "description": "来源类型",
+                      "type": "integer"
+                    },
+                    "sourceTypeName": {
+                      "description": "来源类型名称",
+                      "type": "string"
+                    },
+                    "tokenCount": {
+                      "description": "Token数量",
+                      "type": "integer"
+                    },
+                    "vectorStatus": {
+                      "description": "向量化状态",
+                      "type": "integer"
+                    },
+                    "vectorStatusName": {
+                      "description": "向量化状态名称",
+                      "type": "string"
+                    }
+                  }
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "parentBlock": {
+                  "description": "父级块信息",
+                  "type": "object",
+                  "required": [
+                    "parentBlockId",
+                    "parentBlockNo",
+                    "sectionPath",
+                    "sourceType",
+                    "sourceTypeName",
+                    "charCount",
+                    "tokenCount",
+                    "childCount",
+                    "startChunkNo",
+                    "endChunkNo",
+                    "parentText"
+                  ],
+                  "properties": {
+                    "charCount": {
+                      "description": "字符总数",
+                      "type": "integer"
+                    },
+                    "childCount": {
+                      "description": "子分片数量",
+                      "type": "integer"
+                    },
+                    "endChunkNo": {
+                      "description": "结束分片编号",
+                      "type": "integer"
+                    },
+                    "parentBlockId": {
+                      "description": "父块ID",
+                      "type": "integer"
+                    },
+                    "parentBlockNo": {
+                      "description": "父块编号",
+                      "type": "integer"
+                    },
+                    "parentText": {
+                      "description": "父块文本内容",
+                      "type": "string"
+                    },
+                    "sectionPath": {
+                      "description": "章节路径",
+                      "type": "string"
+                    },
+                    "sourceType": {
+                      "description": "来源类型",
+                      "type": "integer"
+                    },
+                    "sourceTypeName": {
+                      "description": "来源类型名称",
+                      "type": "string"
+                    },
+                    "startChunkNo": {
+                      "description": "起始分片编号",
+                      "type": "integer"
+                    },
+                    "tokenCount": {
+                      "description": "Token总数",
+                      "type": "integer"
+                    }
+                  }
+                },
+                "planId": {
+                  "description": "方案ID",
+                  "type": "integer"
+                },
+                "siblingChunks": {
+                  "description": "同级分片列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "chunkId",
+                      "parentBlockId",
+                      "parentBlockNo",
+                      "parentChildCount",
+                      "parentStartChunkNo",
+                      "parentEndChunkNo",
+                      "chunkNo",
+                      "sectionPath",
+                      "sourceType",
+                      "sourceTypeName",
+                      "charCount",
+                      "tokenCount",
+                      "vectorStatus",
+                      "vectorStatusName",
+                      "chunkText"
+                    ],
+                    "properties": {
+                      "charCount": {
+                        "description": "字符数量",
+                        "type": "integer"
+                      },
+                      "chunkId": {
+                        "description": "分片ID",
+                        "type": "integer"
+                      },
+                      "chunkNo": {
+                        "description": "当前分片编号",
+                        "type": "integer"
+                      },
+                      "chunkText": {
+                        "description": "分片文本内容",
+                        "type": "string"
+                      },
+                      "parentBlockId": {
+                        "description": "父块ID",
+                        "type": "integer"
+                      },
+                      "parentBlockNo": {
+                        "description": "父块编号",
+                        "type": "integer"
+                      },
+                      "parentChildCount": {
+                        "description": "父块下子分片总数",
+                        "type": "integer"
+                      },
+                      "parentEndChunkNo": {
+                        "description": "父块结束分片号",
+                        "type": "integer"
+                      },
+                      "parentStartChunkNo": {
+                        "description": "父块起始分片号",
+                        "type": "integer"
+                      },
+                      "sectionPath": {
+                        "description": "章节路径",
+                        "type": "string"
+                      },
+                      "sourceType": {
+                        "description": "来源类型",
+                        "type": "integer"
+                      },
+                      "sourceTypeName": {
+                        "description": "来源类型名称",
+                        "type": "string"
+                      },
+                      "tokenCount": {
+                        "description": "Token数量",
+                        "type": "integer"
+                      },
+                      "vectorStatus": {
+                        "description": "向量化状态",
+                        "type": "integer"
+                      },
+                      "vectorStatusName": {
+                        "description": "向量化状态名称",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/chunk/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询文档chunk列表",
+        "operationId": "documentQueryDocumentChunks",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer",
+                  "default": 1,
+                  "example": 1
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer",
+                  "default": 10,
+                  "example": 10
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer"
+                },
+                "pageSize": {
+                  "description": "页大小",
+                  "type": "integer"
+                },
+                "planId": {
+                  "description": "方案ID",
+                  "type": "integer"
+                },
+                "records": {
+                  "description": "分片数据列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "chunkId",
+                      "parentBlockId",
+                      "parentBlockNo",
+                      "parentChildCount",
+                      "parentStartChunkNo",
+                      "parentEndChunkNo",
+                      "chunkNo",
+                      "sectionPath",
+                      "sourceType",
+                      "sourceTypeName",
+                      "charCount",
+                      "tokenCount",
+                      "vectorStatus",
+                      "vectorStatusName",
+                      "chunkText"
+                    ],
+                    "properties": {
+                      "charCount": {
+                        "description": "字符数量",
+                        "type": "integer"
+                      },
+                      "chunkId": {
+                        "description": "分片ID",
+                        "type": "integer"
+                      },
+                      "chunkNo": {
+                        "description": "当前分片编号",
+                        "type": "integer"
+                      },
+                      "chunkText": {
+                        "description": "分片文本内容",
+                        "type": "string"
+                      },
+                      "parentBlockId": {
+                        "description": "父块ID",
+                        "type": "integer"
+                      },
+                      "parentBlockNo": {
+                        "description": "父块编号",
+                        "type": "integer"
+                      },
+                      "parentChildCount": {
+                        "description": "父块下子分片总数",
+                        "type": "integer"
+                      },
+                      "parentEndChunkNo": {
+                        "description": "父块结束分片号",
+                        "type": "integer"
+                      },
+                      "parentStartChunkNo": {
+                        "description": "父块起始分片号",
+                        "type": "integer"
+                      },
+                      "sectionPath": {
+                        "description": "章节路径",
+                        "type": "string"
+                      },
+                      "sourceType": {
+                        "description": "来源类型",
+                        "type": "integer"
+                      },
+                      "sourceTypeName": {
+                        "description": "来源类型名称",
+                        "type": "string"
+                      },
+                      "tokenCount": {
+                        "description": "Token数量",
+                        "type": "integer"
+                      },
+                      "vectorStatus": {
+                        "description": "向量化状态",
+                        "type": "integer"
+                      },
+                      "vectorStatusName": {
+                        "description": "向量化状态名称",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                },
+                "total": {
+                  "description": "总条数",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/delete": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "删除文档及其关联数据",
+        "operationId": "documentDeleteDocument",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/detail/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询文档详情",
+        "operationId": "documentQueryDocumentDetail",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "charCount": {
+                  "description": "字符数",
+                  "type": "integer"
+                },
+                "createTime": {
+                  "description": "创建时间",
+                  "type": "string"
+                },
+                "currentPlanId": {
+                  "description": "当前策略ID",
+                  "type": "integer"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "string"
+                },
+                "fileSize": {
+                  "description": "文件大小",
+                  "type": "integer"
+                },
+                "fileType": {
+                  "description": "文件类型",
+                  "type": "integer"
+                },
+                "fileTypeName": {
+                  "description": "文件类型名",
+                  "type": "string"
+                },
+                "indexStatus": {
+                  "description": "索引状态",
+                  "type": "integer"
+                },
+                "indexStatusName": {
+                  "description": "索引状态名",
+                  "type": "string"
+                },
+                "knowledgeScopeCode": {
+                  "description": "知识范围编码",
+                  "type": "string"
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                },
+                "lastIndexTaskId": {
+                  "description": "上一次索引任务ID",
+                  "type": "integer"
+                },
+                "latestTaskId": {
+                  "description": "最新任务ID",
+                  "type": "integer"
+                },
+                "latestTaskStatus": {
+                  "description": "最新任务状态",
+                  "type": "integer"
+                },
+                "latestTaskStatusName": {
+                  "description": "最新任务状态名",
+                  "type": "string"
+                },
+                "latestTaskType": {
+                  "description": "最新任务类型",
+                  "type": "integer"
+                },
+                "latestTaskTypeName": {
+                  "description": "最新任务类型名",
+                  "type": "string"
+                },
+                "originalFileName": {
+                  "description": "原始文件名",
+                  "type": "string"
+                },
+                "parseErrorMsg": {
+                  "description": "解析错误信息",
+                  "type": "string"
+                },
+                "parseStatus": {
+                  "description": "解析状态",
+                  "type": "integer"
+                },
+                "parseStatusName": {
+                  "description": "解析状态名",
+                  "type": "string"
+                },
+                "strategyStatus": {
+                  "description": "策略状态",
+                  "type": "integer"
+                },
+                "strategyStatusName": {
+                  "description": "策略状态名",
+                  "type": "string"
+                },
+                "tokenCount": {
+                  "description": "token数",
+                  "type": "integer"
+                },
+                "updateTime": {
+                  "description": "更新时间",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/index/build": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "构建文档索引",
+        "operationId": "documentBuildIndex",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId",
+                "planId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "integer"
+                },
+                "planId": {
+                  "description": "方案ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "indexStatus": {
+                  "description": "索引状态",
+                  "type": "integer"
+                },
+                "indexStatusName": {
+                  "description": "索引状态名",
+                  "type": "string"
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                },
+                "taskStatus": {
+                  "description": "任务状态",
+                  "type": "integer"
+                },
+                "taskStatusName": {
+                  "description": "任务状态名",
+                  "type": "string"
+                },
+                "taskType": {
+                  "description": "任务类型",
+                  "type": "integer"
+                },
+                "taskTypeName": {
+                  "description": "任务类型名",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/page/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "分页查询文档列表",
+        "operationId": "documentQueryDocumentPage",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "keyword": {
+                  "description": "关键词",
+                  "type": "string"
+                },
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer",
+                  "default": 1,
+                  "example": 1
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer",
+                  "default": 10,
+                  "example": 10
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer"
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer"
+                },
+                "records": {
+                  "description": "文档列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "documentId",
+                      "documentName",
+                      "originalFileName",
+                      "fileType",
+                      "fileTypeName",
+                      "fileSize",
+                      "charCount",
+                      "tokenCount",
+                      "parseStatus",
+                      "parseStatusName",
+                      "strategyStatus",
+                      "strategyStatusName",
+                      "indexStatus",
+                      "indexStatusName",
+                      "parseErrorMsg",
+                      "knowledgeScopeCode",
+                      "knowledgeScopeName",
+                      "businessCategory",
+                      "documentTags",
+                      "currentPlanId",
+                      "lastIndexTaskId",
+                      "latestTaskId",
+                      "latestTaskType",
+                      "latestTaskTypeName",
+                      "latestTaskStatus",
+                      "latestTaskStatusName",
+                      "createTime",
+                      "updateTime"
+                    ],
+                    "properties": {
+                      "businessCategory": {
+                        "description": "业务分类",
+                        "type": "string"
+                      },
+                      "charCount": {
+                        "description": "字符数",
+                        "type": "integer"
+                      },
+                      "createTime": {
+                        "description": "创建时间",
+                        "type": "string"
+                      },
+                      "currentPlanId": {
+                        "description": "当前策略ID",
+                        "type": "integer"
+                      },
+                      "documentId": {
+                        "description": "文档ID",
+                        "type": "integer"
+                      },
+                      "documentName": {
+                        "description": "文档名称",
+                        "type": "string"
+                      },
+                      "documentTags": {
+                        "description": "文档标签",
+                        "type": "string"
+                      },
+                      "fileSize": {
+                        "description": "文件大小",
+                        "type": "integer"
+                      },
+                      "fileType": {
+                        "description": "文件类型",
+                        "type": "integer"
+                      },
+                      "fileTypeName": {
+                        "description": "文件类型名",
+                        "type": "string"
+                      },
+                      "indexStatus": {
+                        "description": "索引状态",
+                        "type": "integer"
+                      },
+                      "indexStatusName": {
+                        "description": "索引状态名",
+                        "type": "string"
+                      },
+                      "knowledgeScopeCode": {
+                        "description": "知识范围编码",
+                        "type": "string"
+                      },
+                      "knowledgeScopeName": {
+                        "description": "知识范围名称",
+                        "type": "string"
+                      },
+                      "lastIndexTaskId": {
+                        "description": "上一次索引任务ID",
+                        "type": "integer"
+                      },
+                      "latestTaskId": {
+                        "description": "最新任务ID",
+                        "type": "integer"
+                      },
+                      "latestTaskStatus": {
+                        "description": "最新任务状态",
+                        "type": "integer"
+                      },
+                      "latestTaskStatusName": {
+                        "description": "最新任务状态名",
+                        "type": "string"
+                      },
+                      "latestTaskType": {
+                        "description": "最新任务类型",
+                        "type": "integer"
+                      },
+                      "latestTaskTypeName": {
+                        "description": "最新任务类型名",
+                        "type": "string"
+                      },
+                      "originalFileName": {
+                        "description": "原始文件名",
+                        "type": "string"
+                      },
+                      "parseErrorMsg": {
+                        "description": "解析错误信息",
+                        "type": "string"
+                      },
+                      "parseStatus": {
+                        "description": "解析状态",
+                        "type": "integer"
+                      },
+                      "parseStatusName": {
+                        "description": "解析状态名",
+                        "type": "string"
+                      },
+                      "strategyStatus": {
+                        "description": "策略状态",
+                        "type": "integer"
+                      },
+                      "strategyStatusName": {
+                        "description": "策略状态名",
+                        "type": "string"
+                      },
+                      "tokenCount": {
+                        "description": "token数",
+                        "type": "integer"
+                      },
+                      "updateTime": {
+                        "description": "更新时间",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "total": {
+                  "description": "总记录数",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/profile/batch/regenerate": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "批量重新生成文档画像",
+        "operationId": "documentBatchRegenerateDocumentProfile",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentIds"
+              ],
+              "properties": {
+                "documentIds": {
+                  "description": "文档ID列表",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "documentId",
+                  "documentSummary",
+                  "documentType",
+                  "coreTopics",
+                  "exampleQuestions",
+                  "graphFriendly",
+                  "supportsGraphOutline",
+                  "supportsItemLookup",
+                  "supportsGraphAssist",
+                  "profileSource",
+                  "profileStatus",
+                  "errorMsg"
+                ],
+                "properties": {
+                  "coreTopics": {
+                    "description": "核心主题",
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "description": "文档ID",
+                    "type": "integer"
+                  },
+                  "documentSummary": {
+                    "description": "文档摘要",
+                    "type": "string"
+                  },
+                  "documentType": {
+                    "description": "文档类型",
+                    "type": "string"
+                  },
+                  "errorMsg": {
+                    "description": "错误信息",
+                    "type": "string"
+                  },
+                  "exampleQuestions": {
+                    "description": "示例问题",
+                    "type": "string"
+                  },
+                  "graphFriendly": {
+                    "description": "是否支持结构图",
+                    "type": "integer"
+                  },
+                  "profileSource": {
+                    "description": "画像来源",
+                    "type": "string"
+                  },
+                  "profileStatus": {
+                    "description": "画像状态",
+                    "type": "integer"
+                  },
+                  "supportsGraphAssist": {
+                    "description": "是否支持图辅助",
+                    "type": "integer"
+                  },
+                  "supportsGraphOutline": {
+                    "description": "是否支持图纲",
+                    "type": "integer"
+                  },
+                  "supportsItemLookup": {
+                    "description": "是否支持条目检索",
+                    "type": "integer"
+                  }
+                }
+              },
+              "properties": {
+                "coreTopics": {
+                  "description": "核心主题",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentSummary": {
+                  "description": "文档摘要",
+                  "type": "string"
+                },
+                "documentType": {
+                  "description": "文档类型",
+                  "type": "string"
+                },
+                "errorMsg": {
+                  "description": "错误信息",
+                  "type": "string"
+                },
+                "exampleQuestions": {
+                  "description": "示例问题",
+                  "type": "string"
+                },
+                "graphFriendly": {
+                  "description": "是否支持结构图",
+                  "type": "integer"
+                },
+                "profileSource": {
+                  "description": "画像来源",
+                  "type": "string"
+                },
+                "profileStatus": {
+                  "description": "画像状态",
+                  "type": "integer"
+                },
+                "supportsGraphAssist": {
+                  "description": "是否支持图辅助",
+                  "type": "integer"
+                },
+                "supportsGraphOutline": {
+                  "description": "是否支持图纲",
+                  "type": "integer"
+                },
+                "supportsItemLookup": {
+                  "description": "是否支持条目检索",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/profile/detail": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询文档画像详情",
+        "operationId": "documentGetDocumentProfile",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "coreTopics": {
+                  "description": "核心主题",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentSummary": {
+                  "description": "文档摘要",
+                  "type": "string"
+                },
+                "documentType": {
+                  "description": "文档类型",
+                  "type": "string"
+                },
+                "errorMsg": {
+                  "description": "错误信息",
+                  "type": "string"
+                },
+                "exampleQuestions": {
+                  "description": "示例问题",
+                  "type": "string"
+                },
+                "graphFriendly": {
+                  "description": "是否支持结构图",
+                  "type": "integer"
+                },
+                "profileSource": {
+                  "description": "画像来源",
+                  "type": "string"
+                },
+                "profileStatus": {
+                  "description": "画像状态",
+                  "type": "integer"
+                },
+                "supportsGraphAssist": {
+                  "description": "是否支持图辅助",
+                  "type": "integer"
+                },
+                "supportsGraphOutline": {
+                  "description": "是否支持图纲",
+                  "type": "integer"
+                },
+                "supportsItemLookup": {
+                  "description": "是否支持条目检索",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/profile/regenerate": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "重新生成文档画像",
+        "operationId": "documentRegenerateDocumentProfile",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "coreTopics": {
+                  "description": "核心主题",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentSummary": {
+                  "description": "文档摘要",
+                  "type": "string"
+                },
+                "documentType": {
+                  "description": "文档类型",
+                  "type": "string"
+                },
+                "errorMsg": {
+                  "description": "错误信息",
+                  "type": "string"
+                },
+                "exampleQuestions": {
+                  "description": "示例问题",
+                  "type": "string"
+                },
+                "graphFriendly": {
+                  "description": "是否支持结构图",
+                  "type": "integer"
+                },
+                "profileSource": {
+                  "description": "画像来源",
+                  "type": "string"
+                },
+                "profileStatus": {
+                  "description": "画像状态",
+                  "type": "integer"
+                },
+                "supportsGraphAssist": {
+                  "description": "是否支持图辅助",
+                  "type": "integer"
+                },
+                "supportsGraphOutline": {
+                  "description": "是否支持图纲",
+                  "type": "integer"
+                },
+                "supportsItemLookup": {
+                  "description": "是否支持条目检索",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/strategy/confirm": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "确认文档策略方案",
+        "operationId": "documentConfirmStrategy",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId",
+                "basePlanId",
+                "parentSteps",
+                "childSteps"
+              ],
+              "properties": {
+                "adjustNote": {
+                  "description": "调整备注",
+                  "type": "string"
+                },
+                "basePlanId": {
+                  "description": "基础方案ID",
+                  "type": "integer"
+                },
+                "childSteps": {
+                  "description": "子块步骤",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "stepNo",
+                      "strategyType"
+                    ],
+                    "properties": {
+                      "stepNo": {
+                        "description": "步骤序号",
+                        "type": "integer"
+                      },
+                      "strategyType": {
+                        "description": "策略类型",
+                        "type": "integer",
+                        "enum": [
+                          "1",
+                          "2",
+                          "3"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "integer"
+                },
+                "parentSteps": {
+                  "description": "父块步骤",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "stepNo",
+                      "strategyType"
+                    ],
+                    "properties": {
+                      "stepNo": {
+                        "description": "步骤序号",
+                        "type": "integer"
+                      },
+                      "strategyType": {
+                        "description": "策略类型",
+                        "type": "integer",
+                        "enum": [
+                          "1",
+                          "2",
+                          "3"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "childPipeline": {
+                  "description": "子块流水线",
+                  "type": "object",
+                  "required": [
+                    "pipelineType",
+                    "pipelineTypeName",
+                    "strategySnapshot",
+                    "steps"
+                  ],
+                  "properties": {
+                    "pipelineType": {
+                      "description": "流水线类型",
+                      "type": "string"
+                    },
+                    "pipelineTypeName": {
+                      "description": "流水线类型名称",
+                      "type": "string"
+                    },
+                    "steps": {
+                      "description": "步骤列表",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "stepNo",
+                          "pipelineType",
+                          "pipelineTypeName",
+                          "strategyType",
+                          "strategyTypeName",
+                          "strategyRole",
+                          "strategyRoleName",
+                          "sourceType",
+                          "sourceTypeName",
+                          "executeStatus",
+                          "executeStatusName",
+                          "recommendReason"
+                        ],
+                        "properties": {
+                          "executeStatus": {
+                            "description": "执行状态",
+                            "type": "integer"
+                          },
+                          "executeStatusName": {
+                            "description": "执行状态名称",
+                            "type": "string"
+                          },
+                          "pipelineType": {
+                            "description": "流水线类型",
+                            "type": "string"
+                          },
+                          "pipelineTypeName": {
+                            "description": "流水线类型名称",
+                            "type": "string"
+                          },
+                          "recommendReason": {
+                            "description": "推荐理由",
+                            "type": "string"
+                          },
+                          "sourceType": {
+                            "description": "来源类型",
+                            "type": "integer"
+                          },
+                          "sourceTypeName": {
+                            "description": "来源类型名称",
+                            "type": "string"
+                          },
+                          "stepNo": {
+                            "description": "步骤序号",
+                            "type": "integer"
+                          },
+                          "strategyRole": {
+                            "description": "策略角色",
+                            "type": "integer"
+                          },
+                          "strategyRoleName": {
+                            "description": "策略角色名称",
+                            "type": "string"
+                          },
+                          "strategyType": {
+                            "description": "策略类型",
+                            "type": "integer"
+                          },
+                          "strategyTypeName": {
+                            "description": "策略类型名称",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "strategySnapshot": {
+                      "description": "策略快照",
+                      "type": "string"
+                    }
+                  }
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "normalized": {
+                  "description": "是否经过标准化",
+                  "type": "boolean"
+                },
+                "parentPipeline": {
+                  "description": "父块流水线",
+                  "type": "object",
+                  "required": [
+                    "pipelineType",
+                    "pipelineTypeName",
+                    "strategySnapshot",
+                    "steps"
+                  ],
+                  "properties": {
+                    "pipelineType": {
+                      "description": "流水线类型",
+                      "type": "string"
+                    },
+                    "pipelineTypeName": {
+                      "description": "流水线类型名称",
+                      "type": "string"
+                    },
+                    "steps": {
+                      "description": "步骤列表",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "stepNo",
+                          "pipelineType",
+                          "pipelineTypeName",
+                          "strategyType",
+                          "strategyTypeName",
+                          "strategyRole",
+                          "strategyRoleName",
+                          "sourceType",
+                          "sourceTypeName",
+                          "executeStatus",
+                          "executeStatusName",
+                          "recommendReason"
+                        ],
+                        "properties": {
+                          "executeStatus": {
+                            "description": "执行状态",
+                            "type": "integer"
+                          },
+                          "executeStatusName": {
+                            "description": "执行状态名称",
+                            "type": "string"
+                          },
+                          "pipelineType": {
+                            "description": "流水线类型",
+                            "type": "string"
+                          },
+                          "pipelineTypeName": {
+                            "description": "流水线类型名称",
+                            "type": "string"
+                          },
+                          "recommendReason": {
+                            "description": "推荐理由",
+                            "type": "string"
+                          },
+                          "sourceType": {
+                            "description": "来源类型",
+                            "type": "integer"
+                          },
+                          "sourceTypeName": {
+                            "description": "来源类型名称",
+                            "type": "string"
+                          },
+                          "stepNo": {
+                            "description": "步骤序号",
+                            "type": "integer"
+                          },
+                          "strategyRole": {
+                            "description": "策略角色",
+                            "type": "integer"
+                          },
+                          "strategyRoleName": {
+                            "description": "策略角色名称",
+                            "type": "string"
+                          },
+                          "strategyType": {
+                            "description": "策略类型",
+                            "type": "integer"
+                          },
+                          "strategyTypeName": {
+                            "description": "策略类型名称",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "strategySnapshot": {
+                      "description": "策略快照",
+                      "type": "string"
+                    }
+                  }
+                },
+                "planId": {
+                  "description": "方案ID",
+                  "type": "integer"
+                },
+                "planVersion": {
+                  "description": "方案版本",
+                  "type": "integer"
+                },
+                "strategyStatus": {
+                  "description": "策略状态",
+                  "type": "integer"
+                },
+                "strategyStatusName": {
+                  "description": "策略状态描述",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/strategy/plan/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询文档策略方案",
+        "operationId": "documentQueryStrategyPlan",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "indexStatus": {
+                  "description": "索引状态",
+                  "type": "integer"
+                },
+                "indexStatusName": {
+                  "description": "索引状态名",
+                  "type": "string"
+                },
+                "parseErrorMsg": {
+                  "description": "解析错误信息",
+                  "type": "string"
+                },
+                "parseStatus": {
+                  "description": "解析状态",
+                  "type": "integer"
+                },
+                "parseStatusName": {
+                  "description": "解析状态名",
+                  "type": "string"
+                },
+                "plan": {
+                  "description": "策略方案",
+                  "type": "object",
+                  "required": [
+                    "planId",
+                    "planVersion",
+                    "planSource",
+                    "planSourceName",
+                    "planStatus",
+                    "planStatusName",
+                    "strategySnapshot",
+                    "recommendReason",
+                    "parentPipeline",
+                    "childPipeline"
+                  ],
+                  "properties": {
+                    "childPipeline": {
+                      "description": "子块流水线",
+                      "type": "object",
+                      "required": [
+                        "pipelineType",
+                        "pipelineTypeName",
+                        "strategySnapshot",
+                        "steps"
+                      ],
+                      "properties": {
+                        "pipelineType": {
+                          "description": "流水线类型",
+                          "type": "string"
+                        },
+                        "pipelineTypeName": {
+                          "description": "流水线类型名称",
+                          "type": "string"
+                        },
+                        "steps": {
+                          "description": "步骤列表",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "stepNo",
+                              "pipelineType",
+                              "pipelineTypeName",
+                              "strategyType",
+                              "strategyTypeName",
+                              "strategyRole",
+                              "strategyRoleName",
+                              "sourceType",
+                              "sourceTypeName",
+                              "executeStatus",
+                              "executeStatusName",
+                              "recommendReason"
+                            ],
+                            "properties": {
+                              "executeStatus": {
+                                "description": "执行状态",
+                                "type": "integer"
+                              },
+                              "executeStatusName": {
+                                "description": "执行状态名称",
+                                "type": "string"
+                              },
+                              "pipelineType": {
+                                "description": "流水线类型",
+                                "type": "string"
+                              },
+                              "pipelineTypeName": {
+                                "description": "流水线类型名称",
+                                "type": "string"
+                              },
+                              "recommendReason": {
+                                "description": "推荐理由",
+                                "type": "string"
+                              },
+                              "sourceType": {
+                                "description": "来源类型",
+                                "type": "integer"
+                              },
+                              "sourceTypeName": {
+                                "description": "来源类型名称",
+                                "type": "string"
+                              },
+                              "stepNo": {
+                                "description": "步骤序号",
+                                "type": "integer"
+                              },
+                              "strategyRole": {
+                                "description": "策略角色",
+                                "type": "integer"
+                              },
+                              "strategyRoleName": {
+                                "description": "策略角色名称",
+                                "type": "string"
+                              },
+                              "strategyType": {
+                                "description": "策略类型",
+                                "type": "integer"
+                              },
+                              "strategyTypeName": {
+                                "description": "策略类型名称",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "strategySnapshot": {
+                          "description": "策略快照",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "parentPipeline": {
+                      "description": "父块流水线",
+                      "type": "object",
+                      "required": [
+                        "pipelineType",
+                        "pipelineTypeName",
+                        "strategySnapshot",
+                        "steps"
+                      ],
+                      "properties": {
+                        "pipelineType": {
+                          "description": "流水线类型",
+                          "type": "string"
+                        },
+                        "pipelineTypeName": {
+                          "description": "流水线类型名称",
+                          "type": "string"
+                        },
+                        "steps": {
+                          "description": "步骤列表",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "stepNo",
+                              "pipelineType",
+                              "pipelineTypeName",
+                              "strategyType",
+                              "strategyTypeName",
+                              "strategyRole",
+                              "strategyRoleName",
+                              "sourceType",
+                              "sourceTypeName",
+                              "executeStatus",
+                              "executeStatusName",
+                              "recommendReason"
+                            ],
+                            "properties": {
+                              "executeStatus": {
+                                "description": "执行状态",
+                                "type": "integer"
+                              },
+                              "executeStatusName": {
+                                "description": "执行状态名称",
+                                "type": "string"
+                              },
+                              "pipelineType": {
+                                "description": "流水线类型",
+                                "type": "string"
+                              },
+                              "pipelineTypeName": {
+                                "description": "流水线类型名称",
+                                "type": "string"
+                              },
+                              "recommendReason": {
+                                "description": "推荐理由",
+                                "type": "string"
+                              },
+                              "sourceType": {
+                                "description": "来源类型",
+                                "type": "integer"
+                              },
+                              "sourceTypeName": {
+                                "description": "来源类型名称",
+                                "type": "string"
+                              },
+                              "stepNo": {
+                                "description": "步骤序号",
+                                "type": "integer"
+                              },
+                              "strategyRole": {
+                                "description": "策略角色",
+                                "type": "integer"
+                              },
+                              "strategyRoleName": {
+                                "description": "策略角色名称",
+                                "type": "string"
+                              },
+                              "strategyType": {
+                                "description": "策略类型",
+                                "type": "integer"
+                              },
+                              "strategyTypeName": {
+                                "description": "策略类型名称",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "strategySnapshot": {
+                          "description": "策略快照",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "planId": {
+                      "description": "方案ID",
+                      "type": "integer"
+                    },
+                    "planSource": {
+                      "description": "方案来源",
+                      "type": "integer"
+                    },
+                    "planSourceName": {
+                      "description": "方案来源名称",
+                      "type": "string"
+                    },
+                    "planStatus": {
+                      "description": "方案状态",
+                      "type": "integer"
+                    },
+                    "planStatusName": {
+                      "description": "方案状态名称",
+                      "type": "string"
+                    },
+                    "planVersion": {
+                      "description": "方案版本",
+                      "type": "integer"
+                    },
+                    "recommendReason": {
+                      "description": "推荐理由",
+                      "type": "string"
+                    },
+                    "strategySnapshot": {
+                      "description": "策略快照",
+                      "type": "string"
+                    }
+                  }
+                },
+                "planReady": {
+                  "description": "方案是否就绪",
+                  "type": "boolean"
+                },
+                "strategyStatus": {
+                  "description": "策略状态",
+                  "type": "integer"
+                },
+                "strategyStatusName": {
+                  "description": "策略状态名",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/task/log/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询任务执行日志",
+        "operationId": "documentQueryTaskLogs",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "taskId"
+              ],
+              "properties": {
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer",
+                  "default": 1,
+                  "example": 1
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer",
+                  "default": 10,
+                  "example": 10
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "costMillis": {
+                  "description": "耗时毫秒数",
+                  "type": "integer"
+                },
+                "currentStage": {
+                  "description": "当前阶段编码",
+                  "type": "integer"
+                },
+                "currentStageName": {
+                  "description": "当前阶段名称",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "errorCode": {
+                  "description": "错误码",
+                  "type": "string"
+                },
+                "errorMsg": {
+                  "description": "错误信息",
+                  "type": "string"
+                },
+                "finishTime": {
+                  "description": "结束时间",
+                  "type": "string"
+                },
+                "logs": {
+                  "description": "任务日志明细列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "stageType",
+                      "stageTypeName",
+                      "eventType",
+                      "eventTypeName",
+                      "logLevel",
+                      "logLevelName",
+                      "content",
+                      "detailJson",
+                      "createTime"
+                    ],
+                    "properties": {
+                      "content": {
+                        "description": "日志简短内容",
+                        "type": "string"
+                      },
+                      "createTime": {
+                        "description": "创建时间",
+                        "type": "string"
+                      },
+                      "detailJson": {
+                        "description": "详细JSON数据",
+                        "type": "string"
+                      },
+                      "eventType": {
+                        "description": "事件类型编码",
+                        "type": "integer"
+                      },
+                      "eventTypeName": {
+                        "description": "事件类型名称",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "主键ID",
+                        "type": "integer"
+                      },
+                      "logLevel": {
+                        "description": "日志等级编码",
+                        "type": "integer"
+                      },
+                      "logLevelName": {
+                        "description": "日志等级名称",
+                        "type": "string"
+                      },
+                      "stageType": {
+                        "description": "阶段类型编码",
+                        "type": "integer"
+                      },
+                      "stageTypeName": {
+                        "description": "阶段类型名称",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "startTime": {
+                  "description": "开始时间",
+                  "type": "string"
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                },
+                "taskStatus": {
+                  "description": "任务状态",
+                  "type": "integer"
+                },
+                "taskStatusName": {
+                  "description": "任务状态名称",
+                  "type": "string"
+                },
+                "taskType": {
+                  "description": "任务类型",
+                  "type": "integer"
+                },
+                "taskTypeName": {
+                  "description": "任务类型名称",
+                  "type": "string"
+                },
+                "total": {
+                  "description": "数据总量",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/upload": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "上传文档",
+        "operationId": "documentUploadDocument",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "string"
+                },
+                "knowledgeScopeCode": {
+                  "description": "知识范围编码",
+                  "type": "string"
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "indexStatus": {
+                  "description": "索引状态",
+                  "type": "integer"
+                },
+                "parseStatus": {
+                  "description": "解析状态",
+                  "type": "integer"
+                },
+                "strategyStatus": {
+                  "description": "策略状态",
+                  "type": "integer"
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-date": "2026-07-13 21:10:34",
+  "x-description": "This is a goctl generated swagger file.",
+  "x-github": "https://github.com/zeromicro/go-zero",
+  "x-go-zero-doc": "https://go-zero.dev/",
+  "x-goctl-version": "1.9.2"
+}

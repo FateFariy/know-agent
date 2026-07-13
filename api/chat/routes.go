@@ -62,11 +62,6 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 				Path:    "/exchange/channel/executions",
 				Handler: GetChannelExecutionsHandler(svcCtx, srv),
 			},
-			{
-				Method:  http.MethodPost,
-				Path:    "/stage/benchmarks",
-				Handler: GetStageBenchmarksHandler(svcCtx, srv),
-			},
 		},
 		rest.WithPrefix("/api/chat"), rest.WithSSE(),
 	)

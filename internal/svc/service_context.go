@@ -90,7 +90,7 @@ func NewArkEmbedding(c *config.Config) embedding.Embedder {
 }
 
 func NewArkChatModel(c *config.Config) *agenticark.Model {
-	llmConf := c.ChatModel["ark"]
+	llmConf := c.ChatModel["Ark"]
 	chatModel, err := agenticark.New(context.TODO(), &agenticark.Config{
 		APIKey:      llmConf.ApiKey,
 		Model:       llmConf.Model,

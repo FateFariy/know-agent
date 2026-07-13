@@ -1,0 +1,2185 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "聊天服务接口",
+    "version": "v1.0.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/api/chat/document/options": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取知识文档选项",
+        "operationId": "chatGetDocumentOptions",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "documentId",
+                  "documentName",
+                  "knowledgeScopeName",
+                  "businessCategory",
+                  "documentTags"
+                ],
+                "properties": {
+                  "businessCategory": {
+                    "description": "业务分类",
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "description": "文档ID",
+                    "type": "integer"
+                  },
+                  "documentName": {
+                    "description": "文档名称",
+                    "type": "string"
+                  },
+                  "documentTags": {
+                    "description": "文档标签",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "knowledgeScopeName": {
+                    "description": "知识范围名称",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/exchange/channel/executions": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取渠道执行结果",
+        "operationId": "chatGetChannelExecutions",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId",
+                "exchangeId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "exchangeId": {
+                  "description": "对话ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "conversationId",
+                  "exchangeId",
+                  "traceId",
+                  "subQuestionIndex",
+                  "subQuestion",
+                  "channelType",
+                  "executionState",
+                  "startTime",
+                  "endTime",
+                  "durationMs",
+                  "recalledCount",
+                  "acceptedCount",
+                  "finalSelectedCount",
+                  "avgScore",
+                  "maxScore",
+                  "minScore",
+                  "errorMessage",
+                  "createTime"
+                ],
+                "properties": {
+                  "acceptedCount": {
+                    "description": "接受数量",
+                    "type": "integer"
+                  },
+                  "avgScore": {
+                    "description": "平均分数",
+                    "type": "number"
+                  },
+                  "channelType": {
+                    "description": "渠道类型",
+                    "type": "string"
+                  },
+                  "conversationId": {
+                    "description": "对话ID",
+                    "type": "string"
+                  },
+                  "createTime": {
+                    "description": "创建时间",
+                    "type": "string"
+                  },
+                  "durationMs": {
+                    "description": "执行时长（毫秒）",
+                    "type": "integer"
+                  },
+                  "endTime": {
+                    "description": "结束时间",
+                    "type": "string"
+                  },
+                  "errorMessage": {
+                    "description": "错误信息",
+                    "type": "string"
+                  },
+                  "exchangeId": {
+                    "description": "交换ID",
+                    "type": "integer"
+                  },
+                  "executionState": {
+                    "description": "执行状态",
+                    "type": "integer"
+                  },
+                  "finalSelectedCount": {
+                    "description": "最终选中数量",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "主键",
+                    "type": "integer"
+                  },
+                  "maxScore": {
+                    "description": "最大分数",
+                    "type": "number"
+                  },
+                  "minScore": {
+                    "description": "最小分数",
+                    "type": "number"
+                  },
+                  "recalledCount": {
+                    "description": "召回数量",
+                    "type": "integer"
+                  },
+                  "startTime": {
+                    "description": "开始时间",
+                    "type": "string"
+                  },
+                  "subQuestion": {
+                    "description": "子问题",
+                    "type": "string"
+                  },
+                  "subQuestionIndex": {
+                    "description": "子问题索引",
+                    "type": "integer"
+                  },
+                  "traceId": {
+                    "description": "跟踪ID",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "acceptedCount": {
+                  "description": "接受数量",
+                  "type": "integer"
+                },
+                "avgScore": {
+                  "description": "平均分数",
+                  "type": "number"
+                },
+                "channelType": {
+                  "description": "渠道类型",
+                  "type": "string"
+                },
+                "conversationId": {
+                  "description": "对话ID",
+                  "type": "string"
+                },
+                "createTime": {
+                  "description": "创建时间",
+                  "type": "string"
+                },
+                "durationMs": {
+                  "description": "执行时长（毫秒）",
+                  "type": "integer"
+                },
+                "endTime": {
+                  "description": "结束时间",
+                  "type": "string"
+                },
+                "errorMessage": {
+                  "description": "错误信息",
+                  "type": "string"
+                },
+                "exchangeId": {
+                  "description": "交换ID",
+                  "type": "integer"
+                },
+                "executionState": {
+                  "description": "执行状态",
+                  "type": "integer"
+                },
+                "finalSelectedCount": {
+                  "description": "最终选中数量",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "主键",
+                  "type": "integer"
+                },
+                "maxScore": {
+                  "description": "最大分数",
+                  "type": "number"
+                },
+                "minScore": {
+                  "description": "最小分数",
+                  "type": "number"
+                },
+                "recalledCount": {
+                  "description": "召回数量",
+                  "type": "integer"
+                },
+                "startTime": {
+                  "description": "开始时间",
+                  "type": "string"
+                },
+                "subQuestion": {
+                  "description": "子问题",
+                  "type": "string"
+                },
+                "subQuestionIndex": {
+                  "description": "子问题索引",
+                  "type": "integer"
+                },
+                "traceId": {
+                  "description": "跟踪ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/exchange/detail": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取对话详情",
+        "operationId": "chatGetExchangeDetail",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId",
+                "exchangeId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "exchangeId": {
+                  "description": "对话ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "exchange": {
+                  "description": "对话交换响应",
+                  "type": "object",
+                  "required": [
+                    "exchangeId",
+                    "question",
+                    "answer",
+                    "thinkingSteps",
+                    "references",
+                    "recommendations",
+                    "usedTools",
+                    "debugTrace",
+                    "status",
+                    "errorMessage",
+                    "firstResponseTimeMs",
+                    "totalResponseTimeMs",
+                    "createTime"
+                  ],
+                  "properties": {
+                    "answer": {
+                      "description": "回答内容",
+                      "type": "string"
+                    },
+                    "createTime": {
+                      "description": "创建时间",
+                      "type": "string"
+                    },
+                    "debugTrace": {
+                      "description": "调试轨迹",
+                      "type": "string"
+                    },
+                    "errorMessage": {
+                      "description": "错误信息",
+                      "type": "string"
+                    },
+                    "exchangeId": {
+                      "description": "对话交换ID",
+                      "type": "integer"
+                    },
+                    "firstResponseTimeMs": {
+                      "description": "首次响应时间毫秒",
+                      "type": "integer"
+                    },
+                    "question": {
+                      "description": "问题内容",
+                      "type": "string"
+                    },
+                    "recommendations": {
+                      "description": "推荐问题列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "references": {
+                      "description": "检索引用列表",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "referenceId",
+                          "sourceType",
+                          "title",
+                          "url",
+                          "snippet",
+                          "documentId",
+                          "documentName",
+                          "chunkId",
+                          "parentBlockId",
+                          "parentBlockNo",
+                          "chunkNo",
+                          "sectionPath",
+                          "structureNodeId",
+                          "structureNodeType",
+                          "canonicalPath",
+                          "itemIndex",
+                          "score",
+                          "subQuestionIndex",
+                          "subQuestion",
+                          "channel",
+                          "toolName",
+                          "knowledgeScopeCode",
+                          "knowledgeScopeName"
+                        ],
+                        "properties": {
+                          "canonicalPath": {
+                            "description": "规范路径",
+                            "type": "string"
+                          },
+                          "channel": {
+                            "description": "渠道",
+                            "type": "string"
+                          },
+                          "chunkId": {
+                            "description": "块ID",
+                            "type": "integer"
+                          },
+                          "chunkNo": {
+                            "description": "块序号",
+                            "type": "integer"
+                          },
+                          "documentId": {
+                            "description": "文档ID",
+                            "type": "integer"
+                          },
+                          "documentName": {
+                            "description": "文档名称",
+                            "type": "string"
+                          },
+                          "itemIndex": {
+                            "description": "项索引",
+                            "type": "integer"
+                          },
+                          "knowledgeScopeCode": {
+                            "description": "知识范围代码",
+                            "type": "string"
+                          },
+                          "knowledgeScopeName": {
+                            "description": "知识范围名称",
+                            "type": "string"
+                          },
+                          "parentBlockId": {
+                            "description": "父块ID",
+                            "type": "integer"
+                          },
+                          "parentBlockNo": {
+                            "description": "父块序号",
+                            "type": "integer"
+                          },
+                          "referenceId": {
+                            "description": "引用ID",
+                            "type": "string"
+                          },
+                          "score": {
+                            "description": "相似度分数",
+                            "type": "number"
+                          },
+                          "sectionPath": {
+                            "description": "章节路径",
+                            "type": "string"
+                          },
+                          "snippet": {
+                            "description": "片段",
+                            "type": "string"
+                          },
+                          "sourceType": {
+                            "description": "来源类型",
+                            "type": "string"
+                          },
+                          "structureNodeId": {
+                            "description": "结构节点ID",
+                            "type": "integer"
+                          },
+                          "structureNodeType": {
+                            "description": "结构节点类型",
+                            "type": "integer"
+                          },
+                          "subQuestion": {
+                            "description": "子问题",
+                            "type": "string"
+                          },
+                          "subQuestionIndex": {
+                            "description": "子问题索引",
+                            "type": "integer"
+                          },
+                          "title": {
+                            "description": "标题",
+                            "type": "string"
+                          },
+                          "toolName": {
+                            "description": "工具名称",
+                            "type": "string"
+                          },
+                          "url": {
+                            "description": "URL",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "status": {
+                      "description": "对话状态",
+                      "type": "integer"
+                    },
+                    "thinkingSteps": {
+                      "description": "思维步骤列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "totalResponseTimeMs": {
+                      "description": "总响应时间毫秒",
+                      "type": "integer"
+                    },
+                    "updateTime": {
+                      "description": "最后更新时间",
+                      "type": "string"
+                    },
+                    "usedTools": {
+                      "description": "使用工具列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "stageTraces": {
+                  "description": "阶段追踪列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "traceId",
+                      "stageCode",
+                      "stageName",
+                      "stageOrder",
+                      "stageLevel",
+                      "parentStageId",
+                      "executionMode",
+                      "stageState",
+                      "startTime",
+                      "endTime",
+                      "durationMs",
+                      "summaryText",
+                      "errorMessage",
+                      "snapshot"
+                    ],
+                    "properties": {
+                      "durationMs": {
+                        "description": "持续时间毫秒",
+                        "type": "integer"
+                      },
+                      "endTime": {
+                        "description": "结束时间",
+                        "type": "string"
+                      },
+                      "errorMessage": {
+                        "description": "错误信息",
+                        "type": "string"
+                      },
+                      "executionMode": {
+                        "description": "执行模式",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "阶段ID",
+                        "type": "integer"
+                      },
+                      "parentStageId": {
+                        "description": "父阶段ID",
+                        "type": "integer"
+                      },
+                      "snapshot": {
+                        "description": "快照数据",
+                        "type": "string"
+                      },
+                      "stageCode": {
+                        "description": "阶段代码",
+                        "type": "string"
+                      },
+                      "stageLevel": {
+                        "description": "阶段层级",
+                        "type": "integer"
+                      },
+                      "stageName": {
+                        "description": "阶段名称",
+                        "type": "string"
+                      },
+                      "stageOrder": {
+                        "description": "阶段顺序",
+                        "type": "integer"
+                      },
+                      "stageState": {
+                        "description": "阶段状态",
+                        "type": "string"
+                      },
+                      "startTime": {
+                        "description": "开始时间",
+                        "type": "string"
+                      },
+                      "summaryText": {
+                        "description": "摘要文本",
+                        "type": "string"
+                      },
+                      "traceId": {
+                        "description": "追踪ID",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/exchange/retrieval/results": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取检索结果",
+        "operationId": "chatGetRetrievalResults",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId",
+                "exchangeId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "exchangeId": {
+                  "description": "对话ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "conversationId",
+                  "exchangeId",
+                  "traceId",
+                  "subQuestionIndex",
+                  "subQuestion",
+                  "channelType",
+                  "channelRank",
+                  "rrfRank",
+                  "finalRank",
+                  "originalScore",
+                  "rrfScore",
+                  "rerankScore",
+                  "gatePassed",
+                  "isElevated",
+                  "isSelected",
+                  "selectionReason",
+                  "chunkId",
+                  "chunkNo",
+                  "parentBlockId",
+                  "parentBlockNo",
+                  "sectionPath",
+                  "chunkTextPreview",
+                  "chunkCharCount",
+                  "createTime"
+                ],
+                "properties": {
+                  "channelRank": {
+                    "description": "渠道排名",
+                    "type": "integer"
+                  },
+                  "channelType": {
+                    "description": "渠道类型",
+                    "type": "string"
+                  },
+                  "chunkCharCount": {
+                    "description": "分块字符数",
+                    "type": "integer"
+                  },
+                  "chunkId": {
+                    "description": "分块ID",
+                    "type": "integer"
+                  },
+                  "chunkNo": {
+                    "description": "分块序号",
+                    "type": "integer"
+                  },
+                  "chunkTextPreview": {
+                    "description": "分块文本预览",
+                    "type": "string"
+                  },
+                  "conversationId": {
+                    "description": "对话ID",
+                    "type": "string"
+                  },
+                  "createTime": {
+                    "description": "创建时间",
+                    "type": "string"
+                  },
+                  "exchangeId": {
+                    "description": "交互ID",
+                    "type": "integer"
+                  },
+                  "finalRank": {
+                    "description": "最终排名",
+                    "type": "integer"
+                  },
+                  "gatePassed": {
+                    "description": "是否通过门控",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "主键ID",
+                    "type": "integer"
+                  },
+                  "isElevated": {
+                    "description": "是否升级",
+                    "type": "integer"
+                  },
+                  "isSelected": {
+                    "description": "是否选中",
+                    "type": "integer"
+                  },
+                  "originalScore": {
+                    "description": "原始分数",
+                    "type": "number"
+                  },
+                  "parentBlockId": {
+                    "description": "父块ID",
+                    "type": "integer"
+                  },
+                  "parentBlockNo": {
+                    "description": "父块序号",
+                    "type": "integer"
+                  },
+                  "rerankScore": {
+                    "description": "重排分数",
+                    "type": "number"
+                  },
+                  "rrfRank": {
+                    "description": "RRF排名",
+                    "type": "integer"
+                  },
+                  "rrfScore": {
+                    "description": "RRF分数",
+                    "type": "number"
+                  },
+                  "sectionPath": {
+                    "description": "章节路径",
+                    "type": "string"
+                  },
+                  "selectionReason": {
+                    "description": "选中原因",
+                    "type": "string"
+                  },
+                  "subQuestion": {
+                    "description": "子问题",
+                    "type": "string"
+                  },
+                  "subQuestionIndex": {
+                    "description": "子问题索引",
+                    "type": "integer"
+                  },
+                  "traceId": {
+                    "description": "跟踪ID",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "channelRank": {
+                  "description": "渠道排名",
+                  "type": "integer"
+                },
+                "channelType": {
+                  "description": "渠道类型",
+                  "type": "string"
+                },
+                "chunkCharCount": {
+                  "description": "分块字符数",
+                  "type": "integer"
+                },
+                "chunkId": {
+                  "description": "分块ID",
+                  "type": "integer"
+                },
+                "chunkNo": {
+                  "description": "分块序号",
+                  "type": "integer"
+                },
+                "chunkTextPreview": {
+                  "description": "分块文本预览",
+                  "type": "string"
+                },
+                "conversationId": {
+                  "description": "对话ID",
+                  "type": "string"
+                },
+                "createTime": {
+                  "description": "创建时间",
+                  "type": "string"
+                },
+                "exchangeId": {
+                  "description": "交互ID",
+                  "type": "integer"
+                },
+                "finalRank": {
+                  "description": "最终排名",
+                  "type": "integer"
+                },
+                "gatePassed": {
+                  "description": "是否通过门控",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "isElevated": {
+                  "description": "是否升级",
+                  "type": "integer"
+                },
+                "isSelected": {
+                  "description": "是否选中",
+                  "type": "integer"
+                },
+                "originalScore": {
+                  "description": "原始分数",
+                  "type": "number"
+                },
+                "parentBlockId": {
+                  "description": "父块ID",
+                  "type": "integer"
+                },
+                "parentBlockNo": {
+                  "description": "父块序号",
+                  "type": "integer"
+                },
+                "rerankScore": {
+                  "description": "重排分数",
+                  "type": "number"
+                },
+                "rrfRank": {
+                  "description": "RRF排名",
+                  "type": "integer"
+                },
+                "rrfScore": {
+                  "description": "RRF分数",
+                  "type": "number"
+                },
+                "sectionPath": {
+                  "description": "章节路径",
+                  "type": "string"
+                },
+                "selectionReason": {
+                  "description": "选中原因",
+                  "type": "string"
+                },
+                "subQuestion": {
+                  "description": "子问题",
+                  "type": "string"
+                },
+                "subQuestionIndex": {
+                  "description": "子问题索引",
+                  "type": "integer"
+                },
+                "traceId": {
+                  "description": "跟踪ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/session/detail": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取会话详情",
+        "operationId": "chatGetSessionDetail",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "chatMode": {
+                  "description": "对话查询模式",
+                  "type": "string"
+                },
+                "checkpointCount": {
+                  "description": "检查点数量",
+                  "type": "integer"
+                },
+                "conversationId": {
+                  "description": "会话唯一标识",
+                  "type": "string"
+                },
+                "createdTime": {
+                  "description": "创建时间",
+                  "type": "string"
+                },
+                "exchanges": {
+                  "description": "交互轮次列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "exchangeId",
+                      "question",
+                      "answer",
+                      "thinkingSteps",
+                      "references",
+                      "recommendations",
+                      "usedTools",
+                      "debugTrace",
+                      "status",
+                      "errorMessage",
+                      "firstResponseTimeMs",
+                      "totalResponseTimeMs",
+                      "createTime"
+                    ],
+                    "properties": {
+                      "answer": {
+                        "description": "回答内容",
+                        "type": "string"
+                      },
+                      "createTime": {
+                        "description": "创建时间",
+                        "type": "string"
+                      },
+                      "debugTrace": {
+                        "description": "调试轨迹",
+                        "type": "string"
+                      },
+                      "errorMessage": {
+                        "description": "错误信息",
+                        "type": "string"
+                      },
+                      "exchangeId": {
+                        "description": "对话交换ID",
+                        "type": "integer"
+                      },
+                      "firstResponseTimeMs": {
+                        "description": "首次响应时间毫秒",
+                        "type": "integer"
+                      },
+                      "question": {
+                        "description": "问题内容",
+                        "type": "string"
+                      },
+                      "recommendations": {
+                        "description": "推荐问题列表",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "references": {
+                        "description": "检索引用列表",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "referenceId",
+                            "sourceType",
+                            "title",
+                            "url",
+                            "snippet",
+                            "documentId",
+                            "documentName",
+                            "chunkId",
+                            "parentBlockId",
+                            "parentBlockNo",
+                            "chunkNo",
+                            "sectionPath",
+                            "structureNodeId",
+                            "structureNodeType",
+                            "canonicalPath",
+                            "itemIndex",
+                            "score",
+                            "subQuestionIndex",
+                            "subQuestion",
+                            "channel",
+                            "toolName",
+                            "knowledgeScopeCode",
+                            "knowledgeScopeName"
+                          ],
+                          "properties": {
+                            "canonicalPath": {
+                              "description": "规范路径",
+                              "type": "string"
+                            },
+                            "channel": {
+                              "description": "渠道",
+                              "type": "string"
+                            },
+                            "chunkId": {
+                              "description": "块ID",
+                              "type": "integer"
+                            },
+                            "chunkNo": {
+                              "description": "块序号",
+                              "type": "integer"
+                            },
+                            "documentId": {
+                              "description": "文档ID",
+                              "type": "integer"
+                            },
+                            "documentName": {
+                              "description": "文档名称",
+                              "type": "string"
+                            },
+                            "itemIndex": {
+                              "description": "项索引",
+                              "type": "integer"
+                            },
+                            "knowledgeScopeCode": {
+                              "description": "知识范围代码",
+                              "type": "string"
+                            },
+                            "knowledgeScopeName": {
+                              "description": "知识范围名称",
+                              "type": "string"
+                            },
+                            "parentBlockId": {
+                              "description": "父块ID",
+                              "type": "integer"
+                            },
+                            "parentBlockNo": {
+                              "description": "父块序号",
+                              "type": "integer"
+                            },
+                            "referenceId": {
+                              "description": "引用ID",
+                              "type": "string"
+                            },
+                            "score": {
+                              "description": "相似度分数",
+                              "type": "number"
+                            },
+                            "sectionPath": {
+                              "description": "章节路径",
+                              "type": "string"
+                            },
+                            "snippet": {
+                              "description": "片段",
+                              "type": "string"
+                            },
+                            "sourceType": {
+                              "description": "来源类型",
+                              "type": "string"
+                            },
+                            "structureNodeId": {
+                              "description": "结构节点ID",
+                              "type": "integer"
+                            },
+                            "structureNodeType": {
+                              "description": "结构节点类型",
+                              "type": "integer"
+                            },
+                            "subQuestion": {
+                              "description": "子问题",
+                              "type": "string"
+                            },
+                            "subQuestionIndex": {
+                              "description": "子问题索引",
+                              "type": "integer"
+                            },
+                            "title": {
+                              "description": "标题",
+                              "type": "string"
+                            },
+                            "toolName": {
+                              "description": "工具名称",
+                              "type": "string"
+                            },
+                            "url": {
+                              "description": "URL",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "status": {
+                        "description": "对话状态",
+                        "type": "integer"
+                      },
+                      "thinkingSteps": {
+                        "description": "思维步骤列表",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "totalResponseTimeMs": {
+                        "description": "总响应时间毫秒",
+                        "type": "integer"
+                      },
+                      "updateTime": {
+                        "description": "最后更新时间",
+                        "type": "string"
+                      },
+                      "usedTools": {
+                        "description": "使用工具列表",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "latestAssistantMessage": {
+                  "description": "模型最新回复",
+                  "type": "string"
+                },
+                "latestExchangeId": {
+                  "description": "最新一轮交互ID",
+                  "type": "integer"
+                },
+                "latestTurnErrorMessage": {
+                  "description": "本轮交互错误信息",
+                  "type": "string"
+                },
+                "latestTurnStatus": {
+                  "description": "本轮交互状态",
+                  "type": "string"
+                },
+                "latestUserMessage": {
+                  "description": "最新用户提问",
+                  "type": "string"
+                },
+                "memorySummary": {
+                  "description": "会话记忆摘要",
+                  "type": "object",
+                  "required": [
+                    "conversationId",
+                    "IsCompressed",
+                    "coveredExchangeId",
+                    "coveredExchangeCount",
+                    "compressionCount",
+                    "summaryVersion",
+                    "summaryText",
+                    "summaryPayload",
+                    "lastSourceUpdateTime",
+                    "updateTime"
+                  ],
+                  "properties": {
+                    "IsCompressed": {
+                      "description": "是否执行过记忆压缩",
+                      "type": "boolean"
+                    },
+                    "compressionCount": {
+                      "description": "累计压缩次数",
+                      "type": "integer"
+                    },
+                    "conversationId": {
+                      "description": "会话ID",
+                      "type": "string"
+                    },
+                    "coveredExchangeCount": {
+                      "description": "压缩覆盖交互轮次",
+                      "type": "integer"
+                    },
+                    "coveredExchangeId": {
+                      "description": "压缩截止交互ID",
+                      "type": "integer"
+                    },
+                    "lastSourceUpdateTime": {
+                      "description": "原始对话最后更新时间",
+                      "type": "string"
+                    },
+                    "summaryPayload": {
+                      "description": "结构化摘要载荷",
+                      "type": "object",
+                      "required": [
+                        "summary",
+                        "conversationGoal",
+                        "stableFacts",
+                        "userPreferences",
+                        "resolvedPoints",
+                        "pendingQuestions",
+                        "retrievalHints"
+                      ],
+                      "properties": {
+                        "conversationGoal": {
+                          "description": "对话目标",
+                          "type": "string"
+                        },
+                        "pendingQuestions": {
+                          "description": "待解决问题列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "resolvedPoints": {
+                          "description": "已解决问题列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "retrievalHints": {
+                          "description": "检索提示列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "stableFacts": {
+                          "description": "稳定事实列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "summary": {
+                          "description": "摘要文本",
+                          "type": "string"
+                        },
+                        "userPreferences": {
+                          "description": "用户偏好列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "summaryText": {
+                      "description": "纯文本摘要",
+                      "type": "string"
+                    },
+                    "summaryVersion": {
+                      "description": "摘要版本号",
+                      "type": "integer"
+                    },
+                    "updateTime": {
+                      "description": "摘要更新时间戳",
+                      "type": "string"
+                    }
+                  }
+                },
+                "messageCount": {
+                  "description": "消息总数",
+                  "type": "integer"
+                },
+                "running": {
+                  "description": "是否正在会话中",
+                  "type": "boolean"
+                },
+                "selectedDocumentId": {
+                  "description": "选中文档ID",
+                  "type": "integer"
+                },
+                "selectedDocumentName": {
+                  "description": "选中文档名称",
+                  "type": "string"
+                },
+                "updatedTime": {
+                  "description": "更新时间",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/session/list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取会话列表",
+        "operationId": "chatListSessions",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "chatMode": {
+                  "description": "聊天模式过滤",
+                  "type": "string"
+                },
+                "keyword": {
+                  "description": "关键词",
+                  "type": "string"
+                },
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer",
+                  "default": 1,
+                  "example": 1
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer",
+                  "default": 10,
+                  "example": 10
+                },
+                "turnStatus": {
+                  "description": "对话状态过滤",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer"
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer"
+                },
+                "records": {
+                  "description": "会话列表",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "conversationId",
+                      "running",
+                      "checkpointCount",
+                      "messageCount",
+                      "latestUserMessage",
+                      "latestAssistantMessage",
+                      "latestExchangeId",
+                      "latestTurnStatus",
+                      "latestTurnErrorMessage",
+                      "chatMode",
+                      "selectedDocumentId",
+                      "selectedDocumentName",
+                      "createdTime",
+                      "updatedTime",
+                      "exchanges",
+                      "memorySummary"
+                    ],
+                    "properties": {
+                      "chatMode": {
+                        "description": "对话查询模式",
+                        "type": "string"
+                      },
+                      "checkpointCount": {
+                        "description": "检查点数量",
+                        "type": "integer"
+                      },
+                      "conversationId": {
+                        "description": "会话唯一标识",
+                        "type": "string"
+                      },
+                      "createdTime": {
+                        "description": "创建时间",
+                        "type": "string"
+                      },
+                      "exchanges": {
+                        "description": "交互轮次列表",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "exchangeId",
+                            "question",
+                            "answer",
+                            "thinkingSteps",
+                            "references",
+                            "recommendations",
+                            "usedTools",
+                            "debugTrace",
+                            "status",
+                            "errorMessage",
+                            "firstResponseTimeMs",
+                            "totalResponseTimeMs",
+                            "createTime"
+                          ],
+                          "properties": {
+                            "answer": {
+                              "description": "回答内容",
+                              "type": "string"
+                            },
+                            "createTime": {
+                              "description": "创建时间",
+                              "type": "string"
+                            },
+                            "debugTrace": {
+                              "description": "调试轨迹",
+                              "type": "string"
+                            },
+                            "errorMessage": {
+                              "description": "错误信息",
+                              "type": "string"
+                            },
+                            "exchangeId": {
+                              "description": "对话交换ID",
+                              "type": "integer"
+                            },
+                            "firstResponseTimeMs": {
+                              "description": "首次响应时间毫秒",
+                              "type": "integer"
+                            },
+                            "question": {
+                              "description": "问题内容",
+                              "type": "string"
+                            },
+                            "recommendations": {
+                              "description": "推荐问题列表",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "references": {
+                              "description": "检索引用列表",
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "referenceId",
+                                  "sourceType",
+                                  "title",
+                                  "url",
+                                  "snippet",
+                                  "documentId",
+                                  "documentName",
+                                  "chunkId",
+                                  "parentBlockId",
+                                  "parentBlockNo",
+                                  "chunkNo",
+                                  "sectionPath",
+                                  "structureNodeId",
+                                  "structureNodeType",
+                                  "canonicalPath",
+                                  "itemIndex",
+                                  "score",
+                                  "subQuestionIndex",
+                                  "subQuestion",
+                                  "channel",
+                                  "toolName",
+                                  "knowledgeScopeCode",
+                                  "knowledgeScopeName"
+                                ],
+                                "properties": {
+                                  "canonicalPath": {
+                                    "description": "规范路径",
+                                    "type": "string"
+                                  },
+                                  "channel": {
+                                    "description": "渠道",
+                                    "type": "string"
+                                  },
+                                  "chunkId": {
+                                    "description": "块ID",
+                                    "type": "integer"
+                                  },
+                                  "chunkNo": {
+                                    "description": "块序号",
+                                    "type": "integer"
+                                  },
+                                  "documentId": {
+                                    "description": "文档ID",
+                                    "type": "integer"
+                                  },
+                                  "documentName": {
+                                    "description": "文档名称",
+                                    "type": "string"
+                                  },
+                                  "itemIndex": {
+                                    "description": "项索引",
+                                    "type": "integer"
+                                  },
+                                  "knowledgeScopeCode": {
+                                    "description": "知识范围代码",
+                                    "type": "string"
+                                  },
+                                  "knowledgeScopeName": {
+                                    "description": "知识范围名称",
+                                    "type": "string"
+                                  },
+                                  "parentBlockId": {
+                                    "description": "父块ID",
+                                    "type": "integer"
+                                  },
+                                  "parentBlockNo": {
+                                    "description": "父块序号",
+                                    "type": "integer"
+                                  },
+                                  "referenceId": {
+                                    "description": "引用ID",
+                                    "type": "string"
+                                  },
+                                  "score": {
+                                    "description": "相似度分数",
+                                    "type": "number"
+                                  },
+                                  "sectionPath": {
+                                    "description": "章节路径",
+                                    "type": "string"
+                                  },
+                                  "snippet": {
+                                    "description": "片段",
+                                    "type": "string"
+                                  },
+                                  "sourceType": {
+                                    "description": "来源类型",
+                                    "type": "string"
+                                  },
+                                  "structureNodeId": {
+                                    "description": "结构节点ID",
+                                    "type": "integer"
+                                  },
+                                  "structureNodeType": {
+                                    "description": "结构节点类型",
+                                    "type": "integer"
+                                  },
+                                  "subQuestion": {
+                                    "description": "子问题",
+                                    "type": "string"
+                                  },
+                                  "subQuestionIndex": {
+                                    "description": "子问题索引",
+                                    "type": "integer"
+                                  },
+                                  "title": {
+                                    "description": "标题",
+                                    "type": "string"
+                                  },
+                                  "toolName": {
+                                    "description": "工具名称",
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "description": "URL",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "status": {
+                              "description": "对话状态",
+                              "type": "integer"
+                            },
+                            "thinkingSteps": {
+                              "description": "思维步骤列表",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "totalResponseTimeMs": {
+                              "description": "总响应时间毫秒",
+                              "type": "integer"
+                            },
+                            "updateTime": {
+                              "description": "最后更新时间",
+                              "type": "string"
+                            },
+                            "usedTools": {
+                              "description": "使用工具列表",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "latestAssistantMessage": {
+                        "description": "模型最新回复",
+                        "type": "string"
+                      },
+                      "latestExchangeId": {
+                        "description": "最新一轮交互ID",
+                        "type": "integer"
+                      },
+                      "latestTurnErrorMessage": {
+                        "description": "本轮交互错误信息",
+                        "type": "string"
+                      },
+                      "latestTurnStatus": {
+                        "description": "本轮交互状态",
+                        "type": "string"
+                      },
+                      "latestUserMessage": {
+                        "description": "最新用户提问",
+                        "type": "string"
+                      },
+                      "memorySummary": {
+                        "description": "会话记忆摘要",
+                        "type": "object",
+                        "required": [
+                          "conversationId",
+                          "IsCompressed",
+                          "coveredExchangeId",
+                          "coveredExchangeCount",
+                          "compressionCount",
+                          "summaryVersion",
+                          "summaryText",
+                          "summaryPayload",
+                          "lastSourceUpdateTime",
+                          "updateTime"
+                        ],
+                        "properties": {
+                          "IsCompressed": {
+                            "description": "是否执行过记忆压缩",
+                            "type": "boolean"
+                          },
+                          "compressionCount": {
+                            "description": "累计压缩次数",
+                            "type": "integer"
+                          },
+                          "conversationId": {
+                            "description": "会话ID",
+                            "type": "string"
+                          },
+                          "coveredExchangeCount": {
+                            "description": "压缩覆盖交互轮次",
+                            "type": "integer"
+                          },
+                          "coveredExchangeId": {
+                            "description": "压缩截止交互ID",
+                            "type": "integer"
+                          },
+                          "lastSourceUpdateTime": {
+                            "description": "原始对话最后更新时间",
+                            "type": "string"
+                          },
+                          "summaryPayload": {
+                            "description": "结构化摘要载荷",
+                            "type": "object",
+                            "required": [
+                              "summary",
+                              "conversationGoal",
+                              "stableFacts",
+                              "userPreferences",
+                              "resolvedPoints",
+                              "pendingQuestions",
+                              "retrievalHints"
+                            ],
+                            "properties": {
+                              "conversationGoal": {
+                                "description": "对话目标",
+                                "type": "string"
+                              },
+                              "pendingQuestions": {
+                                "description": "待解决问题列表",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "resolvedPoints": {
+                                "description": "已解决问题列表",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "retrievalHints": {
+                                "description": "检索提示列表",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "stableFacts": {
+                                "description": "稳定事实列表",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "summary": {
+                                "description": "摘要文本",
+                                "type": "string"
+                              },
+                              "userPreferences": {
+                                "description": "用户偏好列表",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "summaryText": {
+                            "description": "纯文本摘要",
+                            "type": "string"
+                          },
+                          "summaryVersion": {
+                            "description": "摘要版本号",
+                            "type": "integer"
+                          },
+                          "updateTime": {
+                            "description": "摘要更新时间戳",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "messageCount": {
+                        "description": "消息总数",
+                        "type": "integer"
+                      },
+                      "running": {
+                        "description": "是否正在会话中",
+                        "type": "boolean"
+                      },
+                      "selectedDocumentId": {
+                        "description": "选中文档ID",
+                        "type": "integer"
+                      },
+                      "selectedDocumentName": {
+                        "description": "选中文档名称",
+                        "type": "string"
+                      },
+                      "updatedTime": {
+                        "description": "更新时间",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "totalPages": {
+                  "description": "总页数",
+                  "type": "integer"
+                },
+                "totalSize": {
+                  "description": "总记录数",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/session/reset": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "重置会话",
+        "operationId": "chatResetConversation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "message": {
+                  "description": "消息",
+                  "type": "string"
+                },
+                "removedCheckpointCount": {
+                  "description": "移除检查点数",
+                  "type": "integer"
+                },
+                "removedDialogueCount": {
+                  "description": "移除对话数",
+                  "type": "integer"
+                },
+                "removedExchangeCount": {
+                  "description": "移除交换数",
+                  "type": "integer"
+                },
+                "stopped": {
+                  "description": "是否停止",
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/session/stop": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "停止会话",
+        "operationId": "chatStopConversation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "message": {
+                  "description": "消息",
+                  "type": "string"
+                },
+                "stopped": {
+                  "description": "是否停止",
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/session/summary/rebuild": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "重建会话摘要",
+        "operationId": "chatRebuildSummary",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "conversationId"
+              ],
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "IsCompressed": {
+                  "description": "是否执行过记忆压缩",
+                  "type": "boolean"
+                },
+                "compressionCount": {
+                  "description": "累计压缩次数",
+                  "type": "integer"
+                },
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "coveredExchangeCount": {
+                  "description": "压缩覆盖交互轮次",
+                  "type": "integer"
+                },
+                "coveredExchangeId": {
+                  "description": "压缩截止交互ID",
+                  "type": "integer"
+                },
+                "lastSourceUpdateTime": {
+                  "description": "原始对话最后更新时间",
+                  "type": "string"
+                },
+                "summaryPayload": {
+                  "description": "结构化摘要载荷",
+                  "type": "object",
+                  "required": [
+                    "summary",
+                    "conversationGoal",
+                    "stableFacts",
+                    "userPreferences",
+                    "resolvedPoints",
+                    "pendingQuestions",
+                    "retrievalHints"
+                  ],
+                  "properties": {
+                    "conversationGoal": {
+                      "description": "对话目标",
+                      "type": "string"
+                    },
+                    "pendingQuestions": {
+                      "description": "待解决问题列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "resolvedPoints": {
+                      "description": "已解决问题列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "retrievalHints": {
+                      "description": "检索提示列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "stableFacts": {
+                      "description": "稳定事实列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "description": "摘要文本",
+                      "type": "string"
+                    },
+                    "userPreferences": {
+                      "description": "用户偏好列表",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "summaryText": {
+                  "description": "纯文本摘要",
+                  "type": "string"
+                },
+                "summaryVersion": {
+                  "description": "摘要版本号",
+                  "type": "integer"
+                },
+                "updateTime": {
+                  "description": "摘要更新时间戳",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/stream": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "流式聊天",
+        "operationId": "chatStreamChat",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "question",
+                "chatMode"
+              ],
+              "properties": {
+                "chatMode": {
+                  "description": "聊天模式",
+                  "type": "string",
+                  "enum": [
+                    "document",
+                    "open_chat",
+                    "auto_document"
+                  ]
+                },
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "question": {
+                  "description": "问题内容",
+                  "type": "string"
+                },
+                "selectedDocumentId": {
+                  "description": "选中的文档ID",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {}
+          }
+        }
+      }
+    }
+  },
+  "x-date": "2026-07-13 21:10:18",
+  "x-description": "This is a goctl generated swagger file.",
+  "x-github": "https://github.com/zeromicro/go-zero",
+  "x-go-zero-doc": "https://go-zero.dev/",
+  "x-goctl-version": "1.9.2"
+}

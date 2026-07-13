@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components"
@@ -279,7 +280,7 @@ func extractResponseText(response any) string {
 
 // estimateTokens 估算Token数量
 func estimateTokens(content string) int {
-	return (len(strings.TrimSpace(content)) + 3) / 4
+	return (utf8.RuneCountInString(strings.TrimSpace(content)) + 3) / 4
 }
 
 // resolveProvider 解析模型提供商

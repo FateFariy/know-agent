@@ -41,9 +41,6 @@ type HTTPServer interface {
 
 	// GetChannelExecutions 获取渠道执行结果
 	GetChannelExecutions(ctx context.Context, req *RetrievalObserveReq) ([]*ChannelExecutionResp, error)
-
-	// GetStageBenchmarks 获取阶段基准
-	GetStageBenchmarks(ctx context.Context) ([]*StageBenchmarkResp, error)
 }
 
 // StreamChatHandler 流式聊天
@@ -194,14 +191,6 @@ func GetChannelExecutionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 		}
 
 		resp, err := srv.GetChannelExecutions(r.Context(), &req)
-		common.Response(w, resp, "", err)
-	}
-}
-
-// GetStageBenchmarksHandler 获取阶段基准
-func GetStageBenchmarksHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		resp, err := srv.GetStageBenchmarks(r.Context())
 		common.Response(w, resp, "", err)
 	}
 }

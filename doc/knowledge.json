@@ -1,0 +1,1050 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "知识管理服务接口",
+    "version": "v1.0.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/manage/knowledge/route/trace/page/query": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "分页查询知识路由追踪",
+        "operationId": "knowledgeQueryKnowledgeRouteTracePage",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "conversationId": {
+                  "description": "会话ID",
+                  "type": "string"
+                },
+                "mode": {
+                  "description": "模式",
+                  "type": "string"
+                },
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer",
+                  "default": 1,
+                  "example": 1
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer",
+                  "default": 10,
+                  "example": 10
+                },
+                "routeStatus": {
+                  "description": "路由状态",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "pageNo": {
+                  "description": "页码",
+                  "type": "integer"
+                },
+                "pageSize": {
+                  "description": "每页大小",
+                  "type": "integer"
+                },
+                "records": {
+                  "description": "列表数据",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "conversationId",
+                      "exchangeId",
+                      "question",
+                      "rewriteQuestion",
+                      "mode",
+                      "topScopesJson",
+                      "topTopicsJson",
+                      "topDocumentsJson",
+                      "selectedDocumentId",
+                      "hitSelectedDocument",
+                      "confidence",
+                      "routeStatus",
+                      "errorMsg",
+                      "createTime"
+                    ],
+                    "properties": {
+                      "confidence": {
+                        "description": "置信度",
+                        "type": "number"
+                      },
+                      "conversationId": {
+                        "description": "会话ID",
+                        "type": "string"
+                      },
+                      "createTime": {
+                        "description": "创建时间",
+                        "type": "string"
+                      },
+                      "errorMsg": {
+                        "description": "错误信息",
+                        "type": "string"
+                      },
+                      "exchangeId": {
+                        "description": "轮次ID",
+                        "type": "integer"
+                      },
+                      "hitSelectedDocument": {
+                        "description": "是否命中选中文档",
+                        "type": "integer"
+                      },
+                      "id": {
+                        "description": "主键ID",
+                        "type": "integer"
+                      },
+                      "mode": {
+                        "description": "模式",
+                        "type": "string"
+                      },
+                      "question": {
+                        "description": "用户提问",
+                        "type": "string"
+                      },
+                      "rewriteQuestion": {
+                        "description": "改写后的问题",
+                        "type": "string"
+                      },
+                      "routeStatus": {
+                        "description": "路由状态",
+                        "type": "string"
+                      },
+                      "selectedDocumentId": {
+                        "description": "选中的文档ID",
+                        "type": "integer"
+                      },
+                      "topDocumentsJson": {
+                        "description": "候选文档JSON",
+                        "type": "string"
+                      },
+                      "topScopesJson": {
+                        "description": "候选范围JSON",
+                        "type": "string"
+                      },
+                      "topTopicsJson": {
+                        "description": "候选主题JSON",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "totalPages": {
+                  "description": "总页数",
+                  "type": "integer"
+                },
+                "totalSize": {
+                  "description": "总条数",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/scope/delete": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "删除知识范围节点",
+        "operationId": "knowledgeDeleteKnowledgeScope",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "scopeCode"
+              ],
+              "properties": {
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "scopeCode": {
+                  "description": "范围编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/scope/list": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询知识范围列表",
+        "operationId": "knowledgeListKnowledgeScope",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "scopeCode",
+                  "scopeName",
+                  "parentScopeCode",
+                  "description",
+                  "aliases",
+                  "examples",
+                  "sortOrder"
+                ],
+                "properties": {
+                  "aliases": {
+                    "description": "别名",
+                    "type": "string"
+                  },
+                  "description": {
+                    "description": "描述",
+                    "type": "string"
+                  },
+                  "examples": {
+                    "description": "示例",
+                    "type": "string"
+                  },
+                  "id": {
+                    "description": "主键ID",
+                    "type": "integer"
+                  },
+                  "parentScopeCode": {
+                    "description": "上级范围编码",
+                    "type": "string"
+                  },
+                  "scopeCode": {
+                    "description": "范围编码",
+                    "type": "string"
+                  },
+                  "scopeName": {
+                    "description": "范围名称",
+                    "type": "string"
+                  },
+                  "sortOrder": {
+                    "description": "排序",
+                    "type": "integer"
+                  }
+                }
+              },
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "parentScopeCode": {
+                  "description": "上级范围编码",
+                  "type": "string"
+                },
+                "scopeCode": {
+                  "description": "范围编码",
+                  "type": "string"
+                },
+                "scopeName": {
+                  "description": "范围名称",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/scope/save": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "保存知识范围节点",
+        "operationId": "knowledgeSaveKnowledgeScope",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "scopeCode",
+                "scopeName"
+              ],
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "parentScopeCode": {
+                  "description": "上级范围编码",
+                  "type": "string"
+                },
+                "scopeCode": {
+                  "description": "范围编码",
+                  "type": "string"
+                },
+                "scopeName": {
+                  "description": "范围名称",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "parentScopeCode": {
+                  "description": "上级范围编码",
+                  "type": "string"
+                },
+                "scopeCode": {
+                  "description": "范围编码",
+                  "type": "string"
+                },
+                "scopeName": {
+                  "description": "范围名称",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/delete": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "删除知识主题节点",
+        "operationId": "knowledgeDeleteKnowledgeTopic",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "topicCode"
+              ],
+              "properties": {
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/document/list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询主题文档关联",
+        "operationId": "knowledgeListTopicDocumentRelation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "topicCode"
+              ],
+              "properties": {
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "topicCode",
+                  "documentId",
+                  "documentName",
+                  "knowledgeScopeCode",
+                  "knowledgeScopeName",
+                  "businessCategory",
+                  "documentTags",
+                  "relationScore",
+                  "relationSource",
+                  "reason"
+                ],
+                "properties": {
+                  "businessCategory": {
+                    "description": "业务分类",
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "description": "文档ID",
+                    "type": "integer"
+                  },
+                  "documentName": {
+                    "description": "文档名称",
+                    "type": "string"
+                  },
+                  "documentTags": {
+                    "description": "文档标签",
+                    "type": "string"
+                  },
+                  "knowledgeScopeCode": {
+                    "description": "知识范围编码",
+                    "type": "string"
+                  },
+                  "knowledgeScopeName": {
+                    "description": "知识范围名称",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "description": "理由",
+                    "type": "string"
+                  },
+                  "relationScore": {
+                    "description": "关联分数",
+                    "type": "number"
+                  },
+                  "relationSource": {
+                    "description": "关联来源",
+                    "type": "string"
+                  },
+                  "topicCode": {
+                    "description": "主题编码",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "string"
+                },
+                "knowledgeScopeCode": {
+                  "description": "知识范围编码",
+                  "type": "string"
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "理由",
+                  "type": "string"
+                },
+                "relationScore": {
+                  "description": "关联分数",
+                  "type": "number"
+                },
+                "relationSource": {
+                  "description": "关联来源",
+                  "type": "string"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/document/remove": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "移除主题文档关联",
+        "operationId": "knowledgeDeleteTopicDocumentRelation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "topicCode",
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/document/save": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "保存主题文档关联",
+        "operationId": "knowledgeSaveTopicDocumentRelation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "topicCode",
+                "documentId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "理由",
+                  "type": "string"
+                },
+                "relationScore": {
+                  "description": "关联分数",
+                  "type": "number"
+                },
+                "relationSource": {
+                  "description": "关联来源",
+                  "type": "string"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "string"
+                },
+                "knowledgeScopeCode": {
+                  "description": "知识范围编码",
+                  "type": "string"
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "理由",
+                  "type": "string"
+                },
+                "relationScore": {
+                  "description": "关联分数",
+                  "type": "number"
+                },
+                "relationSource": {
+                  "description": "关联来源",
+                  "type": "string"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/list": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询知识主题列表",
+        "operationId": "knowledgeListKnowledgeTopic",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "scopeCode": {
+                  "description": "所属范围编码",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "topicCode",
+                  "topicName",
+                  "scopeCode",
+                  "description",
+                  "aliases",
+                  "examples",
+                  "answerShape",
+                  "executionPreference",
+                  "sortOrder"
+                ],
+                "properties": {
+                  "aliases": {
+                    "description": "别名",
+                    "type": "string"
+                  },
+                  "answerShape": {
+                    "description": "答复形态",
+                    "type": "string"
+                  },
+                  "description": {
+                    "description": "描述",
+                    "type": "string"
+                  },
+                  "examples": {
+                    "description": "示例",
+                    "type": "string"
+                  },
+                  "executionPreference": {
+                    "description": "执行偏好",
+                    "type": "string"
+                  },
+                  "id": {
+                    "description": "主键ID",
+                    "type": "integer"
+                  },
+                  "scopeCode": {
+                    "description": "所属范围编码",
+                    "type": "string"
+                  },
+                  "sortOrder": {
+                    "description": "排序",
+                    "type": "integer"
+                  },
+                  "topicCode": {
+                    "description": "主题编码",
+                    "type": "string"
+                  },
+                  "topicName": {
+                    "description": "主题名称",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "answerShape": {
+                  "description": "答复形态",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "executionPreference": {
+                  "description": "执行偏好",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "scopeCode": {
+                  "description": "所属范围编码",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                },
+                "topicName": {
+                  "description": "主题名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/knowledge/topic/save": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "保存知识主题节点",
+        "operationId": "knowledgeSaveKnowledgeTopic",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "topicCode",
+                "topicName",
+                "scopeCode"
+              ],
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "answerShape": {
+                  "description": "答复形态",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "executionPreference": {
+                  "description": "执行偏好",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "string"
+                },
+                "scopeCode": {
+                  "description": "所属范围编码",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                },
+                "topicName": {
+                  "description": "主题名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "aliases": {
+                  "description": "别名",
+                  "type": "string"
+                },
+                "answerShape": {
+                  "description": "答复形态",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "examples": {
+                  "description": "示例",
+                  "type": "string"
+                },
+                "executionPreference": {
+                  "description": "执行偏好",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "integer"
+                },
+                "scopeCode": {
+                  "description": "所属范围编码",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                },
+                "topicCode": {
+                  "description": "主题编码",
+                  "type": "string"
+                },
+                "topicName": {
+                  "description": "主题名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-date": "2026-07-13 21:11:23",
+  "x-description": "This is a goctl generated swagger file.",
+  "x-github": "https://github.com/zeromicro/go-zero",
+  "x-go-zero-doc": "https://go-zero.dev/",
+  "x-goctl-version": "1.9.2"
+}

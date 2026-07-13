@@ -115,9 +115,3 @@ func (c *ChatService) GetChannelExecutions(ctx context.Context, req *chat.Retrie
 	}
 	return convert.ToChannelExecutionRespList(executions), err
 }
-
-// GetStageBenchmarks 获取阶段基准
-func (c *ChatService) GetStageBenchmarks(ctx context.Context) ([]*chat.StageBenchmarkResp, error) {
-	// todo 待实现
-	panic("implemented")
-}

@@ -1,8 +1,11 @@
 Http:
-  Name: user
+  Name: rag
   Host: 0.0.0.0
-  Port: 8081
+  Port: 8080
   Mode: dev
+#  Middlewares:
+#    Recover: false
+#    Timeout: false
 
 Auth:
   AccessSecret: your-access-secret-key
@@ -13,7 +16,7 @@ Mysql:
   Port: 3306
   Username: root
   Password: "123456"
-  DbName: ai_agent
+  DbName: rag
 
 Redis:
   - Host: 10.104.0.165:6379
@@ -21,7 +24,7 @@ Redis:
     Weight: 100
 
 Minio:
-  Endpoint: http://10.104.1.173:9000
+  Endpoint: 10.104.1.173:9000
   AccessKeyID: minioadmin
   SecretAccessKey: minioadmin
   BucketName: agent-document
@@ -38,7 +41,8 @@ Neo4j:
   QueryTimeoutSeconds: 5
 
 MQ:
-  ParseTopic: know-agent-document
+  Endpoint: 10.104.1.173:9876
+  ParseTopic: know-agent-parse
   IndexTopic: know-agent-index
   Enabled: false
 
@@ -53,7 +57,7 @@ StructureParsing:
 Embedding:
   Model: doubao-embedding-vision-251215
   APIKey: REPLACE_YOUR_ARK_KEY
-  APIType: text
+  APIType: multi_modal
   Dimensions: 1024
 
 Chunk:
@@ -68,7 +72,7 @@ Chunk:
 
 Milvus:
   Addr: 10.104.1.173:19530
-  Collection:
+  Collection: document_chunk_collection
   MetricType: COSINE
 
 Chat:
@@ -135,8 +139,8 @@ Chat:
 
 ChatModel:
   Ark:
-    Model: deepseek-v3-2-251201
-    BaseURL: https://ark.cn-beijing.volces.com/api/v3/responses
+    Model: doubao-seed-2-0-mini-260428
+    BaseURL: https://ark.cn-beijing.volces.com/api/v3
     ApiKey: REPLACE_YOUR_ARK_KEY
     Temperature: 0.1
     MaxTokens: 1024
