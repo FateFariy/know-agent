@@ -110,5 +110,5 @@ type StructureGraphQuerier interface {
 	FindSectionWithSiblings(ctx context.Context, documentId int64, sectionNodeId int64) (*entity.GraphSectionWithSiblings, error)
 
 	// BuildGraphResult 根据节点编号构建结构图结果
-	BuildGraphResult(ctx context.Context, documentId int64, sectionNodeId int64, itemIndex *int, itemKeyword string) (*entity.GraphQueryResult, error)
+	BuildGraphResult(ctx context.Context, documentId int64, sectionNodeId int64, itemIndex int, itemKeyword string) (*entity.GraphQueryResult, error)
 }

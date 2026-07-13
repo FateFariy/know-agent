@@ -43,15 +43,17 @@ func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGra
 // Execute 执行结构图查询并渲染答案
 func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
-	if plan == nil {
-		return nil, nil
+	var decision *vo.DocumentNavigationDecision
+	noEvidenceReply := defaultNoEvidenceReply
+	if plan != nil {
+		decision = plan.NavigationDecision
+		noEvidenceReply = utils.BlankToDefault(plan.NoEvidenceReply, noEvidenceReply)
 	}
 
-	decision := plan.NavigationDecision
 	if decision == nil || decision.StructureAnchor == nil || decision.StructureAnchor.StructureNodeId == 0 {
-		logx.Infof("GRAPH_ONLY 执行器直接返回无证据: decisionPresent=%v, structureNodeId=%v",
-			decision != nil, safeStructureNodeId(decision))
-		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
+		logx.Infof("GRAPH_ONLY 执行器直接返回无证据: planPresent=%v, decisionPresent=%v, structureNodeId=%v",
+			plan != nil, decision != nil, safeStructureNodeId(decision))
+		return singleValueChan(noEvidenceReply), nil
 	}
 
 	if err := publishThinking(convCtx, "正在通过结构图直接查询章节关系。"); err != nil {
@@ -70,8 +72,10 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 	graphResult, err := e.buildGraphResult(ctx, documentId, sectionNodeId, decision)
 	if err != nil {
 		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, err
+		if err = publishThinking(convCtx, "结构图查询失败。"); err != nil {
+			return nil, err
+		}
+		return singleValueChan(noEvidenceReply), nil
 	}
 
 	answer := e.answerRender.RenderAnswer(e.Mode(), decision, graphResult)
@@ -89,12 +93,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 	}
 	_ = e.tracer.CompleteStage(ctx, graphStage, "结构图查询完成。", snapshot)
 
-	if strutil.IsBlank(answer) {
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, nil
-	}
-	publishText(convCtx, answer)
-	return nil, nil
+	return singleValueChan(utils.BlankToDefault(answer, noEvidenceReply)), nil
 }
 
 // buildGraphResult 根据导航动作构建结构图查询结果
@@ -108,9 +107,6 @@ func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, se
 		if err != nil {
 			return nil, err
 		}
-		if siblings == nil {
-			return &ragvo.GraphQueryResult{}, nil
-		}
 		return &ragvo.GraphQueryResult{
 			TargetSection:   siblings.Section,
 			ParentSection:   siblings.Parent,
@@ -122,9 +118,6 @@ func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, se
 	children, err := e.structureQuerier.FindSectionWithChildren(ctx, documentId, sectionNodeId)
 	if err != nil {
 		return nil, err
-	}
-	if children == nil {
-		return &ragvo.GraphQueryResult{}, nil
 	}
 	return &ragvo.GraphQueryResult{
 		TargetSection: children.Section,

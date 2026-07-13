@@ -50,42 +50,44 @@ func (e *GraphThenEvidenceExecutor) Mode() vo.ExecutionMode {
 // Execute 执行结构图定位与证据渲染
 func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
-	if plan == nil {
-		return nil, nil
+	var decision *vo.DocumentNavigationDecision
+	noEvidenceReply := defaultNoEvidenceReply
+	if plan != nil {
+		decision = plan.NavigationDecision
+		noEvidenceReply = utils.BlankToDefault(plan.NoEvidenceReply, noEvidenceReply)
 	}
-	decision := plan.NavigationDecision
 	if decision == nil || decision.StructureAnchor == nil || decision.StructureAnchor.StructureNodeId == 0 {
-		logx.Infof("GRAPH_THEN_EVIDENCE 执行器直接返回无证据: decisionPresent=%v, structureNodeId=%v",
-			decision != nil,
-			safeStructureNodeId(decision))
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, nil
+		logx.Infof("GRAPH_THEN_EVIDENCE 执行器直接返回无证据: planPresent=%v,decisionPresent=%v, structureNodeId=%v",
+			plan != nil, decision != nil, safeStructureNodeId(decision))
+		return singleValueChan(noEvidenceReply), nil
 	}
 
-	publishThinking(convCtx, "正在通过结构图定位目标章节和编号项。")
+	if err := publishThinking(convCtx, "正在通过结构图定位目标章节和编号项。"); err != nil {
+		return nil, err
+	}
 
 	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace,
 		vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在执行结构图定位与取证。", nil)
 
-	var (
-		documentId      = plan.SelectedDocumentId
-		sectionNodeId   = decision.StructureAnchor.StructureNodeId
-		itemIndex       *int
-		itemKeywordHint = extractItemKeyword(plan.OriginalQuestion, decision)
-	)
-	if decision.ItemAnchor != nil && decision.ItemAnchor.ItemIndex > 0 {
-		idx := decision.ItemAnchor.ItemIndex
-		itemIndex = &idx
+	documentId := plan.SelectedDocumentId
+	sectionNodeId := decision.StructureAnchor.StructureNodeId
+	itemIndex := 0
+	itemKeywordHint := extractItemKeyword(plan.OriginalQuestion)
+
+	if decision.ItemAnchor != nil {
+		itemIndex = decision.ItemAnchor.ItemIndex
 	}
 
-	logx.Infof("GRAPH_THEN_EVIDENCE 执行开始: documentId=%v, sectionNodeId=%v, itemIndex=%v",
-		documentId, sectionNodeId, utils.PointerOrDefault(itemIndex, 0))
+	logx.Infof("GRAPH_THEN_EVIDENCE 执行开始: documentId=%v, sectionNodeId=%v, itemIndex=%v，navigationSummary=%v",
+		documentId, sectionNodeId, itemIndex, decision.SummaryText)
 
 	graphResult, err := e.structureQuerier.BuildGraphResult(ctx, documentId, sectionNodeId, itemIndex, itemKeywordHint)
 	if err != nil {
 		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, err
+		if err := publishThinking(convCtx, "结构图查询失败。"); err != nil {
+			return nil, err
+		}
+		return singleValueChan(noEvidenceReply), nil
 	}
 
 	if !hasGraphEvidence(graphResult, decision) {
@@ -96,8 +98,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		}
 		_ = e.tracer.CompleteStage(ctx, graphStage, "结构图定位完成，但证据不满足约束。", snapshot)
 		logx.Infof("GRAPH_THEN_EVIDENCE 证据校验失败: documentId=%v, sectionNodeId=%v", documentId, sectionNodeId)
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, nil
+		return singleValueChan(noEvidenceReply), nil
 	}
 
 	answer := e.answerRender.RenderAnswer(e.Mode(), decision, graphResult)
@@ -113,17 +114,42 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	logx.Infof("GRAPH_THEN_EVIDENCE 执行完成: documentId=%v, sectionNodeId=%v, targetSection=%q, targetItemIndex=%v, answerLength=%v",
 		documentId, sectionNodeId, displayTitleOf(graphResult), targetItemIndexOf(graphResult), len(answer))
 
-	if strutil.IsBlank(answer) {
-		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-		return nil, nil
-	}
-	publishText(convCtx, answer)
-	return nil, nil
+	return singleValueChan(utils.BlankToDefault(answer, noEvidenceReply)), nil
 }
 
-// ==================== 辅助函数 ====================
+// hasGraphEvidence 判断结构图结果是否满足证据要求
+func hasGraphEvidence(result *entity.GraphQueryResult, decision *vo.DocumentNavigationDecision) bool {
+	if result == nil || result.TargetSection == nil {
+		return false
+	}
+	if decision != nil && decision.ItemAnchor != nil && decision.ItemAnchor.ItemIndex > 0 {
+		return result.TargetItem != nil || len(result.MatchedItems) > 0
+	}
+	return strutil.IsNotBlank(result.TargetSection.ContentText) || len(result.MatchedItems) > 0
+}
 
-// safeStructureNodeId 当 decision/anchor 缺失时返回 0，供日志打印使用
+// extractItemKeyword 从原问题文本中抽取用于编号项匹配的关键词
+//
+// - 仅当问题包含 "哪一步" / "哪一项" 时处理
+// - 取对应前缀后的片段，并剔除常见的疑问/语气词
+func extractItemKeyword(question string) string {
+	normalized := strutil.Trim(question)
+	if !strutil.ContainsAny(normalized, []string{"哪一步", "哪一项"}) {
+		return ""
+	}
+	keyword := strutil.AfterLast(normalized, "哪一步")
+	if keyword == "" {
+		keyword = strutil.AfterLast(normalized, "哪一项")
+	}
+
+	replacer := strings.NewReplacer("要求", "", "需要", "", "执行", "", "进行", "", "包含", "", "的是", "", "是什么", "",
+		"什么", "", "？", "", "?", "", "。", "", "，", "")
+	keyword = replacer.Replace(keyword)
+
+	return strutil.Trim(keyword)
+}
+
+// safeStructureNodeId 返回结构图定位的章节ID，若缺失则返回 0
 func safeStructureNodeId(decision *vo.DocumentNavigationDecision) int64 {
 	if decision == nil || decision.StructureAnchor == nil {
 		return 0
@@ -139,12 +165,12 @@ func displayTitleOf(result *entity.GraphQueryResult) string {
 	return result.TargetSection.DisplayTitle()
 }
 
-// targetItemIndexOf 返回目标编号项的索引（以字符串返回，便于日志/快照）
+// targetItemIndexOf 返回目标编号项的索引
 func targetItemIndexOf(result *entity.GraphQueryResult) string {
-	if result == nil || result.TargetItem == nil || result.TargetItem.ItemIndex == nil {
+	if result == nil || result.TargetItem == nil || result.TargetItem.ItemIndex <= 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d", *result.TargetItem.ItemIndex)
+	return fmt.Sprintf("%d", result.TargetItem.ItemIndex)
 }
 
 // matchedItemCountOf 返回命中的编号项数量
@@ -153,66 +179,4 @@ func matchedItemCountOf(result *entity.GraphQueryResult) int {
 		return 0
 	}
 	return len(result.MatchedItems)
-}
-
-// hasGraphEvidence 判断结构图结果是否满足证据要求
-//
-// - 若决策中指定了 itemIndex，则必须存在 targetItem 或 matchedItems
-// - 否则只需要 targetSection 有内容文本 或 存在 matchedItems
-func hasGraphEvidence(result *entity.GraphQueryResult, decision *vo.DocumentNavigationDecision) bool {
-	if result == nil || result.TargetSection == nil {
-		return false
-	}
-	if decision != nil && decision.ItemAnchor != nil && decision.ItemAnchor.ItemIndex > 0 {
-		if result.TargetItem != nil {
-			return true
-		}
-		return len(result.MatchedItems) > 0
-	}
-	if strutil.IsNotBlank(result.TargetSection.ContentText) {
-		return true
-	}
-	return len(result.MatchedItems) > 0
-}
-
-// extractItemKeyword 从原问题文本中抽取用于编号项匹配的关键词
-//
-// - 仅当问题包含 "哪一步" / "哪一项" 时处理
-// - 取对应前缀后的片段，并剔除常见的疑问/语气词
-func extractItemKeyword(question string, decision *vo.DocumentNavigationDecision) string {
-	normalized := strings.TrimSpace(question)
-	if !strings.Contains(normalized, "哪一步") && !strings.Contains(normalized, "哪一项") {
-		return ""
-	}
-
-	keyword := ""
-	switch {
-	case strings.Contains(normalized, "哪一步"):
-		if idx := strings.Index(normalized, "哪一步"); idx >= 0 {
-			keyword = normalized[idx+len("哪一步"):]
-		}
-	case strings.Contains(normalized, "哪一项"):
-		if idx := strings.Index(normalized, "哪一项"); idx >= 0 {
-			keyword = normalized[idx+len("哪一项"):]
-		}
-	}
-	keyword = strings.NewReplacer(
-		"要求", "",
-		"需要", "",
-		"执行", "",
-		"进行", "",
-		"包含", "",
-		"的是", "",
-		"是什么", "",
-		"什么", "",
-		"？", "",
-		"?", "",
-		"。", "",
-		"，", "",
-	).Replace(keyword)
-	keyword = strings.TrimSpace(keyword)
-	if keyword == "" && decision != nil && decision.ItemAnchor != nil {
-		keyword = decision.ItemAnchor.ItemText
-	}
-	return keyword
 }

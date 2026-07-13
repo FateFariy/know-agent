@@ -6,7 +6,6 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
-	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -54,10 +53,9 @@ func (r *DefaultAnswerRender) renderGraphOnly(decision *vo.DocumentNavigationDec
 }
 
 // renderGraphThenEvidence 图谱定位后取证模式
-func (r *DefaultAnswerRender) renderGraphThenEvidence(decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
+func (r *DefaultAnswerRender) renderGraphThenEvidence(_ *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
 	if result.TargetItem != nil {
-		item := result.TargetItem
-		return fmt.Sprintf("“%s”中的第%d步是：%s", result.TargetSection.DisplayTitle(), item.ItemIndex, item.DisplayText())
+		return fmt.Sprintf("“%s”中的第%d步是：%s", result.TargetSection.DisplayTitle(), result.TargetItem.ItemIndex, result.TargetItem.DisplayText())
 	}
 	if len(result.MatchedItems) > 0 {
 		var builder strings.Builder
@@ -123,14 +121,6 @@ func (r *DefaultAnswerRender) formatItem(item *entity.GraphItem) string {
 		return fmt.Sprintf("第%d步：%s", item.ItemIndex, item.DisplayText())
 	}
 	return item.DisplayText()
-}
-
-// formatItemIndex 格式化步骤索引
-func (r *DefaultAnswerRender) formatItemIndex(idx *int) string {
-	if idx == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", *idx)
 }
 
 // formatSectionOrFallback 格式化章节或返回默认值
