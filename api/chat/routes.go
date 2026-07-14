@@ -58,6 +58,6 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 				Handler: GetChannelExecutionsHandler(svcCtx, srv),
 			},
 		},
-		rest.WithPrefix("/api/chat"), rest.WithSSE(),
+		rest.WithPrefix("/chat"), rest.WithSSE(),
 	)
 }

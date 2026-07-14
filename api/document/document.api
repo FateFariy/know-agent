@@ -140,14 +140,14 @@ type (
 		CreateTime           string `json:"createTime"` // 创建时间
 		UpdateTime           string `json:"updateTime"` // 更新时间
 	}
-    // 知识文档选项
-    KnowledgeDocumentOptionResp {
-        DocumentId         int64    `json:"documentId"` // 文档ID
-        DocumentName       string   `json:"documentName"` // 文档名称
-        KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
-        BusinessCategory   string   `json:"businessCategory"` // 业务分类
-        DocumentTags       []string `json:"documentTags"` // 文档标签
-    }
+	// 知识文档选项
+	KnowledgeDocumentOptionResp {
+		DocumentId         int64    `json:"documentId"` // 文档ID
+		DocumentName       string   `json:"documentName"` // 文档名称
+		KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
+		BusinessCategory   string   `json:"businessCategory"` // 业务分类
+		DocumentTags       []string `json:"documentTags"` // 文档标签
+	}
 	// 删除文档响应
 	DeleteDocumentResp {
 		DocumentId   int64  `json:"documentId"` // 文档ID

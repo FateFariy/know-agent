@@ -690,6 +690,86 @@
         }
       }
     },
+    "/manage/document/document/options": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "获取知识文档选项",
+        "operationId": "documentGetDocumentOptions",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "documentId",
+                  "documentName",
+                  "knowledgeScopeName",
+                  "businessCategory",
+                  "documentTags"
+                ],
+                "properties": {
+                  "businessCategory": {
+                    "description": "业务分类",
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "description": "文档ID",
+                    "type": "integer"
+                  },
+                  "documentName": {
+                    "description": "文档名称",
+                    "type": "string"
+                  },
+                  "documentTags": {
+                    "description": "文档标签",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "knowledgeScopeName": {
+                    "description": "知识范围名称",
+                    "type": "string"
+                  }
+                }
+              },
+              "properties": {
+                "businessCategory": {
+                  "description": "业务分类",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "integer"
+                },
+                "documentName": {
+                  "description": "文档名称",
+                  "type": "string"
+                },
+                "documentTags": {
+                  "description": "文档标签",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "knowledgeScopeName": {
+                  "description": "知识范围名称",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/manage/document/index/build": {
       "post": {
         "consumes": [
@@ -2253,9 +2333,9 @@
       }
     }
   },
-  "x-date": "2026-07-13 21:10:34",
+  "x-date": "2026-07-14 12:09:40",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
-  "x-goctl-version": "1.9.2"
+  "x-goctl-version": "1.10.1"
 }

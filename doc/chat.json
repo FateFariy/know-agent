@@ -15,87 +15,7 @@
   },
   "basePath": "/",
   "paths": {
-    "/api/chat/document/options": {
-      "post": {
-        "produces": [
-          "application/json"
-        ],
-        "schemes": [
-          "https"
-        ],
-        "summary": "获取知识文档选项",
-        "operationId": "chatGetDocumentOptions",
-        "responses": {
-          "200": {
-            "description": "",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "documentId",
-                  "documentName",
-                  "knowledgeScopeName",
-                  "businessCategory",
-                  "documentTags"
-                ],
-                "properties": {
-                  "businessCategory": {
-                    "description": "业务分类",
-                    "type": "string"
-                  },
-                  "documentId": {
-                    "description": "文档ID",
-                    "type": "integer"
-                  },
-                  "documentName": {
-                    "description": "文档名称",
-                    "type": "string"
-                  },
-                  "documentTags": {
-                    "description": "文档标签",
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "knowledgeScopeName": {
-                    "description": "知识范围名称",
-                    "type": "string"
-                  }
-                }
-              },
-              "properties": {
-                "businessCategory": {
-                  "description": "业务分类",
-                  "type": "string"
-                },
-                "documentId": {
-                  "description": "文档ID",
-                  "type": "integer"
-                },
-                "documentName": {
-                  "description": "文档名称",
-                  "type": "string"
-                },
-                "documentTags": {
-                  "description": "文档标签",
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "knowledgeScopeName": {
-                  "description": "知识范围名称",
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/exchange/channel/executions": {
+    "/chat/exchange/channel/executions": {
       "post": {
         "consumes": [
           "application/json"
@@ -322,7 +242,7 @@
         }
       }
     },
-    "/api/chat/exchange/detail": {
+    "/chat/exchange/detail": {
       "post": {
         "consumes": [
           "application/json"
@@ -669,7 +589,7 @@
         }
       }
     },
-    "/api/chat/exchange/retrieval/results": {
+    "/chat/exchange/retrieval/results": {
       "post": {
         "consumes": [
           "application/json"
@@ -950,7 +870,7 @@
         }
       }
     },
-    "/api/chat/session/detail": {
+    "/chat/session/detail": {
       "post": {
         "consumes": [
           "application/json"
@@ -1373,7 +1293,7 @@
         }
       }
     },
-    "/api/chat/session/list": {
+    "/chat/session/list": {
       "post": {
         "consumes": [
           "application/json"
@@ -1856,7 +1776,7 @@
         }
       }
     },
-    "/api/chat/session/reset": {
+    "/chat/session/reset": {
       "post": {
         "consumes": [
           "application/json"
@@ -1924,7 +1844,7 @@
         }
       }
     },
-    "/api/chat/session/stop": {
+    "/chat/session/stop": {
       "post": {
         "consumes": [
           "application/json"
@@ -1980,7 +1900,7 @@
         }
       }
     },
-    "/api/chat/session/summary/rebuild": {
+    "/chat/session/summary/rebuild": {
       "post": {
         "consumes": [
           "application/json"
@@ -2118,7 +2038,7 @@
         }
       }
     },
-    "/api/chat/stream": {
+    "/chat/stream": {
       "post": {
         "consumes": [
           "application/json"
@@ -2177,9 +2097,9 @@
       }
     }
   },
-  "x-date": "2026-07-13 21:10:18",
+  "x-date": "2026-07-14 12:10:39",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
-  "x-goctl-version": "1.9.2"
+  "x-goctl-version": "1.10.1"
 }

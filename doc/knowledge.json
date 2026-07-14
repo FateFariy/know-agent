@@ -632,7 +632,7 @@
         "schemes": [
           "https"
         ],
-        "summary": "移除主题文档关联",
+        "summary": "删除主题文档关联",
         "operationId": "knowledgeDeleteTopicDocumentRelation",
         "parameters": [
           {
@@ -1042,9 +1042,9 @@
       }
     }
   },
-  "x-date": "2026-07-13 21:11:23",
+  "x-date": "2026-07-14 12:09:25",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
-  "x-goctl-version": "1.9.2"
+  "x-goctl-version": "1.10.1"
 }
