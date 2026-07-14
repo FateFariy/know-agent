@@ -135,7 +135,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	}
 
 	// 发送解析消息至MQ，触发后续解析流程
-	parseMessage := map[string]any{"documentId": documentId, "taskId": taskId}
+	parseMessage := vo.DocumentParseRouteMessage{DocumentId: documentId, TaskId: taskId}
 	if err = d.port.Send(ctx, d.parseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
 		return nil, err
 	}
@@ -535,7 +535,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	}
 
 	// 发送MQ消息触发异步索引构建
-	indexBuildMessage := map[string]any{"documentId": documentId, "taskId": taskId, "planId": planId}
+	indexBuildMessage := vo.DocumentIndexBuildMessage{DocumentId: documentId, TaskId: taskId, PlanId: planId}
 	if err = d.port.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
 		return nil, err
 	}

@@ -87,7 +87,7 @@ type ChunkStrategyLogic interface {
 // TextPreProcessLogic 文本预处理业务逻辑接口
 type TextPreProcessLogic interface {
 	// PreProcess 文本预处理
-	PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error)
+	PreProcess(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error)
 }
 
 // ProfileLogic 文档画像业务逻辑接口

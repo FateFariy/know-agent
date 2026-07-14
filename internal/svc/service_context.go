@@ -21,20 +21,21 @@ import (
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 )
 
 var ProviderSet = wire.NewSet(NewServiceContext)
 
 type ServiceContext struct {
-	Config    *config.Config
-	Validate  *validator.Validate
-	Minio     *minio.Client
-	Db        *gorm.DB
-	Rdb       *redis.Client
-	MQ        *config.MQConf
-	RedSync   *redsync.Redsync
-	Emb       embedding.Embedder
-	ChatModel model.BaseModel[*schema.AgenticMessage]
+	Config         *config.Config
+	Validate       *validator.Validate
+	Minio          *minio.Client
+	Db             *gorm.DB
+	Rdb            *redis.Client
+	RedSync        *redsync.Redsync
+	Emb            embedding.Embedder
+	ChatModel      model.BaseModel[*schema.AgenticMessage]
+	ParserRegistry *parse.Registry
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {

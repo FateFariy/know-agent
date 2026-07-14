@@ -16,7 +16,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
@@ -36,7 +35,6 @@ var (
 type AsyncProcessingLogicImpl struct {
 	repo           adapter.DocumentRepository
 	port           *adapter.DocumentPort
-	registry       parse.Registry
 	strategyLogic  ChunkStrategyLogic
 	structureLogic StructureNodeLogic
 	textLogic      TextPreProcessLogic
@@ -44,12 +42,11 @@ type AsyncProcessingLogicImpl struct {
 }
 
 // NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
-func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry parse.Registry,
-	strategyLogic ChunkStrategyLogic, structureLogic StructureNodeLogic, textLogic TextPreProcessLogic, profileLogic ProfileLogic) *AsyncProcessingLogicImpl {
+func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkStrategyLogic,
+	structureLogic StructureNodeLogic, textLogic TextPreProcessLogic, profileLogic ProfileLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
 		repo:           repo,
 		port:           port,
-		registry:       registry,
 		strategyLogic:  strategyLogic,
 		structureLogic: structureLogic,
 		textLogic:      textLogic,

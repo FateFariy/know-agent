@@ -26,7 +26,7 @@ var (
 )
 
 type TextPreProcessLogicImpl struct {
-	registry          parse.Registry
+	registry          *parse.Registry
 	signalExtractor   *transform.SignalExtractor   // 信号抽取：将原始文本拆分为标题/列表/正文等结构信号
 	ambiguityResolver *transform.AmbiguityResolver // 歧义消解：对候选标题进行 LLM 二次判定（若配置启用）
 	hierarchyResolver *transform.HierarchyResolver // 层级构建：基于信号流组装父子关系与嵌套列表
@@ -34,7 +34,7 @@ type TextPreProcessLogicImpl struct {
 	classifier        *support.DocumentLineClassifier
 }
 
-func NewTextPreProcessLogicImpl(registry parse.Registry, signalExtractor *transform.SignalExtractor, ambiguityResolver *transform.AmbiguityResolver,
+func NewTextPreProcessLogicImpl(registry *parse.Registry, signalExtractor *transform.SignalExtractor, ambiguityResolver *transform.AmbiguityResolver,
 	hierarchyResolver *transform.HierarchyResolver, treeValidator *transform.TreeValidator) *TextPreProcessLogicImpl {
 	return &TextPreProcessLogicImpl{
 		registry:          registry,
@@ -47,10 +47,10 @@ func NewTextPreProcessLogicImpl(registry parse.Registry, signalExtractor *transf
 }
 
 // PreProcess 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle, parsedText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error) {
+func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error) {
 	// 解析文本
 	parser := p.registry.Get(fileType)
-	parsedText, err := parser.Parse(ctx, []byte(parsedText))
+	parsedText, err := parser.Parse(ctx, []byte(rawText))
 	if err != nil {
 		return nil, err
 	}

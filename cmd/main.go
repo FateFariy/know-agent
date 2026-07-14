@@ -18,8 +18,8 @@ func main() {
 	conf.MustLoad(*configFile, &c)
 
 	server := WireApp(&c)
-	defer server.HTTP.Stop()
+	defer server.Stop()
 
 	fmt.Printf("Starting HTTP server at %s:%d...\n", c.Http.Host, c.Http.Port)
-	server.HTTP.Start()
+	server.Start()
 }

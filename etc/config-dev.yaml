@@ -38,6 +38,7 @@ Neo4j:
   QueryTimeoutSeconds: 5
 
 MQ:
+  Endpoint: 10.104.1.173:9876
   ParseTopic: know-agent-document
   IndexTopic: know-agent-index
   Enabled: false

@@ -19,10 +19,10 @@ type RocketMQMessageProducer struct {
 
 var _ adapter.MessageProducer = (*RocketMQMessageProducer)(nil)
 
-func NewMockMessageProducer(svcCtx *svc.ServiceContext) *RocketMQMessageProducer {
+func NewRocketMQMessageProducer(svcCtx *svc.ServiceContext) *RocketMQMessageProducer {
 	p, err := rocketmq.NewProducer(
-		producer.WithNameServer([]string{svcCtx.MQ.Endpoint}),
-		producer.WithRetry(svcCtx.MQ.Retry))
+		producer.WithNameServer([]string{svcCtx.Config.MQ.Endpoint}),
+		producer.WithRetry(svcCtx.Config.MQ.Retry))
 	if err != nil {
 		panic(err)
 	}

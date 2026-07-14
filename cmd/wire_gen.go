@@ -25,6 +25,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	logic3 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
@@ -36,6 +37,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/vector"
 	"github.com/swiftbit/know-agent/internal/server"
 	"github.com/swiftbit/know-agent/internal/svc"
+	"github.com/swiftbit/know-agent/internal/trigger/consumer"
 	"github.com/swiftbit/know-agent/internal/trigger/handler"
 )
 
@@ -45,10 +47,10 @@ import (
 func WireApp(c *config.Config) *server.Server {
 	serviceContext := svc.NewServiceContext(c)
 	minioStorage := storage.NewMinioStorage(serviceContext)
-	mockMessageProducer := mq.NewMockMessageProducer()
+	rocketMQMessageProducer := mq.NewRocketMQMessageProducer(serviceContext)
 	milvusVector := vector.NewMilvusVector(serviceContext)
 	keywordDB := keyword.NewKeywordDB(serviceContext)
-	documentPort := adapter.NewDocumentPort(minioStorage, mockMessageProducer, milvusVector, keywordDB)
+	documentPort := adapter.NewDocumentPort(minioStorage, rocketMQMessageProducer, milvusVector, keywordDB)
 	documentRepositoryImpl := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	chatModelImpl := logic.NewChatModelImpl(serviceContext)
 	templateLogicImpl := prompt.NewPromptTemplateLogicImpl()
@@ -88,7 +90,16 @@ func WireApp(c *config.Config) *server.Server {
 	chatService := handler.NewChatService(logicImpl)
 	knowledgeLogicImpl := logic3.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
-	restServer := server.NewHTTPServer(c, serviceContext, documentService, chatService, knowledgeService)
-	serverServer := server.NewServer(restServer)
+	restServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
+	registry := domain.NewParserRegistry()
+	signalExtractor := transform.NewSignalExtractor()
+	ambiguityResolver := transform.NewAmbiguityResolver(serviceContext, chatModelImpl, templateLogicImpl)
+	hierarchyResolver := transform.NewHierarchyResolver()
+	treeValidator := transform.NewTreeValidator()
+	textPreProcessLogicImpl := logic2.NewTextPreProcessLogicImpl(registry, signalExtractor, ambiguityResolver, hierarchyResolver, treeValidator)
+	asyncProcessingLogicImpl := logic2.NewAsyncProcessingLogicImpl(documentRepositoryImpl, documentPort, chunkStrategyLogicImpl, structureNodeLogicImpl, textPreProcessLogicImpl, profileLogicImpl)
+	parseDocumentConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessingLogicImpl)
+	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessingLogicImpl)
+	serverServer := server.NewServer(restServer, parseDocumentConsumer, buildIndexConsumer)
 	return serverServer
 }

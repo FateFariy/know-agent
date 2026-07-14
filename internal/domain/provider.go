@@ -20,9 +20,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	knowledgelogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
 )
 
 var ProviderSet = wire.NewSet(
@@ -90,6 +92,7 @@ var documentProviderSet = wire.NewSet(
 	transform.NewHierarchyResolver,
 	transform.NewSignalExtractor,
 	transform.NewTreeValidator,
+	NewParserRegistry,
 )
 
 var knowledgeProviderSet = wire.NewSet(
@@ -118,4 +121,14 @@ func ProvideKnowledgeOptions() []knowledgelogic.Option {
 
 func NewRetrievalChannels(ch1 *channel.VectorRetrievalChannel, ch2 *channel.KeywordRetrievalChannel) []rag.RetrievalChannel {
 	return []rag.RetrievalChannel{ch1, ch2}
+}
+
+func NewParserRegistry() *parse.Registry {
+	fallbackParser := &parser.TextParser{}
+	parsers := []parse.Parser{
+		&parser.HTMLParser{},
+		&parser.TextParser{},
+		&parser.PDFParser{},
+	}
+	return parse.NewRegistry(fallbackParser, parsers...)
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/api/knowledge"
+	"github.com/swiftbit/know-agent/internal/trigger/consumer"
 	"github.com/swiftbit/know-agent/internal/trigger/handler"
 )
 
@@ -16,4 +17,6 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(chat.HTTPServer), new(*handler.ChatService)),
 	handler.NewKnowledgeService,
 	wire.Bind(new(knowledge.HTTPServer), new(*handler.KnowledgeService)),
+	consumer.NewParseDocumentConsumer,
+	consumer.NewBuildIndexConsumer,
 )
