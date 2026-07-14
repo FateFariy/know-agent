@@ -12,5 +12,5 @@ type ChatDialogue struct {
 	SelectedDocumentName string    `gorm:"column:selected_document_name"` // 选中的文档名称
 	CreateTime           time.Time `gorm:"column:create_time"`            // 创建时间
 	UpdateTime           time.Time `gorm:"column:update_time"`            // 更新时间
-	Question             string    `gorm:"column:-"`                      // 问题
+	Question             string    `gorm:"-"`                             // 问题
 }

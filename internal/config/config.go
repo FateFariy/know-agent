@@ -19,7 +19,7 @@ type Config struct {
 	ChatModel        map[string]*LLMConf
 }
 type MinioConf struct {
-	Endpoint         string `json:",omitempty,default=http://127.0.0.1:9000"`
+	Endpoint         string `json:",omitempty,default=127.0.0.1:9000"`
 	AccessKeyID      string `json:",omitempty,default=minioadmin"`
 	SecretAccessKey  string `json:",omitempty,default=minioadmin"`
 	BucketName       string `json:",omitempty,default=super-agent-document"`

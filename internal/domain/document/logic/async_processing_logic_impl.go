@@ -97,7 +97,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 			ID:           taskId,
 			TaskStatus:   vo.TaskStatusRunning,
 			CurrentStage: vo.TaskStageContentParse,
-			StartTime:    startTime,
+			StartTime:    utils.Pointer(startTime),
 		}
 		if err = d.repo.UpdateTaskById(txCtx, runningTask); err != nil {
 			return err
@@ -307,7 +307,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 			ID:           taskId,
 			TaskStatus:   vo.TaskStatusRunning,
 			CurrentStage: vo.TaskStageChunkExecute,
-			StartTime:    time.Now(),
+			StartTime:    utils.Pointer(time.Now()),
 		})
 	}
 	if err = d.repo.Do(ctx, markBuildingTx); err != nil {
@@ -641,7 +641,7 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 		ID:           task.ID,
 		TaskStatus:   vo.TaskStatusSuccess,
 		CurrentStage: currentStage,
-		FinishTime:   time.Now(),
+		FinishTime:   utils.Pointer(time.Now()),
 		CostMillis:   time.Since(startTime).Milliseconds(),
 		ErrorCode:    utils.Pointer(""),
 		ErrorMsg:     utils.Pointer(""),
@@ -737,8 +737,8 @@ func (d *AsyncProcessingLogicImpl) failTask(txCtx context.Context, task *entity.
 		ID:           task.ID,
 		TaskStatus:   vo.TaskStatusFailed,
 		CurrentStage: task.CurrentStage,
-		FinishTime:   time.Now(),
-		CostMillis:   time.Since(task.StartTime).Milliseconds(),
+		FinishTime:   utils.Pointer(time.Now()),
+		CostMillis:   time.Since(*task.StartTime).Milliseconds(),
 		ErrorCode:    utils.Pointer("TASK_FAILED"),
 		ErrorMsg:     utils.Pointer(errorMsg),
 	})

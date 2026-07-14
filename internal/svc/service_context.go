@@ -60,7 +60,7 @@ func NewMinioClient(c *config.Config) *minio.Client {
 		Secure: c.Minio.UseSSL,
 	})
 	if err != nil {
-		return nil
+		panic(err)
 	}
 	return minioClient
 }

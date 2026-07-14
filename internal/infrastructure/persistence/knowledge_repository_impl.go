@@ -2,10 +2,12 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
+	"gorm.io/gorm"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
@@ -59,7 +61,9 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context)
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
 	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Where("scope_code = ?", node.ScopeCode).First(node).Error; err != nil {
-		return err
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
 	nodeModel.ID = node.ID
 	return k.dbWithContext(ctx).Save(nodeModel).Error
@@ -99,7 +103,9 @@ func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, 
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).
 		Where("topic_code = ?", node.TopicCode).
 		First(node).Error; err != nil {
-		return err
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
 	nodeModel.ID = node.ID
 	return k.dbWithContext(ctx).Save(nodeModel).Error
@@ -143,7 +149,9 @@ func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Contex
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
 		Where("topic_code = ? AND document_id = ?", relation.TopicCode, relation.DocumentId).
 		First(relation).Error; err != nil {
-		return err
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
 	relModel.ID = relation.ID
 	return k.dbWithContext(ctx).Save(relModel).Error

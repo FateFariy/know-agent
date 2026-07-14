@@ -81,7 +81,6 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 	var pModelChatDialogue *model.ChatDialogue
 	if source != nil {
 		var modelChatDialogue model.ChatDialogue
-		modelChatDialogue.ID = (*source).ID
 		modelChatDialogue.ConversationId = (*source).ConversationId
 		modelChatDialogue.SessionStatus = (*source).SessionStatus
 		modelChatDialogue.ChatMode = (*source).ChatMode
@@ -812,8 +811,8 @@ func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 		modelDocumentTask.TriggerSource = (*source).TriggerSource
 		modelDocumentTask.StrategySnapshot = (*source).StrategySnapshot
 		modelDocumentTask.RetryCount = (*source).RetryCount
-		modelDocumentTask.StartTime = timeTimeToTimeTime2((*source).StartTime)
-		modelDocumentTask.FinishTime = timeTimeToTimeTime2((*source).FinishTime)
+		modelDocumentTask.StartTime = (*source).StartTime
+		modelDocumentTask.FinishTime = (*source).FinishTime
 		modelDocumentTask.CostMillis = (*source).CostMillis
 		modelDocumentTask.ErrorCode = (*source).ErrorCode
 		modelDocumentTask.ErrorMsg = (*source).ErrorMsg
@@ -827,7 +826,7 @@ func ToKnowledgeDocumentOptionRespList(source []*vo1.KnowledgeDocument) []*docum
 	if source != nil {
 		pDocumentKnowledgeDocumentOptionRespList = make([]*document.KnowledgeDocumentOptionResp, len(source))
 		for i := 0; i < len(source); i++ {
-			pDocumentKnowledgeDocumentOptionRespList[i] = pEntityDocumentToPDocumentKnowledgeDocumentOptionResp(source[i])
+			pDocumentKnowledgeDocumentOptionRespList[i] = pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source[i])
 		}
 	}
 	return pDocumentKnowledgeDocumentOptionRespList
@@ -878,8 +877,8 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 		documentQueryTaskLogsResp.TaskStatusName = (*source).TaskStatusName
 		documentQueryTaskLogsResp.CurrentStage = (*source).CurrentStage
 		documentQueryTaskLogsResp.CurrentStageName = (*source).CurrentStageName
-		documentQueryTaskLogsResp.StartTime = TimeToString((*source).StartTime)
-		documentQueryTaskLogsResp.FinishTime = TimeToString((*source).FinishTime)
+		documentQueryTaskLogsResp.StartTime = pTimeTimeToString((*source).StartTime)
+		documentQueryTaskLogsResp.FinishTime = pTimeTimeToString((*source).FinishTime)
 		documentQueryTaskLogsResp.CostMillis = (*source).CostMillis
 		if (*source).ErrorCode != nil {
 			documentQueryTaskLogsResp.ErrorCode = *(*source).ErrorCode
@@ -1038,10 +1037,18 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 	}
 	return pDocumentTaskLog
 }
-func pEntityDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.KnowledgeDocument) *document.KnowledgeDocumentOptionResp {
+func pTimeTimeToString(source *time.Time) string {
+	var xstring string
+	if source != nil {
+		xstring = TimeToString((*source))
+	}
+	return xstring
+}
+func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.KnowledgeDocument) *document.KnowledgeDocumentOptionResp {
 	var pDocumentKnowledgeDocumentOptionResp *document.KnowledgeDocumentOptionResp
 	if source != nil {
 		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp
+		documentKnowledgeDocumentOptionResp.DocumentId = (*source).DocumentId
 		documentKnowledgeDocumentOptionResp.DocumentName = (*source).DocumentName
 		documentKnowledgeDocumentOptionResp.KnowledgeScopeName = (*source).KnowledgeScopeName
 		documentKnowledgeDocumentOptionResp.BusinessCategory = (*source).BusinessCategory
@@ -1049,9 +1056,6 @@ func pEntityDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.Knowledge
 		pDocumentKnowledgeDocumentOptionResp = &documentKnowledgeDocumentOptionResp
 	}
 	return pDocumentKnowledgeDocumentOptionResp
-}
-func timeTimeToTimeTime2(source time.Time) time.Time {
-	return source
 }
 func FromKnowledgeScopeSaveReq(source *knowledge.KnowledgeScopeSaveReq) *entity2.KnowledgeScopeNode {
 	var pEntityKnowledgeScopeNode *entity2.KnowledgeScopeNode

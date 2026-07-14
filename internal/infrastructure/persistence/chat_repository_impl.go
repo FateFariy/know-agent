@@ -361,7 +361,7 @@ func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.
 	var chatExchanges []*entity.ChatExchange
 	if err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
 		Where("conversation_id IN ?", conversationIds).
-		Order("creat_time DESC, id DESC").Find(&chatExchanges).Error; err != nil {
+		Order("create_time DESC, id DESC").Find(&chatExchanges).Error; err != nil {
 		return nil, err
 	}
 	return utils.SliceToMapBy(chatExchanges, func(item *entity.ChatExchange) (string, *entity.ChatExchange) {

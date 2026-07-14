@@ -60,8 +60,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 				Handler: QueryDocumentChunkDetailHandler(svcCtx, srv),
 			},
 			{
-				Method:  http.MethodPost,
-				Path:    "/document/options",
+				Method:  http.MethodGet,
+				Path:    "/options",
 				Handler: GetDocumentOptionsHandler(svcCtx, srv),
 			},
 			{

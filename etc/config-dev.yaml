@@ -13,7 +13,7 @@ Mysql:
   Port: 3306
   Username: root
   Password: "123456"
-  DbName: ai_agent
+  DbName: rag
 
 Redis:
   - Host: 10.104.0.165:6379
@@ -21,7 +21,7 @@ Redis:
     Weight: 100
 
 Minio:
-  Endpoint: http://10.104.1.173:9000
+  Endpoint: 10.104.1.173:9000
   AccessKeyID: minioadmin
   SecretAccessKey: minioadmin
   BucketName: agent-document

@@ -344,7 +344,7 @@ service document {
 
 	@doc "获取知识文档选项"
 	@handler GetDocumentOptions
-	post /document/options returns ([]*KnowledgeDocumentOptionResp)
+	get /options returns ([]*KnowledgeDocumentOptionResp)
 
 	@doc "删除文档及其关联数据"
 	@handler DeleteDocument

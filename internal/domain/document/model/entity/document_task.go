@@ -19,8 +19,8 @@ type DocumentTask struct {
 	TriggerSource    int                `gorm:"column:trigger_source"`    // 触发来源
 	StrategySnapshot string             `gorm:"column:strategy_snapshot"` // 策略快照
 	RetryCount       int                `gorm:"column:retry_count"`       // 重试次数
-	StartTime        time.Time          `gorm:"column:start_time"`        // 开始时间
-	FinishTime       time.Time          `gorm:"column:finish_time"`       // 完成时间
+	StartTime        *time.Time         `gorm:"column:start_time"`        // 开始时间
+	FinishTime       *time.Time         `gorm:"column:finish_time"`       // 完成时间
 	CostMillis       int64              `gorm:"column:cost_millis"`       // 耗时(毫秒)
 	ErrorCode        *string            `gorm:"column:error_code"`        // 错误码
 	ErrorMsg         *string            `gorm:"column:error_msg"`         // 错误信息

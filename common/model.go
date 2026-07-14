@@ -16,7 +16,7 @@ type Model struct {
 
 type AuditModel struct {
 	CreateTime time.Time             `gorm:"column:create_time;type:datetime;autoCreateTime"`
-	UpdateTime time.Time             `gorm:"column:edit_time;type:datetime;autoUpdateTime"`
+	UpdateTime time.Time             `gorm:"column:update_time;type:datetime;autoUpdateTime"`
 	Deleted    soft_delete.DeletedAt `gorm:"column:deleted;softDelete:flag"`
 }
 
@@ -24,11 +24,5 @@ func (m *Model) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == 0 {
 		m.ID = utils.GetSnowflakeNextID()
 	}
-	m.Deleted = 1
-	return nil
-}
-
-func (m *AuditModel) BeforeCreate(tx *gorm.DB) error {
-	m.Deleted = 1
 	return nil
 }

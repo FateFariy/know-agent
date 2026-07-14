@@ -12,5 +12,5 @@ type KnowledgeTopicNode struct {
 	AnswerShape         string `gorm:"column:answer_shape"`         // 答案形态
 	ExecutionPreference string `gorm:"column:execution_preference"` // 执行偏好
 	SortOrder           int    `gorm:"column:sort_order"`           // 排序顺序
-	OperatorId          string `gorm:"column:-"`                    // 操作员ID
+	OperatorId          string `gorm:"-"`                           // 操作员ID
 }
