@@ -48,11 +48,13 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const res = await chatApi.streamChat({
         question,
-        conversationId,
+        conversationId: conversationId || undefined,
         chatMode: 'document',
         selectedDocumentId: documentId,
       })
-      await fetchSessionDetail(conversationId)
+      if (conversationId) {
+        await fetchSessionDetail(conversationId)
+      }
       return res
     } finally {
       isLoading.value = false

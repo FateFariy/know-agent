@@ -14,14 +14,9 @@ const router = createRouter({
       component: () => import('@/views/ChatView.vue'),
     },
     {
-      path: '/documents',
-      name: 'Documents',
-      component: () => import('@/views/DocumentView.vue'),
-    },
-    {
-      path: '/knowledge',
-      name: 'Knowledge',
-      component: () => import('@/views/KnowledgeView.vue'),
+      path: '/admin',
+      name: 'Admin',
+      component: () => import('@/views/AdminView.vue'),
     },
   ],
 })
