@@ -1,7 +1,6 @@
 import axios from './axios'
 import type {
   Response,
-  DocumentOption,
   SessionDetail,
   SessionListItem,
   PageResult,
@@ -21,11 +20,6 @@ export const chatApi = {
   // 流式聊天
   streamChat(params: ChatReq): Promise<Response<{ conversationId: string }>> {
     return axios.post('/chat/stream', params)
-  },
-
-  // 获取文档选项
-  getDocumentOptions(): Promise<Response<DocumentOption[]>> {
-    return axios.post('/chat/document/options')
   },
 
   // 停止会话

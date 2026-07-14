@@ -3,7 +3,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDocumentStore } from '@/stores/document'
 import { knowledgeApi } from '@/api/knowledge'
-import { documentApi } from '@/api/document'
 import { ElMessage, ElTree, ElButton, ElInput, ElDialog, ElForm, ElFormItem, ElSelect, ElOption } from 'element-plus'
 import {
   Files,
@@ -275,26 +274,16 @@ async function handleUploadAndParse() {
   }
   try {
     for (const file of selectedFiles.value) {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('documentName', documentForm.value.documentName || file.name)
-      if (documentForm.value.knowledgeScopeCode) {
-        formData.append('knowledgeScopeCode', documentForm.value.knowledgeScopeCode)
-      }
-      if (documentForm.value.knowledgeScopeName) {
-        formData.append('knowledgeScopeName', documentForm.value.knowledgeScopeName)
-      }
-      if (documentForm.value.businessCategory) {
-        formData.append('businessCategory', documentForm.value.businessCategory)
-      }
-      if (documentForm.value.documentTags) {
-        formData.append('documentTags', documentForm.value.documentTags)
-      }
-      await documentApi.uploadDocument(formData)
+      await documentStore.uploadFile(file, {
+        documentName: documentForm.value.documentName || file.name,
+        knowledgeScopeCode: documentForm.value.knowledgeScopeCode || undefined,
+        knowledgeScopeName: documentForm.value.knowledgeScopeName || undefined,
+        businessCategory: documentForm.value.businessCategory || undefined,
+        documentTags: documentForm.value.documentTags || undefined,
+      })
     }
     ElMessage.success('上传并解析成功')
     selectedFiles.value = []
-    await fetchDocuments()
   } catch {
     ElMessage.error('上传失败')
   }

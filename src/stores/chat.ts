@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { chatApi } from '@/api/chat'
+import { documentApi } from '@/api/document'
 import type { SessionDetail, SessionListItem, Exchange, DocumentOption } from '@/types'
 
 export const useChatStore = defineStore('chat', () => {
@@ -15,8 +16,14 @@ export const useChatStore = defineStore('chat', () => {
   const pageSize = ref(10)
 
   async function fetchDocumentOptions() {
-    const res = await chatApi.getDocumentOptions()
-    documentOptions.value = res.data || []
+    const res = await documentApi.getDocumentOptions()
+    documentOptions.value = res.data?.map((doc) => ({
+      documentId: doc.documentId,
+      documentName: doc.documentName,
+      knowledgeScopeName: doc.knowledgeScopeName,
+      businessCategory: doc.businessCategory,
+      documentTags: doc.documentTags,
+    })) || []
   }
 
   // async function createSession(documentId?: number) {

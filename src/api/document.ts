@@ -1,15 +1,34 @@
 import axios from './axios'
-import type { Response, DocumentInfo, DocumentProfile, PageResult, UploadDocumentResp, BuildIndexResp, QueryStrategyPlanResp, ConfirmStrategyResp, QueryDocumentChunksResp, QueryDocumentChunkDetailResp, QueryTaskLogsResp, DeleteDocumentResp, UploadDocumentReq, QueryDocumentPageReq, QueryDocumentDetailReq, DeleteDocumentReq, QueryStrategyPlanReq, ConfirmStrategyReq, BuildIndexReq, QueryDocumentChunksReq as DocChunksReq, QueryDocumentChunkDetailReq as DocChunkDetailReq, QueryTaskLogsReq, DocumentProfileDetailReq, DocumentProfileRegenerateReq, DocumentProfileBatchRegenerateReq } from '@/types'
+import type {
+  Response,
+  DocumentInfo,
+  DocumentProfile,
+  PageResult,
+  UploadDocumentResp,
+  BuildIndexResp,
+  QueryStrategyPlanResp,
+  ConfirmStrategyResp,
+  QueryDocumentChunksResp,
+  QueryDocumentChunkDetailResp,
+  QueryTaskLogsResp,
+  DeleteDocumentResp,
+  UploadDocumentReq,
+  QueryDocumentPageReq,
+  QueryDocumentDetailReq,
+  DeleteDocumentReq,
+  QueryStrategyPlanReq,
+  ConfirmStrategyReq,
+  BuildIndexReq,
+  QueryDocumentChunksReq as DocChunksReq,
+  QueryDocumentChunkDetailReq as DocChunkDetailReq,
+  QueryTaskLogsReq,
+  DocumentProfileDetailReq,
+  DocumentProfileRegenerateReq,
+  DocumentProfileBatchRegenerateReq,
+  DocumentOption,
+} from '@/types'
 
 export const documentApi = {
-  // 上传文档（带完整表单数据）
-  uploadDocument(formData: FormData): Promise<Response<UploadDocumentResp>> {
-    return axios.post('/manage/document/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-  },
 
   // 上传文件
   uploadFile(file: File, data?: UploadDocumentReq, onProgress?: (progress: number) => void): Promise<Response<UploadDocumentResp>> {
@@ -45,6 +64,11 @@ export const documentApi = {
   // 查询文档详情
   queryDetail(params: QueryDocumentDetailReq): Promise<Response<DocumentInfo>> {
     return axios.post('/manage/document/detail/query', params)
+  },
+
+  // 获取文档选项
+  getDocumentOptions(): Promise<Response<DocumentOption[]>> {
+    return axios.get('/manage/document/options')
   },
 
   // 删除文档

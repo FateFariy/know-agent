@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { documentApi } from '@/api/document'
-import type { DocumentInfo, DocumentChunk, DocumentProfile, UploadFile } from '@/types'
+import type { DocumentInfo, DocumentChunk, DocumentProfile, UploadFile, UploadDocumentReq } from '@/types'
 
 export const useDocumentStore = defineStore('document', () => {
   const documents = ref<DocumentInfo[]>([])
@@ -15,25 +15,25 @@ export const useDocumentStore = defineStore('document', () => {
 
   async function fetchDocuments(params?: { keyword?: string; pageNo?: number; pageSize?: number }) {
     const res = await documentApi.queryPage(params)
-    documents.value = res.records
-    total.value = res.total
-    pageNo.value = res.pageNo
-    pageSize.value = res.pageSize
+    documents.value = res.data?.records || []
+    total.value = res.data?.totalSize || 0
+    pageNo.value = res.data?.pageNo || 1
+    pageSize.value = res.data?.pageSize || 10
   }
 
   async function fetchDocumentDetail(documentId: number) {
     const res = await documentApi.queryDetail({ documentId })
-    currentDocument.value = res
+    currentDocument.value = res.data || null
   }
 
   async function fetchChunks(documentId: number, params?: { pageNo?: number; pageSize?: number }) {
     const res = await documentApi.queryChunks({ documentId, ...params })
-    chunks.value = res.records
+    chunks.value = res.data?.records || []
   }
 
   async function fetchProfile(documentId: number) {
     const res = await documentApi.getProfile({ documentId })
-    profile.value = res
+    profile.value = res.data || null
   }
 
   async function deleteDocument(documentId: number) {
@@ -41,7 +41,7 @@ export const useDocumentStore = defineStore('document', () => {
     await fetchDocuments()
   }
 
-  async function uploadFile(file: File) {
+  async function uploadFile(file: File, data?: UploadDocumentReq) {
     const uploadFile: UploadFile = {
       file,
       fileName: file.name,
@@ -53,11 +53,11 @@ export const useDocumentStore = defineStore('document', () => {
 
     uploadFile.status = 'uploading'
     try {
-      const res = await documentApi.uploadFile(file, (progress) => {
+      const res = await documentApi.uploadFile(file, data, (progress) => {
         uploadFile.progress = progress
       })
       uploadFile.status = 'success'
-      uploadFile.documentId = res.data.documentId
+      uploadFile.documentId = res.data?.documentId || 0
       await fetchDocuments()
     } catch {
       uploadFile.status = 'error'

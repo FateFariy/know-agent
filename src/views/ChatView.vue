@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { ElMessage } from 'element-plus'
-import { ArrowRight, Cpu, Search, Plus, Lightning, Aim, DataBoard } from '@element-plus/icons-vue'
+import { ArrowRight, Cpu, Search, Plus, Lightning, Aim, DataBoard, FolderOpened } from '@element-plus/icons-vue'
 import ChatSessionList from '@/components/chat/ChatSessionList.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
 
@@ -45,15 +45,6 @@ async function fetchData() {
 
 async function handleSelectSession(conversationId: string) {
   await store.fetchSessionDetail(conversationId)
-}
-
-async function handleDeleteSession(conversationId: string) {
-  await store.deleteSession(conversationId)
-  if (store.currentSession?.conversationId === conversationId) {
-    store.currentSession = null
-    store.exchanges = []
-  }
-  ElMessage.success('会话已删除')
 }
 
 async function handleSend() {
@@ -114,38 +105,58 @@ onMounted(() => {
 <template>
   <div class="chat-view">
     <aside class="chat-sidebar" :class="{ hidden: !showSessionList }">
-      <div class="sidebar-header">
-        <button class="new-chat-btn" @click="store.currentSession = null; store.exchanges = []">
-          <Plus :size="18" />
-          <span>新对话</span>
-        </button>
-        <button class="sidebar-close" @click="showSessionList = false">
-          <span class="close-icon">×</span>
-        </button>
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <Cpu :size="24" />
+        </div>
+        <div class="brand-info">
+          <h1 class="brand-title">RAG 智能问答</h1>
+          <p class="brand-subtitle">Powered by AI</p>
+        </div>
+      </div>
+
+      <div class="quick-start">
+        <div class="quick-start-header">
+          <span class="quick-start-label">快速开始</span>
+          <span class="quick-start-badge">新内容</span>
+        </div>
+        <div class="quick-cards">
+          <button class="quick-card primary" @click="store.currentSession = null; store.exchanges = []">
+            <div class="card-icon-wrap">
+              <Plus :size="20" />
+            </div>
+            <div class="card-text">
+              <span class="card-title">新建对话</span>
+              <span class="card-desc">从空白开始</span>
+            </div>
+          </button>
+          <button class="quick-card secondary" @click="goToDocuments">
+            <div class="card-icon-wrap secondary">
+              <FolderOpened :size="16" />
+            </div>
+            <div class="card-text">
+              <span class="card-title">管理后台</span>
+            </div>
+          </button>
+        </div>
       </div>
 
       <div class="search-box">
         <Search :size="16" />
-        <input type="text" placeholder="搜索对话" class="search-input" />
-      </div>
-
-      <div class="sidebar-nav">
-        <button class="nav-item active">
-          <FolderOpen :size="16" />
-          <span>最近对话</span>
-        </button>
+        <input type="text" placeholder="搜索对话..." class="search-input" />
+        <span class="search-shortcut">Ctrl / Cmd + K</span>
       </div>
 
       <div class="session-list">
-        <ChatSessionList @select="handleSelectSession" @delete="handleDeleteSession" />
+        <div class="session-list-header">
+          <span class="header-label">更早</span>
+        </div>
+        <ChatSessionList @select="handleSelectSession" />
       </div>
 
-      <div class="sidebar-footer">
-        <button class="admin-btn" @click="goToDocuments">
-          <Cpu :size="16" />
-          <span>知识库管理</span>
-        </button>
-      </div>
+      <button class="sidebar-close" @click="showSessionList = false">
+        <span class="close-icon">×</span>
+      </button>
     </aside>
 
     <div class="sidebar-overlay" v-show="!showSessionList" @click="showSessionList = true"></div>
@@ -274,8 +285,8 @@ onMounted(() => {
 
 .chat-sidebar {
   width: 280px;
-  background: #fff;
-  border-right: 1px solid #e8ecf0;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -284,7 +295,7 @@ onMounted(() => {
   bottom: 0;
   z-index: 100;
   transition: transform 0.3s ease;
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.04);
 }
 
 .chat-sidebar.hidden {
@@ -295,52 +306,154 @@ onMounted(() => {
   display: none;
 }
 
-.sidebar-header {
+.sidebar-brand {
   display: flex;
-  gap: 8px;
-  padding: 12px;
-  border-bottom: 1px solid #f0f2f5;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
 }
 
-.new-chat-btn {
-  flex: 1;
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  background: #3b82f6;
   color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.quick-start {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.quick-start-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.quick-start-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.quick-start-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: #dbeafe;
+  color: #3b82f6;
+  border-radius: 10px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 
-.new-chat-btn:hover {
-  background: #2563eb;
+.quick-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.sidebar-close {
-  display: none;
-  background: transparent;
+.quick-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
   border: none;
-  color: #909399;
+  border-radius: 12px;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
+  transition: all 0.25s ease;
+  text-align: left;
+}
+
+.quick-card.primary {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.quick-card.primary:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  transform: translateY(-1px);
+}
+
+.quick-card.secondary {
+  background: #fefce8;
+}
+
+.quick-card.secondary:hover {
+  background: #fef9c3;
+}
+
+.card-icon-wrap {
+  width: 36px;
+  height: 36px;
+  background: #3b82f6;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.card-icon-wrap.secondary {
+  background: #f59e0b;
+}
+
+.card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .search-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: #f5f7fa;
-  margin: 10px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  background: #f1f5f9;
+  margin: 0 16px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.search-box:focus-within {
+  background: #fff;
+  border-color: #cbd5e1;
 }
 
 .search-input {
@@ -348,73 +461,54 @@ onMounted(() => {
   border: none;
   background: transparent;
   font-size: 13px;
-  color: #303133;
+  color: #334155;
   outline: none;
 }
 
 .search-input::placeholder {
-  color: #c0c4cc;
+  color: #94a3b8;
 }
 
-.sidebar-nav {
-  padding: 0 12px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #606266;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.nav-item:hover {
-  background: #f5f7fa;
-}
-
-.nav-item.active {
-  background: #eff6ff;
-  color: #3b82f6;
+.search-shortcut {
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 2px 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
 }
 
 .session-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 0 8px;
 }
 
-.sidebar-footer {
-  padding: 12px;
-  border-top: 1px solid #f0f2f5;
+.session-list-header {
+  padding: 8px 8px;
 }
 
-.admin-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 12px;
-  background: #f5f7fa;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #606266;
+.header-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.sidebar-close {
+  display: none;
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
   cursor: pointer;
-  transition: all 0.2s;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 18px;
 }
 
-.admin-btn:hover {
-  background: #eff6ff;
-  border-color: #c7d2fe;
-  color: #3b82f6;
+.sidebar-close:hover {
+  background: #f1f5f9;
 }
 
 .chat-main {
