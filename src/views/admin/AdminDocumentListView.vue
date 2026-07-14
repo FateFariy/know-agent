@@ -48,7 +48,8 @@
 
           <div class="upload-actions">
             <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
-            <button class="primary-button" type="button" :disabled="uploading || !uploadForm.file" @click="submitUpload">
+            <button class="primary-button" type="button" :disabled="uploading || !uploadForm.file"
+              @click="submitUpload">
               {{ uploading ? '上传中...' : '上传并解析' }}
             </button>
           </div>
@@ -82,13 +83,8 @@
         </div>
 
         <div class="list-actions">
-          <input
-            v-model="keyword"
-            class="search-input"
-            type="text"
-            placeholder="搜索文档名称或原始文件名"
-            @keydown.enter="submitSearch"
-          />
+          <input v-model="keyword" class="search-input" type="text" placeholder="搜索文档名称或原始文件名"
+            @keydown.enter="submitSearch" />
           <button class="ghost-button" type="button" @click="submitSearch">搜索</button>
         </div>
       </div>
@@ -161,13 +157,8 @@
                 <td class="document-cell document-cell-action">
                   <div class="document-action-group">
                     <button class="detail-link" type="button" @click="openDocumentDetail(item.documentId)">查看详情</button>
-                    <button
-                      class="danger-link"
-                      type="button"
-                      :disabled="!canDeleteDocument(item)"
-                      :title="buildDeleteTitle(item)"
-                      @click="deleteDocument(item)"
-                    >
+                    <button class="danger-link" type="button" :disabled="!canDeleteDocument(item)"
+                      :title="buildDeleteTitle(item)" @click="deleteDocument(item)">
                       {{ isDeletingDocument(item.documentId) ? '删除中...' : '删除' }}
                     </button>
                   </div>
@@ -179,14 +170,16 @@
       </div>
 
       <div v-if="documents.length" class="pagination-bar">
-        <button class="ghost-button" type="button" :disabled="currentPage <= 1 || listLoading" @click="changePage(currentPage - 1)">
+        <button class="ghost-button" type="button" :disabled="currentPage <= 1 || listLoading"
+          @click="changePage(currentPage - 1)">
           上一页
         </button>
         <div class="pagination-status">
           <strong>第 {{ currentPage }} / {{ totalPages }} 页</strong>
           <span>共 {{ total }} 条文档</span>
         </div>
-        <button class="ghost-button" type="button" :disabled="currentPage >= totalPages || listLoading" @click="changePage(currentPage + 1)">
+        <button class="ghost-button" type="button" :disabled="currentPage >= totalPages || listLoading"
+          @click="changePage(currentPage + 1)">
           下一页
         </button>
       </div>
@@ -194,18 +187,25 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { APIError, manageApi } from '../../api/api'
-import AdminStatusBadge from '../../components/admin/AdminStatusBadge.vue'
-import { formatDateTime, formatFileSize, hasCode } from '../../utils/manageFormat'
+import { documentApi } from '@/api/document'
+import type {
+  DocumentInfo,
+  UploadDocumentReq,
+  QueryDocumentPageReq,
+  DeleteDocumentReq,
+  UploadDocumentResp
+} from '@/types'
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
+import { formatDateTime, formatFileSize, hasCode } from '@/utils/manageFormat'
 
 const router = useRouter()
 const OPERATOR_ID = '10001'
 const DEFAULT_PAGE_SIZE = 12
 
-const uploadForm = reactive({
+const uploadForm = reactive<UploadDocumentReq & { file: File | null }>({
   documentName: '',
   knowledgeScopeCode: '',
   knowledgeScopeName: '',
@@ -213,11 +213,11 @@ const uploadForm = reactive({
   documentTags: '',
   file: null
 })
-const fileInputRef = ref(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const listLoading = ref(false)
 const keyword = ref('')
-const documents = ref([])
+const documents = ref<DocumentInfo[]>([])
 const currentPage = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const total = ref(0)
@@ -263,11 +263,13 @@ async function loadDocuments(page = currentPage.value) {
   listLoading.value = true
 
   try {
-    const data = await manageApi.queryDocumentPage({
-      pageNo: page,
+    const params: QueryDocumentPageReq = {
+      pageNo: Number(page),
       pageSize: pageSize.value,
       keyword: keyword.value.trim()
-    })
+    }
+    const { data } = await documentApi.queryPage(params)
+
     documents.value = Array.isArray(data?.records) ? data.records : []
     currentPage.value = Number(data?.pageNo || page)
     pageSize.value = Number(data?.pageSize || pageSize.value)
@@ -340,15 +342,16 @@ async function submitUpload() {
   clearNotice()
 
   try {
-    const result = await manageApi.uploadDocument({
-      file: uploadForm.file,
-      documentName: uploadForm.documentName.trim(),
-      operatorId: OPERATOR_ID,
-      knowledgeScopeCode: uploadForm.knowledgeScopeCode.trim(),
-      knowledgeScopeName: uploadForm.knowledgeScopeName.trim(),
-      businessCategory: uploadForm.businessCategory.trim(),
-      documentTags: uploadForm.documentTags.trim()
-    })
+    const data: UploadDocumentReq = {
+      documentName: uploadForm.documentName.trim() || undefined,
+      operatorId: Number(OPERATOR_ID),
+      knowledgeScopeCode: uploadForm.knowledgeScopeCode.trim() || undefined,
+      knowledgeScopeName: uploadForm.knowledgeScopeName.trim() || undefined,
+      businessCategory: uploadForm.businessCategory.trim() || undefined,
+      documentTags: uploadForm.documentTags.trim() || undefined
+    }
+    const res = await documentApi.uploadFile(uploadForm.file, data)
+    const result = res.data as UploadDocumentResp
     clearSelectedFile()
     showNotice(`文档已上传，任务 ${result.taskId} 已进入解析与策略推荐队列。`, 'success')
     await loadDocuments(1)
@@ -361,7 +364,7 @@ async function submitUpload() {
   }
 }
 
-async function deleteDocument(item) {
+async function deleteDocument(item: DocumentInfo) {
   if (!item?.documentId) {
     return
   }
@@ -384,9 +387,10 @@ async function deleteDocument(item) {
   clearNotice()
 
   try {
-    await manageApi.deleteDocument({
-      documentId
-    })
+    const params: DeleteDocumentReq = {
+      documentId: Number(item.documentId)
+    }
+    await documentApi.deleteDoc(params)
     const nextPage = documents.value.length === 1 && currentPage.value > 1
       ? currentPage.value - 1
       : currentPage.value
@@ -400,12 +404,12 @@ async function deleteDocument(item) {
   }
 }
 
-function normalizeError(error, fallbackMessage) {
-  if (error instanceof APIError && error.message) {
-    return error.message
-  }
+function normalizeError(error: unknown, fallbackMessage: string): string {
   if (error instanceof Error && error.message) {
     return error.message
+  }
+  if (typeof error === 'string') {
+    return error
   }
   return fallbackMessage
 }
@@ -422,7 +426,7 @@ onMounted(() => {
   --radius-lg: 12px;
   --radius-md: 8px;
   --radius-sm: 6px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   gap: 18px;

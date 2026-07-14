@@ -24,12 +24,8 @@
           </div>
 
           <div class="build-overlay-stage-list">
-            <article
-              v-for="stage in buildStageItems"
-              :key="`overlay-stage-${stage.code}`"
-              class="build-overlay-stage"
-              :class="`build-overlay-stage-${stage.status}`"
-            >
+            <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`" class="build-overlay-stage"
+              :class="`build-overlay-stage-${stage.status}`">
               <span class="build-overlay-stage-icon">
                 <span v-if="stage.status === 'current'" class="stage-spinner" aria-hidden="true"></span>
                 <span v-else>{{ stage.order }}</span>
@@ -63,19 +59,13 @@
         <div class="drawer-summary">
           <div class="summary-chip">
             <span>当前状态</span>
-            <AdminStatusBadge
-              :label="documentDetail?.latestTaskStatusName || '暂无状态'"
-              :code="documentDetail?.latestTaskStatus"
-              type="task"
-            />
+            <AdminStatusBadge :label="documentDetail?.latestTaskStatusName || '暂无状态'"
+              :code="documentDetail?.latestTaskStatus" type="task" />
           </div>
           <div class="summary-chip">
             <span>索引状态</span>
-            <AdminStatusBadge
-              :label="documentDetail?.indexStatusName || '暂无状态'"
-              :code="documentDetail?.indexStatus"
-              type="index"
-            />
+            <AdminStatusBadge :label="documentDetail?.indexStatusName || '暂无状态'" :code="documentDetail?.indexStatus"
+              type="index" />
           </div>
         </div>
 
@@ -138,30 +128,28 @@
             <div class="chunk-detail-head">
               <div class="chunk-detail-title-group">
                 <span class="chunk-kind-badge chunk-kind-badge-child">Child Evidence</span>
-                <h4>当前子块 C#{{ chunkDetail.chunk.chunkNo || '-' }}</h4>
+                <h4>当前子块 C#{{ chunkDetail?.chunk.chunkNo || '-' }}</h4>
               </div>
-              <span>{{ buildChunkRelationText(chunkDetail.chunk) }}</span>
+              <span>{{ buildChunkRelationText(chunkDetail?.chunk) }}</span>
             </div>
             <div class="chunk-detail-meta">
-              <span>章节：{{ chunkDetail.chunk.sectionPath || '未识别章节' }}</span>
-              <span>字符：{{ formatCount(chunkDetail.chunk.charCount) }}</span>
-              <span>Token：{{ formatCount(chunkDetail.chunk.tokenCount) }}</span>
+              <span>章节：{{ chunkDetail?.chunk.sectionPath || '未识别章节' }}</span>
+              <span>字符：{{ formatCount(chunkDetail?.chunk.charCount) }}</span>
+              <span>Token：{{ formatCount(chunkDetail?.chunk.tokenCount) }}</span>
             </div>
-            <pre class="chunk-detail-text">{{ chunkDetail.chunk.chunkText }}</pre>
+            <pre class="chunk-detail-text">{{ chunkDetail?.chunk.chunkText || '' }}</pre>
           </section>
 
-          <section
-            ref="parentBlockSectionRef"
-            class="chunk-detail-section chunk-detail-section-parent"
+          <section ref="parentBlockSectionRef" class="chunk-detail-section chunk-detail-section-parent"
             :class="{ 'chunk-detail-section-focused': chunkDetailFocusMode === 'parent' }"
-            v-if="chunkDetail.parentBlock"
-          >
+            v-if="chunkDetail.parentBlock">
             <div class="chunk-detail-head">
               <div class="chunk-detail-title-group">
                 <span class="chunk-kind-badge chunk-kind-badge-parent">Parent Context</span>
                 <h4>所属父块 P#{{ chunkDetail.parentBlock.parentBlockNo || '-' }}</h4>
               </div>
-              <span>子块范围 C#{{ chunkDetail.parentBlock.startChunkNo || '-' }} - C#{{ chunkDetail.parentBlock.endChunkNo || '-' }}</span>
+              <span>子块范围 C#{{ chunkDetail.parentBlock.startChunkNo || '-' }} - C#{{ chunkDetail.parentBlock.endChunkNo
+                || '-' }}</span>
             </div>
             <div class="chunk-detail-meta">
               <span>章节：{{ chunkDetail.parentBlock.sectionPath || '未识别章节' }}</span>
@@ -171,7 +159,8 @@
             <pre class="chunk-detail-text parent-block-text">{{ chunkDetail.parentBlock.parentText }}</pre>
           </section>
 
-          <section class="chunk-detail-section" v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length">
+          <section class="chunk-detail-section"
+            v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length">
             <div class="chunk-detail-head">
               <h4>同父子块关系</h4>
               <span>点击可切换查看其他子块</span>
@@ -188,31 +177,21 @@
             </p>
             <div class="chunk-relation-track">
               <template v-for="(item, index) in chunkDetail.siblingChunks" :key="`track-${item.chunkId}`">
-                <button
-                  class="chunk-relation-node"
-                  :class="{ active: isCurrentChunk(item) }"
-                  type="button"
-                  @click="openChunkDetail(item.chunkId)"
-                >
+                <button class="chunk-relation-node" :class="{ active: isCurrentChunk(item) }" type="button"
+                  @click="openChunkDetail(item.chunkId)">
                   <strong>C#{{ item.chunkNo || '-' }}</strong>
                   <span>{{ buildSiblingOrderLabel(index, chunkDetail.siblingChunks.length) }}</span>
                 </button>
-                <div
-                  v-if="index < chunkDetail.siblingChunks.length - 1"
-                  class="chunk-relation-line"
-                  :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1]) }"
-                ></div>
+                <div v-if="index < chunkDetail.siblingChunks.length - 1" class="chunk-relation-line"
+                  :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1]) }">
+                </div>
               </template>
             </div>
             <div class="sibling-chunk-list">
-              <button
-                v-for="item in chunkDetail.siblingChunks"
-                :key="`sibling-${item.chunkId}`"
+              <button v-for="item in chunkDetail.siblingChunks" :key="`sibling-${item.chunkId}`"
                 class="sibling-chunk-card"
                 :class="{ active: normalizeCode(item.chunkId) === normalizeCode(chunkDetail.chunk.chunkId) }"
-                type="button"
-                @click="openChunkDetail(item.chunkId)"
-              >
+                type="button" @click="openChunkDetail(item.chunkId)">
                 <div class="sibling-chunk-head">
                   <strong>子块 C#{{ item.chunkNo || '-' }}</strong>
                   <span>{{ buildChunkRelationText(item) }}</span>
@@ -253,14 +232,9 @@
     <article v-if="documentDetail" class="panel-card detail-card">
       <div class="detail-content">
         <nav class="workbench-nav" aria-label="文档工作台章节导航">
-          <button
-            v-for="item in workbenchSections"
-            :key="`workbench-nav-${item.key}`"
-            class="workbench-nav-item"
-            :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]"
-            type="button"
-            @click="scrollToWorkbenchSection(item.key)"
-          >
+          <button v-for="item in workbenchSections" :key="`workbench-nav-${item.key}`" class="workbench-nav-item"
+            :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]" type="button"
+            @click="scrollToWorkbenchSection(item.key)">
             <span class="workbench-nav-step">{{ item.step }}</span>
             <span class="workbench-nav-copy">
               <strong>{{ item.label }}</strong>
@@ -270,7 +244,8 @@
           </button>
         </nav>
 
-        <section v-show="activeWorkbenchSection === 'overview'" ref="overviewSectionRef" class="detail-section workbench-section" data-workbench-section="overview">
+        <section v-show="activeWorkbenchSection === 'overview'" ref="overviewSectionRef"
+          class="detail-section workbench-section" data-workbench-section="overview">
           <div class="workbench-section-head">
             <div class="workbench-section-heading">
               <span class="workbench-section-step-badge">Overview</span>
@@ -284,13 +259,17 @@
             <div class="overview-document-main">
               <p class="overview-document-kicker">Current Document</p>
               <h3>{{ documentDetail.documentName }}</h3>
-              <p v-if="showOriginalFileName" class="overview-document-subtitle">{{ documentDetail.originalFileName }}</p>
+              <p v-if="showOriginalFileName" class="overview-document-subtitle">{{ documentDetail.originalFileName }}
+              </p>
             </div>
             <div class="overview-document-side">
               <div class="detail-statuses">
-                <AdminStatusBadge :label="documentDetail.parseStatusName" :code="documentDetail.parseStatus" type="parse" />
-                <AdminStatusBadge :label="documentDetail.strategyStatusName" :code="documentDetail.strategyStatus" type="strategy" />
-                <AdminStatusBadge :label="documentDetail.indexStatusName" :code="documentDetail.indexStatus" type="index" />
+                <AdminStatusBadge :label="documentDetail.parseStatusName" :code="documentDetail.parseStatus"
+                  type="parse" />
+                <AdminStatusBadge :label="documentDetail.strategyStatusName" :code="documentDetail.strategyStatus"
+                  type="strategy" />
+                <AdminStatusBadge :label="documentDetail.indexStatusName" :code="documentDetail.indexStatus"
+                  type="index" />
               </div>
               <span class="overview-document-phase">{{ workflowCurrentPhase.title }}</span>
             </div>
@@ -330,7 +309,8 @@
           </article>
         </section>
 
-        <section v-show="activeWorkbenchSection === 'strategy'" ref="strategySectionRef" class="detail-section workbench-section" data-workbench-section="strategy">
+        <section v-show="activeWorkbenchSection === 'strategy'" ref="strategySectionRef"
+          class="detail-section workbench-section" data-workbench-section="strategy">
           <div class="workbench-section-head">
             <div class="workbench-section-heading">
               <span class="workbench-section-step-badge">Step 1</span>
@@ -345,12 +325,8 @@
           </div>
 
           <div class="strategy-status-bar" v-if="strategySystemStages.length">
-            <article
-              v-for="item in strategySystemStages"
-              :key="`strategy-stage-${item.code}`"
-              class="strategy-status-step"
-              :class="`strategy-status-step-${item.status}`"
-            >
+            <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
+              class="strategy-status-step" :class="`strategy-status-step-${item.status}`">
               <div class="strategy-status-index">{{ item.order }}</div>
               <div class="strategy-status-copy">
                 <strong>{{ item.label }}</strong>
@@ -373,29 +349,21 @@
               </div>
 
               <div class="strategy-flow-stack">
-                <section
-                  v-for="pipeline in strategyPipelineLibrary"
-                  :key="`recommended-${pipeline.key}`"
-                  class="strategy-lane strategy-lane-recommended"
-                  :class="`strategy-lane-${pipeline.key}`"
-                >
+                <section v-for="pipeline in strategyPipelineLibrary" :key="`recommended-${pipeline.key}`"
+                  class="strategy-lane strategy-lane-recommended" :class="`strategy-lane-${pipeline.key}`">
                   <div class="strategy-lane-header">
                     <div class="strategy-lane-titlebox">
-                      <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' : 'Retrieval Recall Pipeline' }}</p>
+                      <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                        'Retrieval Recall Pipeline' }}</p>
                       <h5>{{ pipeline.label }}</h5>
                     </div>
                     <p class="strategy-lane-description">{{ pipeline.description }}</p>
                   </div>
 
-                  <div
-                    v-if="resolvePlanPipeline(strategyPlan.plan, pipeline.key)?.steps?.length"
-                    class="timeline-list"
-                    :class="`timeline-list-${pipeline.key}`"
-                  >
-                    <template
-                      v-for="(step, index) in resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps"
-                      :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}`"
-                    >
+                  <div v-if="resolvePlanPipeline(strategyPlan.plan, pipeline.key)?.steps?.length" class="timeline-list"
+                    :class="`timeline-list-${pipeline.key}`">
+                    <template v-for="(step, index) in resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps"
+                      :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}`">
                       <article class="timeline-item">
                         <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}</div>
                         <div class="timeline-main">
@@ -403,11 +371,8 @@
                           <p>{{ step.recommendReason || step.strategyRoleName }}</p>
                         </div>
                       </article>
-                      <div
-                        v-if="index < resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps.length - 1"
-                        :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}-arrow`"
-                        class="flow-arrow"
-                      >
+                      <div v-if="index < resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps.length - 1"
+                        :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}-arrow`" class="flow-arrow">
                         <span class="flow-arrow-icon" aria-hidden="true">↓</span>
                       </div>
                     </template>
@@ -428,15 +393,12 @@
                 </div>
 
                 <div class="strategy-flow-stack strategy-flow-stack-edit">
-                  <section
-                    v-for="pipeline in strategyPipelineLibrary"
-                    :key="`editor-${pipeline.key}`"
-                    class="strategy-lane strategy-lane-edit"
-                    :class="`strategy-lane-${pipeline.key}`"
-                  >
+                  <section v-for="pipeline in strategyPipelineLibrary" :key="`editor-${pipeline.key}`"
+                    class="strategy-lane strategy-lane-edit" :class="`strategy-lane-${pipeline.key}`">
                     <div class="strategy-lane-header">
                       <div class="strategy-lane-titlebox">
-                        <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' : 'Retrieval Recall Pipeline' }}</p>
+                        <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                          'Retrieval Recall Pipeline' }}</p>
                         <h5>{{ pipeline.label }}</h5>
                       </div>
                       <p class="strategy-lane-description">{{ pipeline.description }}</p>
@@ -445,8 +407,10 @@
                     <div class="selected-flow-board" :class="`selected-flow-board-${pipeline.key}`">
                       <span class="selected-flow-label" :class="`selected-flow-label-${pipeline.key}`">当前配置</span>
 
-                      <div v-if="getSelectedStrategyPreview(pipeline.key).length" class="sequence-board selected-flow-sequence">
-                        <template v-for="(row, rowIndex) in getSelectedStrategyRows(pipeline.key)" :key="`strategy-row-${pipeline.key}-${rowIndex}`">
+                      <div v-if="getSelectedStrategyPreview(pipeline.key).length"
+                        class="sequence-board selected-flow-sequence">
+                        <template v-for="(row, rowIndex) in getSelectedStrategyRows(pipeline.key)"
+                          :key="`strategy-row-${pipeline.key}-${rowIndex}`">
                           <div class="sequence-row">
                             <article v-if="row.leftItem" class="selected-flow-card sequence-card">
                               <div class="selected-flow-order">{{ row.leftItem.order }}</div>
@@ -455,17 +419,21 @@
                                 <span>{{ row.leftItem.description }}</span>
                               </div>
                               <div class="selected-flow-actions">
-                                <button class="flow-action-button" type="button" :disabled="row.leftItem.index === 0" @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
+                                <button class="flow-action-button" type="button" :disabled="row.leftItem.index === 0"
+                                  @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
                                   上移
                                 </button>
-                                <button class="flow-action-button" type="button" :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
+                                <button class="flow-action-button" type="button"
+                                  :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
                                   下移
                                 </button>
                               </div>
                             </article>
                             <div v-else class="sequence-card-placeholder"></div>
 
-                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction === 'rtl' ? '←' : '→' }}</div>
+                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction ===
+                              'rtl' ? '←' : '→' }}</div>
                             <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
                             <article v-if="row.rightItem" class="selected-flow-card sequence-card">
@@ -475,10 +443,13 @@
                                 <span>{{ row.rightItem.description }}</span>
                               </div>
                               <div class="selected-flow-actions">
-                                <button class="flow-action-button" type="button" :disabled="row.rightItem.index === 0" @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
+                                <button class="flow-action-button" type="button" :disabled="row.rightItem.index === 0"
+                                  @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
                                   上移
                                 </button>
-                                <button class="flow-action-button" type="button" :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
+                                <button class="flow-action-button" type="button"
+                                  :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
                                   下移
                                 </button>
                               </div>
@@ -486,7 +457,8 @@
                             <div v-else class="sequence-card-placeholder"></div>
                           </div>
 
-                          <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1" class="sequence-down-row" :class="`sequence-down-row-${row.downColumn}`">
+                          <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
+                            class="sequence-down-row" :class="`sequence-down-row-${row.downColumn}`">
                             <span class="sequence-down-arrow">↓</span>
                           </div>
                         </template>
@@ -498,17 +470,16 @@
                     </div>
 
                     <div class="strategy-picker" :class="`strategy-picker-${pipeline.key}`">
-                      <button
-                        v-for="item in strategyLibrary"
-                        :key="`${pipeline.key}-${item.type}`"
+                      <button v-for="item in strategyLibrary" :key="`${pipeline.key}-${item.type}`"
                         class="strategy-chip"
-                        :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
-                        type="button"
-                        @click="toggleStrategy(item.type, pipeline.key)"
-                      >
+                        :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }" type="button"
+                        @click="toggleStrategy(item.type, pipeline.key)">
                         <div class="strategy-chip-top">
-                          <span class="strategy-chip-state">{{ getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' : '点击添加' }}</span>
-                          <CheckCircleIcon v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)" class="strategy-chip-check" />
+                          <span class="strategy-chip-state">{{
+                            getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' :
+                              '点击添加' }}</span>
+                          <CheckCircleIcon v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
+                            class="strategy-chip-check" />
                         </div>
                         <strong>{{ item.label }}</strong>
                         <span>{{ item.description }}</span>
@@ -516,11 +487,14 @@
                     </div>
 
                     <div class="preview-box" :class="`preview-box-${pipeline.key}`">
-                      <span class="preview-box-title" :class="`preview-box-title-${pipeline.key}`">{{ pipeline.label }}最终提交顺序</span>
+                      <span class="preview-box-title" :class="`preview-box-title-${pipeline.key}`">{{ pipeline.label
+                        }}最终提交顺序</span>
                       <div v-if="getSelectedStrategyPreview(pipeline.key).length" class="preview-flow">
-                        <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)" :key="`preview-${pipeline.key}-${item.type}`">
+                        <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
+                          :key="`preview-${pipeline.key}-${item.type}`">
                           <span class="preview-tag">{{ item.label }}</span>
-                          <ArrowRightIcon v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1" class="preview-arrow" />
+                          <ArrowRightIcon v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
+                            class="preview-arrow" />
                         </template>
                       </div>
                       <p v-else class="preview-empty">还没有选中策略，无法生成当前流水线的最终提交顺序。</p>
@@ -533,7 +507,8 @@
           </template>
         </section>
 
-        <section v-show="activeWorkbenchSection === 'execution'" ref="executionSectionRef" class="detail-section workbench-section" data-workbench-section="execution">
+        <section v-show="activeWorkbenchSection === 'execution'" ref="executionSectionRef"
+          class="detail-section workbench-section" data-workbench-section="execution">
           <div class="workbench-section-head">
             <div class="workbench-section-heading">
               <span class="workbench-section-step-badge">Step 2</span>
@@ -571,12 +546,8 @@
                 </div>
                 <strong>先确认策略方案</strong>
                 <p>{{ confirmStepDescription }}</p>
-                <button
-                  class="action-button action-button-confirm"
-                  type="button"
-                  :disabled="!canConfirmStrategyAction"
-                  @click="submitConfirmStrategy"
-                >
+                <button class="action-button action-button-confirm" type="button" :disabled="!canConfirmStrategyAction"
+                  @click="submitConfirmStrategy">
                   <span>{{ confirmButtonLabel }}</span>
                   <CheckCircleIcon class="action-button-icon" aria-hidden="true" />
                 </button>
@@ -589,12 +560,8 @@
                 </div>
                 <strong>再执行构建索引</strong>
                 <p>{{ buildStepDescription }}</p>
-                <button
-                  class="action-button action-button-build"
-                  type="button"
-                  :disabled="!canBuildIndexAction"
-                  @click="submitBuildIndex"
-                >
+                <button class="action-button action-button-build" type="button" :disabled="!canBuildIndexAction"
+                  @click="submitBuildIndex">
                   <span>{{ buildButtonLabel }}</span>
                   <ArrowRightIcon class="action-button-icon" aria-hidden="true" />
                 </button>
@@ -629,10 +596,12 @@
                   </article>
                   <div v-else class="sequence-card-placeholder"></div>
 
-                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction === 'rtl' ? '←' : '→' }}</div>
+                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction === 'rtl' ?
+                    '←' : '→' }}</div>
                   <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
-                  <article v-if="row.rightItem" class="stage-card sequence-card" :class="`stage-${row.rightItem.status}`">
+                  <article v-if="row.rightItem" class="stage-card sequence-card"
+                    :class="`stage-${row.rightItem.status}`">
                     <div class="stage-order">
                       <span v-if="row.rightItem.status === 'current'" class="stage-spinner" aria-hidden="true"></span>
                       <span v-else>{{ row.rightItem.order }}</span>
@@ -646,7 +615,8 @@
                   <div v-else class="sequence-card-placeholder"></div>
                 </div>
 
-                <div v-if="rowIndex < buildStageRows.length - 1" class="sequence-down-row" :class="`sequence-down-row-${row.downColumn}`">
+                <div v-if="rowIndex < buildStageRows.length - 1" class="sequence-down-row"
+                  :class="`sequence-down-row-${row.downColumn}`">
                   <span class="sequence-down-arrow">↓</span>
                 </div>
               </template>
@@ -654,13 +624,15 @@
 
             <div class="tracker-footer">
               <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
-              <span>状态 {{ buildTaskSnapshot?.taskStatusName || (hasCode(documentDetail.indexStatus, 3) ? '成功' : '未知') }}</span>
+              <span>状态 {{ buildTaskSnapshot?.taskStatusName || (hasCode(documentDetail.indexStatus, 3) ? '成功' : '未知')
+                }}</span>
               <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
             </div>
           </div>
         </section>
 
-        <section v-show="activeWorkbenchSection === 'chunk'" ref="chunkSectionRef" class="detail-section workbench-section" data-workbench-section="chunk">
+        <section v-show="activeWorkbenchSection === 'chunk'" ref="chunkSectionRef"
+          class="detail-section workbench-section" data-workbench-section="chunk">
           <div class="workbench-section-head">
             <div class="workbench-section-heading">
               <span class="workbench-section-step-badge">Step 3</span>
@@ -672,36 +644,20 @@
               <span v-if="chunkQuery?.taskId">任务 {{ chunkQuery.taskId }} · {{ chunkQuery.total || 0 }} 条</span>
               <span v-else>当前还没有可展示的 chunk</span>
               <div v-if="chunkRecords.length" class="chunk-view-switch">
-                <button
-                  class="chunk-view-button"
-                  :class="{ active: chunkDisplayMode === 'grouped' }"
-                  type="button"
-                  @click="chunkDisplayMode = 'grouped'"
-                >
+                <button class="chunk-view-button" :class="{ active: chunkDisplayMode === 'grouped' }" type="button"
+                  @click="chunkDisplayMode = 'grouped'">
                   按父块分组
                 </button>
-                <button
-                  class="chunk-view-button"
-                  :class="{ active: chunkDisplayMode === 'flat' }"
-                  type="button"
-                  @click="chunkDisplayMode = 'flat'"
-                >
+                <button class="chunk-view-button" :class="{ active: chunkDisplayMode === 'flat' }" type="button"
+                  @click="chunkDisplayMode = 'flat'">
                   平铺列表
                 </button>
-                <button
-                  v-if="chunkDisplayMode === 'grouped'"
-                  class="chunk-view-button"
-                  type="button"
-                  @click="setAllChunkGroupsCollapsed(false)"
-                >
+                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button" type="button"
+                  @click="setAllChunkGroupsCollapsed(false)">
                   展开全部
                 </button>
-                <button
-                  v-if="chunkDisplayMode === 'grouped'"
-                  class="chunk-view-button"
-                  type="button"
-                  @click="setAllChunkGroupsCollapsed(true)"
-                >
+                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button" type="button"
+                  @click="setAllChunkGroupsCollapsed(true)">
                   折叠全部
                 </button>
               </div>
@@ -738,12 +694,9 @@
             </div>
 
             <div v-if="chunkDisplayMode === 'grouped'" class="chunk-group-list">
-              <article
-                v-for="group in chunkGroupedRecords"
-                :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`"
-                class="chunk-group-card"
-                :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }"
-              >
+              <article v-for="group in chunkGroupedRecords"
+                :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`" class="chunk-group-card"
+                :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }">
                 <div class="chunk-group-head">
                   <div class="chunk-group-head-main">
                     <strong>父块 P#{{ group.parentBlockNo || '-' }}</strong>
@@ -751,10 +704,12 @@
                   </div>
                   <div class="chunk-group-head-side">
                     <div class="chunk-group-head-actions">
-                      <button class="ghost-button chunk-group-detail-button" type="button" @click="openParentBlockDetail(group)">
+                      <button class="ghost-button chunk-group-detail-button" type="button"
+                        @click="openParentBlockDetail(group)">
                         查看父块上下文
                       </button>
-                      <button class="ghost-button chunk-group-toggle-button" type="button" @click="toggleChunkGroup(group.groupKey)">
+                      <button class="ghost-button chunk-group-toggle-button" type="button"
+                        @click="toggleChunkGroup(group.groupKey)">
                         {{ isChunkGroupCollapsed(group.groupKey) ? '展开子块' : '折叠子块' }}
                       </button>
                     </div>
@@ -766,13 +721,8 @@
                 </div>
 
                 <div v-if="!isChunkGroupCollapsed(group.groupKey)" class="chunk-group-track">
-                  <button
-                    v-for="item in group.items"
-                    :key="`group-track-${item.chunkId}`"
-                    class="chunk-group-node"
-                    type="button"
-                    @click="openChunkDetail(item.chunkId)"
-                  >
+                  <button v-for="item in group.items" :key="`group-track-${item.chunkId}`" class="chunk-group-node"
+                    type="button" @click="openChunkDetail(item.chunkId)">
                     <strong>#{{ item.chunkNo || '-' }}</strong>
                     <span>{{ formatCount(item.tokenCount) }} Token</span>
                   </button>
@@ -787,12 +737,8 @@
                     <span>Token</span>
                     <span>内容预览</span>
                   </div>
-                  <article
-                    v-for="item in group.items"
-                    :key="`group-row-${item.chunkId}`"
-                    class="chunk-row chunk-row-clickable"
-                    @click="openChunkDetail(item.chunkId)"
-                  >
+                  <article v-for="item in group.items" :key="`group-row-${item.chunkId}`"
+                    class="chunk-row chunk-row-clickable" @click="openChunkDetail(item.chunkId)">
                     <div class="chunk-cell chunk-cell-index" data-label="Chunk">
                       <strong>子块 C#{{ item.chunkNo }}</strong>
                       <span>{{ item.chunkId }}</span>
@@ -832,12 +778,8 @@
                 <span>内容预览</span>
               </div>
 
-              <article
-                v-for="item in chunkRecords"
-                :key="item.chunkId"
-                class="chunk-row chunk-row-clickable"
-                @click="openChunkDetail(item.chunkId)"
-              >
+              <article v-for="item in chunkRecords" :key="item.chunkId" class="chunk-row chunk-row-clickable"
+                @click="openChunkDetail(item.chunkId)">
                 <div class="chunk-cell chunk-cell-index" data-label="Chunk">
                   <strong>子块 C#{{ item.chunkNo }}</strong>
                   <span>{{ item.chunkId }}</span>
@@ -866,23 +808,15 @@
             </div>
 
             <div class="pagination-bar chunk-pagination-bar">
-              <button
-                class="ghost-button"
-                type="button"
-                :disabled="chunkCurrentPage <= 1 || chunkLoading"
-                @click="changeChunkPage(chunkCurrentPage - 1)"
-              >
+              <button class="ghost-button" type="button" :disabled="chunkCurrentPage <= 1 || chunkLoading"
+                @click="changeChunkPage(chunkCurrentPage - 1)">
                 上一页
               </button>
               <div class="pagination-status">
                 <label class="page-size-control">
                   <span>每页显示</span>
-                  <select
-                    class="page-size-select"
-                    :value="chunkCurrentPageSize"
-                    :disabled="chunkLoading"
-                    @change="changeChunkPageSize($event.target.value)"
-                  >
+                  <select class="page-size-select" :value="chunkCurrentPageSize" :disabled="chunkLoading"
+                    @change="changeChunkPageSize($event.target.value)">
                     <option v-for="size in chunkPageSizeOptions" :key="`chunk-page-size-${size}`" :value="size">
                       {{ size }} 条
                     </option>
@@ -891,19 +825,16 @@
                 <strong>第 {{ chunkCurrentPage }} / {{ chunkTotalPages }} 页</strong>
                 <span>共 {{ chunkTotalCount }} 条 Chunk，当前页 {{ chunkRecords.length }} 条</span>
               </div>
-              <button
-                class="ghost-button"
-                type="button"
-                :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading"
-                @click="changeChunkPage(chunkCurrentPage + 1)"
-              >
+              <button class="ghost-button" type="button" :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading"
+                @click="changeChunkPage(chunkCurrentPage + 1)">
                 下一页
               </button>
             </div>
           </div>
         </section>
 
-        <section v-show="activeWorkbenchSection === 'tasks'" ref="taskSectionRef" class="detail-section workbench-section" data-workbench-section="tasks">
+        <section v-show="activeWorkbenchSection === 'tasks'" ref="taskSectionRef"
+          class="detail-section workbench-section" data-workbench-section="tasks">
           <div class="workbench-section-head">
             <div class="workbench-section-heading">
               <span class="workbench-section-step-badge">Step 4</span>
@@ -912,7 +843,8 @@
             </div>
             <div class="task-section-actions">
               <span class="workbench-section-pill">{{ taskSectionStatusText }}</span>
-              <button class="ghost-button" type="button" :disabled="!documentDetail.latestTaskId" @click="openLogDrawer">
+              <button class="ghost-button" type="button" :disabled="!documentDetail.latestTaskId"
+                @click="openLogDrawer">
                 查看完整任务时间线
               </button>
             </div>
@@ -940,11 +872,27 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
-import { APIError, manageApi } from '../../api/api'
+import { documentApi } from '@/api/document.ts'
+import type {
+  DocumentInfo,
+  QueryStrategyPlanResp,
+  QueryTaskLogsResp,
+  QueryDocumentChunksResp,
+  QueryDocumentChunkDetailResp,
+  BuildIndexResp,
+  TaskLog,
+  QueryDocumentDetailReq,
+  QueryStrategyPlanReq,
+  QueryTaskLogsReq,
+  QueryDocumentChunksReq,
+  QueryDocumentChunkDetailReq,
+  ConfirmStrategyReq,
+  BuildIndexReq
+} from '@/types'
 import AdminStatusBadge from '../../components/admin/AdminStatusBadge.vue'
 import { formatCount, formatDateTime, hasCode, normalizeCode } from '../../utils/manageFormat'
 import {
@@ -956,14 +904,13 @@ import {
   extractPipelineStrategyTypes,
   normalizeStrategyTypeList,
   resolvePlanPipeline
-} from '../../utils/documentStrategyPipeline'
+} from '@/utils/documentStrategyPipeline'
 
 const route = useRoute()
 const router = useRouter()
 const OPERATOR_ID = '10001'
 const DEFAULT_CHUNK_PAGE_SIZE = 20
 const CHUNK_PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
-const WORKBENCH_SECTION_KEYS = ['overview', 'strategy', 'execution', 'chunk', 'tasks']
 
 const strategyLibrary = STRATEGY_LIBRARY
 const strategyPipelineLibrary = STRATEGY_PIPELINE_LIBRARY
@@ -977,16 +924,16 @@ const BUILD_STAGE_LIBRARY = [
 
 const BUILD_STAGE_CODE_SET = new Set(BUILD_STAGE_LIBRARY.map((item) => item.code))
 
-const documentDetail = ref(null)
-const strategyPlan = ref(null)
-const selectedParentStrategyTypes = ref([])
-const selectedChildStrategyTypes = ref([])
+const documentDetail = ref<DocumentInfo>(null)
+const strategyPlan = ref<QueryStrategyPlanResp>(null)
+const selectedParentStrategyTypes = ref<string[]>([])
+const selectedChildStrategyTypes = ref<string[]>([])
 const adjustNote = ref('')
-const taskLogs = ref([])
-const taskLogSnapshot = ref(null)
-const buildTaskSnapshot = ref(null)
-const chunkQuery = ref(null)
-const chunkDetail = ref(null)
+const taskLogs = ref<TaskLog[]>([])
+const taskLogSnapshot = ref<QueryTaskLogsResp>(null)
+const buildTaskSnapshot = ref<QueryTaskLogsResp>(null)
+const chunkQuery = ref<QueryDocumentChunksResp>(null)
+const chunkDetail = ref<QueryDocumentChunkDetailResp>(null)
 const chunkDisplayMode = ref('grouped')
 const chunkGroupCollapsedMap = ref({})
 const chunkPageNo = ref(1)
@@ -1752,7 +1699,7 @@ function moveStrategy(type, direction, pipelineKey) {
     return
   }
   const nextList = [...orderedTypes]
-  ;[nextList[sourceIndex], nextList[targetIndex]] = [nextList[targetIndex], nextList[sourceIndex]]
+    ;[nextList[sourceIndex], nextList[targetIndex]] = [nextList[targetIndex], nextList[sourceIndex]]
   setSelectedStrategyTypes(pipelineKey, nextList)
 }
 
@@ -1766,13 +1713,17 @@ function focusBuildTracker() {
 }
 
 async function loadDocumentDetail() {
-  documentDetail.value = await manageApi.queryDocumentDetail(documentId.value)
+  const params: QueryDocumentDetailReq = { documentId: Number(documentId.value) }
+  const res = await documentApi.queryDetail(params)
+  documentDetail.value = res.data || null
 }
 
 async function loadStrategyPlan() {
   planLoading.value = true
   try {
-    strategyPlan.value = await manageApi.queryStrategyPlan(documentId.value)
+    const params: QueryStrategyPlanReq = { documentId: Number(documentId.value) }
+    const res = await documentApi.queryStrategyPlan(params)
+    strategyPlan.value = res.data || null
     selectedParentStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary)
     selectedChildStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'child', strategyLibrary)
     adjustNote.value = ''
@@ -1790,13 +1741,14 @@ async function loadTaskLogs() {
   }
   logLoading.value = true
   try {
-    const data = await manageApi.queryTaskLogs({
-      taskId: latestTaskId,
-      pageNo: '1',
-      pageSize: '30'
-    })
-    taskLogSnapshot.value = data || null
-    taskLogs.value = Array.isArray(data?.logs) ? data.logs : []
+    const params: QueryTaskLogsReq = {
+      taskId: Number(latestTaskId),
+      pageNo: 1,
+      pageSize: 30
+    }
+    const res = await documentApi.queryTaskLogs(params)
+    taskLogSnapshot.value = res.data || null
+    taskLogs.value = Array.isArray(res.data?.logs) ? res.data.logs : []
   } catch (error) {
     console.error('读取任务日志失败', error)
     taskLogSnapshot.value = null
@@ -1813,19 +1765,20 @@ async function loadBuildTaskLogs() {
     return
   }
   try {
-    const data = await manageApi.queryTaskLogs({
-      taskId: buildTaskId,
-      pageNo: '1',
-      pageSize: '30'
-    })
-    buildTaskSnapshot.value = data || null
+    const params: QueryTaskLogsReq = {
+      taskId: Number(buildTaskId),
+      pageNo: 1,
+      pageSize: 30
+    }
+    const res = await documentApi.queryTaskLogs(params)
+    buildTaskSnapshot.value = res.data || null
   } catch (error) {
     console.error('读取构建任务日志失败', error)
     buildTaskSnapshot.value = null
   }
 }
 
-async function loadDocumentChunks(page = chunkCurrentPage.value, options = {}) {
+async function loadDocumentChunks(page = chunkCurrentPage.value, options: { resetCollapse?: boolean; resetChunkDetail?: boolean } = {}) {
   const {
     resetCollapse = true,
     resetChunkDetail = false
@@ -1838,11 +1791,13 @@ async function loadDocumentChunks(page = chunkCurrentPage.value, options = {}) {
       chunkDetailDrawerOpen.value = false
       chunkDetailFocusMode.value = 'chunk'
     }
-    chunkQuery.value = await manageApi.queryDocumentChunks({
-      documentId: documentId.value,
-      pageNo: page,
+    const params: QueryDocumentChunksReq = {
+      documentId: Number(documentId.value),
+      pageNo: Number(page),
       pageSize: chunkPageSize.value
-    })
+    }
+    const res = await documentApi.queryChunks(params)
+    chunkQuery.value = res.data || null
     chunkPageNo.value = Number(chunkQuery.value?.pageNo || page || 1)
     chunkPageSize.value = Number(chunkQuery.value?.pageSize || chunkPageSize.value || DEFAULT_CHUNK_PAGE_SIZE)
     if (resetCollapse) {
@@ -1915,14 +1870,15 @@ async function submitConfirmStrategy() {
   confirmLoading.value = true
   clearNotice()
   try {
-    await manageApi.confirmStrategy({
-      documentId: documentId.value,
+    const params: ConfirmStrategyReq = {
+      documentId: Number(documentId.value),
       basePlanId: strategyPlan.value.plan.planId,
-      adjustNote: adjustNote.value.trim(),
-      operatorId: OPERATOR_ID,
+      adjustNote: adjustNote.value.trim() || undefined,
+      operatorId: Number(OPERATOR_ID),
       parentSteps: buildPipelineStepPayload(selectedParentStrategyTypes.value, strategyLibrary),
       childSteps: buildPipelineStepPayload(selectedChildStrategyTypes.value, strategyLibrary)
-    })
+    }
+    await documentApi.confirmStrategy(params)
     showNotice('策略方案已确认，接下来可以直接构建索引。', 'success')
     await loadAll()
   } catch (error) {
@@ -1954,11 +1910,13 @@ async function submitBuildIndex() {
   buildLoading.value = true
   clearNotice()
   try {
-    const result = await manageApi.buildIndex({
-      documentId: documentId.value,
+    const params: BuildIndexReq = {
+      documentId: Number(documentId.value),
       planId: documentDetail.value.currentPlanId,
-      operatorId: OPERATOR_ID
-    })
+      operatorId: Number(OPERATOR_ID)
+    }
+    const res = await documentApi.buildIndex(params)
+    const result = res.data as BuildIndexResp
     showNotice(`索引任务 ${result.taskId} 已创建，系统正在异步构建中。`, 'success')
     await loadAll()
     startBuildPolling()
@@ -1971,7 +1929,7 @@ async function submitBuildIndex() {
   }
 }
 
-async function openChunkDetail(chunkId, focusMode = 'chunk') {
+async function openChunkDetail(chunkId: number, focusMode: string = 'chunk') {
   if (!chunkId) {
     return
   }
@@ -1979,11 +1937,13 @@ async function openChunkDetail(chunkId, focusMode = 'chunk') {
   chunkDetailLoading.value = true
   chunkDetailFocusMode.value = focusMode
   try {
-    chunkDetail.value = await manageApi.queryDocumentChunkDetail({
-      documentId: documentId.value,
-      taskId: chunkQuery.value?.taskId || null,
-      chunkId
-    })
+    const params: QueryDocumentChunkDetailReq = {
+      documentId: Number(documentId.value),
+      chunkId: Number(chunkId),
+      taskId: chunkQuery.value?.taskId || undefined
+    }
+    const res = await documentApi.queryChunkDetail(params)
+    chunkDetail.value = res.data || null
     if (focusMode === 'parent') {
       await nextTick()
       parentBlockSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -2066,7 +2026,7 @@ function startPlanPolling() {
   }, 2500)
 }
 
-function formatDuration(value) {
+function formatDuration(value: number | string | undefined): string {
   const millis = Number(value || 0)
   if (!Number.isFinite(millis) || millis <= 0) {
     return '-'
@@ -2080,30 +2040,16 @@ function formatDuration(value) {
   return `${(millis / 60_000).toFixed(1)} min`
 }
 
-function normalizeError(error, fallbackMessage) {
-  if (error instanceof APIError && error.message) {
-    return error.message
-  }
+function normalizeError(error: unknown, fallbackMessage: string): string {
   if (error instanceof Error && error.message) {
     return error.message
+  }
+  if (typeof error === 'string') {
+    return error
   }
   return fallbackMessage
 }
 
-watch(() => route.params.documentId, async (value, oldValue) => {
-  if (!value || value === oldValue) {
-    return
-  }
-  activeWorkbenchSection.value = 'overview'
-  chunkPageNo.value = 1
-  chunkPageSize.value = DEFAULT_CHUNK_PAGE_SIZE
-  chunkGroupCollapsedMap.value = {}
-  chunkDetail.value = null
-  chunkDetailDrawerOpen.value = false
-  chunkDetailFocusMode.value = 'chunk'
-  await loadAll()
-  await nextTick()
-})
 
 watch(documentDetail, (value) => {
   if (!value) {
@@ -3055,7 +3001,7 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 
-.strategy-lane + .strategy-lane {
+.strategy-lane+.strategy-lane {
   padding-top: 24px;
   border-top: 1px dashed rgba(17, 24, 39, 0.1);
 }
@@ -3146,7 +3092,7 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 
-.strategy-lane-edit + .strategy-lane-edit {
+.strategy-lane-edit+.strategy-lane-edit {
   border-top: none;
 }
 
@@ -3211,10 +3157,25 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.chunk-chip-1 { background: rgba(17, 24, 39, 0.08); color: var(--color-text); }
-.chunk-chip-2 { background: rgba(37, 87, 214, 0.1); color: var(--color-primary-strong); }
-.chunk-chip-3 { background: rgba(21, 115, 91, 0.1); color: #12644f; }
-.chunk-chip-4 { background: rgba(179, 76, 47, 0.1); color: #9f422b; }
+.chunk-chip-1 {
+  background: rgba(17, 24, 39, 0.08);
+  color: var(--color-text);
+}
+
+.chunk-chip-2 {
+  background: rgba(37, 87, 214, 0.1);
+  color: var(--color-primary-strong);
+}
+
+.chunk-chip-3 {
+  background: rgba(21, 115, 91, 0.1);
+  color: #12644f;
+}
+
+.chunk-chip-4 {
+  background: rgba(179, 76, 47, 0.1);
+  color: #9f422b;
+}
 
 .chunk-body {
   margin: 0;
@@ -3524,7 +3485,9 @@ onBeforeUnmount(() => {
   box-shadow: inset 4px 0 0 rgb(var(--section-accent-rgb));
 }
 
-.chunk-row:last-child { border-bottom: none; }
+.chunk-row:last-child {
+  border-bottom: none;
+}
 
 .chunk-cell {
   min-width: 0;
@@ -3533,16 +3496,35 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.chunk-cell strong { color: var(--color-text-strong); line-height: 1.35; }
-.chunk-cell span { color: #66768a; font-size: 12px; line-height: 1.5; word-break: break-word; }
-.chunk-cell-index strong { font-size: 20px; }
+.chunk-cell strong {
+  color: var(--color-text-strong);
+  line-height: 1.35;
+}
+
+.chunk-cell span {
+  color: #66768a;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chunk-cell-index strong {
+  font-size: 20px;
+}
+
 .chunk-relation-hint {
   color: var(--color-primary-strong) !important;
   font-size: 12px !important;
   font-weight: 700;
 }
-.chunk-cell-status { gap: 8px; }
-.chunk-cell-status .chunk-chip { width: fit-content; }
+
+.chunk-cell-status {
+  gap: 8px;
+}
+
+.chunk-cell-status .chunk-chip {
+  width: fit-content;
+}
 
 .chunk-cell-content .chunk-body {
   display: -webkit-box;
@@ -3807,7 +3789,10 @@ onBeforeUnmount(() => {
   -webkit-line-clamp: 3;
 }
 
-.selected-flow-board { margin-top: 14px; }
+.selected-flow-board {
+  margin-top: 14px;
+}
+
 .selected-flow-board {
   border: 1px solid rgba(17, 24, 39, 0.08);
 }
@@ -3862,10 +3847,14 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.sequence-card-placeholder { min-height: 1px; }
+.sequence-card-placeholder {
+  min-height: 1px;
+}
 
 .selected-flow-sequence,
-.build-stage-board { margin-top: 14px; }
+.build-stage-board {
+  margin-top: 14px;
+}
 
 .sequence-row {
   display: grid;
@@ -3885,7 +3874,9 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 
-.sequence-inline-arrow-empty { visibility: hidden; }
+.sequence-inline-arrow-empty {
+  visibility: hidden;
+}
 
 .sequence-down-row {
   display: grid;
@@ -3894,8 +3885,13 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.sequence-down-row-left .sequence-down-arrow { grid-column: 1; }
-.sequence-down-row-right .sequence-down-arrow { grid-column: 3; }
+.sequence-down-row-left .sequence-down-arrow {
+  grid-column: 1;
+}
+
+.sequence-down-row-right .sequence-down-arrow {
+  grid-column: 3;
+}
 
 .selected-flow-card {
   display: grid;
@@ -3938,8 +3934,18 @@ onBeforeUnmount(() => {
   font-weight: 900;
 }
 
-.selected-flow-content strong { display: block; color: var(--color-text-strong); }
-.selected-flow-content span { display: block; margin-top: 6px; color: #66768a; font-size: 12px; line-height: 1.55; }
+.selected-flow-content strong {
+  display: block;
+  color: var(--color-text-strong);
+}
+
+.selected-flow-content span {
+  display: block;
+  margin-top: 6px;
+  color: #66768a;
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 .selected-flow-actions {
   display: flex;
@@ -3960,7 +3966,10 @@ onBeforeUnmount(() => {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
 }
 
-.flow-action-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.flow-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .flow-action-button:hover:not(:disabled) {
   border-color: rgba(37, 87, 214, 0.2);
@@ -4057,8 +4066,19 @@ onBeforeUnmount(() => {
   color: #1a3fa0;
 }
 
-.strategy-chip strong { display: block; color: var(--color-text-strong); font-size: 15px; }
-.strategy-chip span { display: block; margin-top: 6px; color: #66768a; font-size: 12px; line-height: 1.5; }
+.strategy-chip strong {
+  display: block;
+  color: var(--color-text-strong);
+  font-size: 15px;
+}
+
+.strategy-chip span {
+  display: block;
+  margin-top: 6px;
+  color: #66768a;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .strategy-chip-state {
   display: inline-flex;
@@ -4071,8 +4091,15 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.strategy-chip-check { width: 22px; height: 22px; color: var(--color-primary-strong); }
-.strategy-chip-top { justify-content: space-between; }
+.strategy-chip-check {
+  width: 22px;
+  height: 22px;
+  color: var(--color-primary-strong);
+}
+
+.strategy-chip-top {
+  justify-content: space-between;
+}
 
 .preview-box {
   margin-top: 16px;
@@ -4082,7 +4109,11 @@ onBeforeUnmount(() => {
   padding: 16px 18px;
 }
 
-.preview-box > span { font-weight: 700; color: var(--color-primary-strong); font-size: 14px; }
+.preview-box>span {
+  font-weight: 700;
+  color: var(--color-primary-strong);
+  font-size: 14px;
+}
 
 .reason-card p,
 .preview-empty,
@@ -4132,7 +4163,11 @@ onBeforeUnmount(() => {
 
 .preview-arrow,
 .back-icon,
-.drawer-icon { width: 18px; height: 18px; color: var(--color-primary-strong); }
+.drawer-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-primary-strong);
+}
 
 .flow-arrow-icon {
   position: relative;
@@ -4215,8 +4250,16 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.action-stage-card strong { color: var(--color-text-strong); font-size: 18px; }
-.action-stage-card p { margin: 0; color: var(--color-muted-strong); line-height: 1.7; }
+.action-stage-card strong {
+  color: var(--color-text-strong);
+  font-size: 18px;
+}
+
+.action-stage-card p {
+  margin: 0;
+  color: var(--color-muted-strong);
+  line-height: 1.7;
+}
 
 .action-stage-ready {
   border-color: rgba(37, 87, 214, 0.18);
@@ -4242,7 +4285,9 @@ onBeforeUnmount(() => {
 }
 
 .action-stage-current strong,
-.action-stage-current p { color: #fff; }
+.action-stage-current p {
+  color: #fff;
+}
 
 .action-stage-completed {
   border-color: rgba(21, 115, 91, 0.18);
@@ -4266,7 +4311,10 @@ onBeforeUnmount(() => {
   color: var(--color-muted-strong);
 }
 
-.action-stage-card .action-button { width: 100%; justify-content: center; }
+.action-stage-card .action-button {
+  width: 100%;
+  justify-content: center;
+}
 
 .action-button,
 .primary-button,
@@ -4302,7 +4350,10 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-sm);
 }
 
-.action-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .action-button:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.01);
@@ -4328,7 +4379,9 @@ onBeforeUnmount(() => {
 }
 
 .action-stage-completed .action-button-confirm:disabled,
-.action-stage-locked .action-button-build:disabled { opacity: 0.88; }
+.action-stage-locked .action-button-build:disabled {
+  opacity: 0.88;
+}
 
 .action-stage-locked .action-button-build {
   border-color: var(--color-border);
@@ -4393,7 +4446,10 @@ onBeforeUnmount(() => {
   background: var(--color-surface-soft);
 }
 
-.compact-empty { min-height: 140px; margin-top: 14px; }
+.compact-empty {
+  min-height: 140px;
+  margin-top: 14px;
+}
 
 .build-progress-card {
   padding: 18px 20px;
@@ -4402,7 +4458,10 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
 }
 
-.build-progress-card-inline { margin-top: 18px; scroll-margin-top: 24px; }
+.build-progress-card-inline {
+  margin-top: 18px;
+  scroll-margin-top: 24px;
+}
 
 .build-pulse {
   padding: 6px 10px;
@@ -4413,9 +4472,16 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.build-pulse-static { background: rgba(17, 24, 39, 0.08); color: var(--color-text); }
+.build-pulse-static {
+  background: rgba(17, 24, 39, 0.08);
+  color: var(--color-text);
+}
 
-.build-progress-text { margin: 10px 0 0; color: var(--color-muted); line-height: 1.7; }
+.build-progress-text {
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
 
 .stage-card {
   display: grid;
@@ -4440,9 +4506,24 @@ onBeforeUnmount(() => {
   color: var(--color-text);
 }
 
-.stage-order > span { display: inline-flex; align-items: center; justify-content: center; }
-.stage-body strong { display: block; color: var(--color-text-strong); }
-.stage-body span { display: block; margin-top: 8px; color: #66768a; font-size: 12px; line-height: 1.55; }
+.stage-order>span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-body strong {
+  display: block;
+  color: var(--color-text-strong);
+}
+
+.stage-body span {
+  display: block;
+  margin-top: 8px;
+  color: #66768a;
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 .stage-body em {
   display: inline-flex;
@@ -4463,16 +4544,32 @@ onBeforeUnmount(() => {
 .stage-current .stage-order,
 .stage-current .stage-body strong,
 .stage-current .stage-body span,
-.stage-current .stage-body em { color: #fff; background: transparent; }
+.stage-current .stage-body em {
+  color: #fff;
+  background: transparent;
+}
 
-.stage-current .stage-order .stage-spinner { border-color: rgba(255, 255, 255, 0.32); border-top-color: #fff; }
+.stage-current .stage-order .stage-spinner {
+  border-color: rgba(255, 255, 255, 0.32);
+  border-top-color: #fff;
+}
 
 .stage-completed .stage-order,
-.stage-completed .stage-body em { background: rgba(21, 115, 91, 0.1); color: #12644f; }
+.stage-completed .stage-body em {
+  background: rgba(21, 115, 91, 0.1);
+  color: #12644f;
+}
 
-.stage-failed { border-color: rgba(179, 76, 47, 0.14); background: rgba(255, 247, 237, 0.96); }
+.stage-failed {
+  border-color: rgba(179, 76, 47, 0.14);
+  background: rgba(255, 247, 237, 0.96);
+}
+
 .stage-failed .stage-order,
-.stage-failed .stage-body em { background: rgba(179, 76, 47, 0.1); color: #9f422b; }
+.stage-failed .stage-body em {
+  background: rgba(179, 76, 47, 0.1);
+  color: #9f422b;
+}
 
 .tracker-footer span {
   padding: 8px 12px;
@@ -4484,7 +4581,9 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.summary-log-button { align-self: flex-start; }
+.summary-log-button {
+  align-self: flex-start;
+}
 
 .stage-spinner,
 .build-overlay-spinner {
@@ -4529,7 +4628,12 @@ onBeforeUnmount(() => {
   align-items: start;
 }
 
-.build-overlay-head h3 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.2; }
+.build-overlay-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
 
 .build-overlay-spinner {
   width: 56px;
@@ -4539,9 +4643,17 @@ onBeforeUnmount(() => {
 }
 
 .build-overlay-text,
-.build-overlay-tip { margin: 8px 0 0; color: rgba(255, 255, 255, 0.78); line-height: 1.7; }
+.build-overlay-tip {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.7;
+}
 
-.build-overlay-task-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+.build-overlay-task-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 .build-overlay-task-meta span {
   display: inline-flex;
@@ -4583,14 +4695,41 @@ onBeforeUnmount(() => {
   font-weight: 900;
 }
 
-.build-overlay-stage-copy strong { display: block; color: #fff; }
-.build-overlay-stage-copy span { display: block; margin-top: 6px; color: rgba(255, 255, 255, 0.74); font-size: 13px; }
+.build-overlay-stage-copy strong {
+  display: block;
+  color: #fff;
+}
 
-.build-overlay-stage-current { border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.14); }
-.build-overlay-stage-current .build-overlay-stage-icon { background: rgba(255, 255, 255, 0.18); }
-.build-overlay-stage-current .stage-spinner { border-color: rgba(255, 255, 255, 0.32); border-top-color: #fff; }
-.build-overlay-stage-completed .build-overlay-stage-icon { background: rgba(94, 234, 212, 0.16); color: #8ff8df; }
-.build-overlay-stage-failed .build-overlay-stage-icon { background: rgba(248, 113, 113, 0.16); color: #fecaca; }
+.build-overlay-stage-copy span {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 13px;
+}
+
+.build-overlay-stage-current {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.build-overlay-stage-current .build-overlay-stage-icon {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.build-overlay-stage-current .stage-spinner {
+  border-color: rgba(255, 255, 255, 0.32);
+  border-top-color: #fff;
+}
+
+.build-overlay-stage-completed .build-overlay-stage-icon {
+  background: rgba(94, 234, 212, 0.16);
+  color: #8ff8df;
+}
+
+.build-overlay-stage-failed .build-overlay-stage-icon {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fecaca;
+}
 
 .drawer-overlay {
   position: fixed;
@@ -4675,7 +4814,10 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.drawer-log-node { position: relative; width: 18px; }
+.drawer-log-node {
+  position: relative;
+  width: 18px;
+}
 
 .drawer-log-node::before {
   content: '';
@@ -4699,7 +4841,9 @@ onBeforeUnmount(() => {
   background: rgba(37, 87, 214, 0.15);
 }
 
-.drawer-log-item:last-child .drawer-log-node::after { display: none; }
+.drawer-log-item:last-child .drawer-log-node::after {
+  display: none;
+}
 
 .drawer-log-body {
   padding: 14px 16px;
@@ -4708,7 +4852,9 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
 }
 
-.drawer-log-body p { margin: 10px 0 0; }
+.drawer-log-body p {
+  margin: 10px 0 0;
+}
 
 .drawer-log-detail {
   margin: 12px 0 0;
@@ -4723,19 +4869,35 @@ onBeforeUnmount(() => {
 }
 
 .drawer-fade-enter-active,
-.drawer-fade-leave-active { transition: opacity 0.22s ease; }
+.drawer-fade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
 .drawer-fade-enter-from,
-.drawer-fade-leave-to { opacity: 0; }
+.drawer-fade-leave-to {
+  opacity: 0;
+}
 
 .drawer-slide-enter-active,
-.drawer-slide-leave-active { transition: transform 0.26s ease, opacity 0.26s ease; }
+.drawer-slide-leave-active {
+  transition: transform 0.26s ease, opacity 0.26s ease;
+}
+
 .drawer-slide-enter-from,
-.drawer-slide-leave-to { opacity: 0; transform: translateX(24px); }
+.drawer-slide-leave-to {
+  opacity: 0;
+  transform: translateX(24px);
+}
 
 .build-mask-fade-enter-active,
-.build-mask-fade-leave-active { transition: opacity 0.22s ease; }
+.build-mask-fade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
 .build-mask-fade-enter-from,
-.build-mask-fade-leave-to { opacity: 0; }
+.build-mask-fade-leave-to {
+  opacity: 0;
+}
 
 .page-notice {
   padding: 12px 14px;
@@ -4743,8 +4905,13 @@ onBeforeUnmount(() => {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 960px) {
@@ -4771,34 +4938,114 @@ onBeforeUnmount(() => {
   .workspace-guidance-grid,
   .meta-grid,
   .execution-summary-grid,
-  .strategy-picker { grid-template-columns: 1fr; }
-  .workspace-shortcut-group { grid-template-columns: 1fr; }
-  .overview-action-row { grid-template-columns: 1fr; }
-  .workspace-subsection-copy-inline { text-align: left; }
-  .overview-document-card h3 { font-size: 30px; }
-  .workbench-section-heading h2 { font-size: 34px; }
-  .workspace-subsection h3 { font-size: 24px; }
-  .strategy-adjust-titlebox h5 { font-size: 28px; }
-  .strategy-lane-titlebox h5 { font-size: 20px; }
-  .chunk-toolbar { grid-template-columns: 1fr 1fr; }
-  .pagination-bar { flex-direction: column; }
-  .sequence-row { grid-template-columns: 1fr; }
-  .selected-flow-card { grid-template-columns: 56px minmax(0, 1fr); }
-  .selected-flow-actions { grid-column: span 2; flex-direction: row; }
+  .strategy-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-shortcut-group {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-subsection-copy-inline {
+    text-align: left;
+  }
+
+  .overview-document-card h3 {
+    font-size: 30px;
+  }
+
+  .workbench-section-heading h2 {
+    font-size: 34px;
+  }
+
+  .workspace-subsection h3 {
+    font-size: 24px;
+  }
+
+  .strategy-adjust-titlebox h5 {
+    font-size: 28px;
+  }
+
+  .strategy-lane-titlebox h5 {
+    font-size: 20px;
+  }
+
+  .chunk-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pagination-bar {
+    flex-direction: column;
+  }
+
+  .sequence-row {
+    grid-template-columns: 1fr;
+  }
+
+  .selected-flow-card {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .selected-flow-actions {
+    grid-column: span 2;
+    flex-direction: row;
+  }
+
   .sequence-inline-arrow,
-  .sequence-down-row { justify-content: center; }
-  .sequence-down-row { grid-template-columns: 1fr; }
+  .sequence-down-row {
+    justify-content: center;
+  }
+
+  .sequence-down-row {
+    grid-template-columns: 1fr;
+  }
+
   .sequence-down-row-left .sequence-down-arrow,
-  .sequence-down-row-right .sequence-down-arrow { grid-column: 1; }
+  .sequence-down-row-right .sequence-down-arrow {
+    grid-column: 1;
+  }
+
   .strategy-submit-actions,
-  .build-overlay-stage-list { grid-template-columns: 1fr; }
-  .chunk-table-head { display: none; }
-  .chunk-row { grid-template-columns: 1fr 1fr; }
-  .chunk-cell { padding-top: 2px; }
-  .chunk-cell::before { content: attr(data-label); font-size: 11px; color: var(--color-muted); }
-  .chunk-cell-content { grid-column: 1 / -1; }
-  .build-overlay { padding: 16px; }
-  .build-overlay-card { padding: 20px; }
-  .build-overlay-head { grid-template-columns: 1fr; }
+  .build-overlay-stage-list {
+    grid-template-columns: 1fr;
+  }
+
+  .chunk-table-head {
+    display: none;
+  }
+
+  .chunk-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chunk-cell {
+    padding-top: 2px;
+  }
+
+  .chunk-cell::before {
+    content: attr(data-label);
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .chunk-cell-content {
+    grid-column: 1 / -1;
+  }
+
+  .build-overlay {
+    padding: 16px;
+  }
+
+  .build-overlay-card {
+    padding: 20px;
+  }
+
+  .build-overlay-head {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -228,7 +228,7 @@ export interface TopicDocumentRelation {
 export interface PageResult<T> {
   pageNo: number
   pageSize: number
-  totalSize: number
+  total: number
   totalPages: number
   records: T[]
 }
@@ -461,7 +461,7 @@ export interface QueryDocumentChunksResp {
   planId: number
   pageNo: number
   pageSize: number
-  totalSize: number
+  total: number
   records: DocumentChunk[]
 }
 

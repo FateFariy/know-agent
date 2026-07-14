@@ -106,17 +106,17 @@ export const documentApi = {
     return axios.post('/manage/document/task/log/query', params)
   },
 
-  // 查询文档配置
+  // 查询文档画像
   getProfile(params: DocumentProfileDetailReq): Promise<Response<DocumentProfile>> {
     return axios.post('/manage/document/profile/detail', params)
   },
 
-  // 重新生成文档配置
+  // 重新生成文档画像
   regenerateProfile(params: DocumentProfileRegenerateReq): Promise<Response<DocumentProfile>> {
     return axios.post('/manage/document/profile/regenerate', params)
   },
 
-  // 批量重新生成文档配置
+  // 批量重新生成文档画像
   batchRegenerateProfile(params: DocumentProfileBatchRegenerateReq): Promise<Response<DocumentProfile[]>> {
     return axios.post('/manage/document/profile/batch/regenerate', params)
   },

@@ -189,7 +189,7 @@
               <p>{{ item.originalFileName }}</p>
               <div class="document-row-meta">
                 <span>{{ formatFileSize(item.fileSize) }}</span>
-                <span>{{ formatDateTime(item.editTime) }}</span>
+                <span>{{ formatDateTime(item.updateTime) }}</span>
               </div>
             </div>
             <div class="document-row-status">
@@ -244,7 +244,7 @@
             <div class="meta-item">
               <span>字符 / Token</span>
               <strong>{{ formatCount(selectedDocument.charCount) }} / {{ formatCount(selectedDocument.tokenCount)
-                }}</strong>
+              }}</strong>
             </div>
           </div>
 
@@ -343,8 +343,7 @@
                       <div class="strategy-lane-header">
                         <div class="strategy-lane-titlebox">
                           <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                            'Retrieval Recall
-                            Pipeline' }}</p>
+                            'Retrieval Recall Pipeline' }}</p>
                           <h5>{{ pipeline.label }}</h5>
                         </div>
                         <p class="strategy-lane-description">{{ pipeline.description }}</p>
@@ -434,7 +433,7 @@
 
                       <div class="preview-box" :class="`preview-box-${pipeline.key}`">
                         <span class="preview-box-title" :class="`preview-box-title-${pipeline.key}`">{{ pipeline.label
-                          }}最终提交顺序</span>
+                        }}最终提交顺序</span>
                         <div v-if="getSelectedStrategyPreview(pipeline.key).length" class="preview-flow">
                           <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
                             :key="`preview-${pipeline.key}-${item.type}`">
@@ -634,9 +633,8 @@ import type {
   BuildIndexResp,
   QueryDocumentChunksResp,
   QueryTaskLogsResp,
-  TaskLog,
-  DocumentChunk
-} from '../../types'
+  TaskLog
+} from '@/types'
 import AdminStatusBadge from '../../components/admin/AdminStatusBadge.vue'
 import { formatCount, formatDateTime, formatFileSize, hasCode, normalizeCode } from '../../utils/manageFormat'
 import {
@@ -1153,7 +1151,7 @@ async function loadSelectedDocumentDetail() {
   await Promise.all([loadTaskLogs(), loadBuildTaskLogs(), loadDocumentChunks()])
 }
 
-async function selectDocument(documentId) {
+async function selectDocument(documentId?: string | number) {
   selectedDocumentId.value = String(documentId || '')
 }
 
@@ -1530,7 +1528,7 @@ function normalizeError(error: unknown, fallbackMessage: string): string {
   return fallbackMessage
 }
 
-function formatDuration(value) {
+function formatDuration(value: number | string | undefined): string {
   const millis = Number(value || 0)
   if (!Number.isFinite(millis) || millis <= 0) {
     return '-'
