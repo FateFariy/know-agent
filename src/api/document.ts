@@ -14,7 +14,7 @@ export const documentApi = {
       })
     }
 
-    return axios.post<UploadDocumentResp>('/manage/document/upload', formData, {
+    return axios.post('/manage/document/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -27,51 +27,51 @@ export const documentApi = {
     })
   },
 
-  queryPage(params?: QueryDocumentPageReq) {
-    return axios.post<PageResult<DocumentInfo>>('/manage/document/page/query', params || {})
+  queryPage(params?: QueryDocumentPageReq): Promise<Response<PageResult<DocumentInfo>>> {
+    return axios.post('/manage/document/page/query', params || {})
   },
 
-  queryDetail(params: QueryDocumentDetailReq) {
-    return axios.post<DocumentInfo>('/manage/document/detail/query', params)
+  queryDetail(params: QueryDocumentDetailReq): Promise<Response<DocumentInfo>> {
+    return axios.post('/manage/document/detail/query', params)
   },
 
-  deleteDocument(params: DeleteDocumentReq) {
-    return axios.post<DeleteDocumentResp>('/manage/document/delete', params)
+  deleteDocument(params: DeleteDocumentReq): Promise<Response<DeleteDocumentResp>> {
+    return axios.post('/manage/document/delete', params)
   },
 
-  queryStrategyPlan(params: QueryStrategyPlanReq) {
-    return axios.post<QueryStrategyPlanResp>('/manage/document/strategy/plan/query', params)
+  queryStrategyPlan(params: QueryStrategyPlanReq): Promise<Response<QueryStrategyPlanResp>> {
+    return axios.post('/manage/document/strategy/plan/query', params)
   },
 
-  confirmStrategy(params: ConfirmStrategyReq) {
-    return axios.post<ConfirmStrategyResp>('/manage/document/strategy/confirm', params)
+  confirmStrategy(params: ConfirmStrategyReq): Promise<Response<ConfirmStrategyResp>> {
+    return axios.post('/manage/document/strategy/confirm', params)
   },
 
-  buildIndex(params: BuildIndexReq) {
-    return axios.post<BuildIndexResp>('/manage/document/index/build', params)
+  buildIndex(params: BuildIndexReq): Promise<Response<BuildIndexResp>> {
+    return axios.post('/manage/document/index/build', params)
   },
 
-  queryChunks(params: DocChunksReq) {
-    return axios.post<QueryDocumentChunksResp>('/manage/document/chunk/query', params)
+  queryChunks(params: DocChunksReq): Promise<Response<QueryDocumentChunksResp>> {
+    return axios.post('/manage/document/chunk/query', params)
   },
 
-  queryChunkDetail(params: DocChunkDetailReq) {
-    return axios.post<QueryDocumentChunkDetailResp>('/manage/document/chunk/detail/query', params)
+  queryChunkDetail(params: DocChunkDetailReq): Promise<Response<QueryDocumentChunkDetailResp>> {
+    return axios.post('/manage/document/chunk/detail/query', params)
   },
 
-  queryTaskLogs(params: QueryTaskLogsReq) {
-    return axios.post<QueryTaskLogsResp>('/manage/document/task/log/query', params)
+  queryTaskLogs(params: QueryTaskLogsReq): Promise<Response<QueryTaskLogsResp>> {
+    return axios.post('/manage/document/task/log/query', params)
   },
 
-  getProfile(params: DocumentProfileDetailReq) {
-    return axios.post<DocumentProfile>('/manage/document/profile/detail', params)
+  getProfile(params: DocumentProfileDetailReq): Promise<Response<DocumentProfile>> {
+    return axios.post('/manage/document/profile/detail', params)
   },
 
-  regenerateProfile(params: DocumentProfileRegenerateReq) {
-    return axios.post<DocumentProfile>('/manage/document/profile/regenerate', params)
+  regenerateProfile(params: DocumentProfileRegenerateReq): Promise<Response<DocumentProfile>> {
+    return axios.post('/manage/document/profile/regenerate', params)
   },
 
-  batchRegenerateProfile(params: DocumentProfileBatchRegenerateReq) {
-    return axios.post<DocumentProfile[]>('/manage/document/profile/batch/regenerate', params)
+  batchRegenerateProfile(params: DocumentProfileBatchRegenerateReq): Promise<Response<DocumentProfile[]>> {
+    return axios.post('/manage/document/profile/batch/regenerate', params)
   },
 }

@@ -16,31 +16,31 @@ export const useChatStore = defineStore('chat', () => {
 
   async function fetchDocumentOptions() {
     const res = await chatApi.getDocumentOptions()
-    documentOptions.value = res
+    documentOptions.value = res.data || []
   }
 
-  async function createSession(documentId?: number) {
-    const res = await chatApi.streamChat({
-      question: '',
-      chatMode: 'document',
-      selectedDocumentId: documentId,
-    })
-    return res.conversationId || ''
-  }
+  // async function createSession(documentId?: number) {
+  //   const res = await chatApi.streamChat({
+  //     question: '',
+  //     chatMode: 'document',
+  //     selectedDocumentId: documentId,
+  //   })
+  //   return res.conversationId || ''
+  // }
 
   async function fetchSessionDetail(conversationId: string) {
     const res = await chatApi.getSessionDetail({ conversationId })
-    currentSession.value = res
-    exchanges.value = res.exchanges
-    selectedDocumentId.value = res.selectedDocumentId
+    currentSession.value = res.data || null
+    exchanges.value = res.data?.exchanges || []
+    selectedDocumentId.value = res.data?.selectedDocumentId || null
   }
 
   async function fetchSessions(params?: { chatMode?: string; keyword?: string; pageNo?: number; pageSize?: number }) {
     const res = await chatApi.listSessions(params)
-    sessions.value = res.records
-    total.value = res.totalSize
-    pageNo.value = res.pageNo
-    pageSize.value = res.pageSize
+    sessions.value = res.data?.records || []
+    total.value = res.data?.totalSize || 0
+    pageNo.value = res.data?.pageNo || 1
+    pageSize.value = res.data?.pageSize || 10
   }
 
   async function sendMessage(conversationId: string, question: string, documentId?: number) {
@@ -79,7 +79,7 @@ export const useChatStore = defineStore('chat', () => {
     pageNo,
     pageSize,
     fetchDocumentOptions,
-    createSession,
+    // createSession,
     fetchSessionDetail,
     fetchSessions,
     sendMessage,

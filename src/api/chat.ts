@@ -1,44 +1,60 @@
 import axios from './axios'
-import type { DocumentOption, SessionDetail, SessionListItem, PageResult, StageTrace, RetrievalResult, ChannelExecution, ConversationStopResp, ConversationResetResp, GetExchangeDetailResponse, ChatReq, ConversationIdentityReq, ConversationExchangeDetailQueryReq, ConversationSessionListReq, RetrievalObserveReq } from '@/types'
+import type {
+  Response,
+  DocumentOption,
+  SessionDetail,
+  SessionListItem,
+  PageResult,
+  RetrievalResult,
+  ChannelExecution,
+  ConversationStopResp,
+  ConversationResetResp,
+  GetExchangeDetailResponse,
+  ChatReq,
+  ConversationIdentityReq,
+  ConversationExchangeDetailQueryReq,
+  ConversationSessionListReq,
+  RetrievalObserveReq
+} from '@/types'
 
 export const chatApi = {
-  streamChat(params: ChatReq) {
+  streamChat(params: ChatReq): Promise<Response<void>> {
     return axios.post('/chat/stream', params)
   },
 
-  getDocumentOptions() {
-    return axios.post<DocumentOption[]>('/chat/document/options')
+  getDocumentOptions(): Promise<Response<DocumentOption[]>> {
+    return axios.post('/chat/document/options')
   },
 
-  stopConversation(params: ConversationIdentityReq) {
-    return axios.post<ConversationStopResp>('/chat/session/stop', params)
+  stopConversation(params: ConversationIdentityReq): Promise<Response<ConversationStopResp>> {
+    return axios.post('/chat/session/stop', params)
   },
 
-  getSessionDetail(params: ConversationIdentityReq) {
-    return axios.post<SessionDetail>('/chat/session/detail', params)
+  getSessionDetail(params: ConversationIdentityReq): Promise<Response<SessionDetail>> {
+    return axios.post('/chat/session/detail', params)
   },
 
-  listSessions(params?: ConversationSessionListReq) {
-    return axios.post<PageResult<SessionListItem>>('/chat/session/list', params || {})
+  listSessions(params?: ConversationSessionListReq): Promise<Response<PageResult<SessionListItem>>> {
+    return axios.post('/chat/session/list', params || {})
   },
 
-  resetConversation(params: ConversationIdentityReq) {
-    return axios.post<ConversationResetResp>('/chat/session/reset', params)
+  resetConversation(params: ConversationIdentityReq): Promise<Response<ConversationResetResp>> {
+    return axios.post('/chat/session/reset', params)
   },
 
-  rebuildSummary(params: ConversationIdentityReq) {
-    return axios.post<ConversationResetResp>('/chat/session/summary/rebuild', params)
+  rebuildSummary(params: ConversationIdentityReq): Promise<Response<ConversationResetResp>> {
+    return axios.post('/chat/session/summary/rebuild', params)
   },
 
-  getExchangeDetail(params: ConversationExchangeDetailQueryReq) {
-    return axios.post<GetExchangeDetailResponse>('/chat/exchange/detail', params)
+  getExchangeDetail(params: ConversationExchangeDetailQueryReq): Promise<Response<GetExchangeDetailResponse>> {
+    return axios.post('/chat/exchange/detail', params)
   },
 
-  getRetrievalResults(params: RetrievalObserveReq) {
-    return axios.post<RetrievalResult[]>('/chat/exchange/retrieval/results', params)
+  getRetrievalResults(params: RetrievalObserveReq): Promise<Response<RetrievalResult[]>> {
+    return axios.post('/chat/exchange/retrieval/results', params)
   },
 
-  getChannelExecutions(params: RetrievalObserveReq) {
-    return axios.post<ChannelExecution[]>('/chat/exchange/channel/executions', params)
+  getChannelExecutions(params: RetrievalObserveReq): Promise<Response<ChannelExecution[]>> {
+    return axios.post('/chat/exchange/channel/executions', params)
   },
 }
