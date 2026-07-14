@@ -155,7 +155,7 @@ type (
 	ConversationSessionListResp {
 		PageNo     int                        `json:"pageNo"` // 页码
 		PageSize   int                        `json:"pageSize"` // 每页大小
-		TotalSize  int64                      `json:"totalSize"` // 总记录数
+		Total  int64                      `json:"total"` // 总记录数
 		TotalPages int64                      `json:"totalPages"` // 总页数
 		Records    []*ConversationSessionResp `json:"records"` // 会话列表
 	}

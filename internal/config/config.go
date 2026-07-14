@@ -46,8 +46,10 @@ type MilvusConf struct {
 }
 
 type MQConf struct {
+	Endpoint   string `json:",omitempty,default=127.0.0.1"`
 	ParseTopic string `json:",omitempty,default=know-agent-document"`
 	IndexTopic string `json:",omitempty,default=know-agent-index"`
+	Retry      int    `json:",optional,default=3"`
 	Enabled    bool   `json:",omitempty,default=false"`
 }
 

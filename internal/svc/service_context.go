@@ -31,6 +31,7 @@ type ServiceContext struct {
 	Minio     *minio.Client
 	Db        *gorm.DB
 	Rdb       *redis.Client
+	MQ        *config.MQConf
 	RedSync   *redsync.Redsync
 	Emb       embedding.Embedder
 	ChatModel model.BaseModel[*schema.AgenticMessage]
