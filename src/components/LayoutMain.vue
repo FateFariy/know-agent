@@ -1,17 +1,4 @@
 <script setup lang="ts">
-import { useRouter, useRoute } from 'vue-router'
-import { Setting, Menu, Cpu } from '@element-plus/icons-vue'
-
-const router = useRouter()
-const route = useRoute()
-
-function goToAdmin() {
-  router.push('/admin')
-}
-
-function isAdminPage(): boolean {
-  return route.path === '/admin'
-}
 </script>
 
 <template>

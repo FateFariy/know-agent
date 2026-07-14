@@ -2,6 +2,15 @@ import axios from './axios'
 import type { Response, DocumentInfo, DocumentProfile, PageResult, UploadDocumentResp, BuildIndexResp, QueryStrategyPlanResp, ConfirmStrategyResp, QueryDocumentChunksResp, QueryDocumentChunkDetailResp, QueryTaskLogsResp, DeleteDocumentResp, UploadDocumentReq, QueryDocumentPageReq, QueryDocumentDetailReq, DeleteDocumentReq, QueryStrategyPlanReq, ConfirmStrategyReq, BuildIndexReq, QueryDocumentChunksReq as DocChunksReq, QueryDocumentChunkDetailReq as DocChunkDetailReq, QueryTaskLogsReq, DocumentProfileDetailReq, DocumentProfileRegenerateReq, DocumentProfileBatchRegenerateReq } from '@/types'
 
 export const documentApi = {
+  // 上传文档（带完整表单数据）
+  uploadDocument(formData: FormData): Promise<Response<UploadDocumentResp>> {
+    return axios.post('/manage/document/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  },
+
   // 上传文件
   uploadFile(file: File, data?: UploadDocumentReq, onProgress?: (progress: number) => void): Promise<Response<UploadDocumentResp>> {
     const formData = new FormData()
