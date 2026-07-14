@@ -1,0 +1,36 @@
+{
+  "dependencies": {
+    "@vueuse/core": "^14.3.0",
+    "axios": "^1.18.1",
+    "element-plus": "^2.14.3",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.39",
+    "vue-router": "^4.6.4"
+  },
+  "name": "know-agent-front",
+  "version": "1.0.0",
+  "description": "This template should help get you started developing with Vue 3 in Vite.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "@vue/tsconfig": "^0.9.1",
+    "eslint": "^9.39.5",
+    "jiti": "^2.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3",
+    "vite-plugin-vue-devtools": "^8.1.5",
+    "vue-tsc": "^2.2.12"
+  }
+}
