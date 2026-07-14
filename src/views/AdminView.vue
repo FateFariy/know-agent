@@ -8,7 +8,6 @@ import {
   Files,
   Document,
   Folder,
-  ArrowDown,
   ArrowLeft,
   Plus,
   Edit,
@@ -23,10 +22,9 @@ import type { KnowledgeScope, KnowledgeTopic, TopicDocumentRelation, UploadDocum
 const router = useRouter()
 const documentStore = useDocumentStore()
 
-type MenuKey = 'document-upload' | 'document-list' | 'knowledge-scope' | 'knowledge-topic'
+type MenuKey = 'document-upload' | 'document-list' | 'knowledge-scope' | 'knowledge-topic' | 'overview' | 'dialog-observation'
 
 const activeMenu = ref<MenuKey>('document-upload')
-const expandedMenus = ref<string[]>(['document', 'knowledge'])
 
 interface NavItem {
   key: string
@@ -37,22 +35,29 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    key: 'document',
-    label: '文档管理',
+    key: 'overview',
+    label: '运营总览',
     icon: Files,
-    children: [
-      { key: 'document-upload', label: '上传文档', icon: Plus },
-      { key: 'document-list', label: '文档列表', icon: Document },
-    ],
   },
   {
-    key: 'knowledge',
-    label: '知识库管理',
+    key: 'document-upload',
+    label: '文档接入',
+    icon: Document,
+  },
+  {
+    key: 'knowledge-scope',
+    label: '知识路由',
     icon: Folder,
-    children: [
-      { key: 'knowledge-scope', label: '知识范围', icon: Folder },
-      { key: 'knowledge-topic', label: '知识主题', icon: Document },
-    ],
+  },
+  {
+    key: 'knowledge-topic',
+    label: '路由追踪',
+    icon: Document,
+  },
+  {
+    key: 'dialog-observation',
+    label: '对话观测',
+    icon: Folder,
   },
 ]
 
@@ -307,33 +312,16 @@ function goBack() {
   router.push('/')
 }
 
-function toggleMenu(key: string) {
-  const idx = expandedMenus.value.indexOf(key)
-  if (idx >= 0) {
-    expandedMenus.value.splice(idx, 1)
-  } else {
-    expandedMenus.value.push(key)
-  }
-}
-
-function selectMenu(key: MenuKey, parentKey: string) {
+function selectMenu(key: MenuKey) {
   activeMenu.value = key
-  if (!expandedMenus.value.includes(parentKey)) {
-    expandedMenus.value.push(parentKey)
-  }
   if (key === 'document-list') {
     fetchDocuments()
   }
 }
 
 function getCurrentTitle() {
-  for (const item of navItems) {
-    if (item.children) {
-      const child = item.children.find(c => c.key === activeMenu.value)
-      if (child) return child.label
-    }
-  }
-  return '管理后台'
+  const item = navItems.find(i => i.key === activeMenu.value)
+  return item?.label || '管理后台'
 }
 
 onMounted(() => {
@@ -348,10 +336,9 @@ onMounted(() => {
     <aside class="admin-sidebar" :class="{ collapsed: !showSidebar }">
       <div class="sidebar-header">
         <div class="brand">
-          <div class="brand-logo">R</div>
+          <div class="brand-logo">SA</div>
           <div class="brand-info">
-            <div class="brand-title">Ragent 管理后台</div>
-            <div class="brand-subtitle">Knowledge Console</div>
+            <div class="brand-title">Super Agent</div>
           </div>
         </div>
       </div>
@@ -363,36 +350,13 @@ onMounted(() => {
           <button
             class="nav-item"
             :class="{
-              active: item.children?.some(c => c.key === activeMenu),
+              active: activeMenu === item.key,
             }"
-            @click="item.children ? toggleMenu(item.key) : null"
+            @click="selectMenu(item.key)"
           >
-            <component :is="item.icon" :size="14" />
+            <component :is="item.icon" :size="12" />
             <span class="nav-label">{{ item.label }}</span>
-            <ArrowDown
-              v-if="item.children"
-              :size="12"
-              class="nav-arrow"
-              :class="{ rotated: expandedMenus.includes(item.key) }"
-            />
           </button>
-
-          <div
-            v-if="item.children"
-            class="submenu"
-            :class="{ expanded: expandedMenus.includes(item.key) }"
-          >
-            <button
-              v-for="child in item.children"
-              :key="child.key"
-              class="submenu-item"
-              :class="{ active: activeMenu === child.key }"
-              @click="selectMenu(child.key, item.key)"
-            >
-              <component :is="child.icon" :size="12" />
-              <span>{{ child.label }}</span>
-            </button>
-          </div>
         </template>
       </div>
 
@@ -901,9 +865,9 @@ onMounted(() => {
 }
 
 .admin-sidebar {
-  width: 200px;
-  background: #0f172a;
-  color: #cbd5e1;
+  width: 180px;
+  background: #ffffff;
+  color: #333333;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -914,6 +878,7 @@ onMounted(() => {
   transition: transform 0.3s ease;
   overflow-y: auto;
   overflow-x: hidden;
+  border-right: 1px solid #f0f0f0;
 }
 
 .admin-sidebar.collapsed {
@@ -930,26 +895,26 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 16px 16px 18px;
-  border-bottom: 1px solid #1e293b;
+  padding: 16px 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .brand-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #2563eb;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -957,22 +922,14 @@ onMounted(() => {
 .brand-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
 .brand-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.brand-subtitle {
-  font-size: 10px;
-  color: #64748b;
+  color: #1a1a1a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -980,44 +937,44 @@ onMounted(() => {
 
 .sidebar-section {
   flex: 1;
-  padding: 16px 12px;
+  padding: 12px 8px;
 }
 
 .section-label {
   font-size: 10px;
-  color: #475569;
+  color: #999999;
   text-transform: uppercase;
   letter-spacing: 1px;
-  padding: 0 8px 10px;
+  padding: 0 8px 8px;
   font-weight: 600;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 10px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   font-size: 13px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #666666;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
   text-align: left;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 .nav-item:hover {
-  background: #1e293b;
-  color: #f1f5f9;
+  background: #f0f5ff;
+  color: #2563eb;
 }
 
 .nav-item.active {
-  background: #6366f1;
+  background: #2563eb;
   color: #fff;
 }
 
@@ -1027,69 +984,11 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-.nav-arrow {
-  transition: transform 0.2s ease;
-  opacity: 0.6;
-}
 
-.nav-arrow.rotated {
-  transform: rotate(180deg);
-}
-
-.submenu {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-}
-
-.submenu.expanded {
-  max-height: 200px;
-}
-
-.submenu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 12px 6px 40px;
-  background: transparent;
-  border: none;
-  border-radius: 5px;
-  font-size: 12px;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  text-align: left;
-  margin: 1px 0;
-}
-
-.submenu-item:hover {
-  background: #1e293b;
-  color: #f1f5f9;
-}
-
-.submenu-item.active {
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
-  position: relative;
-}
-
-.submenu-item.active::before {
-  content: '';
-  position: absolute;
-  left: 26px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 4px;
-  background: #6366f1;
-  border-radius: 50%;
-}
 
 .sidebar-footer {
   padding: 12px 12px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid #f0f0f0;
 }
 
 .back-btn {
@@ -1098,10 +997,10 @@ onMounted(() => {
   gap: 8px;
   padding: 7px 12px;
   background: transparent;
-  border: 1px solid #334155;
-  border-radius: 6px;
+  border: 1px solid #d0d0d0;
+  border-radius: 5px;
   font-size: 12px;
-  color: #94a3b8;
+  color: #666666;
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
@@ -1109,14 +1008,14 @@ onMounted(() => {
 }
 
 .back-btn:hover {
-  background: #1e293b;
-  border-color: #6366f1;
-  color: #a5b4fc;
+  background: #f0f5ff;
+  border-color: #2563eb;
+  color: #2563eb;
 }
 
 .admin-main {
   flex: 1;
-  margin-left: 200px;
+  margin-left: 180px;
   display: flex;
   flex-direction: column;
   transition: margin-left 0.3s ease;
