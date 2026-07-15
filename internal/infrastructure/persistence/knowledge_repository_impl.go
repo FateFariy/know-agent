@@ -64,9 +64,10 @@ func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		return k.dbWithContext(ctx).Create(nodeModel).Error
 	}
 	nodeModel.ID = node.ID
-	return k.dbWithContext(ctx).Save(nodeModel).Error
+	return k.dbWithContext(ctx).Updates(nodeModel).Error
 }
 
 // DeleteKnowledgeScopeNode 删除知识范围节点
@@ -106,9 +107,10 @@ func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		return k.dbWithContext(ctx).Create(nodeModel).Error
 	}
 	nodeModel.ID = node.ID
-	return k.dbWithContext(ctx).Save(nodeModel).Error
+	return k.dbWithContext(ctx).Updates(nodeModel).Error
 }
 
 // DeleteKnowledgeTopicNode 删除主题节点
@@ -152,9 +154,10 @@ func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Contex
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		return k.dbWithContext(ctx).Create(relModel).Error
 	}
 	relModel.ID = relation.ID
-	return k.dbWithContext(ctx).Save(relModel).Error
+	return k.dbWithContext(ctx).Updates(relModel).Error
 }
 
 // DeleteTopicDocumentRelation 删除主题-文档关系
