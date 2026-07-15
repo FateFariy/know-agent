@@ -1,9 +1,116 @@
-const ROUTE_MODE_LABELS = {
+type RouteMode = 'auto' | 'shadow'
+
+type RouteStatusKey = 'SUCCESS' | 'LOW_CONFIDENCE' | 'FAILED'
+
+type StatusTone = 'success' | 'warning' | 'danger'
+
+interface RouteStatusMeta {
+  key: RouteStatusKey
+  label: string
+  tone: StatusTone
+}
+
+interface ConfidenceBand {
+  label: string
+  tone: StatusTone
+}
+
+interface CandidateItem {
+  score?: number
+  documentId?: number
+  documentName?: string
+  reason?: string
+  [key: string]: unknown
+}
+
+interface NormalizedCandidate extends CandidateItem {
+  scoreNumber: number | null
+  scoreText: string
+}
+
+interface RouteTraceRecord {
+  mode?: unknown
+  topScopesJson?: unknown
+  topTopicsJson?: unknown
+  topDocumentsJson?: unknown
+  confidence?: unknown
+  routeStatus?: unknown
+  selectedDocumentId?: unknown
+  createTime?: unknown
+  hitSelectedDocument?: unknown
+  errorMsg?: unknown
+  exchangeId?: unknown
+  [key: string]: unknown
+}
+
+export interface NormalizedRouteTrace extends RouteTraceRecord {
+  mode: string
+  modeLabel: string
+  scopes: NormalizedCandidate[]
+  topics: NormalizedCandidate[]
+  documents: NormalizedCandidate[]
+  topDocument: NormalizedCandidate | null
+  selectedDocumentId: string
+  selectedDocument: NormalizedCandidate | null
+  confidenceNumber: number | null
+  confidenceText: string
+  confidenceBand: ConfidenceBand
+  statusKey: RouteStatusKey
+  statusLabel: string
+  statusTone: StatusTone
+  reasonText: string
+  createTimeNumber: number
+  hitTop3: boolean
+  missedTop3: boolean
+  candidateDocumentCount: number
+  candidateTopicCount: number
+  candidateScopeCount: number
+  lowConfidenceWidened: boolean
+}
+
+export interface RouteExplain extends NormalizedRouteTrace {
+  summary: string
+  notes: string[]
+  topDocuments: NormalizedCandidate[]
+  scopePreview: NormalizedCandidate[]
+  topicPreview: NormalizedCandidate[]
+}
+
+export interface RouteTraceSummary {
+  total: number
+  autoCount: number
+  shadowCount: number
+  successCount: number
+  lowConfidenceCount: number
+  failedCount: number
+  highConfidenceCount: number
+  widenedCount: number
+  uniqueTopDocumentCount: number
+  averageConfidenceText: string
+  averageDocumentCountText: string
+  averageTopicCountText: string
+  averageScopeCountText: string
+  successRateText: string
+  lowConfidenceRateText: string
+  shadowHitRateText: string
+}
+
+export interface DocumentDistributionItem {
+  documentId: string
+  documentName: string
+  count: number
+  confidenceTotal: number
+  confidenceCount: number
+  lowConfidenceCount: number
+  averageConfidenceText: string
+}
+
+const ROUTE_MODE_LABELS: Record<RouteMode, string> = {
   auto: '自动知识路由',
   shadow: '影子路由对比'
 }
 
-const ROUTE_STATUS_ALIAS = {
+const ROUTE_STATUS_ALIAS: Record<string, RouteStatusKey> = {
   '1': 'SUCCESS',
   '2': 'LOW_CONFIDENCE',
   '3': 'FAILED',
@@ -12,7 +119,7 @@ const ROUTE_STATUS_ALIAS = {
   FAILED: 'FAILED'
 }
 
-const ROUTE_STATUS_META = {
+const ROUTE_STATUS_META: Record<RouteStatusKey, RouteStatusMeta> = {
   SUCCESS: {
     key: 'SUCCESS',
     label: '成功',
@@ -30,19 +137,19 @@ const ROUTE_STATUS_META = {
   }
 }
 
-function asString(value) {
+function asString(value: unknown): string {
   if (value == null) {
     return ''
   }
   return String(value).trim()
 }
 
-function toNumber(value) {
+function toNumber(value: unknown): number | null {
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
 
-function parseCandidateList(rawValue) {
+function parseCandidateList(rawValue: unknown): CandidateItem[] {
   const normalized = asString(rawValue)
   if (!normalized) {
     return []
@@ -56,26 +163,25 @@ function parseCandidateList(rawValue) {
   }
 }
 
-function resolveRouteStatusMeta(value) {
+function resolveRouteStatusMeta(value: unknown): RouteStatusMeta {
   const alias = ROUTE_STATUS_ALIAS[asString(value)] || 'FAILED'
   return ROUTE_STATUS_META[alias] || ROUTE_STATUS_META.FAILED
 }
 
-function resolveConfidenceBand(value) {
-  const numeric = toNumber(value)
-  if (numeric == null || numeric <= 0) {
+function resolveConfidenceBand(value: number | null): ConfidenceBand {
+  if (value == null || value <= 0) {
     return {
       label: '未形成有效置信度',
       tone: 'danger'
     }
   }
-  if (numeric >= 0.8) {
+  if (value >= 0.8) {
     return {
       label: '高置信',
       tone: 'success'
     }
   }
-  if (numeric >= 0.55) {
+  if (value >= 0.55) {
     return {
       label: '可用但偏保守',
       tone: 'warning'
@@ -87,7 +193,7 @@ function resolveConfidenceBand(value) {
   }
 }
 
-function normalizeCandidate(item = {}) {
+function normalizeCandidate(item: CandidateItem = {}): NormalizedCandidate {
   const scoreNumber = toNumber(item.score)
   return {
     ...item,
@@ -96,7 +202,7 @@ function normalizeCandidate(item = {}) {
   }
 }
 
-function average(numbers) {
+function average(numbers: number[]): number | null {
   if (!numbers.length) {
     return null
   }
@@ -104,11 +210,11 @@ function average(numbers) {
   return total / numbers.length
 }
 
-export function formatRouteMode(value) {
-  return ROUTE_MODE_LABELS[asString(value)] || asString(value) || '未知路由模式'
+export function formatRouteMode(value: unknown): string {
+  return ROUTE_MODE_LABELS[asString(value) as RouteMode] || asString(value) || '未知路由模式'
 }
 
-export function normalizeRouteTrace(record = {}) {
+export function normalizeRouteTrace(record: RouteTraceRecord = {}): NormalizedRouteTrace {
   const scopes = parseCandidateList(record.topScopesJson).map(normalizeCandidate)
   const topics = parseCandidateList(record.topTopicsJson).map(normalizeCandidate)
   const documents = parseCandidateList(record.topDocumentsJson).map(normalizeCandidate)
@@ -116,10 +222,10 @@ export function normalizeRouteTrace(record = {}) {
   const statusMeta = resolveRouteStatusMeta(record.routeStatus)
   const selectedDocumentId = asString(record.selectedDocumentId)
   const selectedDocument = selectedDocumentId
-    ? documents.find((item) => asString(item.documentId) === selectedDocumentId) || null
+    ? documents.find((item) => asString(item.documentId) === selectedDocumentId) ?? null
     : null
-  const topDocument = documents[0] || null
-  const createTimeNumber = toNumber(record.createTime) || 0
+  const topDocument = documents[0] ?? null
+  const createTimeNumber = toNumber(record.createTime) ?? 0
   const hitSelectedDocument = asString(record.hitSelectedDocument)
   const mode = asString(record.mode)
 
@@ -150,7 +256,7 @@ export function normalizeRouteTrace(record = {}) {
   }
 }
 
-export function buildRouteTraceLookup(records = []) {
+export function buildRouteTraceLookup(records: RouteTraceRecord[] = []): Record<string, NormalizedRouteTrace> {
   return records.reduce((lookup, item) => {
     const normalized = normalizeRouteTrace(item)
     const exchangeId = asString(normalized.exchangeId)
@@ -170,10 +276,10 @@ export function buildRouteTraceLookup(records = []) {
       lookup[exchangeId] = normalized
     }
     return lookup
-  }, {})
+  }, {} as Record<string, NormalizedRouteTrace>)
 }
 
-export function buildChatRouteExplain(record) {
+export function buildChatRouteExplain(record: RouteTraceRecord | null | undefined): RouteExplain | null {
   if (!record) {
     return null
   }
@@ -182,7 +288,7 @@ export function buildChatRouteExplain(record) {
   const topDocuments = trace.documents.slice(0, 5)
   const scopePreview = trace.scopes.slice(0, 3)
   const topicPreview = trace.topics.slice(0, 3)
-  const notes = []
+  const notes: string[] = []
   let summary = ''
 
   if (trace.mode === 'auto') {
@@ -227,17 +333,17 @@ export function buildChatRouteExplain(record) {
   }
 }
 
-export function summarizeRouteTraceRecords(records = []) {
+export function summarizeRouteTraceRecords(records: RouteTraceRecord[] = []): RouteTraceSummary {
   const normalized = records.map(normalizeRouteTrace)
   const autoCount = normalized.filter((item) => item.mode === 'auto').length
   const shadowCount = normalized.filter((item) => item.mode === 'shadow').length
   const successCount = normalized.filter((item) => item.statusKey === 'SUCCESS').length
   const lowConfidenceCount = normalized.filter((item) => item.statusKey === 'LOW_CONFIDENCE').length
   const failedCount = normalized.filter((item) => item.statusKey === 'FAILED').length
-  const highConfidenceCount = normalized.filter((item) => (item.confidenceNumber || 0) >= 0.8).length
+  const highConfidenceCount = normalized.filter((item) => (item.confidenceNumber ?? 0) >= 0.8).length
   const confidenceValues = normalized
     .map((item) => item.confidenceNumber)
-    .filter((item) => item != null)
+    .filter((item): item is number => item != null)
   const averageConfidence = average(confidenceValues)
   const shadowSamples = normalized.filter((item) => item.mode === 'shadow' && (item.hitTop3 || item.missedTop3))
   const shadowHitCount = shadowSamples.filter((item) => item.hitTop3).length
@@ -274,7 +380,7 @@ export function summarizeRouteTraceRecords(records = []) {
   }
 }
 
-export function buildTopDocumentDistribution(records = []) {
+export function buildTopDocumentDistribution(records: RouteTraceRecord[] = []): DocumentDistributionItem[] {
   const rows = records
     .map(normalizeRouteTrace)
     .filter((item) => item.topDocument)
@@ -298,7 +404,7 @@ export function buildTopDocumentDistribution(records = []) {
       }
       map.set(documentId, existing)
       return map
-    }, new Map())
+    }, new Map<string, DocumentDistributionItem>())
 
   return [...rows.values()]
     .map((item) => ({

@@ -1,6 +1,303 @@
-import { APIError } from '../../api/api'
+import type {
+  Exchange,
+  Reference,
+  RetrievalResult,
+  SessionDetail,
+  SessionListItem,
+  StageTrace
+} from '@/types'
 
-const STATUS_LABELS = {
+export interface APIError {
+  message: string
+}
+
+export type StatusType = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'STOPPED' | 'SKIPPED' | 'WARNING'
+
+export type StatusTone =
+  'running'
+  | 'completed'
+  | 'failed'
+  | 'stopped'
+  | 'idle'
+  | 'warning'
+  | 'neutral'
+  | 'success'
+  | 'primary'
+
+export type ExecutionMode = 'RAG_CHAT' | 'REACT_AGENT' | 'CLARIFICATION' | string
+
+export type RelationType = 'FOLLOW_UP' | 'TOPIC_SWITCH' | 'FRESH_TOPIC' | 'UNKNOWN' | string
+
+export type RetrievalMode =
+  'DIRECT_QUERY'
+  | 'SECTION_FOCUSED'
+  | 'ANALYTIC_DECOMPOSITION'
+  | 'UNKNOWN'
+  | string
+
+export type AnswerShape =
+  'LIST'
+  | 'STEPS'
+  | 'OUTLINE'
+  | 'COMPARISON'
+  | 'EXPLANATION'
+  | 'JUDGMENT'
+  | 'FACT'
+  | 'UNKNOWN'
+  | string
+
+export type ChannelType = 'keyword' | 'vector' | 'rerank' | 'hybrid' | 'web-search' | string
+
+export type ExecutionState = 1 | 2 | 3 | 4
+
+export type ToolName = 'tavily_search' | 'keyword' | 'vector' | 'rerank' | string
+
+export type ChatMode = 'DOCUMENT' | 'AUTO_DOCUMENT' | 'OPEN_CHAT' | string
+
+export type StageCode =
+  'MEMORY'
+  | 'INTENT'
+  | 'REWRITE'
+  | 'ROUTE'
+  | 'RAG_RETRIEVE'
+  | 'EVIDENCE_BUDGET'
+  | 'ANSWER_GENERATE'
+  | 'REACT_AGENT'
+  | 'RECOMMENDATION'
+  | 'FINALIZE'
+  | string
+
+export interface TextBlock {
+  label: string
+  value: string
+  code: boolean
+}
+
+export interface ListBlock {
+  label: string
+  items: string[]
+  ordered: boolean
+}
+
+export interface Chip {
+  label: string
+  value: string
+  tone: StatusTone
+}
+
+export interface Metric {
+  label: string
+  value: string
+  mono: boolean
+}
+
+export interface ToolTrace {
+  toolName: string
+  topic: string
+
+  [key: string]: unknown
+}
+
+export interface Stage {
+  key: string
+  eyebrow: string
+  title: string
+  subtitle: string
+  tone: StatusTone
+  chips?: Chip[]
+  metrics?: Metric[]
+  textBlocks?: TextBlock[]
+  listBlocks?: ListBlock[]
+  toolTraces?: ToolTrace[]
+  references?: Reference[]
+  advancedTextBlocks?: TextBlock[]
+  advancedListBlocks?: ListBlock[]
+}
+
+export interface IntentResolution {
+  relationType?: RelationType
+  retrievalMode?: RetrievalMode
+  answerShape?: AnswerShape
+  confidence?: number
+  informationNeed?: string
+  rationale?: string
+  softSectionHints?: string[]
+  queryContextHints?: string[]
+}
+
+export interface LimitStats {
+  modelCallsRunLimit?: number
+  modelCallsUsed?: number
+  toolCallsRunLimit?: number
+  toolCallsUsed?: number
+  limitTriggered?: boolean
+  limitReason?: string
+  modelCallsThreadLimit?: number
+  toolCallsThreadLimit?: number
+}
+
+export interface ModelUsageTrace {
+  stageName?: string
+  provider?: string
+  model?: string
+  totalTokens?: number
+  promptTokens?: number
+  completionTokens?: number
+  estimatedCost?: number
+  durationMs?: number
+  status?: string
+}
+
+export interface DebugTrace {
+  originalQuestion?: string
+  agentQuestion?: string
+  retrievalQuestion?: string
+  executionMode?: ExecutionMode
+  intentResolution?: IntentResolution
+  retrievalSubQuestions?: string[]
+  retrievalAnchorResolvedQuestion?: string
+  retrievalAnchorApplied?: boolean
+  retrievalAnchorRootTopic?: string
+  retrievalAnchorRootSectionTitle?: string
+  retrievalAnchorTargetSectionHint?: string
+  retrievalAnchorItemText?: string
+  rewriteQuestion?: string
+  rewriteSubQuestions?: string[]
+  longTermSummary?: string
+  answerHistoryContext?: string
+  historySummary?: string
+  chatMode?: ChatMode
+  selectedDocumentId?: string
+  usedChannels?: ChannelType[]
+  limitStats?: LimitStats
+  modelUsageTraces?: ModelUsageTrace[]
+  toolTraces?: ToolTrace[]
+  retrievalNotes?: string[]
+  requiresCurrentDateAnchoring?: boolean
+  requiresFreshSearch?: boolean
+  ragSystemPrompt?: string
+  ragUserPrompt?: string
+  currentDateText?: string
+  historyCoveredExchangeCount?: number
+  historyCompressionCount?: number
+}
+
+export interface ExtendedExchange extends Exchange {
+  debugTrace?: DebugTrace
+  selectedDocumentId?: string
+}
+
+export type Session = SessionDetail | SessionListItem
+
+export interface StageTraceSnapshot {
+  compressionApplied?: boolean
+  coveredExchangeId?: string
+  coveredExchangeCount?: number
+  compressionCount?: number
+  longTermSummary?: string
+  recentTranscript?: string
+  answerRecentTranscript?: string
+  originalQuestion?: string
+  relationType?: RelationType
+  resolvedTopic?: string
+  resolvedFacet?: string
+  informationNeed?: string
+  answerShape?: AnswerShape
+  retrievalMode?: RetrievalMode
+  retrievalQuery?: string
+  confidence?: number
+  rationale?: string
+  previousAnchorDescription?: string
+  retrievalSubQuestions?: string[]
+  softSectionHints?: string[]
+  queryContextHints?: string[]
+  rewriteQuestion?: string
+  historyContext?: string
+  rewriteOverrideEnabled?: boolean
+  rewriteTemperature?: number
+  rewriteTopP?: number
+  rewriteThinking?: boolean
+  subQuestions?: string[]
+  rootTopic?: string
+  rootSectionCode?: string
+  rootSectionTitle?: string
+  targetSectionHint?: string
+  anchorApplied?: boolean
+  referenceCount?: number
+  subQuestionCount?: number
+  usedChannels?: ChannelType[]
+  retrievalNotes?: string[]
+  references?: Array<{
+    referenceId?: string
+    documentName?: string
+    sectionPath?: string
+    channel?: ChannelType
+  }>
+  totalBudget?: string
+  perSubQuestionBudget?: string
+  renderedReferenceCount?: number
+  omittedReferenceCount?: number
+  renderedReferenceDetails?: string[]
+  omittedReferenceDetails?: string[]
+  systemPrompt?: string
+  userPrompt?: string
+  firstResponseTimeMs?: number
+  answerLength?: number
+  usedTools?: string[]
+  recommendationCount?: number
+  recommendations?: string[]
+  finalStatus?: StatusType
+  reason?: string
+  errorMessage?: string
+}
+
+export interface ExtendedStageTrace extends StageTrace {
+  snapshotJson?: StageTraceSnapshot
+}
+
+export interface TableRow {
+  cells: string[]
+}
+
+export interface TableSection {
+  label: string
+  columns: string[]
+  rows: TableRow[]
+}
+
+export interface StageInspector {
+  title: string
+  summary: string
+  status?: string
+  startTime?: string
+  endTime?: string
+  durationMs?: number
+  summaryItems: Array<{
+    label: string
+    value: string
+    code?: boolean
+  }>
+  listSections: ListBlock[]
+  tableSections: TableSection[]
+  advancedItems: Array<{
+    label: string
+    value: string
+    code?: boolean
+  }>
+}
+
+export interface GroupedChannelResult {
+  type: string
+  results: RetrievalResult[]
+}
+
+export interface GroupedSubQuestionResult {
+  index: number
+  question: string
+  channels: GroupedChannelResult[]
+}
+
+const STATUS_LABELS: Record<StatusType, string> = {
   RUNNING: '进行中',
   COMPLETED: '已完成',
   FAILED: '失败',
@@ -9,7 +306,7 @@ const STATUS_LABELS = {
   WARNING: '警告'
 }
 
-const STATUS_TONES = {
+const STATUS_TONES: Record<StatusType, StatusTone> = {
   RUNNING: 'running',
   COMPLETED: 'completed',
   FAILED: 'failed',
@@ -18,27 +315,27 @@ const STATUS_TONES = {
   WARNING: 'warning'
 }
 
-const EXECUTION_MODE_LABELS = {
+const EXECUTION_MODE_LABELS: Record<ExecutionMode, string> = {
   RAG_CHAT: '文档检索问答',
   REACT_AGENT: 'Agent 自主执行',
   CLARIFICATION: '路由澄清'
 }
 
-const RELATION_TYPE_LABELS = {
+const RELATION_TYPE_LABELS: Record<RelationType, string> = {
   FOLLOW_UP: '承接上文追问',
   TOPIC_SWITCH: '切换到新主题',
   FRESH_TOPIC: '独立新问题',
   UNKNOWN: '未识别'
 }
 
-const RETRIEVAL_MODE_LABELS = {
+const RETRIEVAL_MODE_LABELS: Record<RetrievalMode, string> = {
   DIRECT_QUERY: '直接检索',
   SECTION_FOCUSED: '定向查章节',
   ANALYTIC_DECOMPOSITION: '拆成多个子问题',
   UNKNOWN: '未识别'
 }
 
-const ANSWER_SHAPE_LABELS = {
+const ANSWER_SHAPE_LABELS: Record<AnswerShape, string> = {
   LIST: '列表型回答',
   STEPS: '步骤型回答',
   OUTLINE: '提纲型回答',
@@ -49,7 +346,7 @@ const ANSWER_SHAPE_LABELS = {
   UNKNOWN: '未识别'
 }
 
-const CHANNEL_LABELS = {
+const CHANNEL_LABELS: Record<ChannelType, string> = {
   keyword: '关键词检索',
   vector: '向量检索',
   rerank: '重排精排',
@@ -57,34 +354,38 @@ const CHANNEL_LABELS = {
   'web-search': '网页搜索'
 }
 
-const EXECUTION_STATE_LABELS = {
+const EXECUTION_STATE_LABELS: Record<ExecutionState, string> = {
   1: '成功',
   2: '失败',
   3: '超时',
   4: '跳过'
 }
 
-const TOOL_LABELS = {
+const TOOL_LABELS: Record<ToolName, string> = {
   tavily_search: 'Tavily 联网搜索',
   keyword: '关键词检索通道',
   vector: '向量检索通道',
   rerank: '重排精排'
 }
 
-function asList(value) {
+function asList<T>(value: T | T[] | undefined | null): T[] {
   return Array.isArray(value) ? value.filter(Boolean) : []
 }
 
-function mapLabel(value, mapping, fallback = '未识别') {
+function mapLabel<K extends string | number>(
+  value: K | undefined | null,
+  mapping: Record<K, string>,
+  fallback: string = '未识别'
+): string {
   if (!value) {
     return fallback
   }
-  return mapping[value] || value
+  return mapping[value] || String(value)
 }
 
-function uniqueStrings(values) {
-  const result = []
-  const seen = new Set()
+function uniqueStrings(values: string[]): string[] {
+  const result: string[] = []
+  const seen = new Set<string>()
   values.filter(Boolean).forEach((item) => {
     if (seen.has(item)) {
       return
@@ -95,24 +396,24 @@ function uniqueStrings(values) {
   return result
 }
 
-export function normalizeError(error, fallbackMessage) {
-  if (error instanceof APIError && error.message) {
-    return error.message
-  }
+export function normalizeError(error: unknown, fallbackMessage: string): string {
   if (error instanceof Error && error.message) {
     return error.message
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message: unknown }).message)
   }
   return fallbackMessage
 }
 
-export function truncate(value, maxLength) {
+export function truncate(value: string | undefined | null, maxLength: number): string {
   if (!value) {
     return ''
   }
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
 }
 
-export function formatTime(value) {
+export function formatTime(value: string | undefined | null): string {
   if (!value) {
     return '刚刚'
   }
@@ -128,7 +429,7 @@ export function formatTime(value) {
   }).format(date)
 }
 
-export function formatDateTime(value) {
+export function formatDateTime(value: string | undefined | null): string {
   if (!value) {
     return '无'
   }
@@ -146,7 +447,7 @@ export function formatDateTime(value) {
   }).format(date)
 }
 
-export function formatChatMode(value) {
+export function formatChatMode(value: ChatMode | undefined | null): string {
   if (value === 'DOCUMENT') {
     return '当前文档问答'
   }
@@ -159,47 +460,47 @@ export function formatChatMode(value) {
   return value || '未知模式'
 }
 
-export function formatStatusLabel(value) {
-  return STATUS_LABELS[value] || value || '未知状态'
+export function formatStatusLabel(value: StatusType | undefined | null): string {
+  return STATUS_LABELS[value as StatusType] || String(value) || '未知状态'
 }
 
-export function statusTone(value) {
-  return STATUS_TONES[value] || 'idle'
+export function statusTone(value: StatusType | undefined | null): StatusTone {
+  return STATUS_TONES[value as StatusType] || 'idle'
 }
 
-export function formatExecutionMode(value) {
+export function formatExecutionMode(value: ExecutionMode | undefined | null): string {
   return mapLabel(value, EXECUTION_MODE_LABELS)
 }
 
-export function formatRelationType(value) {
+export function formatRelationType(value: RelationType | undefined | null): string {
   return mapLabel(value, RELATION_TYPE_LABELS)
 }
 
-export function formatRetrievalMode(value) {
+export function formatRetrievalMode(value: RetrievalMode | undefined | null): string {
   return mapLabel(value, RETRIEVAL_MODE_LABELS)
 }
 
-export function formatAnswerShape(value) {
+export function formatAnswerShape(value: AnswerShape | undefined | null): string {
   return mapLabel(value, ANSWER_SHAPE_LABELS)
 }
 
-export function formatChannelName(value) {
+export function formatChannelName(value: ChannelType | undefined | null): string {
   return mapLabel(value, CHANNEL_LABELS, value || '未知通道')
 }
 
-export function formatToolName(value) {
+export function formatToolName(value: ToolName | undefined | null): string {
   return mapLabel(value, TOOL_LABELS, value || '未知工具')
 }
 
-export function formatChannelType(value) {
+export function formatChannelType(value: ChannelType | undefined | null): string {
   return mapLabel(value, CHANNEL_LABELS, value || '未知通道')
 }
 
-export function formatExecutionState(value) {
+export function formatExecutionState(value: ExecutionState | undefined | null): string {
   return mapLabel(value, EXECUTION_STATE_LABELS, '未知')
 }
 
-export function formatScore(value) {
+export function formatScore(value: number | string | undefined | null): string {
   if (value == null || value === '') {
     return '-'
   }
@@ -210,120 +511,103 @@ export function formatScore(value) {
   return num.toFixed(4)
 }
 
-export function formatRank(value) {
+export function formatRank(value: number | string | undefined | null): string {
   if (value == null || value === '') {
     return '-'
   }
   return String(value)
 }
 
-function latestExchangeQuestion(session) {
-  const exchanges = asList(session?.exchanges)
+function latestExchangeQuestion(session: Session | undefined | null): string {
+  const exchanges = session?.exchanges ?? []
   for (let index = exchanges.length - 1; index >= 0; index -= 1) {
     if (exchanges[index]?.question) {
-      return exchanges[index].question
+      return exchanges[index]?.question || ''
     }
   }
   return ''
 }
 
-function latestExchangeAnswer(session) {
-  const exchanges = asList(session?.exchanges)
+function latestExchangeAnswer(session: Session | undefined | null): string {
+  const exchanges = session?.exchanges ?? []
   for (let index = exchanges.length - 1; index >= 0; index -= 1) {
     if (exchanges[index]?.answer) {
-      return exchanges[index].answer
+      return exchanges[index]?.answer || ''
     }
   }
   return ''
 }
 
-export function sessionTitle(session) {
+export function sessionTitle(session: Session | undefined | null): string {
   const latestUserMessage = session?.latestUserMessage || latestExchangeQuestion(session)
   const latestAssistantMessage = session?.latestAssistantMessage || latestExchangeAnswer(session)
   return truncate(latestUserMessage || latestAssistantMessage || '未命名会话', 28)
 }
 
-export function sessionPreview(session) {
+export function sessionPreview(session: Session | undefined | null): string {
   const latestAssistantMessage = session?.latestAssistantMessage || latestExchangeAnswer(session)
   const latestUserMessage = session?.latestUserMessage || latestExchangeQuestion(session)
   return truncate(latestAssistantMessage || latestUserMessage || '暂无内容', 72)
 }
 
-export function sessionMessageCount(session) {
+export function sessionMessageCount(session: Session | undefined | null): number {
   if (session?.messageCount) {
     return session.messageCount
   }
-  return asList(session?.exchanges).reduce((count, exchange) => {
-    let total = count
-    if (exchange?.question) {
-      total += 1
-    }
-    if (exchange?.answer) {
-      total += 1
-    }
-    return total
+  const exchanges = session?.exchanges ?? []
+  return exchanges.reduce((count, exchange) => {
+    let num = count
+    if (exchange.question) num++
+    if (exchange.answer) num++
+    return num
   }, 0)
 }
 
-export function listAssistantExchanges(session) {
-  return asList(session?.exchanges).filter((item) => item && item.status)
+export function listAssistantExchanges(session: Session | undefined | null): Exchange[] {
+  return (session?.exchanges ?? []).filter((item) => item && item.status)
 }
 
-export function resolvePreferredExchange(exchanges, preferredId) {
-  if (!exchanges.length) {
-    return ''
-  }
-  const normalizedPreferredId = preferredId ? String(preferredId) : ''
-  if (normalizedPreferredId) {
-    const matched = exchanges.find((item) => String(item.exchangeId) === normalizedPreferredId)
-    if (matched) {
-      return String(matched.exchangeId)
-    }
-  }
-  return String(exchanges[exchanges.length - 1].exchangeId)
-}
-
-function pushTextBlock(target, label, value, options = {}) {
+function pushTextBlock(target: TextBlock[], label: string, value: string | undefined | null, options: {
+  code?: boolean
+} = {}): void {
   if (!value) {
     return
   }
-  target.push({
-    label,
-    value,
-    code: Boolean(options.code)
-  })
+  target.push({ label, value, code: Boolean(options.code) })
 }
 
-function pushListBlock(target, label, items, options = {}) {
+function pushListBlock(target: ListBlock[], label: string, items: unknown[] | undefined | null, options: {
+  ordered?: boolean
+} = {}): void {
   const values = asList(items)
   if (!values.length) {
     return
   }
   target.push({
     label,
-    items: values,
+    items: values.map(String),
     ordered: Boolean(options.ordered)
   })
 }
 
-function formatLatency(value) {
+function formatLatency(value: number | undefined | null): string {
   if (value == null || value <= 0) {
     return '无'
   }
   return `${value} ms`
 }
 
-function formatConfidence(value) {
-  if (value == null || Number.isNaN(Number(value))) {
+function formatConfidence(value: number | undefined | null): string {
+  if (!value || Number.isNaN(value)) {
     return ''
   }
-  return `${Math.round(Number(value) * 100)}%`
+  return `${Math.round(value * 100)}%`
 }
 
-function buildChips(...entries) {
+function buildChips(...entries: (Chip | null | undefined)[]): Chip[] {
   return entries
     .flat()
-    .filter((item) => item && item.value)
+    .filter((item): item is Chip => item != null && item.value)
     .map((item) => ({
       label: item.label,
       value: item.value,
@@ -331,10 +615,10 @@ function buildChips(...entries) {
     }))
 }
 
-function buildMetrics(...entries) {
+function buildMetrics(...entries: (Metric | null | undefined)[]): Metric[] {
   return entries
     .flat()
-    .filter((item) => item && item.value && item.value !== '无')
+    .filter((item): item is Metric => item != null && item.value && item.value !== '无')
     .map((item) => ({
       label: item.label,
       value: item.value,
@@ -342,36 +626,32 @@ function buildMetrics(...entries) {
     }))
 }
 
-function buildOutcomeSummary(exchange, references) {
+function buildOutcomeSummary(exchange: ExtendedExchange | undefined | null, references: Reference[]): string {
   if (!exchange) {
     return ''
   }
-  if (exchange.status === 'FAILED') {
-    return exchange.errorMessage
-      ? `本轮执行失败，结束原因是：${exchange.errorMessage}`
-      : '本轮执行失败，但当前没有拿到更具体的错误说明。'
-  }
-  if (exchange.status === 'STOPPED') {
-    return exchange.errorMessage
-      ? `本轮被主动停止，结束说明是：${exchange.errorMessage}`
-      : '本轮被主动停止。'
-  }
-  if (exchange.status === 'COMPLETED') {
+  if (exchange.status === 2) {
     if (references.length > 0) {
       return `本轮已完成，并基于 ${references.length} 条最终证据生成回答。排障时优先核对这些引用是否真的支撑了答案。`
     }
     return '本轮已完成，但没有看到最终引用，适合继续检查检索或 Prompt 组装阶段。'
   }
+  if (exchange.status === 3) {
+    return exchange.errorMessage ? `本轮执行失败，结束原因是：${exchange.errorMessage}` : '本轮执行失败，但当前没有拿到更具体的错误说明。'
+  }
+  if (exchange.status === 4) {
+    return exchange.errorMessage ? `本轮被主动停止，结束说明是：${exchange.errorMessage}` : '本轮被主动停止。'
+  }
   return '这是一条正在执行中的轮次，建议优先关注执行过程提示和实时状态。'
 }
 
-export function buildExchangeStatusNarrative(exchange) {
+export function buildExchangeStatusNarrative(exchange: ExtendedExchange | undefined | null): string {
   if (!exchange) {
     return ''
   }
   const trace = exchange.debugTrace || {}
   const intent = trace.intentResolution || null
-  const parts = [
+  const parts: string[] = [
     `当前查看的是 exchange ${exchange.exchangeId}。`,
     `执行路径是“${formatExecutionMode(trace.executionMode)}”。`
   ]
@@ -384,14 +664,13 @@ export function buildExchangeStatusNarrative(exchange) {
   }
   if (exchange.status === 'FAILED' && exchange.errorMessage) {
     parts.push(`当前结束原因：${exchange.errorMessage}`)
-  }
-  else if (exchange.status === 'COMPLETED') {
+  } else if (exchange.status === 'COMPLETED') {
     parts.push('这轮已经成功完成，默认先看“结果与诊断”和“执行过程”两块。')
   }
   return parts.join(' ')
 }
 
-export function buildExchangeStages(session, exchange) {
+export function buildExchangeStages(session: Session | undefined | null, exchange: ExtendedExchange | undefined | null): Stage[] {
   if (!exchange) {
     return []
   }
@@ -410,25 +689,25 @@ export function buildExchangeStages(session, exchange) {
     topic: item?.topic || ''
   }))
 
-  const requestPrimaryBlocks = []
+  const requestPrimaryBlocks: TextBlock[] = []
   pushTextBlock(requestPrimaryBlocks, '用户原始问题', trace.originalQuestion || exchange.question)
   pushTextBlock(requestPrimaryBlocks, '当前日期锚点', trace.currentDateText)
 
-  const requestAdvancedBlocks = []
+  const requestAdvancedBlocks: TextBlock[] = []
   pushTextBlock(requestAdvancedBlocks, 'Agent 增强问题', trace.agentQuestion, { code: true })
 
-  const planningPrimaryBlocks = []
+  const planningPrimaryBlocks: TextBlock[] = []
   pushTextBlock(planningPrimaryBlocks, '系统理解后的问题', trace.retrievalQuestion)
   pushTextBlock(planningPrimaryBlocks, '信息需求', intent?.informationNeed)
   pushTextBlock(planningPrimaryBlocks, '判定说明', intent?.rationale)
   pushTextBlock(planningPrimaryBlocks, '检索锚点主问题', trace.retrievalAnchorResolvedQuestion)
 
-  const planningPrimaryLists = []
+  const planningPrimaryLists: ListBlock[] = []
   if (asList(trace.retrievalSubQuestions).length > 1) {
     pushListBlock(planningPrimaryLists, '最终检索子问题', trace.retrievalSubQuestions, { ordered: true })
   }
 
-  const planningAdvancedBlocks = []
+  const planningAdvancedBlocks: TextBlock[] = []
   pushTextBlock(planningAdvancedBlocks, 'Rewrite 独立问题', trace.rewriteQuestion)
   pushTextBlock(planningAdvancedBlocks, '长期摘要', trace.longTermSummary, { code: true })
   pushTextBlock(planningAdvancedBlocks, '回答承接上下文', trace.answerHistoryContext, { code: true })
@@ -438,46 +717,58 @@ export function buildExchangeStages(session, exchange) {
   pushTextBlock(planningAdvancedBlocks, '目标章节提示', trace.retrievalAnchorTargetSectionHint)
   pushTextBlock(planningAdvancedBlocks, '编号项文本', trace.retrievalAnchorItemText)
 
-  const planningAdvancedLists = []
+  const planningAdvancedLists: ListBlock[] = []
   pushListBlock(planningAdvancedLists, 'Rewrite 子问题拆分', trace.rewriteSubQuestions, { ordered: true })
   pushListBlock(planningAdvancedLists, '软章节提示', intent?.softSectionHints)
   pushListBlock(planningAdvancedLists, '上下文提示词', intent?.queryContextHints)
 
-  const executionPrimaryLists = []
+  const executionPrimaryLists: ListBlock[] = []
   pushListBlock(executionPrimaryLists, '关键执行节点', executionNotes)
 
-  const executionAdvancedLists = []
+  const executionAdvancedLists: ListBlock[] = []
   pushListBlock(executionAdvancedLists, '原始 thinking 事件', thinkingSteps)
   pushListBlock(executionAdvancedLists, '原始检索/Agent 轨迹', retrievalNotes)
 
-  const generationPrimaryBlocks = []
+  const generationPrimaryBlocks: TextBlock[] = []
   pushTextBlock(generationPrimaryBlocks, '回答预览', exchange.answer, { code: true })
 
-  const generationAdvancedBlocks = []
+  const generationAdvancedBlocks: TextBlock[] = []
   pushTextBlock(generationAdvancedBlocks, '系统 Prompt', trace.ragSystemPrompt, { code: true })
   pushTextBlock(generationAdvancedBlocks, '用户 Prompt', trace.ragUserPrompt, { code: true })
 
-  const outcomePrimaryBlocks = []
+  const outcomePrimaryBlocks: TextBlock[] = []
   pushTextBlock(outcomePrimaryBlocks, '排障结论', buildOutcomeSummary(exchange, references))
   pushTextBlock(outcomePrimaryBlocks, '结束说明', exchange.errorMessage)
 
-  const outcomeAdvancedLists = []
+  const outcomeAdvancedLists: ListBlock[] = []
   pushListBlock(outcomeAdvancedLists, '推荐追问', recommendations, { ordered: true })
 
-  const stages = [
+  const stages: Stage[] = [
     {
       key: 'outcome',
       eyebrow: '1. 排障结论',
       title: '结果与诊断',
       subtitle: '先看这块，快速判断这轮到底是成功、失败、停止，还是证据不足。',
-      tone: statusTone(exchange.status),
+      tone: statusTone(exchange.status as StatusType),
       chips: buildChips(
-        { label: '最终状态', value: formatStatusLabel(exchange.status), tone: statusTone(exchange.status) },
-        { label: '引用情况', value: references.length ? `${references.length} 条证据` : '未看到最终引用', tone: references.length ? 'success' : 'warning' }
+        {
+          label: '最终状态',
+          value: formatStatusLabel(exchange.status as StatusType),
+          tone: statusTone(exchange.status as StatusType)
+        },
+        {
+          label: '引用情况',
+          value: references.length ? `${references.length} 条证据` : '未看到最终引用',
+          tone: references.length ? 'success' : 'warning'
+        }
       ),
       metrics: buildMetrics(
         { label: '最终引用数', value: references.length ? `${references.length}` : '', mono: true },
-        { label: '推荐追问', value: recommendations.length ? `${recommendations.length}` : '', mono: true }
+        {
+          label: '推荐追问',
+          value: recommendations.length ? `${recommendations.length}` : '',
+          mono: true
+        }
       ),
       textBlocks: outcomePrimaryBlocks,
       listBlocks: [],
@@ -494,8 +785,16 @@ export function buildExchangeStages(session, exchange) {
         : '如果结果不对，先看检索通道、执行节点和最终证据组织是否正常。',
       tone: 'warning',
       chips: buildChips(
-        asList(trace.usedChannels).map((item) => ({ label: '使用通道', value: formatChannelName(item), tone: 'success' })),
-        asList(exchange.usedTools).map((item) => ({ label: '使用组件', value: formatToolName(item), tone: 'warning' })),
+        asList(trace.usedChannels).map((item) => ({
+          label: '使用通道',
+          value: formatChannelName(item),
+          tone: 'success' as StatusTone
+        })),
+        asList(exchange.usedTools).map((item) => ({
+          label: '使用组件',
+          value: formatToolName(item),
+          tone: 'warning' as StatusTone
+        })),
         trace.limitStats?.modelCallsRunLimit ? {
           label: 'ModelHook',
           value: `${trace.limitStats?.modelCallsUsed || 0}/${trace.limitStats?.modelCallsRunLimit || 0}`,
@@ -508,8 +807,16 @@ export function buildExchangeStages(session, exchange) {
         } : null
       ),
       metrics: buildMetrics(
-        { label: '关键节点数', value: executionNotes.length ? String(executionNotes.length) : '', mono: true },
-        { label: '工具调用次数', value: toolTraces.length ? String(toolTraces.length) : '', mono: true }
+        {
+          label: '关键节点数',
+          value: executionNotes.length ? String(executionNotes.length) : '',
+          mono: true
+        },
+        {
+          label: '工具调用次数',
+          value: toolTraces.length ? String(toolTraces.length) : '',
+          mono: true
+        }
       ),
       textBlocks: [],
       listBlocks: executionPrimaryLists,
@@ -528,11 +835,23 @@ export function buildExchangeStages(session, exchange) {
         { label: '检索方式', value: formatRetrievalMode(intent?.retrievalMode), tone: 'success' },
         { label: '答案形态', value: formatAnswerShape(intent?.answerShape), tone: 'neutral' },
         { label: '意图置信度', value: formatConfidence(intent?.confidence), tone: 'warning' },
-        { label: '锚点应用', value: trace.retrievalAnchorApplied ? '已使用锚点' : '未使用锚点', tone: trace.retrievalAnchorApplied ? 'success' : 'neutral' }
+        {
+          label: '锚点应用',
+          value: trace.retrievalAnchorApplied ? '已使用锚点' : '未使用锚点',
+          tone: trace.retrievalAnchorApplied ? 'success' : 'neutral'
+        }
       ),
       metrics: buildMetrics(
-        { label: '摘要覆盖轮次', value: trace.historyCoveredExchangeCount != null ? String(trace.historyCoveredExchangeCount) : '', mono: true },
-        { label: '摘要压缩次数', value: trace.historyCompressionCount != null ? String(trace.historyCompressionCount) : '', mono: true }
+        {
+          label: '摘要覆盖轮次',
+          value: trace.historyCoveredExchangeCount != null ? String(trace.historyCoveredExchangeCount) : '',
+          mono: true
+        },
+        {
+          label: '摘要压缩次数',
+          value: trace.historyCompressionCount != null ? String(trace.historyCompressionCount) : '',
+          mono: true
+        }
       ),
       textBlocks: planningPrimaryBlocks,
       listBlocks: planningPrimaryLists,
@@ -546,15 +865,35 @@ export function buildExchangeStages(session, exchange) {
       subtitle: '确认用户原始问题、模式和文档边界有没有偏掉。',
       tone: 'primary',
       chips: buildChips(
-        { label: '回答模式', value: formatChatMode(trace.chatMode || session?.chatMode), tone: 'primary' },
+        {
+          label: '回答模式',
+          value: formatChatMode(trace.chatMode || session?.chatMode),
+          tone: 'primary'
+        },
         { label: '执行路径', value: formatExecutionMode(trace.executionMode), tone: 'success' },
-        { label: '文档范围', value: session?.selectedDocumentName || (trace.selectedDocumentId ? `文档 ${trace.selectedDocumentId}` : ''), tone: 'neutral' },
-        { label: '时间解释', value: trace.requiresCurrentDateAnchoring ? '按当前日期解释' : '', tone: 'warning' },
-        { label: '实时核实', value: trace.requiresFreshSearch ? '优先核实最新事实' : '', tone: 'warning' }
+        {
+          label: '文档范围',
+          value: session?.selectedDocumentName || (trace.selectedDocumentId ? `文档 ${trace.selectedDocumentId}` : ''),
+          tone: 'neutral'
+        },
+        {
+          label: '时间解释',
+          value: trace.requiresCurrentDateAnchoring ? '按当前日期解释' : '',
+          tone: 'warning'
+        },
+        {
+          label: '实时核实',
+          value: trace.requiresFreshSearch ? '优先核实最新事实' : '',
+          tone: 'warning'
+        }
       ),
       metrics: buildMetrics(
         { label: '会话ID', value: session?.conversationId, mono: true },
-        { label: '轮次ID', value: exchange.exchangeId ? String(exchange.exchangeId) : '', mono: true }
+        {
+          label: '轮次ID',
+          value: exchange.exchangeId ? String(exchange.exchangeId) : '',
+          mono: true
+        }
       ),
       textBlocks: requestPrimaryBlocks,
       listBlocks: [],
@@ -568,7 +907,11 @@ export function buildExchangeStages(session, exchange) {
       subtitle: '默认只看耗时和回答预览；Prompt 已折叠到高级技术细节里。',
       tone: 'neutral',
       chips: buildChips(
-        { label: '当前状态', value: formatStatusLabel(exchange.status), tone: statusTone(exchange.status) }
+        {
+          label: '当前状态',
+          value: formatStatusLabel(exchange.status as StatusType),
+          tone: statusTone(exchange.status as StatusType)
+        }
       ),
       metrics: buildMetrics(
         { label: '首包耗时', value: formatLatency(exchange.firstResponseTimeMs), mono: true },
@@ -594,7 +937,11 @@ export function buildExchangeStages(session, exchange) {
         } : null
       ),
       metrics: buildMetrics(
-        { label: '模型调用数', value: modelUsageTraces.length ? String(modelUsageTraces.length) : '', mono: true },
+        {
+          label: '模型调用数',
+          value: modelUsageTraces.length ? String(modelUsageTraces.length) : '',
+          mono: true
+        },
         {
           label: '总 Token',
           value: modelUsageTraces.length
@@ -628,7 +975,7 @@ export function buildExchangeStages(session, exchange) {
           ordered: false,
           items: [trace.limitStats.limitReason]
         } : null
-      ].filter(Boolean)
+      ].filter((item): item is ListBlock => item != null)
     }
   ]
 
@@ -644,7 +991,7 @@ export function buildExchangeStages(session, exchange) {
   })
 }
 
-export function stageHasAdvancedDetails(stage) {
+export function stageHasAdvancedDetails(stage: Stage | undefined | null): boolean {
   if (!stage) {
     return false
   }
@@ -656,40 +1003,46 @@ export function stageHasAdvancedDetails(stage) {
   )
 }
 
-function snapshotValue(snapshot, key) {
+function snapshotValue(snapshot: StageTraceSnapshot | undefined | null, key: keyof StageTraceSnapshot): string {
   if (!snapshot || typeof snapshot !== 'object') {
     return ''
   }
-  return snapshot[key]
+  const value = snapshot[key]
+  return value != null ? String(value) : ''
 }
 
-function snapshotList(snapshot, key) {
+function snapshotList(snapshot: StageTraceSnapshot | undefined | null, key: keyof StageTraceSnapshot): unknown[] {
   const value = snapshotValue(snapshot, key)
   return Array.isArray(value) ? value.filter(Boolean) : []
 }
 
-function pushPair(target, label, value, options = {}) {
+function pushPair(
+  target: Array<{ label: string; value: string; code?: boolean }>,
+  label: string,
+  value: string | number | boolean | undefined | null,
+  options: { code?: boolean } = {}
+): void {
   if (value == null || value === '') {
     return
   }
   target.push({
     label,
-    value,
+    value: String(value),
     code: Boolean(options.code)
   })
 }
 
-function safeJson(snapshot) {
+function safeJson(snapshot: StageTraceSnapshot | undefined | null): string {
   if (!snapshot || typeof snapshot !== 'object' || !Object.keys(snapshot).length) {
     return ''
   }
   return JSON.stringify(snapshot, null, 2)
 }
 
-function stageUsageDetails(exchange, stageNames = []) {
+function stageUsageDetails(exchange: ExtendedExchange | undefined | null, stageNames: string[]): string[] {
   const traces = asList(exchange?.debugTrace?.modelUsageTraces)
   return traces
-    .filter((item) => stageNames.includes(item?.stageName))
+    .filter((item) => stageNames.includes(item?.stageName || ''))
     .map((item) => {
       const tokens = item?.totalTokens ? `总Token ${item.totalTokens}` : ''
       const prompt = item?.promptTokens ? `输入 ${item.promptTokens}` : ''
@@ -700,8 +1053,8 @@ function stageUsageDetails(exchange, stageNames = []) {
     })
 }
 
-function formatUsageStageName(stageName) {
-  const mapping = {
+function formatUsageStageName(stageName: string | undefined | null): string {
+  const mapping: Record<string, string> = {
     intent: '意图分析',
     rewrite: '问题改写',
     summary: '会话记忆压缩',
@@ -709,10 +1062,13 @@ function formatUsageStageName(stageName) {
     recommendation: '推荐问题',
     react_agent_turn: 'Agent 推理'
   }
-  return mapping[stageName] || stageName || '未知阶段'
+  return mapping[stageName || ''] || stageName || '未知阶段'
 }
 
-function buildReferenceDecisionRows(details = []) {
+function buildReferenceDecisionRows(details: string[]): Array<{
+  reference: string;
+  reason: string
+}> {
   return asList(details).map((detail) => {
     const text = String(detail || '')
     const index = text.lastIndexOf(' | ')
@@ -729,18 +1085,18 @@ function buildReferenceDecisionRows(details = []) {
   })
 }
 
-export function buildTraceStageInspector(stageTrace, exchange) {
+export function buildTraceStageInspector(stageTrace: ExtendedStageTrace | undefined | null, exchange: ExtendedExchange | undefined | null): StageInspector | null {
   if (!stageTrace) {
     return null
   }
 
-  const snapshot = stageTrace.snapshot || {}
-  const summaryItems = []
-  const listSections = []
-  const tableSections = []
-  const advancedItems = []
+  const snapshot = stageTrace.snapshotJson || {}
+  const summaryItems: Array<{ label: string; value: string; code?: boolean }> = []
+  const listSections: ListBlock[] = []
+  const tableSections: TableSection[] = []
+  const advancedItems: Array<{ label: string; value: string; code?: boolean }> = []
 
-  switch (stageTrace.stageCode) {
+  switch (stageTrace.stageCode as StageCode) {
     case 'MEMORY':
       pushPair(summaryItems, '是否命中长期摘要', snapshotValue(snapshot, 'compressionApplied') ? '是' : '否')
       pushPair(summaryItems, '摘要覆盖到的最后一轮', snapshotValue(snapshot, 'coveredExchangeId'))
@@ -757,12 +1113,12 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       break
     case 'INTENT':
       pushPair(summaryItems, '原始问题', snapshotValue(snapshot, 'originalQuestion'))
-      pushPair(summaryItems, '关系判定', formatRelationType(snapshotValue(snapshot, 'relationType')))
+      pushPair(summaryItems, '关系判定', formatRelationType(snapshotValue(snapshot, 'relationType') as RelationType))
       pushPair(summaryItems, '当前主题', snapshotValue(snapshot, 'resolvedTopic'))
       pushPair(summaryItems, '当前面向', snapshotValue(snapshot, 'resolvedFacet'))
       pushPair(summaryItems, '信息需求', snapshotValue(snapshot, 'informationNeed'))
-      pushPair(summaryItems, '答案形态', formatAnswerShape(snapshotValue(snapshot, 'answerShape')))
-      pushPair(summaryItems, '检索模式', formatRetrievalMode(snapshotValue(snapshot, 'retrievalMode')))
+      pushPair(summaryItems, '答案形态', formatAnswerShape(snapshotValue(snapshot, 'answerShape') as AnswerShape))
+      pushPair(summaryItems, '检索模式', formatRetrievalMode(snapshotValue(snapshot, 'retrievalMode') as RetrievalMode))
       pushPair(summaryItems, '检索查询', snapshotValue(snapshot, 'retrievalQuery'))
       pushPair(summaryItems, '置信度', formatConfidence(snapshotValue(snapshot, 'confidence')))
       pushPair(summaryItems, '判定理由', snapshotValue(snapshot, 'rationale'))
@@ -773,17 +1129,17 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       })
       listSections.push({
         label: '规划出的检索子问题',
-        items: snapshotList(snapshot, 'retrievalSubQuestions'),
+        items: snapshotList(snapshot, 'retrievalSubQuestions').map(String),
         ordered: true
       })
       listSections.push({
         label: '软章节提示',
-        items: snapshotList(snapshot, 'softSectionHints'),
+        items: snapshotList(snapshot, 'softSectionHints').map(String),
         ordered: false
       })
       listSections.push({
         label: '上下文提示词',
-        items: snapshotList(snapshot, 'queryContextHints'),
+        items: snapshotList(snapshot, 'queryContextHints').map(String),
         ordered: false
       })
       listSections.push({
@@ -796,17 +1152,17 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '原始问题', exchange?.question || '')
       pushPair(summaryItems, '改写后问题', snapshotValue(snapshot, 'rewriteQuestion'))
       pushPair(summaryItems, '改写参考历史', snapshotValue(snapshot, 'historyContext'), { code: true })
-      pushPair(summaryItems, '参数覆盖', snapshotValue(snapshot, 'rewriteOverrideEnabled') === true ? '已启用' : '未启用')
+      pushPair(summaryItems, '参数覆盖', snapshotValue(snapshot, 'rewriteOverrideEnabled') === 'true' || snapshotValue(snapshot, 'rewriteOverrideEnabled') === true ? '已启用' : '未启用')
       pushPair(summaryItems, 'Temperature', snapshotValue(snapshot, 'rewriteTemperature'))
       pushPair(summaryItems, 'TopP', snapshotValue(snapshot, 'rewriteTopP'))
       pushPair(
         summaryItems,
         'Thinking',
-        snapshotValue(snapshot, 'rewriteThinking') === true ? 'true' : snapshotValue(snapshot, 'rewriteThinking') === false ? 'false' : ''
+        snapshotValue(snapshot, 'rewriteThinking') === 'true' || snapshotValue(snapshot, 'rewriteThinking') === true ? 'true' : snapshotValue(snapshot, 'rewriteThinking') === 'false' || snapshotValue(snapshot, 'rewriteThinking') === false ? 'false' : ''
       )
       listSections.push({
         label: '改写拆分出的子问题',
-        items: snapshotList(snapshot, 'subQuestions'),
+        items: snapshotList(snapshot, 'subQuestions').map(String),
         ordered: true
       })
       listSections.push({
@@ -817,7 +1173,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       break
     case 'ROUTE':
       pushPair(summaryItems, '原始问题', snapshotValue(snapshot, 'originalQuestion'))
-      pushPair(summaryItems, '最终执行路径', formatExecutionMode(snapshotValue(snapshot, 'executionMode')))
+      pushPair(summaryItems, '最终执行路径', formatExecutionMode(snapshotValue(snapshot, 'executionMode') as ExecutionMode))
       pushPair(summaryItems, '最终检索问题', snapshotValue(snapshot, 'retrievalQuestion'))
       pushPair(summaryItems, '根主题', snapshotValue(snapshot, 'rootTopic'))
       pushPair(summaryItems, '根章节编码', snapshotValue(snapshot, 'rootSectionCode'))
@@ -826,7 +1182,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '是否使用锚点', snapshotValue(snapshot, 'anchorApplied') ? '是' : '否')
       listSections.push({
         label: '最终检索子问题',
-        items: snapshotList(snapshot, 'retrievalSubQuestions'),
+        items: snapshotList(snapshot, 'retrievalSubQuestions').map(String),
         ordered: true
       })
       break
@@ -836,12 +1192,12 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '子问题数量', snapshotValue(snapshot, 'subQuestionCount'))
       listSections.push({
         label: '使用通道',
-        items: snapshotList(snapshot, 'usedChannels').map(formatChannelName),
+        items: snapshotList(snapshot, 'usedChannels').map((item) => formatChannelName(item as ChannelType)),
         ordered: false
       })
       listSections.push({
         label: '检索过程说明',
-        items: snapshotList(snapshot, 'retrievalNotes'),
+        items: snapshotList(snapshot, 'retrievalNotes').map(String),
         ordered: false
       })
       listSections.push({
@@ -850,13 +1206,28 @@ export function buildTraceStageInspector(stageTrace, exchange) {
           if (!item || typeof item !== 'object') {
             return ''
           }
-          const channelTraceText = asList(item.channelTraces).map((trace) => {
+          const channelTraces = asList((item as { channelTraces?: unknown[] }).channelTraces)
+          const channelTraceText = channelTraces.map((trace) => {
             if (!trace || typeof trace !== 'object') {
               return ''
             }
-            return `${formatChannelName(trace.channelName)} raw=${trace.recalledCount || 0} accepted=${trace.acceptedCount || 0}`
+            const t = trace as {
+              channelName?: ChannelType;
+              recalledCount?: number;
+              acceptedCount?: number
+            }
+            return `${formatChannelName(t.channelName)} raw=${t.recalledCount || 0} accepted=${t.acceptedCount || 0}`
           }).filter(Boolean).join('；')
-          return `${item.index}. ${item.question} | 通道 ${channelTraceText || '无'} | fused ${item.fusedCandidateCount || 0} | parent ${item.parentCandidateCount || 0} | rerank ${item.rerankedCandidateCount || 0} | 文档 ${item.documentCount || 0} | 引用 ${item.referenceCount || 0}`
+          const i = item as {
+            index?: number;
+            question?: string;
+            fusedCandidateCount?: number;
+            parentCandidateCount?: number;
+            rerankedCandidateCount?: number;
+            documentCount?: number;
+            referenceCount?: number
+          }
+          return `${i.index}. ${i.question} | 通道 ${channelTraceText || '无'} | fused ${i.fusedCandidateCount || 0} | parent ${i.parentCandidateCount || 0} | rerank ${i.rerankedCandidateCount || 0} | 文档 ${i.documentCount || 0} | 引用 ${i.referenceCount || 0}`
         }).filter(Boolean),
         ordered: false
       })
@@ -866,7 +1237,13 @@ export function buildTraceStageInspector(stageTrace, exchange) {
           if (!item || typeof item !== 'object') {
             return ''
           }
-          return `[${item.referenceId || '-'}] ${item.documentName || '未命名引用'} ${item.sectionPath ? `| ${item.sectionPath}` : ''} ${item.channel ? `| ${formatChannelName(item.channel)}` : ''}`.trim()
+          const i = item as {
+            referenceId?: string;
+            documentName?: string;
+            sectionPath?: string;
+            channel?: ChannelType
+          }
+          return `[${i.referenceId || '-'}] ${i.documentName || '未命名引用'} ${i.sectionPath ? `| ${i.sectionPath}` : ''} ${i.channel ? `| ${formatChannelName(i.channel)}` : ''}`.trim()
         }).filter(Boolean),
         ordered: false
       })
@@ -877,21 +1254,40 @@ export function buildTraceStageInspector(stageTrace, exchange) {
           if (!item || typeof item !== 'object') {
             return null
           }
-          const channelTraces = Array.isArray(item.channelTraces) ? item.channelTraces : []
-          const keywordTrace = channelTraces.find((trace) => trace?.channelName === 'keyword')
-          const vectorTrace = channelTraces.find((trace) => trace?.channelName === 'vector')
+          const i = item as {
+            index?: number;
+            question?: string;
+            fusedCandidateCount?: number;
+            parentCandidateCount?: number;
+            rerankedCandidateCount?: number;
+            referenceCount?: number;
+            channelTraces?: unknown[]
+          }
+          const channelTraces = Array.isArray(i.channelTraces) ? i.channelTraces : []
+          const keywordTrace = channelTraces.find((trace) => typeof trace === 'object' && trace !== null && (trace as {
+            channelName?: string
+          }).channelName === 'keyword') as {
+            recalledCount?: number;
+            acceptedCount?: number
+          } | undefined
+          const vectorTrace = channelTraces.find((trace) => typeof trace === 'object' && trace !== null && (trace as {
+            channelName?: string
+          }).channelName === 'vector') as {
+            recalledCount?: number;
+            acceptedCount?: number
+          } | undefined
           return {
             cells: [
-              `${item.index}. ${item.question}`,
+              `${i.index}. ${i.question}`,
               `${keywordTrace?.recalledCount ?? 0} / ${keywordTrace?.acceptedCount ?? 0}`,
               `${vectorTrace?.recalledCount ?? 0} / ${vectorTrace?.acceptedCount ?? 0}`,
-              String(item.fusedCandidateCount ?? 0),
-              String(item.parentCandidateCount ?? 0),
-              String(item.rerankedCandidateCount ?? 0),
-              String(item.referenceCount ?? 0)
+              String(i.fusedCandidateCount ?? 0),
+              String(i.parentCandidateCount ?? 0),
+              String(i.rerankedCandidateCount ?? 0),
+              String(i.referenceCount ?? 0)
             ]
           }
-        }).filter(Boolean)
+        }).filter((row): row is TableRow => row != null)
       })
       tableSections.push({
         label: '最终证据表',
@@ -900,15 +1296,21 @@ export function buildTraceStageInspector(stageTrace, exchange) {
           if (!item || typeof item !== 'object') {
             return null
           }
+          const i = item as {
+            referenceId?: string;
+            documentName?: string;
+            sectionPath?: string;
+            channel?: ChannelType
+          }
           return {
             cells: [
-              item.referenceId || '-',
-              item.documentName || '未命名引用',
-              item.sectionPath || '未识别章节',
-              formatChannelName(item.channel)
+              i.referenceId || '-',
+              i.documentName || '未命名引用',
+              i.sectionPath || '未识别章节',
+              formatChannelName(i.channel)
             ]
           }
-        }).filter(Boolean)
+        }).filter((row): row is TableRow => row != null)
       })
       break
     case 'EVIDENCE_BUDGET':
@@ -918,25 +1320,25 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '被省略引用', snapshotValue(snapshot, 'omittedReferenceCount'))
       listSections.push({
         label: '已纳入 Prompt 的引用',
-        items: snapshotList(snapshot, 'renderedReferenceDetails'),
+        items: snapshotList(snapshot, 'renderedReferenceDetails').map(String),
         ordered: false
       })
       listSections.push({
         label: '因预算被省略的引用',
-        items: snapshotList(snapshot, 'omittedReferenceDetails'),
+        items: snapshotList(snapshot, 'omittedReferenceDetails').map(String),
         ordered: false
       })
       tableSections.push({
         label: '保留到 Prompt 的引用',
         columns: ['引用', '结果'],
-        rows: buildReferenceDecisionRows(snapshotList(snapshot, 'renderedReferenceDetails')).map((item) => ({
+        rows: buildReferenceDecisionRows(snapshotList(snapshot, 'renderedReferenceDetails').map(String)).map((item) => ({
           cells: [item.reference, item.reason || '已纳入 Prompt']
         }))
       })
       tableSections.push({
         label: '因预算被裁掉的引用',
         columns: ['引用', '原因'],
-        rows: buildReferenceDecisionRows(snapshotList(snapshot, 'omittedReferenceDetails')).map((item) => ({
+        rows: buildReferenceDecisionRows(snapshotList(snapshot, 'omittedReferenceDetails').map(String)).map((item) => ({
           cells: [item.reference, item.reason || '超出上下文预算']
         }))
       })
@@ -957,7 +1359,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '使用组件数', snapshotList(snapshot, 'usedTools').length)
       listSections.push({
         label: '使用组件',
-        items: snapshotList(snapshot, 'usedTools').map(formatToolName),
+        items: snapshotList(snapshot, 'usedTools').map((item) => formatToolName(item as ToolName)),
         ordered: false
       })
       break
@@ -965,7 +1367,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       pushPair(summaryItems, '推荐问题数量', snapshotValue(snapshot, 'recommendationCount'))
       listSections.push({
         label: '推荐问题列表',
-        items: snapshotList(snapshot, 'recommendations'),
+        items: snapshotList(snapshot, 'recommendations').map(String),
         ordered: true
       })
       listSections.push({
@@ -975,7 +1377,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
       })
       break
     case 'FINALIZE':
-      pushPair(summaryItems, '最终状态', formatStatusLabel(snapshotValue(snapshot, 'finalStatus')))
+      pushPair(summaryItems, '最终状态', formatStatusLabel(snapshotValue(snapshot, 'finalStatus') as StatusType))
       pushPair(summaryItems, '回答长度', snapshotValue(snapshot, 'answerLength'))
       pushPair(summaryItems, '引用数', snapshotValue(snapshot, 'referenceCount'))
       pushPair(summaryItems, '推荐问题数', snapshotValue(snapshot, 'recommendationCount'))
@@ -1012,7 +1414,7 @@ export function buildTraceStageInspector(stageTrace, exchange) {
   }
 }
 
-export function buildUsageStageInspector(exchange) {
+export function buildUsageStageInspector(exchange: ExtendedExchange | undefined | null): StageInspector | null {
   if (!exchange) {
     return null
   }
@@ -1042,7 +1444,7 @@ export function buildUsageStageInspector(exchange) {
     summary: '这一轮里每一次模型调用都按阶段分组列在下面，便于排查到底哪个阶段最耗 token 和成本。',
     status: limitStats?.limitTriggered ? 'WARNING' : 'COMPLETED',
     startTime: exchange.createTime,
-    endTime: exchange.editTime,
+    endTime: (exchange as ExtendedExchange)?.editTime,
     durationMs: exchange.totalResponseTimeMs,
     summaryItems: [
       {
@@ -1081,10 +1483,10 @@ export function buildUsageStageInspector(exchange) {
     listSections: [],
     tableSections: rows.length
       ? [{
-          label: '按阶段分组的模型使用明细',
-          columns: ['阶段', '模型', '输入 Token', '输出 Token', '总 Token', '成本', '耗时', '状态'],
-          rows
-        }]
+        label: '按阶段分组的模型使用明细',
+        columns: ['阶段', '模型', '输入 Token', '输出 Token', '总 Token', '成本', '耗时', '状态'],
+        rows
+      }]
       : [],
     advancedItems: [
       limitStats?.modelCallsThreadLimit != null
@@ -1093,16 +1495,20 @@ export function buildUsageStageInspector(exchange) {
       limitStats?.toolCallsThreadLimit != null
         ? { label: '线程级工具上限', value: String(limitStats.toolCallsThreadLimit) }
         : null
-    ].filter(Boolean)
+    ].filter((item): item is { label: string; value: string } => item != null)
   }
 }
 
-export function groupResultsBySubQuestion(results) {
+export function groupResultsBySubQuestion(results: RetrievalResult[] | undefined | null): GroupedSubQuestionResult[] {
   if (!results || !results.length) {
     return []
   }
 
-  const grouped = new Map()
+  const grouped = new Map<number, {
+    index: number
+    question: string
+    channels: Map<string, GroupedChannelResult>
+  }>()
 
   results.forEach((result) => {
     const index = result.subQuestionIndex || 1
@@ -1114,7 +1520,7 @@ export function groupResultsBySubQuestion(results) {
       })
     }
 
-    const subQ = grouped.get(index)
+    const subQ = grouped.get(index)!
     const channelType = result.channelType || 'unknown'
 
     if (!subQ.channels.has(channelType)) {
@@ -1124,7 +1530,7 @@ export function groupResultsBySubQuestion(results) {
       })
     }
 
-    subQ.channels.get(channelType).results.push(result)
+    subQ.channels.get(channelType)!.results.push(result)
   })
 
   return Array.from(grouped.values()).map((subQ) => ({

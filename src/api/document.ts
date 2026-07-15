@@ -1,9 +1,8 @@
 import axios from './axios'
 import type {
   Response,
-  DocumentInfo,
-  DocumentProfile,
-  PageResult,
+  DocumentDetailResp,
+  DocumentProfileResp,
   UploadDocumentResp,
   BuildIndexResp,
   QueryStrategyPlanResp,
@@ -25,7 +24,7 @@ import type {
   DocumentProfileDetailReq,
   DocumentProfileRegenerateReq,
   DocumentProfileBatchRegenerateReq,
-  DocumentOption,
+  KnowledgeDocumentOptionResp,
 } from '@/types'
 
 export const documentApi = {
@@ -57,17 +56,17 @@ export const documentApi = {
   },
 
   // 查询文档分页
-  queryPage(params?: QueryDocumentPageReq): Promise<Response<PageResult<DocumentInfo>>> {
-    return axios.post('/manage/document/page/query', params || {})
+  queryDocumentPage(params?: QueryDocumentPageReq): Promise<Response<PageResult<DocumentDetailResp>>> {
+    return axios.post('/manage/document/page/query', params)
   },
 
   // 查询文档详情
-  queryDetail(params: QueryDocumentDetailReq): Promise<Response<DocumentInfo>> {
+  queryDocumentDetail(params: QueryDocumentDetailReq): Promise<Response<DocumentDetailResp>> {
     return axios.post('/manage/document/detail/query', params)
   },
 
   // 获取文档选项
-  getDocumentOptions(): Promise<Response<DocumentOption[]>> {
+  getDocumentOptions(): Promise<Response<KnowledgeDocumentOptionResp[]>> {
     return axios.get('/manage/document/options')
   },
 
@@ -107,17 +106,17 @@ export const documentApi = {
   },
 
   // 查询文档画像
-  getProfile(params: DocumentProfileDetailReq): Promise<Response<DocumentProfile>> {
+  getProfile(params: DocumentProfileDetailReq): Promise<Response<DocumentProfileResp>> {
     return axios.post('/manage/document/profile/detail', params)
   },
 
   // 重新生成文档画像
-  regenerateProfile(params: DocumentProfileRegenerateReq): Promise<Response<DocumentProfile>> {
+  regenerateProfile(params: DocumentProfileRegenerateReq): Promise<Response<DocumentProfileResp>> {
     return axios.post('/manage/document/profile/regenerate', params)
   },
 
   // 批量重新生成文档画像
-  batchRegenerateProfile(params: DocumentProfileBatchRegenerateReq): Promise<Response<DocumentProfile[]>> {
+  batchRegenerateProfile(params: DocumentProfileBatchRegenerateReq): Promise<Response<DocumentProfileResp[]>> {
     return axios.post('/manage/document/profile/batch/regenerate', params)
   },
 }

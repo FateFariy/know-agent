@@ -14,29 +14,29 @@ export const useDocumentStore = defineStore('document', () => {
   const pageSize = ref(10)
 
   async function fetchDocuments(params?: { keyword?: string; pageNo?: number; pageSize?: number }) {
-    const res = await documentApi.queryPage(params)
+    const res = await documentApi.queryDocumentPage(params)
     documents.value = res.data?.records || []
-    total.value = res.data?.totalSize || 0
+    total.value = res.data?.total || 0
     pageNo.value = res.data?.pageNo || 1
     pageSize.value = res.data?.pageSize || 10
   }
 
-  async function fetchDocumentDetail(documentId: number) {
-    const res = await documentApi.queryDetail({ documentId })
+  async function fetchDocumentDetail(documentId: string) {
+    const res = await documentApi.queryDocumentDetail({ documentId })
     currentDocument.value = res.data || null
   }
 
-  async function fetchChunks(documentId: number, params?: { pageNo?: number; pageSize?: number }) {
+  async function fetchChunks(documentId: string, params?: { pageNo?: number; pageSize?: number }) {
     const res = await documentApi.queryChunks({ documentId, ...params })
     chunks.value = res.data?.records || []
   }
 
-  async function fetchProfile(documentId: number) {
+  async function fetchProfile(documentId: string) {
     const res = await documentApi.getProfile({ documentId })
     profile.value = res.data || null
   }
 
-  async function deleteDocument(documentId: number) {
+  async function deleteDocument(documentId: string) {
     await documentApi.deleteDocument({ documentId })
     await fetchDocuments()
   }
@@ -57,7 +57,7 @@ export const useDocumentStore = defineStore('document', () => {
         uploadFile.progress = progress
       })
       uploadFile.status = 'success'
-      uploadFile.documentId = res.data?.documentId || 0
+      uploadFile.documentId = res.data?.documentId || ''
       await fetchDocuments()
     } catch {
       uploadFile.status = 'error'

@@ -4,5 +4,6 @@ export interface Response<T> {
   data?: T
 }
 
-export * from './request'
-export * from './response'
+export * from './document'
+export * from './knowledge'
+export * from './chat'

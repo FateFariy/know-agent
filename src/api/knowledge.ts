@@ -1,11 +1,10 @@
 import axios from './axios'
 import type {
   Response,
-  KnowledgeScope,
-  KnowledgeTopic,
-  TopicDocumentRelation,
-  PageResult,
-  RouteTrace,
+  KnowledgeScopeResp,
+  KnowledgeTopicResp,
+  TopicDocumentRelationResp,
+  KnowledgeRouteTracePageResp,
   KnowledgeScopeSaveReq,
   KnowledgeScopeDeleteReq,
   KnowledgeTopicSaveReq,
@@ -14,17 +13,17 @@ import type {
   TopicDocumentRelationListReq,
   TopicDocumentRelationSaveReq,
   TopicDocumentRelationRemoveReq,
-  KnowledgeRouteTracePageReq
+  KnowledgeRouteTracePageReq,
 } from '@/types'
 
 export const knowledgeApi = {
   // 查询知识范围列表
-  listScopes(): Promise<Response<KnowledgeScope[]>> {
+  listScopes(): Promise<Response<KnowledgeScopeResp[]>> {
     return axios.post('/manage/knowledge/scope/list')
   },
 
   // 保存知识范围
-  saveScope(params: KnowledgeScopeSaveReq): Promise<Response<KnowledgeScope>> {
+  saveScope(params: KnowledgeScopeSaveReq): Promise<Response<KnowledgeScopeResp>> {
     return axios.post('/manage/knowledge/scope/save', params)
   },
 
@@ -34,12 +33,12 @@ export const knowledgeApi = {
   },
 
   // 查询知识主题列表
-  listTopics(params?: KnowledgeTopicListReq): Promise<Response<KnowledgeTopic[]>> {
+  listTopics(params?: KnowledgeTopicListReq): Promise<Response<KnowledgeTopicResp[]>> {
     return axios.post('/manage/knowledge/topic/list', params || {})
   },
 
   // 保存知识主题
-  saveTopic(params: KnowledgeTopicSaveReq): Promise<Response<KnowledgeTopic>> {
+  saveTopic(params: KnowledgeTopicSaveReq): Promise<Response<KnowledgeTopicResp>> {
     return axios.post('/manage/knowledge/topic/save', params)
   },
 
@@ -49,12 +48,12 @@ export const knowledgeApi = {
   },
 
   // 查询知识主题下的文档列表
-  listTopicDocuments(params: TopicDocumentRelationListReq): Promise<Response<TopicDocumentRelation[]>> {
+  listTopicDocuments(params: TopicDocumentRelationListReq): Promise<Response<TopicDocumentRelationResp[]>> {
     return axios.post('/manage/knowledge/topic/document/list', params)
   },
 
   // 保存知识主题下的文档
-  saveTopicDocument(params: TopicDocumentRelationSaveReq): Promise<Response<TopicDocumentRelation>> {
+  saveTopicDocument(params: TopicDocumentRelationSaveReq): Promise<Response<TopicDocumentRelationResp>> {
     return axios.post('/manage/knowledge/topic/document/save', params)
   },
 
@@ -64,7 +63,7 @@ export const knowledgeApi = {
   },
 
   // 查询知识路由轨迹分页列表
-  queryRouteTracePage(params?: KnowledgeRouteTracePageReq): Promise<Response<PageResult<RouteTrace>>> {
+  queryRouteTracePage(params?: KnowledgeRouteTracePageReq): Promise<Response<KnowledgeRouteTracePageResp>> {
     return axios.post('/manage/knowledge/route/trace/page/query', params || {})
   },
 }
