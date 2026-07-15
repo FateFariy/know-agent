@@ -165,7 +165,7 @@
               <td class="document-cell document-cell-action">
                 <div class="document-action-group">
                   <button class="detail-link" type="button"
-                          @click="openDocumentDetail(item.documentId)">查看详情
+                          @click="openDocumentDetail(item.documentId)">查询详情
                   </button>
                   <button class="danger-link" type="button" :disabled="!canDeleteDocument(item)"
                           :title="buildDeleteTitle(item)" @click="deleteDocument(item)">
@@ -212,7 +212,7 @@ import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
 import { formatDateTime, formatFileSize } from '@/utils/manageFormat'
 
 const router = useRouter()
-const OPERATOR_ID = 10001
+const OPERATOR_ID = '10001'
 const DEFAULT_PAGE_SIZE = 12
 
 const uploadForm = reactive<UploadDocumentReq>({
@@ -231,7 +231,7 @@ const documents = ref<DocumentInfo[]>([])
 const currentPage = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const total = ref(0)
-const deletingDocumentId = ref(0)
+const deletingDocumentId = ref('')
 const pageNotice = reactive({ type: 'info', message: '' })
 
 const totalPages = computed(() => {
@@ -308,7 +308,8 @@ function changePage(page: number): void {
   loadDocuments(page)
 }
 
-function openDocumentDetail(documentId: number): void {
+function openDocumentDetail(documentId: string): void {
+  console.log('openDocumentDetail', documentId)
   router.push({
     name: 'AdminDocumentDetail',
     params: {
@@ -361,7 +362,7 @@ async function submitUpload(): Promise<void> {
     clearSelectedFile()
     showNotice(`文档已上传，任务 ${data?.taskId} 已进入解析与策略推荐队列。`, 'success')
     await loadDocuments(1)
-    openDocumentDetail(data?.documentId || 0)
+    openDocumentDetail(data?.documentId || '')
   } catch (error) {
     console.error('上传文档失败', error)
     showNotice(normalizeError(error, '上传文档失败'), 'danger')
@@ -405,7 +406,7 @@ async function deleteDocument(item: DocumentInfo): Promise<void> {
     console.error('删除文档失败', error)
     showNotice(normalizeError(error, '删除文档失败'), 'danger')
   } finally {
-    deletingDocumentId.value = 0
+    deletingDocumentId.value = ''
   }
 }
 

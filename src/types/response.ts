@@ -1,5 +1,5 @@
 export interface DocumentInfo {
-  documentId: number
+  documentId: string
   documentName: string
   originalFileName: string
   fileType: number
@@ -18,9 +18,9 @@ export interface DocumentInfo {
   knowledgeScopeName: string
   businessCategory: string
   documentTags: string
-  currentPlanId: number
-  lastIndexTaskId: number
-  latestTaskId: number
+  currentPlanId: string
+  lastIndexTaskId: string
+  latestTaskId: string
   latestTaskType: number
   latestTaskTypeName: string
   latestTaskStatus: number
@@ -30,8 +30,8 @@ export interface DocumentInfo {
 }
 
 export interface DocumentChunk {
-  chunkId: number
-  parentBlockId: number
+  chunkId: string
+  parentBlockId: string
   parentBlockNo: number
   parentChildCount: number
   parentStartChunkNo: number
@@ -48,7 +48,7 @@ export interface DocumentChunk {
 }
 
 export interface DocumentParentBlock {
-  parentBlockId: number
+  parentBlockId: string
   parentBlockNo: number
   sectionPath: string
   sourceType: number
@@ -62,7 +62,7 @@ export interface DocumentParentBlock {
 }
 
 export interface DocumentProfile {
-  documentId: number
+  documentId: string
   documentSummary: string
   documentType: string
   coreTopics: string
@@ -77,7 +77,7 @@ export interface DocumentProfile {
 }
 
 export interface DocumentOption {
-  documentId: number
+  documentId: string
   documentName: string
   knowledgeScopeName: string
   businessCategory: string
@@ -85,7 +85,7 @@ export interface DocumentOption {
 }
 
 export interface Exchange {
-  exchangeId: number
+  exchangeId: string
   question: string
   answer: string
   thinkingSteps: string[]
@@ -107,14 +107,14 @@ export interface Reference {
   title: string
   url: string
   snippet: string
-  documentId: number
+  documentId: string
   documentName: string
-  chunkId: number
-  parentBlockId: number
+  chunkId: string
+  parentBlockId: string
   parentBlockNo: number
   chunkNo: number
   sectionPath: string
-  structureNodeId: number
+  structureNodeId: string
   structureNodeType: number
   canonicalPath: string
   itemIndex: number
@@ -136,11 +136,11 @@ export interface SessionDetail {
   exchanges: Exchange[]
   messageCount: number
   running: boolean
-  selectedDocumentId: number
+  selectedDocumentId: string
   selectedDocumentName: string
   latestUserMessage: string
   latestAssistantMessage: string
-  latestExchangeId: number
+  latestExchangeId: string
   latestTurnStatus: string
   latestTurnErrorMessage: string
   memorySummary: MemorySummary
@@ -149,7 +149,7 @@ export interface SessionDetail {
 export interface MemorySummary {
   conversationId: string
   IsCompressed: boolean
-  coveredExchangeId: number
+  coveredExchangeId: string
   coveredExchangeCount: number
   compressionCount: number
   summaryVersion: number
@@ -176,11 +176,11 @@ export interface SessionListItem {
   messageCount: number
   latestUserMessage: string
   latestAssistantMessage: string
-  latestExchangeId: number
+  latestExchangeId: string
   latestTurnStatus: string
   latestTurnErrorMessage: string
   chatMode: string
-  selectedDocumentId: number
+  selectedDocumentId: string
   selectedDocumentName: string
   createdTime: string
   updatedTime: string
@@ -189,7 +189,7 @@ export interface SessionListItem {
 }
 
 export interface KnowledgeScope {
-  id: number
+  id: string
   scopeCode: string
   scopeName: string
   parentScopeCode: string
@@ -200,7 +200,7 @@ export interface KnowledgeScope {
 }
 
 export interface KnowledgeTopic {
-  id: number
+  id: string
   topicCode: string
   topicName: string
   scopeCode: string
@@ -214,7 +214,7 @@ export interface KnowledgeTopic {
 
 export interface TopicDocumentRelation {
   topicCode: string
-  documentId: number
+  documentId: string
   documentName: string
   knowledgeScopeCode: string
   knowledgeScopeName: string
@@ -240,17 +240,17 @@ export interface UploadFile {
   progress: number
   status: 'pending' | 'uploading' | 'success' | 'error'
   errorMessage?: string
-  documentId?: number
+  documentId?: string
 }
 
 export interface StageTrace {
-  id: number
+  id: string
   traceId: string
   stageCode: string
   stageName: string
   stageOrder: number
   stageLevel: number
-  parentStageId: number
+  parentStageId: string
   executionMode: string
   stageState: string
   startTime: string
@@ -262,9 +262,9 @@ export interface StageTrace {
 }
 
 export interface RetrievalResult {
-  id: number
+  id: string
   conversationId: string
-  exchangeId: number
+  exchangeId: string
   traceId: string
   subQuestionIndex: number
   subQuestion: string
@@ -279,9 +279,9 @@ export interface RetrievalResult {
   isElevated: number
   isSelected: number
   selectionReason: string
-  chunkId: number
+  chunkId: string
   chunkNo: number
-  parentBlockId: number
+  parentBlockId: string
   parentBlockNo: number
   sectionPath: string
   chunkTextPreview: string
@@ -290,9 +290,9 @@ export interface RetrievalResult {
 }
 
 export interface ChannelExecution {
-  id: number
+  id: string
   conversationId: string
-  exchangeId: number
+  exchangeId: string
   traceId: string
   subQuestionIndex: number
   subQuestion: string
@@ -327,16 +327,16 @@ export interface ConversationStopResp {
 }
 
 export interface RouteTrace {
-  id: number
+  id: string
   conversationId: string
-  exchangeId: number
+  exchangeId: string
   question: string
   rewriteQuestion: string
   mode: string
   topScopesJson: string
   topTopicsJson: string
   topDocumentsJson: string
-  selectedDocumentId: number
+  selectedDocumentId: string
   hitSelectedDocument: number
   confidence: number
   routeStatus: string
@@ -367,7 +367,7 @@ export interface DocumentStrategyPipeline {
 }
 
 export interface DocumentStrategyPlan {
-  planId: number
+  planId: string
   planVersion: number
   planSource: number
   planSourceName: string
@@ -380,7 +380,7 @@ export interface DocumentStrategyPlan {
 }
 
 export interface QueryStrategyPlanResp {
-  documentId: number
+  documentId: string
   documentName: string
   parseStatus: number
   parseStatusName: string
@@ -394,8 +394,8 @@ export interface QueryStrategyPlanResp {
 }
 
 export interface ConfirmStrategyResp {
-  planId: number
-  documentId: number
+  planId: string
+  documentId: string
   planVersion: number
   strategyStatus: number
   strategyStatusName: string
@@ -405,7 +405,7 @@ export interface ConfirmStrategyResp {
 }
 
 export interface TaskLog {
-  id: number
+  id: string
   stageType: number
   stageTypeName: string
   eventType: number
@@ -418,8 +418,8 @@ export interface TaskLog {
 }
 
 export interface QueryTaskLogsResp {
-  taskId: number
-  documentId: number
+  taskId: string
+  documentId: string
   taskType: number
   taskTypeName: string
   taskStatus: number
@@ -436,8 +436,8 @@ export interface QueryTaskLogsResp {
 }
 
 export interface UploadDocumentResp {
-  documentId: number
-  taskId: number
+  documentId: string
+  taskId: string
   documentName: string
   parseStatus: number
   strategyStatus: number
@@ -445,8 +445,8 @@ export interface UploadDocumentResp {
 }
 
 export interface BuildIndexResp {
-  taskId: number
-  documentId: number
+  taskId: string
+  documentId: string
   taskType: number
   taskTypeName: string
   taskStatus: number
@@ -456,9 +456,9 @@ export interface BuildIndexResp {
 }
 
 export interface QueryDocumentChunksResp {
-  documentId: number
-  taskId: number
-  planId: number
+  documentId: string
+  taskId: string
+  planId: string
   pageNo: number
   pageSize: number
   total: number
@@ -466,16 +466,16 @@ export interface QueryDocumentChunksResp {
 }
 
 export interface QueryDocumentChunkDetailResp {
-  documentId: number
-  taskId: number
-  planId: number
+  documentId: string
+  taskId: string
+  planId: string
   chunk: DocumentChunk
   parentBlock: DocumentParentBlock
   siblingChunks: DocumentChunk[]
 }
 
 export interface DeleteDocumentResp {
-  documentId: number
+  documentId: string
   documentName: string
 }
 

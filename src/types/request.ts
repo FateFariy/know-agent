@@ -2,7 +2,7 @@ export interface ChatReq {
   question: string
   conversationId?: string
   chatMode?: string
-  selectedDocumentId?: number
+  selectedDocumentId?: string
 }
 
 export interface ConversationIdentityReq {
@@ -11,7 +11,7 @@ export interface ConversationIdentityReq {
 
 export interface ConversationExchangeDetailQueryReq {
   conversationId: string
-  exchangeId: number
+  exchangeId: string
 }
 
 export interface ConversationSessionListReq {
@@ -24,16 +24,17 @@ export interface ConversationSessionListReq {
 
 export interface RetrievalObserveReq {
   conversationId: string
-  exchangeId: number
+  exchangeId: string
 }
 
 export interface UploadDocumentReq {
   documentName?: string
-  operatorId?: number
+  operatorId?: string
   knowledgeScopeCode?: string
   knowledgeScopeName?: string
   businessCategory?: string
   documentTags?: string
+  file: File | null
 }
 
 export interface QueryDocumentPageReq {
@@ -43,67 +44,67 @@ export interface QueryDocumentPageReq {
 }
 
 export interface QueryDocumentDetailReq {
-  documentId: number
+  documentId: string
 }
 
 export interface DeleteDocumentReq {
-  documentId: number
+  documentId: string
 }
 
 export interface QueryStrategyPlanReq {
-  documentId: number
+  documentId: string
 }
 
 export interface ConfirmStrategyReq {
-  documentId: number
-  basePlanId: number
-  operatorId?: number
+  documentId: string
+  basePlanId: string
+  operatorId?: string
   adjustNote?: string
   parentSteps: StrategyStepItem[]
   childSteps: StrategyStepItem[]
 }
 
 export interface BuildIndexReq {
-  documentId: number
-  planId: number
-  operatorId?: number
+  documentId: string
+  planId: string
+  operatorId?: string
 }
 
 export interface QueryDocumentChunksReq {
-  documentId: number
-  taskId?: number
+  documentId: string
+  taskId?: string
   pageNo?: number
   pageSize?: number
 }
 
 export interface QueryDocumentChunkDetailReq {
-  documentId: number
-  chunkId: number
-  taskId?: number
+  documentId: string
+  chunkId: string
+  taskId?: string
 }
 
 export interface QueryTaskLogsReq {
-  taskId: number
+  taskId: string
   pageNo?: number
   pageSize?: number
 }
 
 export interface DocumentProfileDetailReq {
-  documentId: number
+  documentId: string
 }
 
 export interface DocumentProfileRegenerateReq {
-  documentId: number
+  documentId: string
   operatorId?: string
 }
 
 export interface DocumentProfileBatchRegenerateReq {
-  documentIds: number[]
+  documentIds: string[]
   operatorId?: string
 }
 
 export interface KnowledgeScopeSaveReq {
-  id?: number
+  id?: string
   scopeCode: string
   scopeName: string
   parentScopeCode?: string
@@ -120,7 +121,7 @@ export interface KnowledgeScopeDeleteReq {
 }
 
 export interface KnowledgeTopicSaveReq {
-  id?: number
+  id?: string
   topicCode: string
   topicName: string
   scopeCode: string
@@ -148,7 +149,7 @@ export interface TopicDocumentRelationListReq {
 
 export interface TopicDocumentRelationSaveReq {
   topicCode: string
-  documentId: number
+  documentId: string
   relationScore?: number
   relationSource?: string
   reason?: string
@@ -157,7 +158,7 @@ export interface TopicDocumentRelationSaveReq {
 
 export interface TopicDocumentRelationRemoveReq {
   topicCode: string
-  documentId: number
+  documentId: string
   operatorId?: string
 }
 
