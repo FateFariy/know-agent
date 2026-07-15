@@ -7,6 +7,7 @@ export interface UploadDocumentReq {
   knowledgeScopeName?: string;
   businessCategory?: string;
   documentTags?: string;
+  file: File | null;
 }
 
 /** 分页查询文档列表请求 */

@@ -204,7 +204,7 @@ import { useRouter } from 'vue-router'
 import { documentApi } from '@/api/document'
 import type {
   DeleteDocumentReq,
-  DocumentInfo,
+  DocumentDetailResp,
   QueryDocumentPageReq,
   UploadDocumentReq
 } from '@/types'
@@ -227,7 +227,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const listLoading = ref(false)
 const keyword = ref('')
-const documents = ref<DocumentInfo[]>([])
+const documents = ref<DocumentDetailResp[]>([])
 const currentPage = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const total = ref(0)
@@ -237,10 +237,9 @@ const pageNotice = reactive({ type: 'info', message: '' })
 const totalPages = computed(() => {
   return Math.max(1, Math.ceil((total.value || 0) / pageSize.value))
 })
-const visibleParseReadyCount = computed(() => documents.value.filter((item) => item.parseStatus === 3).length)
-const visibleStrategyReadyCount = computed(() => documents.value.filter((item) => item.strategyStatus === 3).length)
-const visibleIndexReadyCount = computed(() => documents.value.filter((item) => item.indexStatus === 3).length
-)
+const visibleParseReadyCount = computed<number>(() => documents.value.filter((item: DocumentDetailResp) => item.parseStatus === 3).length)
+const visibleStrategyReadyCount = computed<number>(() => documents.value.filter((item: DocumentDetailResp) => item.strategyStatus === 3).length)
+const visibleIndexReadyCount = computed<number>(() => documents.value.filter((item: DocumentDetailResp) => item.indexStatus === 3).length)
 
 function showNotice(message: string, type = 'info'): void {
   pageNotice.type = type
@@ -309,7 +308,6 @@ function changePage(page: number): void {
 }
 
 function openDocumentDetail(documentId: string): void {
-  console.log('openDocumentDetail', documentId)
   router.push({
     name: 'AdminDocumentDetail',
     params: {
@@ -318,18 +316,18 @@ function openDocumentDetail(documentId: string): void {
   })
 }
 
-function hasRunningDocumentTask(item: DocumentInfo): boolean {
+function hasRunningDocumentTask(item: DocumentDetailResp): boolean {
   return item?.latestTaskStatus === 1 || item?.latestTaskStatus === 2 || item?.parseStatus === 2 || item?.indexStatus === 2
 }
 
-function canDeleteDocument(item: DocumentInfo): boolean {
+function canDeleteDocument(item: DocumentDetailResp): boolean {
   if (!item?.documentId) {
     return false
   }
   return !listLoading.value && !deletingDocumentId.value && !hasRunningDocumentTask(item)
 }
 
-function buildDeleteTitle(item: DocumentInfo): string {
+function buildDeleteTitle(item: DocumentDetailResp): string {
   if (hasRunningDocumentTask(item)) {
     return '请等待当前任务完成后再删除'
   }
@@ -371,7 +369,7 @@ async function submitUpload(): Promise<void> {
   }
 }
 
-async function deleteDocument(item: DocumentInfo): Promise<void> {
+async function deleteDocument(item: DocumentDetailResp): Promise<void> {
   if (!item?.documentId) {
     return
   }
