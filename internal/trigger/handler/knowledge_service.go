@@ -6,6 +6,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/knowledge"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 )
@@ -91,7 +92,7 @@ func (k *KnowledgeService) SaveTopicDocumentRelation(ctx context.Context, req *k
 
 // RemoveTopicDocumentRelation 移除主题文档关联
 func (k *KnowledgeService) RemoveTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationRemoveReq) (bool, error) {
-	return k.l.RemoveTopicDocumentRelation(ctx, req.TopicCode, req.DocumentId)
+	return k.l.RemoveTopicDocumentRelation(ctx, req.TopicCode, utils.StringToInt64(req.DocumentId))
 }
 
 // ==================== 路由追踪 ====================
@@ -106,7 +107,7 @@ func (k *KnowledgeService) QueryKnowledgeRouteTracePage(ctx context.Context, req
 	return &knowledge.KnowledgeRouteTracePageResp{
 		PageNo:     req.PageNo,
 		PageSize:   req.PageSize,
-		TotalSize:  total,
+		Total:      total,
 		TotalPages: int(totalPages),
 		Records:    result,
 	}, nil

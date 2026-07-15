@@ -12,7 +12,7 @@ type (
 	// 文档上传请求
 	UploadDocumentReq {
 		DocumentName       string `json:"documentName,optional"` // 文档名称
-		OperatorId         int64  `json:"operatorId,optional"` // 操作人ID
+		OperatorId         string `json:"operatorId,optional"` // 操作人ID
 		KnowledgeScopeCode string `json:"knowledgeScopeCode,optional"` // 知识范围编码
 		KnowledgeScopeName string `json:"knowledgeScopeName,optional"` // 知识范围名称
 		BusinessCategory   string `json:"businessCategory,optional"` // 业务分类
@@ -26,21 +26,21 @@ type (
 	}
 	// 查询文档详情请求
 	QueryDocumentDetailReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 	}
 	// 删除文档请求
 	DeleteDocumentReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 	}
 	// 查询文档策略推荐结果请求
 	QueryStrategyPlanReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 	}
 	// 确认文档策略方案请求
 	ConfirmStrategyReq {
-		DocumentId  int64               `json:"documentId"` // 文档ID
-		BasePlanId  int64               `json:"basePlanId"` // 基础方案ID
-		OperatorId  int64               `json:"operatorId,optional"` // 操作人ID
+		DocumentId  string              `json:"documentId"` // 文档ID
+		BasePlanId  string              `json:"basePlanId"` // 基础方案ID
+		OperatorId  string              `json:"operatorId,optional"` // 操作人ID
 		AdjustNote  string              `json:"adjustNote,optional"` // 调整备注
 		ParentSteps []*StrategyStepItem `json:"parentSteps"` // 父块步骤
 		ChildSteps  []*StrategyStepItem `json:"childSteps"` // 子块步骤
@@ -52,42 +52,42 @@ type (
 	}
 	// 执行文档索引构建请求
 	BuildIndexReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
-		PlanId     int64 `json:"planId"` // 方案ID
-		OperatorId int64 `json:"operatorId,optional"` // 操作人ID
+		DocumentId string `json:"documentId"` // 文档ID
+		PlanId     string `json:"planId"` // 方案ID
+		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 查询文档chunk列表请求
 	QueryDocumentChunksReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
-		TaskId     int64 `json:"taskId,optional"` // 任务ID
-		PageNo     int   `json:"pageNo,optional,default=1"` // 页码
-		PageSize   int   `json:"pageSize,optional,default=10"` // 每页大小
+		DocumentId string `json:"documentId"` // 文档ID
+		TaskId     string `json:"taskId,optional"` // 任务ID
+		PageNo     int    `json:"pageNo,optional,default=1"` // 页码
+		PageSize   int    `json:"pageSize,optional,default=10"` // 每页大小
 	}
 	// 查询单个文档chunk详情请求
 	QueryDocumentChunkDetailReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
-		ChunkId    int64 `json:"chunkId"` // 块ID
-		TaskId     int64 `json:"taskId,optional"` // 任务ID
+		DocumentId string `json:"documentId"` // 文档ID
+		ChunkId    string `json:"chunkId"` // 块ID
+		TaskId     string `json:"taskId,optional"` // 任务ID
 	}
 	// 查询任务执行日志请求
 	QueryTaskLogsReq {
-		TaskId   int64 `json:"taskId"` // 任务ID
-		PageNo   int   `json:"pageNo,optional,default=1"` // 页码
-		PageSize int   `json:"pageSize,optional,default=10"` // 每页大小
+		TaskId   string `json:"taskId"` // 任务ID
+		PageNo   int    `json:"pageNo,optional,default=1"` // 页码
+		PageSize int    `json:"pageSize,optional,default=10"` // 每页大小
 	}
 	// 查询文档画像详情请求
 	DocumentProfileDetailReq {
-		DocumentId int64 `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 	}
 	// 重新生成文档画像请求
 	DocumentProfileRegenerateReq {
-		DocumentId int64  `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 批量重新生成文档画像请求
 	DocumentProfileBatchRegenerateReq {
-		DocumentIds []int64 `json:"documentIds"` // 文档ID列表
-		OperatorId  string  `json:"operatorId,optional"` // 操作人ID
+		DocumentIds []string `json:"documentIds"` // 文档ID列表
+		OperatorId  string   `json:"operatorId,optional"` // 操作人ID
 	}
 )
 
@@ -95,8 +95,8 @@ type (
 type (
 	// 文档上传响应
 	UploadDocumentResp {
-		DocumentId     int64  `json:"documentId"` // 文档ID
-		TaskId         int64  `json:"taskId"` // 任务ID
+		DocumentId     string `json:"documentId"` // 文档ID
+		TaskId         string `json:"taskId"` // 任务ID
 		DocumentName   string `json:"documentName"` // 文档名称
 		ParseStatus    int    `json:"parseStatus"` // 解析状态
 		StrategyStatus int    `json:"strategyStatus"` // 策略状态
@@ -111,7 +111,7 @@ type (
 	}
 	// 文档列表项
 	DocumentListItem {
-		ID                   int64  `json:"documentId"` // 文档ID
+		ID                   string `json:"documentId"` // 文档ID
 		DocumentName         string `json:"documentName"` // 文档名称
 		OriginalFileName     string `json:"originalFileName"` // 原始文件名
 		FileType             int    `json:"fileType"` // 文件类型
@@ -130,9 +130,9 @@ type (
 		KnowledgeScopeName   string `json:"knowledgeScopeName"` // 知识范围名称
 		BusinessCategory     string `json:"businessCategory"` // 业务分类
 		DocumentTags         string `json:"documentTags"` // 文档标签
-		CurrentPlanId        int64  `json:"currentPlanId"` // 当前策略ID
-		LastIndexTaskId      int64  `json:"lastIndexTaskId"` // 上一次索引任务ID
-		LatestTaskId         int64  `json:"latestTaskId"` // 最新任务ID
+		CurrentPlanId        string `json:"currentPlanId"` // 当前策略ID
+		LastIndexTaskId      string `json:"lastIndexTaskId"` // 上一次索引任务ID
+		LatestTaskId         string `json:"latestTaskId"` // 最新任务ID
 		LatestTaskType       int    `json:"latestTaskType"` // 最新任务类型
 		LatestTaskTypeName   string `json:"latestTaskTypeName"` // 最新任务类型名
 		LatestTaskStatus     int    `json:"latestTaskStatus"` // 最新任务状态
@@ -142,7 +142,7 @@ type (
 	}
 	// 知识文档选项
 	KnowledgeDocumentOptionResp {
-		DocumentId         int64    `json:"documentId"` // 文档ID
+		DocumentId         string   `json:"documentId"` // 文档ID
 		DocumentName       string   `json:"documentName"` // 文档名称
 		KnowledgeScopeName string   `json:"knowledgeScopeName"` // 知识范围名称
 		BusinessCategory   string   `json:"businessCategory"` // 业务分类
@@ -150,12 +150,12 @@ type (
 	}
 	// 删除文档响应
 	DeleteDocumentResp {
-		DocumentId   int64  `json:"documentId"` // 文档ID
+		DocumentId   string `json:"documentId"` // 文档ID
 		DocumentName string `json:"documentName"` // 文档名称
 	}
 	// 查询文档策略方案响应
 	QueryStrategyPlanResp {
-		ID                 int64                 `json:"documentId"` // 文档ID
+		ID                 string                `json:"documentId"` // 文档ID
 		DocumentName       string                `json:"documentName"` // 文档名称
 		ParseStatus        int                   `json:"parseStatus"` // 解析状态
 		ParseStatusName    string                `json:"parseStatusName"` // 解析状态名
@@ -169,7 +169,7 @@ type (
 	}
 	// 文档策略方案信息
 	DocumentStrategyPlan {
-		ID               int64                     `json:"planId"` // 方案ID
+		ID               string                    `json:"planId"` // 方案ID
 		PlanVersion      int                       `json:"planVersion"` // 方案版本
 		PlanSource       int                       `json:"planSource"` // 方案来源
 		PlanSourceName   string                    `json:"planSourceName"` // 方案来源名称
@@ -204,8 +204,8 @@ type (
 	}
 	// 确认文档策略方案响应
 	ConfirmStrategyResp {
-		ID                 int64                     `json:"planId"` // 方案ID
-		DocumentId         int64                     `json:"documentId"` // 文档ID
+		ID                 string                    `json:"planId"` // 方案ID
+		DocumentId         string                    `json:"documentId"` // 文档ID
 		PlanVersion        int                       `json:"planVersion"` // 方案版本
 		StrategyStatus     int                       `json:"strategyStatus"` // 策略状态
 		StrategyStatusName string                    `json:"strategyStatusName"` // 策略状态描述
@@ -215,8 +215,8 @@ type (
 	}
 	// 执行文档索引构建响应
 	BuildIndexResp {
-		TaskId          int64  `json:"taskId"` // 任务ID
-		DocumentId      int64  `json:"documentId"` // 文档ID
+		TaskId          string `json:"taskId"` // 任务ID
+		DocumentId      string `json:"documentId"` // 文档ID
 		TaskType        int    `json:"taskType"` // 任务类型
 		TaskTypeName    string `json:"taskTypeName"` // 任务类型名
 		TaskStatus      int    `json:"taskStatus"` // 任务状态
@@ -226,9 +226,9 @@ type (
 	}
 	// 查询文档chunk列表响应
 	QueryDocumentChunksResp {
-		DocumentId int64                `json:"documentId"` // 文档ID
-		TaskId     int64                `json:"taskId"` // 任务ID
-		PlanId     int64                `json:"planId"` // 方案ID
+		DocumentId string               `json:"documentId"` // 文档ID
+		TaskId     string               `json:"taskId"` // 任务ID
+		PlanId     string               `json:"planId"` // 方案ID
 		PageNo     int                  `json:"pageNo"` // 页码
 		PageSize   int                  `json:"pageSize"` // 页大小
 		Total      int64                `json:"total"` // 总条数
@@ -236,17 +236,17 @@ type (
 	}
 	// 查询单个文档chunk详情响应
 	QueryDocumentChunkDetailResp {
-		DocumentId    int64                    `json:"documentId"` // 文档ID
-		TaskId        int64                    `json:"taskId"` // 任务ID
-		PlanId        int64                    `json:"planId"` // 方案ID
+		DocumentId    string                   `json:"documentId"` // 文档ID
+		TaskId        string                   `json:"taskId"` // 任务ID
+		PlanId        string                   `json:"planId"` // 方案ID
 		Chunk         *DocumentChunkItem       `json:"chunk"` // 当前分片信息
 		ParentBlock   *DocumentParentBlockItem `json:"parentBlock"` // 父级块信息
 		SiblingChunks []*DocumentChunkItem     `json:"siblingChunks"` // 同级分片列表
 	}
 	// 文档块信息
 	DocumentChunkItem {
-		ChunkId            int64  `json:"chunkId"` // 分片ID
-		ParentBlockId      int64  `json:"parentBlockId"` // 父块ID
+		ChunkId            string `json:"chunkId"` // 分片ID
+		ParentBlockId      string `json:"parentBlockId"` // 父块ID
 		ParentBlockNo      int    `json:"parentBlockNo"` // 父块编号
 		ParentChildCount   int    `json:"parentChildCount"` // 父块下子分片总数
 		ParentStartChunkNo int    `json:"parentStartChunkNo"` // 父块起始分片号
@@ -263,7 +263,7 @@ type (
 	}
 	// 文档父块信息
 	DocumentParentBlockItem {
-		ParentBlockId  int64  `json:"parentBlockId"` // 父块ID
+		ParentBlockId  string `json:"parentBlockId"` // 父块ID
 		ParentBlockNo  int    `json:"parentBlockNo"` // 父块编号
 		SectionPath    string `json:"sectionPath"` // 章节路径
 		SourceType     int    `json:"sourceType"` // 来源类型
@@ -277,8 +277,8 @@ type (
 	}
 	// 查询任务执行日志响应
 	QueryTaskLogsResp {
-		ID               int64      `json:"taskId"` // 任务ID
-		DocumentId       int64      `json:"documentId"` // 文档ID
+		ID               string     `json:"taskId"` // 任务ID
+		DocumentId       string     `json:"documentId"` // 文档ID
 		TaskType         int        `json:"taskType"` // 任务类型
 		TaskTypeName     string     `json:"taskTypeName"` // 任务类型名称
 		TaskStatus       int        `json:"taskStatus"` // 任务状态
@@ -295,7 +295,7 @@ type (
 	}
 	// 任务日志
 	TaskLog {
-		ID            int64  `json:"id"` // 主键ID
+		ID            string `json:"id"` // 主键ID
 		StageType     int    `json:"stageType"` // 阶段类型编码
 		StageTypeName string `json:"stageTypeName"` // 阶段类型名称
 		EventType     int    `json:"eventType"` // 事件类型编码
@@ -308,7 +308,7 @@ type (
 	}
 	// 文档画像信息
 	DocumentProfileResp {
-		DocumentId           int64  `json:"documentId"` // 文档ID
+		DocumentId           string `json:"documentId"` // 文档ID
 		DocumentSummary      string `json:"documentSummary"` // 文档摘要
 		DocumentType         string `json:"documentType"` // 文档类型
 		CoreTopics           string `json:"coreTopics"` // 核心主题

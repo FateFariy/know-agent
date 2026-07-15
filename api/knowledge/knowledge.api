@@ -11,7 +11,7 @@ info (
 type (
 	// 保存知识范围请求
 	KnowledgeScopeSaveReq {
-		ID              int64  `json:"id,optional"` // 主键ID
+		ID              string `json:"id,optional"` // 主键ID
 		ScopeCode       string `json:"scopeCode"` // 范围编码
 		ScopeName       string `json:"scopeName"` // 范围名称
 		ParentScopeCode string `json:"parentScopeCode,optional"` // 上级范围编码
@@ -28,7 +28,7 @@ type (
 	}
 	// 保存知识主题请求
 	KnowledgeTopicSaveReq {
-		ID                  int64  `json:"id,optional"` // 主键ID
+		ID                  string `json:"id,optional"` // 主键ID
 		TopicCode           string `json:"topicCode"` // 主题编码
 		TopicName           string `json:"topicName"` // 主题名称
 		ScopeCode           string `json:"scopeCode"` // 所属范围编码
@@ -56,7 +56,7 @@ type (
 	// 保存主题文档关联请求
 	TopicDocumentRelationSaveReq {
 		TopicCode      string  `json:"topicCode"` // 主题编码
-		DocumentId     int64   `json:"documentId"` // 文档ID
+		DocumentId     string  `json:"documentId"` // 文档ID
 		RelationScore  float64 `json:"relationScore,optional"` // 关联分数
 		RelationSource string  `json:"relationSource,optional"` // 关联来源
 		Reason         string  `json:"reason,optional"` // 理由
@@ -65,7 +65,7 @@ type (
 	// 移除主题文档关联请求
 	TopicDocumentRelationRemoveReq {
 		TopicCode  string `json:"topicCode"` // 主题编码
-		DocumentId int64  `json:"documentId"` // 文档ID
+		DocumentId string `json:"documentId"` // 文档ID
 		OperatorId string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 分页查询知识路由追踪请求
@@ -82,7 +82,7 @@ type (
 type (
 	// 知识范围项
 	KnowledgeScopeItem {
-		ID              int64  `json:"id"` // 主键ID
+		ID              string `json:"id"` // 主键ID
 		ScopeCode       string `json:"scopeCode"` // 范围编码
 		ScopeName       string `json:"scopeName"` // 范围名称
 		ParentScopeCode string `json:"parentScopeCode"` // 上级范围编码
@@ -93,7 +93,7 @@ type (
 	}
 	// 知识主题项
 	KnowledgeTopicItem {
-		ID                  int64  `json:"id"` // 主键ID
+		ID                  string `json:"id"` // 主键ID
 		TopicCode           string `json:"topicCode"` // 主题编码
 		TopicName           string `json:"topicName"` // 主题名称
 		ScopeCode           string `json:"scopeCode"` // 所属范围编码
@@ -107,7 +107,7 @@ type (
 	// 主题文档关联项
 	TopicDocumentRelationItem {
 		TopicCode          string  `json:"topicCode"` // 主题编码
-		DocumentId         int64   `json:"documentId"` // 文档ID
+		DocumentId         string  `json:"documentId"` // 文档ID
 		DocumentName       string  `json:"documentName"` // 文档名称
 		KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围编码
 		KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
@@ -119,16 +119,16 @@ type (
 	}
 	// 知识路由追踪列表项
 	KnowledgeRouteTraceItem {
-		ID                  int64   `json:"id"` // 主键ID
+		ID                  string  `json:"id"` // 主键ID
 		ConversationId      string  `json:"conversationId"` // 会话ID
-		ExchangeId          int64   `json:"exchangeId"` // 轮次ID
+		ExchangeId          string  `json:"exchangeId"` // 轮次ID
 		Question            string  `json:"question"` // 用户提问
 		RewriteQuestion     string  `json:"rewriteQuestion"` // 改写后的问题
 		Mode                string  `json:"mode"` // 模式
 		TopScopesJson       string  `json:"topScopesJson"` // 候选范围JSON
 		TopTopicsJson       string  `json:"topTopicsJson"` // 候选主题JSON
 		TopDocumentsJson    string  `json:"topDocumentsJson"` // 候选文档JSON
-		SelectedDocumentId  int64   `json:"selectedDocumentId"` // 选中的文档ID
+		SelectedDocumentId  string  `json:"selectedDocumentId"` // 选中的文档ID
 		HitSelectedDocument int     `json:"hitSelectedDocument"` // 是否命中选中文档
 		Confidence          float64 `json:"confidence"` // 置信度
 		RouteStatus         string  `json:"routeStatus"` // 路由状态
@@ -139,7 +139,7 @@ type (
 	KnowledgeRouteTracePageResp {
 		PageNo     int                        `json:"pageNo"` // 页码
 		PageSize   int                        `json:"pageSize"` // 每页大小
-		TotalSize  int64                      `json:"totalSize"` // 总条数
+		Total      int64                      `json:"total"` // 总条数
 		TotalPages int                        `json:"totalPages"` // 总页数
 		Records    []*KnowledgeRouteTraceItem `json:"records"` // 列表数据
 	}

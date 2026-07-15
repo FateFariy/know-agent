@@ -25,7 +25,7 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 		voChatCommand.Question = (*source).Question
 		voChatCommand.ConversationId = (*source).ConversationId
 		voChatCommand.ChatMode = ToChatQueryMode((*source).ChatMode)
-		voChatCommand.SelectedDocumentId = (*source).SelectedDocumentId
+		voChatCommand.SelectedDocumentId = StringToInt64((*source).SelectedDocumentId)
 		pVoChatCommand = &voChatCommand
 	}
 	return pVoChatCommand
@@ -34,9 +34,9 @@ func ToChannelExecutionResp(source *vo.ChatChannelExecution) *chat.ChannelExecut
 	var pChatChannelExecutionResp *chat.ChannelExecutionResp
 	if source != nil {
 		var chatChannelExecutionResp chat.ChannelExecutionResp
-		chatChannelExecutionResp.ID = (*source).ID
+		chatChannelExecutionResp.ID = Int64ToString((*source).ID)
 		chatChannelExecutionResp.ConversationId = (*source).ConversationId
-		chatChannelExecutionResp.ExchangeId = (*source).ExchangeId
+		chatChannelExecutionResp.ExchangeId = Int64ToString((*source).ExchangeId)
 		chatChannelExecutionResp.TraceId = (*source).TraceId
 		chatChannelExecutionResp.SubQuestionIndex = (*source).SubQuestionIndex
 		chatChannelExecutionResp.SubQuestion = (*source).SubQuestion
@@ -167,7 +167,7 @@ func ToConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationE
 	var pChatConversationExchangeResp *chat.ConversationExchangeResp
 	if source != nil {
 		var chatConversationExchangeResp chat.ConversationExchangeResp
-		chatConversationExchangeResp.ID = (*source).ID
+		chatConversationExchangeResp.ID = Int64ToString((*source).ID)
 		chatConversationExchangeResp.Question = (*source).Question
 		chatConversationExchangeResp.Answer = (*source).Answer
 		chatConversationExchangeResp.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
@@ -191,7 +191,7 @@ func ToConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.Con
 		var chatConversationMemorySummaryResp chat.ConversationMemorySummaryResp
 		chatConversationMemorySummaryResp.ConversationId = (*source).ConversationId
 		chatConversationMemorySummaryResp.IsCompressed = (*source).IsCompressed
-		chatConversationMemorySummaryResp.CoveredExchangeId = (*source).CoveredExchangeId
+		chatConversationMemorySummaryResp.CoveredExchangeId = Int64ToString((*source).CoveredExchangeId)
 		chatConversationMemorySummaryResp.CoveredExchangeCount = (*source).CoveredExchangeCount
 		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
 		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
@@ -226,11 +226,11 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 		chatConversationSessionResp.MessageCount = (*source).MessageCount
 		chatConversationSessionResp.LatestUserMessage = (*source).LatestUserMessage
 		chatConversationSessionResp.LatestAssistantMessage = (*source).LatestAssistantMessage
-		chatConversationSessionResp.LatestExchangeId = (*source).LatestExchangeId
+		chatConversationSessionResp.LatestExchangeId = Int64ToString((*source).LatestExchangeId)
 		chatConversationSessionResp.LatestTurnStatus = (*source).LatestTurnStatus
 		chatConversationSessionResp.LatestTurnErrorMessage = (*source).LatestTurnErrorMessage
 		chatConversationSessionResp.ChatMode = ToChatQueryModeName((*source).ChatMode)
-		chatConversationSessionResp.SelectedDocumentId = (*source).SelectedDocumentId
+		chatConversationSessionResp.SelectedDocumentId = Int64ToString((*source).SelectedDocumentId)
 		chatConversationSessionResp.SelectedDocumentName = (*source).SelectedDocumentName
 		chatConversationSessionResp.CreatedTime = TimeToString((*source).CreatedTime)
 		chatConversationSessionResp.UpdatedTime = TimeToString((*source).UpdatedTime)
@@ -282,13 +282,13 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source *enti
 	var pChatConversationTraceStageResp *chat.ConversationTraceStageResp
 	if source != nil {
 		var chatConversationTraceStageResp chat.ConversationTraceStageResp
-		chatConversationTraceStageResp.ID = (*source).ID
+		chatConversationTraceStageResp.ID = Int64ToString((*source).ID)
 		chatConversationTraceStageResp.TraceId = (*source).TraceId
 		chatConversationTraceStageResp.StageCode = (*source).StageCode
 		chatConversationTraceStageResp.StageName = (*source).StageName
 		chatConversationTraceStageResp.StageOrder = (*source).StageOrder
 		chatConversationTraceStageResp.StageLevel = (*source).StageLevel
-		chatConversationTraceStageResp.ParentStageId = (*source).ParentStageId
+		chatConversationTraceStageResp.ParentStageId = Int64ToString((*source).ParentStageId)
 		chatConversationTraceStageResp.ExecutionMode = (*source).ExecutionMode
 		chatConversationTraceStageResp.StageState = ToChatQueryModeName((*source).StageState)
 		chatConversationTraceStageResp.StartTime = TimeToString((*source).StartTime)
@@ -353,9 +353,9 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalRe
 	var pChatRetrievalResultResp *chat.RetrievalResultResp
 	if source != nil {
 		var chatRetrievalResultResp chat.RetrievalResultResp
-		chatRetrievalResultResp.ID = (*source).ID
+		chatRetrievalResultResp.ID = Int64ToString((*source).ID)
 		chatRetrievalResultResp.ConversationId = (*source).ConversationId
-		chatRetrievalResultResp.ExchangeId = (*source).ExchangeId
+		chatRetrievalResultResp.ExchangeId = Int64ToString((*source).ExchangeId)
 		chatRetrievalResultResp.TraceId = (*source).TraceId
 		chatRetrievalResultResp.SubQuestionIndex = (*source).SubQuestionIndex
 		chatRetrievalResultResp.SubQuestion = (*source).SubQuestion
@@ -370,9 +370,9 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalRe
 		chatRetrievalResultResp.IsElevated = (*source).IsElevated
 		chatRetrievalResultResp.IsSelected = (*source).IsSelected
 		chatRetrievalResultResp.SelectionReason = (*source).SelectionReason
-		chatRetrievalResultResp.ChunkId = (*source).ChunkId
+		chatRetrievalResultResp.ChunkId = Int64ToString((*source).ChunkId)
 		chatRetrievalResultResp.ChunkNo = (*source).ChunkNo
-		chatRetrievalResultResp.ParentBlockId = (*source).ParentBlockId
+		chatRetrievalResultResp.ParentBlockId = Int64ToString((*source).ParentBlockId)
 		chatRetrievalResultResp.ParentBlockNo = (*source).ParentBlockNo
 		chatRetrievalResultResp.SectionPath = (*source).SectionPath
 		chatRetrievalResultResp.ChunkTextPreview = (*source).ChunkTextPreview
@@ -423,9 +423,9 @@ func FromConfirmStrategyReq(source *document.ConfirmStrategyReq) *vo1.DocumentSt
 	var pVoDocumentStrategyConfirmCmd *vo1.DocumentStrategyConfirmCmd
 	if source != nil {
 		var voDocumentStrategyConfirmCmd vo1.DocumentStrategyConfirmCmd
-		voDocumentStrategyConfirmCmd.DocumentId = (*source).DocumentId
-		voDocumentStrategyConfirmCmd.BasePlanId = (*source).BasePlanId
-		voDocumentStrategyConfirmCmd.OperatorId = (*source).OperatorId
+		voDocumentStrategyConfirmCmd.DocumentId = StringToInt64((*source).DocumentId)
+		voDocumentStrategyConfirmCmd.BasePlanId = StringToInt64((*source).BasePlanId)
+		voDocumentStrategyConfirmCmd.OperatorId = StringToInt64((*source).OperatorId)
 		voDocumentStrategyConfirmCmd.AdjustNote = (*source).AdjustNote
 		if (*source).ParentSteps != nil {
 			voDocumentStrategyConfirmCmd.ParentSteps = make([]*vo1.DocumentStrategyStepItem, len((*source).ParentSteps))
@@ -452,7 +452,7 @@ func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity1.Document
 		entityDocument.KnowledgeScopeName = (*source).KnowledgeScopeName
 		entityDocument.BusinessCategory = (*source).BusinessCategory
 		entityDocument.DocumentTags = (*source).DocumentTags
-		entityDocument.OperatorId = (*source).OperatorId
+		entityDocument.OperatorId = StringToInt64((*source).OperatorId)
 		pEntityDocument = &entityDocument
 	}
 	return pEntityDocument
@@ -461,8 +461,8 @@ func ToBuildIndexResp(source *vo1.DocumentIndexBuild) *document.BuildIndexResp {
 	var pDocumentBuildIndexResp *document.BuildIndexResp
 	if source != nil {
 		var documentBuildIndexResp document.BuildIndexResp
-		documentBuildIndexResp.TaskId = (*source).TaskId
-		documentBuildIndexResp.DocumentId = (*source).DocumentId
+		documentBuildIndexResp.TaskId = Int64ToString((*source).TaskId)
+		documentBuildIndexResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentBuildIndexResp.TaskType = (*source).TaskType
 		documentBuildIndexResp.TaskTypeName = (*source).TaskTypeName
 		documentBuildIndexResp.TaskStatus = (*source).TaskStatus
@@ -477,8 +477,8 @@ func ToConfirmStrategyResp(source *entity1.DocumentStrategyPlan) *document.Confi
 	var pDocumentConfirmStrategyResp *document.ConfirmStrategyResp
 	if source != nil {
 		var documentConfirmStrategyResp document.ConfirmStrategyResp
-		documentConfirmStrategyResp.ID = (*source).ID
-		documentConfirmStrategyResp.DocumentId = (*source).DocumentId
+		documentConfirmStrategyResp.ID = Int64ToString((*source).ID)
+		documentConfirmStrategyResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentConfirmStrategyResp.PlanVersion = (*source).PlanVersion
 		documentConfirmStrategyResp.Normalized = (*source).Normalized
 		documentConfirmStrategyResp.ParentPipeline = pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline((*source).ParentPipeline)
@@ -537,7 +537,7 @@ func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 	var pDocumentDocumentListItem *document.DocumentListItem
 	if source != nil {
 		var documentDocumentListItem document.DocumentListItem
-		documentDocumentListItem.ID = (*source).ID
+		documentDocumentListItem.ID = Int64ToString((*source).ID)
 		documentDocumentListItem.DocumentName = (*source).DocumentName
 		documentDocumentListItem.OriginalFileName = (*source).OriginalFileName
 		documentDocumentListItem.FileType = (*source).FileType
@@ -558,9 +558,9 @@ func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
 		documentDocumentListItem.KnowledgeScopeName = (*source).KnowledgeScopeName
 		documentDocumentListItem.BusinessCategory = (*source).BusinessCategory
 		documentDocumentListItem.DocumentTags = (*source).DocumentTags
-		documentDocumentListItem.CurrentPlanId = (*source).CurrentPlanId
-		documentDocumentListItem.LastIndexTaskId = (*source).LastIndexTaskId
-		documentDocumentListItem.LatestTaskId = (*source).LatestTaskId
+		documentDocumentListItem.CurrentPlanId = Int64ToString((*source).CurrentPlanId)
+		documentDocumentListItem.LastIndexTaskId = Int64ToString((*source).LastIndexTaskId)
+		documentDocumentListItem.LatestTaskId = Int64ToString((*source).LatestTaskId)
 		documentDocumentListItem.LatestTaskType = (*source).LatestTaskType
 		documentDocumentListItem.LatestTaskTypeName = (*source).LatestTaskTypeName
 		documentDocumentListItem.LatestTaskStatus = (*source).LatestTaskStatus
@@ -677,7 +677,7 @@ func ToDocumentProfileResp(source *entity1.DocumentProfile) *document.DocumentPr
 	var pDocumentDocumentProfileResp *document.DocumentProfileResp
 	if source != nil {
 		var documentDocumentProfileResp document.DocumentProfileResp
-		documentDocumentProfileResp.DocumentId = (*source).DocumentId
+		documentDocumentProfileResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentDocumentProfileResp.DocumentSummary = (*source).DocumentSummary
 		documentDocumentProfileResp.DocumentType = (*source).DocumentType
 		documentDocumentProfileResp.CoreTopics = (*source).CoreTopics
@@ -709,7 +709,7 @@ func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.Docu
 	var pDocumentDocumentStrategyPlan *document.DocumentStrategyPlan
 	if source != nil {
 		var documentDocumentStrategyPlan document.DocumentStrategyPlan
-		documentDocumentStrategyPlan.ID = (*source).ID
+		documentDocumentStrategyPlan.ID = Int64ToString((*source).ID)
 		documentDocumentStrategyPlan.PlanVersion = (*source).PlanVersion
 		documentDocumentStrategyPlan.PlanSource = (*source).PlanSource
 		documentDocumentStrategyPlan.PlanSourceName = (*source).PlanSourceName
@@ -835,9 +835,9 @@ func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *docu
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
 	if source != nil {
 		var documentQueryDocumentChunkDetailResp document.QueryDocumentChunkDetailResp
-		documentQueryDocumentChunkDetailResp.DocumentId = (*source).DocumentId
-		documentQueryDocumentChunkDetailResp.TaskId = (*source).TaskId
-		documentQueryDocumentChunkDetailResp.PlanId = (*source).PlanId
+		documentQueryDocumentChunkDetailResp.DocumentId = Int64ToString((*source).DocumentId)
+		documentQueryDocumentChunkDetailResp.TaskId = Int64ToString((*source).TaskId)
+		documentQueryDocumentChunkDetailResp.PlanId = Int64ToString((*source).PlanId)
 		documentQueryDocumentChunkDetailResp.Chunk = pEntityDocumentChunkToPDocumentDocumentChunkItem((*source).Chunk)
 		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentBlockToPDocumentDocumentParentBlockItem((*source).ParentBlock)
 		documentQueryDocumentChunkDetailResp.SiblingChunks = ToDocumentChunkItemList((*source).SiblingChunks)
@@ -849,7 +849,7 @@ func ToQueryStrategyPlanResp(source *entity1.Document) *document.QueryStrategyPl
 	var pDocumentQueryStrategyPlanResp *document.QueryStrategyPlanResp
 	if source != nil {
 		var documentQueryStrategyPlanResp document.QueryStrategyPlanResp
-		documentQueryStrategyPlanResp.ID = (*source).ID
+		documentQueryStrategyPlanResp.ID = Int64ToString((*source).ID)
 		documentQueryStrategyPlanResp.DocumentName = (*source).DocumentName
 		documentQueryStrategyPlanResp.ParseStatus = (*source).ParseStatus
 		documentQueryStrategyPlanResp.ParseStatusName = (*source).ParseStatusName
@@ -869,8 +869,8 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 	var pDocumentQueryTaskLogsResp *document.QueryTaskLogsResp
 	if source != nil {
 		var documentQueryTaskLogsResp document.QueryTaskLogsResp
-		documentQueryTaskLogsResp.ID = (*source).ID
-		documentQueryTaskLogsResp.DocumentId = (*source).DocumentId
+		documentQueryTaskLogsResp.ID = Int64ToString((*source).ID)
+		documentQueryTaskLogsResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentQueryTaskLogsResp.TaskType = (*source).TaskType
 		documentQueryTaskLogsResp.TaskTypeName = (*source).TaskTypeName
 		documentQueryTaskLogsResp.TaskStatus = (*source).TaskStatus
@@ -900,8 +900,8 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 	var pDocumentUploadDocumentResp *document.UploadDocumentResp
 	if source != nil {
 		var documentUploadDocumentResp document.UploadDocumentResp
-		documentUploadDocumentResp.DocumentId = (*source).DocumentId
-		documentUploadDocumentResp.TaskId = (*source).TaskId
+		documentUploadDocumentResp.DocumentId = Int64ToString((*source).DocumentId)
+		documentUploadDocumentResp.TaskId = Int64ToString((*source).TaskId)
 		documentUploadDocumentResp.DocumentName = (*source).DocumentName
 		documentUploadDocumentResp.ParseStatus = (*source).ParseStatus
 		documentUploadDocumentResp.StrategyStatus = (*source).StrategyStatus
@@ -924,7 +924,7 @@ func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentCh
 	var pDocumentDocumentChunkItem *document.DocumentChunkItem
 	if source != nil {
 		var documentDocumentChunkItem document.DocumentChunkItem
-		documentDocumentChunkItem.ParentBlockId = (*source).ParentBlockId
+		documentDocumentChunkItem.ParentBlockId = Int64ToString((*source).ParentBlockId)
 		documentDocumentChunkItem.ParentBlockNo = (*source).ParentBlockNo
 		documentDocumentChunkItem.ParentChildCount = (*source).ParentChildCount
 		documentDocumentChunkItem.ParentStartChunkNo = (*source).ParentStartChunkNo
@@ -1023,7 +1023,7 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 	var pDocumentTaskLog *document.TaskLog
 	if source != nil {
 		var documentTaskLog document.TaskLog
-		documentTaskLog.ID = (*source).ID
+		documentTaskLog.ID = Int64ToString((*source).ID)
 		documentTaskLog.StageType = (*source).StageType
 		documentTaskLog.StageTypeName = (*source).StageTypeName
 		documentTaskLog.EventType = (*source).EventType
@@ -1048,7 +1048,7 @@ func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.Know
 	var pDocumentKnowledgeDocumentOptionResp *document.KnowledgeDocumentOptionResp
 	if source != nil {
 		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp
-		documentKnowledgeDocumentOptionResp.DocumentId = (*source).DocumentId
+		documentKnowledgeDocumentOptionResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentKnowledgeDocumentOptionResp.DocumentName = (*source).DocumentName
 		documentKnowledgeDocumentOptionResp.KnowledgeScopeName = (*source).KnowledgeScopeName
 		documentKnowledgeDocumentOptionResp.BusinessCategory = (*source).BusinessCategory
@@ -1061,7 +1061,7 @@ func FromKnowledgeScopeSaveReq(source *knowledge.KnowledgeScopeSaveReq) *entity2
 	var pEntityKnowledgeScopeNode *entity2.KnowledgeScopeNode
 	if source != nil {
 		var entityKnowledgeScopeNode entity2.KnowledgeScopeNode
-		entityKnowledgeScopeNode.ID = (*source).ID
+		entityKnowledgeScopeNode.ID = StringToInt64((*source).ID)
 		entityKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
 		entityKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
 		entityKnowledgeScopeNode.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
@@ -1079,7 +1079,7 @@ func FromKnowledgeTopicDocumentRelationSaveReq(source *knowledge.TopicDocumentRe
 	if source != nil {
 		var entityKnowledgeTopicDocumentRelation entity2.KnowledgeTopicDocumentRelation
 		entityKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
-		entityKnowledgeTopicDocumentRelation.DocumentId = (*source).DocumentId
+		entityKnowledgeTopicDocumentRelation.DocumentId = StringToInt64((*source).DocumentId)
 		entityKnowledgeTopicDocumentRelation.RelationScore = (*source).RelationScore
 		entityKnowledgeTopicDocumentRelation.RelationSource = NormalizeString((*source).RelationSource)
 		entityKnowledgeTopicDocumentRelation.Reason = NormalizeString((*source).Reason)
@@ -1091,7 +1091,7 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	var pEntityKnowledgeTopicNode *entity2.KnowledgeTopicNode
 	if source != nil {
 		var entityKnowledgeTopicNode entity2.KnowledgeTopicNode
-		entityKnowledgeTopicNode.ID = (*source).ID
+		entityKnowledgeTopicNode.ID = StringToInt64((*source).ID)
 		entityKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
 		entityKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
 		entityKnowledgeTopicNode.ScopeCode = NormalizeString((*source).ScopeCode)
@@ -1110,16 +1110,16 @@ func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.K
 	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem
 	if source != nil {
 		var knowledgeKnowledgeRouteTraceItem knowledge.KnowledgeRouteTraceItem
-		knowledgeKnowledgeRouteTraceItem.ID = (*source).ID
+		knowledgeKnowledgeRouteTraceItem.ID = Int64ToString((*source).ID)
 		knowledgeKnowledgeRouteTraceItem.ConversationId = NormalizeString((*source).ConversationId)
-		knowledgeKnowledgeRouteTraceItem.ExchangeId = (*source).ExchangeId
+		knowledgeKnowledgeRouteTraceItem.ExchangeId = Int64ToString((*source).ExchangeId)
 		knowledgeKnowledgeRouteTraceItem.Question = NormalizeString((*source).Question)
 		knowledgeKnowledgeRouteTraceItem.RewriteQuestion = NormalizeString((*source).RewriteQuestion)
 		knowledgeKnowledgeRouteTraceItem.Mode = NormalizeString((*source).Mode)
 		knowledgeKnowledgeRouteTraceItem.TopScopesJson = NormalizeString((*source).TopScopesJson)
 		knowledgeKnowledgeRouteTraceItem.TopTopicsJson = NormalizeString((*source).TopTopicsJson)
 		knowledgeKnowledgeRouteTraceItem.TopDocumentsJson = NormalizeString((*source).TopDocumentsJson)
-		knowledgeKnowledgeRouteTraceItem.SelectedDocumentId = (*source).SelectedDocumentId
+		knowledgeKnowledgeRouteTraceItem.SelectedDocumentId = Int64ToString((*source).SelectedDocumentId)
 		knowledgeKnowledgeRouteTraceItem.HitSelectedDocument = (*source).HitSelectedDocument
 		knowledgeKnowledgeRouteTraceItem.Confidence = (*source).Confidence
 		knowledgeKnowledgeRouteTraceItem.RouteStatus = ToRouteStatus((*source).RouteStatus)
@@ -1164,7 +1164,7 @@ func ToKnowledgeScopeItem(source *entity2.KnowledgeScopeNode) *knowledge.Knowled
 	var pKnowledgeKnowledgeScopeItem *knowledge.KnowledgeScopeItem
 	if source != nil {
 		var knowledgeKnowledgeScopeItem knowledge.KnowledgeScopeItem
-		knowledgeKnowledgeScopeItem.ID = (*source).ID
+		knowledgeKnowledgeScopeItem.ID = Int64ToString((*source).ID)
 		knowledgeKnowledgeScopeItem.ScopeCode = NormalizeString((*source).ScopeCode)
 		knowledgeKnowledgeScopeItem.ScopeName = NormalizeString((*source).ScopeName)
 		knowledgeKnowledgeScopeItem.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
@@ -1207,7 +1207,7 @@ func ToKnowledgeTopicDocumentRelationItem(source *entity2.KnowledgeTopicDocument
 	if source != nil {
 		var knowledgeTopicDocumentRelationItem knowledge.TopicDocumentRelationItem
 		knowledgeTopicDocumentRelationItem.TopicCode = NormalizeString((*source).TopicCode)
-		knowledgeTopicDocumentRelationItem.DocumentId = (*source).DocumentId
+		knowledgeTopicDocumentRelationItem.DocumentId = Int64ToString((*source).DocumentId)
 		knowledgeTopicDocumentRelationItem.DocumentName = NormalizeString((*source).DocumentName)
 		knowledgeTopicDocumentRelationItem.KnowledgeScopeCode = NormalizeString((*source).KnowledgeScopeCode)
 		knowledgeTopicDocumentRelationItem.KnowledgeScopeName = NormalizeString((*source).KnowledgeScopeName)
@@ -1248,7 +1248,7 @@ func ToKnowledgeTopicItem(source *entity2.KnowledgeTopicNode) *knowledge.Knowled
 	var pKnowledgeKnowledgeTopicItem *knowledge.KnowledgeTopicItem
 	if source != nil {
 		var knowledgeKnowledgeTopicItem knowledge.KnowledgeTopicItem
-		knowledgeKnowledgeTopicItem.ID = (*source).ID
+		knowledgeKnowledgeTopicItem.ID = Int64ToString((*source).ID)
 		knowledgeKnowledgeTopicItem.TopicCode = NormalizeString((*source).TopicCode)
 		knowledgeKnowledgeTopicItem.TopicName = NormalizeString((*source).TopicName)
 		knowledgeKnowledgeTopicItem.ScopeCode = NormalizeString((*source).ScopeCode)

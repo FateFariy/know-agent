@@ -33,7 +33,7 @@ func (r *TopicDocumentRelationSaveReq) Validate() (err error) {
 	if strutil.IsBlank(r.TopicCode) {
 		return fmt.Errorf("topic_code 不能为空")
 	}
-	if r.DocumentId <= 0 {
+	if r.DocumentId == "" {
 		return fmt.Errorf("document_id 非法")
 	}
 	return nil
@@ -43,7 +43,7 @@ func (r *TopicDocumentRelationRemoveReq) Validate() (err error) {
 	if strutil.IsBlank(r.TopicCode) {
 		return fmt.Errorf("topic_code 不能为空")
 	}
-	if r.DocumentId <= 0 {
+	if r.DocumentId == "" {
 		return fmt.Errorf("document_id 非法")
 	}
 	return nil

@@ -14,7 +14,7 @@ type (
 		Question           string `json:"question"` // 问题内容
 		ConversationId     string `json:"conversationId,optional"` // 会话ID
 		ChatMode           string `json:"chatMode,options=document|open_chat|auto_document"` // 聊天模式
-		SelectedDocumentId int64  `json:"selectedDocumentId,optional"` // 选中的文档ID
+		SelectedDocumentId string `json:"selectedDocumentId,optional"` // 选中的文档ID
 	}
 	// 会话标识请求
 	ConversationIdentityReq {
@@ -23,7 +23,7 @@ type (
 	// 对话详情查询请求
 	ConversationExchangeDetailQueryReq {
 		ConversationId string `json:"conversationId"` // 会话ID
-		ExchangeId     int64  `json:"exchangeId"` // 对话ID
+		ExchangeId     string `json:"exchangeId"` // 对话ID
 	}
 	// 会话列表查询请求
 	ConversationSessionListReq {
@@ -36,7 +36,7 @@ type (
 	// 检索观察查询请求
 	RetrievalObserveReq {
 		ConversationId string `json:"conversationId"` // 会话ID
-		ExchangeId     int64  `json:"exchangeId"` // 对话ID
+		ExchangeId     string `json:"exchangeId"` // 对话ID
 	}
 )
 
@@ -50,11 +50,11 @@ type (
 		MessageCount           int                            `json:"messageCount"` // 消息总数
 		LatestUserMessage      string                         `json:"latestUserMessage"` // 最新用户提问
 		LatestAssistantMessage string                         `json:"latestAssistantMessage"` // 模型最新回复
-		LatestExchangeId       int64                          `json:"latestExchangeId"` // 最新一轮交互ID
+		LatestExchangeId       string                         `json:"latestExchangeId"` // 最新一轮交互ID
 		LatestTurnStatus       string                         `json:"latestTurnStatus"` // 本轮交互状态
 		LatestTurnErrorMessage string                         `json:"latestTurnErrorMessage"` // 本轮交互错误信息
 		ChatMode               string                         `json:"chatMode"` // 对话查询模式
-		SelectedDocumentId     int64                          `json:"selectedDocumentId"` // 选中文档ID
+		SelectedDocumentId     string                         `json:"selectedDocumentId"` // 选中文档ID
 		SelectedDocumentName   string                         `json:"selectedDocumentName"` // 选中文档名称
 		CreatedTime            string                         `json:"createdTime"` // 创建时间
 		UpdatedTime            string                         `json:"updatedTime"` // 更新时间
@@ -63,7 +63,7 @@ type (
 	}
 	// 对话交换响应
 	ConversationExchangeResp {
-		ID                  int64                  `json:"exchangeId"` // 对话交换ID
+		ID                  string                 `json:"exchangeId"` // 对话交换ID
 		Question            string                 `json:"question"` // 问题内容
 		Answer              string                 `json:"answer"` // 回答内容
 		ThinkingSteps       []string               `json:"thinkingSteps"` // 思维步骤列表
@@ -82,7 +82,7 @@ type (
 	ConversationMemorySummaryResp {
 		ConversationId       string               `json:"conversationId"` // 会话ID
 		IsCompressed         bool                 `json:"IsCompressed"` // 是否执行过记忆压缩
-		CoveredExchangeId    int64                `json:"coveredExchangeId"` // 压缩截止交互ID
+		CoveredExchangeId    string               `json:"coveredExchangeId"` // 压缩截止交互ID
 		CoveredExchangeCount int                  `json:"coveredExchangeCount"` // 压缩覆盖交互轮次
 		CompressionCount     int                  `json:"compressionCount"` // 累计压缩次数
 		SummaryVersion       int                  `json:"summaryVersion"` // 摘要版本号
@@ -109,13 +109,13 @@ type (
 	}
 	// 阶段追踪响应
 	ConversationTraceStageResp {
-		ID            int64  `json:"id"` // 阶段ID
+		ID            string `json:"id"` // 阶段ID
 		TraceId       string `json:"traceId"` // 追踪ID
 		StageCode     string `json:"stageCode"` // 阶段代码
 		StageName     string `json:"stageName"` // 阶段名称
 		StageOrder    int    `json:"stageOrder"` // 阶段顺序
 		StageLevel    int    `json:"stageLevel"` // 阶段层级
-		ParentStageId int64  `json:"parentStageId"` // 父阶段ID
+		ParentStageId string `json:"parentStageId"` // 父阶段ID
 		ExecutionMode string `json:"executionMode"` // 执行模式
 		StageState    string `json:"stageState"` // 阶段状态
 		StartTime     string `json:"startTime"` // 开始时间
@@ -132,14 +132,14 @@ type (
 		Title              string  `json:"title"` // 标题
 		Url                string  `json:"url"` // URL
 		Snippet            string  `json:"snippet"` // 片段
-		DocumentId         int64   `json:"documentId"` // 文档ID
+		DocumentId         string  `json:"documentId"` // 文档ID
 		DocumentName       string  `json:"documentName"` // 文档名称
-		ChunkId            int64   `json:"chunkId"` // 块ID
-		ParentBlockId      int64   `json:"parentBlockId"` // 父块ID
+		ChunkId            string  `json:"chunkId"` // 块ID
+		ParentBlockId      string  `json:"parentBlockId"` // 父块ID
 		ParentBlockNo      int     `json:"parentBlockNo"` // 父块序号
 		ChunkNo            int     `json:"chunkNo"` // 块序号
 		SectionPath        string  `json:"sectionPath"` // 章节路径
-		StructureNodeId    int64   `json:"structureNodeId"` // 结构节点ID
+		StructureNodeId    string  `json:"structureNodeId"` // 结构节点ID
 		StructureNodeType  int     `json:"structureNodeType"` // 结构节点类型
 		CanonicalPath      string  `json:"canonicalPath"` // 规范路径
 		ItemIndex          int     `json:"itemIndex"` // 项索引
@@ -155,7 +155,7 @@ type (
 	ConversationSessionListResp {
 		PageNo     int                        `json:"pageNo"` // 页码
 		PageSize   int                        `json:"pageSize"` // 每页大小
-		Total  int64                      `json:"total"` // 总记录数
+		Total      int64                      `json:"total"` // 总记录数
 		TotalPages int64                      `json:"totalPages"` // 总页数
 		Records    []*ConversationSessionResp `json:"records"` // 会话列表
 	}
@@ -176,9 +176,9 @@ type (
 	}
 	// 检索结果响应
 	RetrievalResultResp {
-		ID               int64   `json:"id"` // 主键ID
+		ID               string  `json:"id"` // 主键ID
 		ConversationId   string  `json:"conversationId"` // 对话ID
-		ExchangeId       int64   `json:"exchangeId"` // 交互ID
+		ExchangeId       string  `json:"exchangeId"` // 交互ID
 		TraceId          string  `json:"traceId"` // 跟踪ID
 		SubQuestionIndex int     `json:"subQuestionIndex"` // 子问题索引
 		SubQuestion      string  `json:"subQuestion"` // 子问题
@@ -193,9 +193,9 @@ type (
 		IsElevated       int     `json:"isElevated"` // 是否升级
 		IsSelected       int     `json:"isSelected"` // 是否选中
 		SelectionReason  string  `json:"selectionReason"` // 选中原因
-		ChunkId          int64   `json:"chunkId"` // 分块ID
+		ChunkId          string  `json:"chunkId"` // 分块ID
 		ChunkNo          int     `json:"chunkNo"` // 分块序号
-		ParentBlockId    int64   `json:"parentBlockId"` // 父块ID
+		ParentBlockId    string  `json:"parentBlockId"` // 父块ID
 		ParentBlockNo    int     `json:"parentBlockNo"` // 父块序号
 		SectionPath      string  `json:"sectionPath"` // 章节路径
 		ChunkTextPreview string  `json:"chunkTextPreview"` // 分块文本预览
@@ -204,9 +204,9 @@ type (
 	}
 	// 渠道执行响应
 	ChannelExecutionResp {
-		ID                 int64   `json:"id"` // 主键
+		ID                 string  `json:"id"` // 主键
 		ConversationId     string  `json:"conversationId"` // 对话ID
-		ExchangeId         int64   `json:"exchangeId"` // 交换ID
+		ExchangeId         string  `json:"exchangeId"` // 交换ID
 		TraceId            string  `json:"traceId"` // 跟踪ID
 		SubQuestionIndex   int     `json:"subQuestionIndex"` // 子问题索引
 		SubQuestion        string  `json:"subQuestion"` // 子问题

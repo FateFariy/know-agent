@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/api/chat"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -49,7 +50,7 @@ func (c *ChatService) GetSessionDetail(ctx context.Context, req *chat.Conversati
 
 // GetExchangeDetail 获取对话详情
 func (c *ChatService) GetExchangeDetail(ctx context.Context, req *chat.ConversationExchangeDetailQueryReq) (*chat.ConversationExchangeDetailResp, error) {
-	detail, stages, err := c.l.GetExchangeDetail(ctx, req.ConversationId, req.ExchangeId)
+	detail, stages, err := c.l.GetExchangeDetail(ctx, req.ConversationId, utils.StringToInt64(req.ExchangeId))
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func (c *ChatService) ListSessions(ctx context.Context, req *chat.ConversationSe
 		PageNo:     req.PageNo,
 		PageSize:   req.PageSize,
 		TotalPages: (total + int64(req.PageSize) - 1) / int64(req.PageSize),
-		TotalSize:  total,
+		Total:      total,
 		Records:    convert.ToConversationSessionRespList(records),
 	}, err
 }
@@ -95,7 +96,7 @@ func (c *ChatService) RebuildSummary(ctx context.Context, req *chat.Conversation
 
 // GetRetrievalResults 获取检索结果
 func (c *ChatService) GetRetrievalResults(ctx context.Context, req *chat.RetrievalObserveReq) ([]*chat.RetrievalResultResp, error) {
-	results, err := c.l.GetRetrievalResults(ctx, req.ConversationId, req.ExchangeId)
+	results, err := c.l.GetRetrievalResults(ctx, req.ConversationId, utils.StringToInt64(req.ExchangeId))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func (c *ChatService) GetRetrievalResults(ctx context.Context, req *chat.Retriev
 
 // GetChannelExecutions 获取渠道执行结果
 func (c *ChatService) GetChannelExecutions(ctx context.Context, req *chat.RetrievalObserveReq) ([]*chat.ChannelExecutionResp, error) {
-	executions, err := c.l.GetChannelExecutions(ctx, req.ConversationId, req.ExchangeId)
+	executions, err := c.l.GetChannelExecutions(ctx, req.ConversationId, utils.StringToInt64(req.ExchangeId))
 	if err != nil {
 		return nil, err
 	}

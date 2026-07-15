@@ -4,9 +4,11 @@ import (
 	"context"
 	"mime/multipart"
 
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/document"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
 )
@@ -45,7 +47,7 @@ func (d *DocumentService) QueryDocumentPage(ctx context.Context, req *document.Q
 
 // QueryDocumentDetail 查询文档详情
 func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document.QueryDocumentDetailReq) (*document.DocumentListItem, error) {
-	detail, err := d.lifeCycleLogic.QueryDocumentDetail(ctx, req.DocumentId)
+	detail, err := d.lifeCycleLogic.QueryDocumentDetail(ctx, utils.StringToInt64(req.DocumentId))
 	return convert.ToDocumentListItem(detail), err
 }
 
@@ -60,13 +62,13 @@ func (d *DocumentService) GetDocumentOptions(ctx context.Context) ([]*document.K
 
 // DeleteDocument 删除文档
 func (d *DocumentService) DeleteDocument(ctx context.Context, req *document.DeleteDocumentReq) (*document.DeleteDocumentResp, error) {
-	documentName, err := d.lifeCycleLogic.DeleteDocument(ctx, req.DocumentId)
+	documentName, err := d.lifeCycleLogic.DeleteDocument(ctx, utils.StringToInt64(req.DocumentId))
 	return &document.DeleteDocumentResp{DocumentId: req.DocumentId, DocumentName: documentName}, err
 }
 
 // QueryStrategyPlan 查询策略计划
 func (d *DocumentService) QueryStrategyPlan(ctx context.Context, req *document.QueryStrategyPlanReq) (*document.QueryStrategyPlanResp, error) {
-	doc, plan, err := d.lifeCycleLogic.QueryStrategyPlan(ctx, req.DocumentId)
+	doc, plan, err := d.lifeCycleLogic.QueryStrategyPlan(ctx, utils.StringToInt64(req.DocumentId))
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +90,13 @@ func (d *DocumentService) ConfirmStrategy(ctx context.Context, req *document.Con
 
 // BuildIndex 构建索引
 func (d *DocumentService) BuildIndex(ctx context.Context, req *document.BuildIndexReq) (*document.BuildIndexResp, error) {
-	resp, err := d.lifeCycleLogic.BuildIndex(ctx, req.DocumentId, req.PlanId, req.OperatorId)
+	resp, err := d.lifeCycleLogic.BuildIndex(ctx, utils.StringToInt64(req.DocumentId), utils.StringToInt64(req.PlanId), utils.StringToInt64(req.OperatorId))
 	return convert.ToBuildIndexResp(resp), err
 }
 
 // QueryDocumentChunks 查询文档块列表
 func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document.QueryDocumentChunksReq) (*document.QueryDocumentChunksResp, error) {
-	chunks, total, planId, err := d.lifeCycleLogic.QueryDocumentChunks(ctx, req.DocumentId, req.TaskId, req.PageNo, req.PageSize)
+	chunks, total, planId, err := d.lifeCycleLogic.QueryDocumentChunks(ctx, utils.StringToInt64(req.DocumentId), utils.StringToInt64(req.TaskId), req.PageNo, req.PageSize)
 	taskId := int64(0)
 	if total > 0 {
 		taskId = chunks[0].TaskId
@@ -103,22 +105,22 @@ func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document
 		DocumentId: req.DocumentId,
 		PageNo:     req.PageNo,
 		PageSize:   req.PageSize,
-		PlanId:     planId,
+		PlanId:     utils.Int64ToString(planId),
 		Records:    convert.ToDocumentChunkItemList(chunks),
-		TaskId:     taskId,
+		TaskId:     utils.Int64ToString(taskId),
 		Total:      total,
 	}, err
 }
 
 // QueryDocumentChunkDetail 查询文档块详情
 func (d *DocumentService) QueryDocumentChunkDetail(ctx context.Context, req *document.QueryDocumentChunkDetailReq) (*document.QueryDocumentChunkDetailResp, error) {
-	detail, err := d.lifeCycleLogic.QueryDocumentChunkDetail(ctx, req.DocumentId, req.TaskId, req.ChunkId)
+	detail, err := d.lifeCycleLogic.QueryDocumentChunkDetail(ctx, utils.StringToInt64(req.DocumentId), utils.StringToInt64(req.TaskId), utils.StringToInt64(req.ChunkId))
 	return convert.ToQueryDocumentChunkDetailResp(detail), err
 }
 
 // QueryTaskLogs 查询任务日志
 func (d *DocumentService) QueryTaskLogs(ctx context.Context, req *document.QueryTaskLogsReq) (*document.QueryTaskLogsResp, error) {
-	task, total, err := d.lifeCycleLogic.QueryTaskLogs(ctx, req.TaskId, req.PageNo, req.PageSize)
+	task, total, err := d.lifeCycleLogic.QueryTaskLogs(ctx, utils.StringToInt64(req.TaskId), req.PageNo, req.PageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +131,7 @@ func (d *DocumentService) QueryTaskLogs(ctx context.Context, req *document.Query
 
 // GetDocumentProfile 查询文档画像详情
 func (d *DocumentService) GetDocumentProfile(ctx context.Context, req *document.DocumentProfileDetailReq) (*document.DocumentProfileResp, error) {
-	profile, err := d.profileLogic.GetProfileByDocumentId(ctx, req.DocumentId)
+	profile, err := d.profileLogic.GetProfileByDocumentId(ctx, utils.StringToInt64(req.DocumentId))
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +140,7 @@ func (d *DocumentService) GetDocumentProfile(ctx context.Context, req *document.
 
 // RegenerateDocumentProfile 重新生成文档画像
 func (d *DocumentService) RegenerateDocumentProfile(ctx context.Context, req *document.DocumentProfileRegenerateReq) (*document.DocumentProfileResp, error) {
-	profile, err := d.profileLogic.RegenerateProfile(ctx, req.DocumentId)
+	profile, err := d.profileLogic.RegenerateProfile(ctx, utils.StringToInt64(req.DocumentId))
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +149,8 @@ func (d *DocumentService) RegenerateDocumentProfile(ctx context.Context, req *do
 
 // BatchRegenerateDocumentProfile 批量重新生成文档画像
 func (d *DocumentService) BatchRegenerateDocumentProfile(ctx context.Context, req *document.DocumentProfileBatchRegenerateReq) ([]*document.DocumentProfileResp, error) {
-	profiles, err := d.profileLogic.BatchRegenerateProfiles(ctx, req.DocumentIds)
+	ids := slice.Map(req.DocumentIds, func(_ int, item string) int64 { return utils.StringToInt64(item) })
+	profiles, err := d.profileLogic.BatchRegenerateProfiles(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

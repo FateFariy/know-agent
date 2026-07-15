@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString StringToStringSlice
+// goverter:extend TimeToString StringToStringSlice Int64ToString StringToInt64
 // goverter:skipCopySameType
 //
 //go:generate goverter gen .
@@ -66,7 +67,7 @@ type DocumentConverter interface {
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString ToChatQueryMode ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences
+// goverter:extend TimeToString ToChatQueryMode ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences Int64ToString StringToInt64
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
@@ -108,8 +109,6 @@ type KnowledgeConverter interface {
 	ToKnowledgeTopicItem(src *klen.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem
 	ToKnowledgeScopeItemList(src []*klen.KnowledgeScopeNode) []*knowledge.KnowledgeScopeItem
 	ToKnowledgeTopicItemList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem
-	// ToDocumentProfileResp(src *klen.DocumentProfile) *knowledge.DocumentProfileResp
-	// ToDocumentProfileItemList(src []*klen.DocumentProfile) []*knowledge.DocumentProfileResp
 
 	ToKnowledgeTopicDocumentRelationItem(src *klen.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationItem
 	ToKnowledgeTopicDocumentRelationItemList(src []*klen.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationItem
@@ -161,4 +160,13 @@ func ToRouteStatus(code int) string {
 
 func NormalizeString(s string) string {
 	return strutil.Trim(s)
+}
+
+func Int64ToString(i int64) string {
+	return strconv.FormatInt(i, 10)
+}
+
+func StringToInt64(s string) int64 {
+	i, _ := strconv.ParseInt(s, 10, 64)
+	return i
 }

@@ -42,15 +42,15 @@
               "properties": {
                 "chunkId": {
                   "description": "块ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -89,7 +89,7 @@
                     },
                     "chunkId": {
                       "description": "分片ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "chunkNo": {
                       "description": "当前分片编号",
@@ -101,7 +101,7 @@
                     },
                     "parentBlockId": {
                       "description": "父块ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "parentBlockNo": {
                       "description": "父块编号",
@@ -147,7 +147,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "parentBlock": {
                   "description": "父级块信息",
@@ -180,7 +180,7 @@
                     },
                     "parentBlockId": {
                       "description": "父块ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "parentBlockNo": {
                       "description": "父块编号",
@@ -214,7 +214,7 @@
                 },
                 "planId": {
                   "description": "方案ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "siblingChunks": {
                   "description": "同级分片列表",
@@ -245,7 +245,7 @@
                       },
                       "chunkId": {
                         "description": "分片ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "chunkNo": {
                         "description": "当前分片编号",
@@ -257,7 +257,7 @@
                       },
                       "parentBlockId": {
                         "description": "父块ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "parentBlockNo": {
                         "description": "父块编号",
@@ -304,7 +304,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -338,7 +338,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "pageNo": {
                   "description": "页码",
@@ -354,7 +354,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -368,7 +368,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "pageNo": {
                   "description": "页码",
@@ -380,7 +380,7 @@
                 },
                 "planId": {
                   "description": "方案ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "records": {
                   "description": "分片数据列表",
@@ -411,7 +411,7 @@
                       },
                       "chunkId": {
                         "description": "分片ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "chunkNo": {
                         "description": "当前分片编号",
@@ -423,7 +423,7 @@
                       },
                       "parentBlockId": {
                         "description": "父块ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "parentBlockNo": {
                         "description": "父块编号",
@@ -470,7 +470,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "total": {
                   "description": "总条数",
@@ -508,7 +508,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -522,7 +522,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentName": {
                   "description": "文档名称",
@@ -560,7 +560,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -586,11 +586,11 @@
                 },
                 "currentPlanId": {
                   "description": "当前策略ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentName": {
                   "description": "文档名称",
@@ -630,11 +630,11 @@
                 },
                 "lastIndexTaskId": {
                   "description": "上一次索引任务ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "latestTaskId": {
                   "description": "最新任务ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "latestTaskStatus": {
                   "description": "最新任务状态",
@@ -690,8 +690,93 @@
         }
       }
     },
-    "/manage/document/document/options": {
+    "/manage/document/index/build": {
       "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "构建文档索引",
+        "operationId": "documentBuildIndex",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "documentId",
+                "planId"
+              ],
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "string"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
+                  "type": "integer"
+                },
+                "planId": {
+                  "description": "方案ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "string"
+                },
+                "indexStatus": {
+                  "description": "索引状态",
+                  "type": "integer"
+                },
+                "indexStatusName": {
+                  "description": "索引状态名",
+                  "type": "string"
+                },
+                "taskId": {
+                  "description": "任务ID",
+                  "type": "string"
+                },
+                "taskStatus": {
+                  "description": "任务状态",
+                  "type": "integer"
+                },
+                "taskStatusName": {
+                  "description": "任务状态名",
+                  "type": "string"
+                },
+                "taskType": {
+                  "description": "任务类型",
+                  "type": "integer"
+                },
+                "taskTypeName": {
+                  "description": "任务类型名",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/document/options": {
+      "get": {
         "produces": [
           "application/json"
         ],
@@ -721,7 +806,7 @@
                   },
                   "documentId": {
                     "description": "文档ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "documentName": {
                     "description": "文档名称",
@@ -747,7 +832,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentName": {
                   "description": "文档名称",
@@ -762,91 +847,6 @@
                 },
                 "knowledgeScopeName": {
                   "description": "知识范围名称",
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/manage/document/index/build": {
-      "post": {
-        "consumes": [
-          "application/json"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "schemes": [
-          "https"
-        ],
-        "summary": "构建文档索引",
-        "operationId": "documentBuildIndex",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "required": [
-                "documentId",
-                "planId"
-              ],
-              "properties": {
-                "documentId": {
-                  "description": "文档ID",
-                  "type": "integer"
-                },
-                "operatorId": {
-                  "description": "操作人ID",
-                  "type": "integer"
-                },
-                "planId": {
-                  "description": "方案ID",
-                  "type": "integer"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "documentId": {
-                  "description": "文档ID",
-                  "type": "integer"
-                },
-                "indexStatus": {
-                  "description": "索引状态",
-                  "type": "integer"
-                },
-                "indexStatusName": {
-                  "description": "索引状态名",
-                  "type": "string"
-                },
-                "taskId": {
-                  "description": "任务ID",
-                  "type": "integer"
-                },
-                "taskStatus": {
-                  "description": "任务状态",
-                  "type": "integer"
-                },
-                "taskStatusName": {
-                  "description": "任务状态名",
-                  "type": "string"
-                },
-                "taskType": {
-                  "description": "任务类型",
-                  "type": "integer"
-                },
-                "taskTypeName": {
-                  "description": "任务类型名",
                   "type": "string"
                 }
               }
@@ -960,11 +960,11 @@
                       },
                       "currentPlanId": {
                         "description": "当前策略ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "documentId": {
                         "description": "文档ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "documentName": {
                         "description": "文档名称",
@@ -1004,11 +1004,11 @@
                       },
                       "lastIndexTaskId": {
                         "description": "上一次索引任务ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "latestTaskId": {
                         "description": "最新任务ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "latestTaskStatus": {
                         "description": "最新任务状态",
@@ -1099,7 +1099,7 @@
                   "description": "文档ID列表",
                   "type": "array",
                   "items": {
-                    "type": "integer"
+                    "type": "string"
                   }
                 },
                 "operatorId": {
@@ -1138,7 +1138,7 @@
                   },
                   "documentId": {
                     "description": "文档ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "documentSummary": {
                     "description": "文档摘要",
@@ -1189,7 +1189,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentSummary": {
                   "description": "文档摘要",
@@ -1263,7 +1263,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -1281,7 +1281,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentSummary": {
                   "description": "文档摘要",
@@ -1355,7 +1355,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "operatorId": {
                   "description": "操作人ID",
@@ -1377,7 +1377,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentSummary": {
                   "description": "文档摘要",
@@ -1458,7 +1458,7 @@
                 },
                 "basePlanId": {
                   "description": "基础方案ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "childSteps": {
                   "description": "子块步骤",
@@ -1488,7 +1488,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "operatorId": {
                   "description": "操作人ID",
@@ -1627,7 +1627,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "normalized": {
                   "description": "是否经过标准化",
@@ -1730,7 +1730,7 @@
                 },
                 "planId": {
                   "description": "方案ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "planVersion": {
                   "description": "方案版本",
@@ -1776,7 +1776,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -1790,7 +1790,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentName": {
                   "description": "文档名称",
@@ -2024,7 +2024,7 @@
                     },
                     "planId": {
                       "description": "方案ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "planSource": {
                       "description": "方案来源",
@@ -2112,7 +2112,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -2138,7 +2138,7 @@
                 },
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "errorCode": {
                   "description": "错误码",
@@ -2192,7 +2192,7 @@
                       },
                       "id": {
                         "description": "主键ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "logLevel": {
                         "description": "日志等级编码",
@@ -2219,7 +2219,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "taskStatus": {
                   "description": "任务状态",
@@ -2304,7 +2304,7 @@
               "properties": {
                 "documentId": {
                   "description": "文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "documentName": {
                   "description": "文档名称",
@@ -2324,7 +2324,7 @@
                 },
                 "taskId": {
                   "description": "任务ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -2333,7 +2333,7 @@
       }
     }
   },
-  "x-date": "2026-07-14 12:09:40",
+  "x-date": "2026-07-15 17:39:29",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

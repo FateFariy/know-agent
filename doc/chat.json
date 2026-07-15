@@ -46,7 +46,7 @@
                 },
                 "exchangeId": {
                   "description": "对话ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -115,7 +115,7 @@
                   },
                   "exchangeId": {
                     "description": "交换ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "executionState": {
                     "description": "执行状态",
@@ -127,7 +127,7 @@
                   },
                   "id": {
                     "description": "主键",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "maxScore": {
                     "description": "最大分数",
@@ -194,7 +194,7 @@
                 },
                 "exchangeId": {
                   "description": "交换ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "executionState": {
                   "description": "执行状态",
@@ -206,7 +206,7 @@
                 },
                 "id": {
                   "description": "主键",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "maxScore": {
                   "description": "最大分数",
@@ -273,7 +273,7 @@
                 },
                 "exchangeId": {
                   "description": "对话ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -326,7 +326,7 @@
                     },
                     "exchangeId": {
                       "description": "对话交换ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "firstResponseTimeMs": {
                       "description": "首次响应时间毫秒",
@@ -384,7 +384,7 @@
                           },
                           "chunkId": {
                             "description": "块ID",
-                            "type": "integer"
+                            "type": "string"
                           },
                           "chunkNo": {
                             "description": "块序号",
@@ -392,7 +392,7 @@
                           },
                           "documentId": {
                             "description": "文档ID",
-                            "type": "integer"
+                            "type": "string"
                           },
                           "documentName": {
                             "description": "文档名称",
@@ -412,7 +412,7 @@
                           },
                           "parentBlockId": {
                             "description": "父块ID",
-                            "type": "integer"
+                            "type": "string"
                           },
                           "parentBlockNo": {
                             "description": "父块序号",
@@ -440,7 +440,7 @@
                           },
                           "structureNodeId": {
                             "description": "结构节点ID",
-                            "type": "integer"
+                            "type": "string"
                           },
                           "structureNodeType": {
                             "description": "结构节点类型",
@@ -522,7 +522,7 @@
                     "properties": {
                       "durationMs": {
                         "description": "持续时间毫秒",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "endTime": {
                         "description": "结束时间",
@@ -538,11 +538,11 @@
                       },
                       "id": {
                         "description": "阶段ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "parentStageId": {
                         "description": "父阶段ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "snapshot": {
                         "description": "快照数据",
@@ -620,7 +620,7 @@
                 },
                 "exchangeId": {
                   "description": "对话ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -675,7 +675,7 @@
                   },
                   "chunkId": {
                     "description": "分块ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "chunkNo": {
                     "description": "分块序号",
@@ -695,7 +695,7 @@
                   },
                   "exchangeId": {
                     "description": "交互ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "finalRank": {
                     "description": "最终排名",
@@ -707,7 +707,7 @@
                   },
                   "id": {
                     "description": "主键ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "isElevated": {
                     "description": "是否升级",
@@ -723,7 +723,7 @@
                   },
                   "parentBlockId": {
                     "description": "父块ID",
-                    "type": "integer"
+                    "type": "string"
                   },
                   "parentBlockNo": {
                     "description": "父块序号",
@@ -778,7 +778,7 @@
                 },
                 "chunkId": {
                   "description": "分块ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "chunkNo": {
                   "description": "分块序号",
@@ -798,7 +798,7 @@
                 },
                 "exchangeId": {
                   "description": "交互ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "finalRank": {
                   "description": "最终排名",
@@ -810,7 +810,7 @@
                 },
                 "id": {
                   "description": "主键ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "isElevated": {
                   "description": "是否升级",
@@ -826,7 +826,7 @@
                 },
                 "parentBlockId": {
                   "description": "父块ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "parentBlockNo": {
                   "description": "父块序号",
@@ -963,7 +963,7 @@
                       },
                       "exchangeId": {
                         "description": "对话交换ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "firstResponseTimeMs": {
                         "description": "首次响应时间毫秒",
@@ -1021,7 +1021,7 @@
                             },
                             "chunkId": {
                               "description": "块ID",
-                              "type": "integer"
+                              "type": "string"
                             },
                             "chunkNo": {
                               "description": "块序号",
@@ -1029,7 +1029,7 @@
                             },
                             "documentId": {
                               "description": "文档ID",
-                              "type": "integer"
+                              "type": "string"
                             },
                             "documentName": {
                               "description": "文档名称",
@@ -1049,7 +1049,7 @@
                             },
                             "parentBlockId": {
                               "description": "父块ID",
-                              "type": "integer"
+                              "type": "string"
                             },
                             "parentBlockNo": {
                               "description": "父块序号",
@@ -1077,7 +1077,7 @@
                             },
                             "structureNodeId": {
                               "description": "结构节点ID",
-                              "type": "integer"
+                              "type": "string"
                             },
                             "structureNodeType": {
                               "description": "结构节点类型",
@@ -1141,7 +1141,7 @@
                 },
                 "latestExchangeId": {
                   "description": "最新一轮交互ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "latestTurnErrorMessage": {
                   "description": "本轮交互错误信息",
@@ -1189,7 +1189,7 @@
                     },
                     "coveredExchangeId": {
                       "description": "压缩截止交互ID",
-                      "type": "integer"
+                      "type": "string"
                     },
                     "lastSourceUpdateTime": {
                       "description": "原始对话最后更新时间",
@@ -1277,7 +1277,7 @@
                 },
                 "selectedDocumentId": {
                   "description": "选中文档ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "selectedDocumentName": {
                   "description": "选中文档名称",
@@ -1435,7 +1435,7 @@
                             },
                             "exchangeId": {
                               "description": "对话交换ID",
-                              "type": "integer"
+                              "type": "string"
                             },
                             "firstResponseTimeMs": {
                               "description": "首次响应时间毫秒",
@@ -1493,7 +1493,7 @@
                                   },
                                   "chunkId": {
                                     "description": "块ID",
-                                    "type": "integer"
+                                    "type": "string"
                                   },
                                   "chunkNo": {
                                     "description": "块序号",
@@ -1501,7 +1501,7 @@
                                   },
                                   "documentId": {
                                     "description": "文档ID",
-                                    "type": "integer"
+                                    "type": "string"
                                   },
                                   "documentName": {
                                     "description": "文档名称",
@@ -1521,7 +1521,7 @@
                                   },
                                   "parentBlockId": {
                                     "description": "父块ID",
-                                    "type": "integer"
+                                    "type": "string"
                                   },
                                   "parentBlockNo": {
                                     "description": "父块序号",
@@ -1549,7 +1549,7 @@
                                   },
                                   "structureNodeId": {
                                     "description": "结构节点ID",
-                                    "type": "integer"
+                                    "type": "string"
                                   },
                                   "structureNodeType": {
                                     "description": "结构节点类型",
@@ -1613,7 +1613,7 @@
                       },
                       "latestExchangeId": {
                         "description": "最新一轮交互ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "latestTurnErrorMessage": {
                         "description": "本轮交互错误信息",
@@ -1661,7 +1661,7 @@
                           },
                           "coveredExchangeId": {
                             "description": "压缩截止交互ID",
-                            "type": "integer"
+                            "type": "string"
                           },
                           "lastSourceUpdateTime": {
                             "description": "原始对话最后更新时间",
@@ -1749,7 +1749,7 @@
                       },
                       "selectedDocumentId": {
                         "description": "选中文档ID",
-                        "type": "integer"
+                        "type": "string"
                       },
                       "selectedDocumentName": {
                         "description": "选中文档名称",
@@ -1762,12 +1762,12 @@
                     }
                   }
                 },
-                "totalPages": {
-                  "description": "总页数",
+                "total": {
+                  "description": "总记录数",
                   "type": "integer"
                 },
-                "totalSize": {
-                  "description": "总记录数",
+                "totalPages": {
+                  "description": "总页数",
                   "type": "integer"
                 }
               }
@@ -1956,7 +1956,7 @@
                 },
                 "coveredExchangeId": {
                   "description": "压缩截止交互ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "lastSourceUpdateTime": {
                   "description": "原始对话最后更新时间",
@@ -2082,7 +2082,7 @@
                 },
                 "selectedDocumentId": {
                   "description": "选中的文档ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -2097,7 +2097,7 @@
       }
     }
   },
-  "x-date": "2026-07-14 12:10:39",
+  "x-date": "2026-07-15 17:39:37",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",
