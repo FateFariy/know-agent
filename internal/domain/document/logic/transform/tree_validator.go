@@ -212,8 +212,10 @@ func (v *TreeValidator) recomputeDepths(draftMap map[int]*vo.DocumentStructureNo
 	slices.SortFunc(ordered, func(a, b *vo.DocumentStructureNodeDraft) int { return a.NodeNo - b.NodeNo })
 	for _, draft := range ordered {
 		if draft.NodeNo != 1 {
-			parent, ok := draftMap[draft.ParentNodeNo]
-			draft.Depth = utils.Ternary(ok, parent.Depth+1, 1)
+			draft.Depth = 1
+			if parent, ok := draftMap[draft.ParentNodeNo]; ok {
+				draft.Depth = parent.Depth + 1
+			}
 		}
 	}
 }
@@ -234,9 +236,12 @@ func (v *TreeValidator) rebuildPaths(draftMap map[int]*vo.DocumentStructureNodeD
 		}
 
 		// 获取父节点路径（含容错默认值）
-		parent, ok := draftMap[draft.ParentNodeNo]
-		parentCanonicalPath := utils.Ternary(ok, utils.BlankToDefault(parent.CanonicalPath, "/document"), "/document")
-		parentSectionPath := utils.Ternary(ok, parent.SectionPath, "")
+		parentCanonicalPath := "/document"
+		parentSectionPath := ""
+		if parent, ok := draftMap[draft.ParentNodeNo]; ok {
+			parentCanonicalPath = utils.BlankToDefault(parent.CanonicalPath, "/document")
+			parentSectionPath = parent.SectionPath
+		}
 
 		// 构建当前节点的规范化路径片段并组装
 		segment := v.buildPathSegment(draft)
@@ -273,8 +278,12 @@ func (v *TreeValidator) rebuildSiblingLinks(draftMap map[int]*vo.DocumentStructu
 		// 建立前驱/后继双向指针
 		for index := 0; index < len(siblings); index++ {
 			current := siblings[index]
-			current.PrevSiblingNodeNo = utils.Ternary(index != 0, siblings[index-1].NodeNo, 0)
-			current.NextSiblingNodeNo = utils.Ternary(index != len(siblings)-1, siblings[index+1].NodeNo, 0)
+			if index != 0 {
+				current.PrevSiblingNodeNo = siblings[index-1].NodeNo
+			}
+			if index != len(siblings)-1 {
+				current.NextSiblingNodeNo = siblings[index+1].NodeNo
+			}
 		}
 	}
 }

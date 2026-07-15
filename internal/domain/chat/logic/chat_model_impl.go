@@ -272,7 +272,10 @@ func extractResponseText(response any) string {
 		blocks := slice.Filter(resp.ContentBlocks, func(index int, item *schema.ContentBlock) bool {
 			return item.Type == schema.ContentBlockTypeAssistantGenText
 		})
-		return utils.Ternary(len(blocks) > 0, blocks[0].AssistantGenText.Text, "")
+		if len(blocks) == 0 {
+			return ""
+		}
+		return blocks[0].AssistantGenText.Text
 	default:
 		return ""
 	}

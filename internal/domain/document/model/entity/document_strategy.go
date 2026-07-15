@@ -85,7 +85,7 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 	steps := make([]*DocumentStrategyStep, 0, len(stepList))
 	strategyTypes := make([]string, 0, len(stepList))
 	for i := range stepList {
-		stepList[i].PipelineType = utils.Ternary(stepList[i].PipelineType == "", vo.PipelineTypeChild, stepList[i].PipelineType)
+		stepList[i].PipelineType = utils.BlankToDefault(stepList[i].PipelineType, vo.PipelineTypeChild)
 		if stepList[i].PipelineType == d.PipelineType {
 			stepList[i].FillEnumNames()
 			steps = append(steps, stepList[i])

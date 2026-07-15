@@ -17,7 +17,7 @@ const (
 
 func (r *ChatReq) Validate() (err error) {
 	r.ConversationId = strutil.Trim(r.ConversationId)
-	r.ConversationId = utils.Ternary(r.ConversationId != "", r.ConversationId, utils.GenerateUUIDWithoutHyphen())
+	r.ConversationId = utils.BlankToDefault(r.ConversationId, utils.GenerateUUIDWithoutHyphen())
 	r.Question = strutil.Trim(r.Question)
 	defer func() {
 		if err != nil {

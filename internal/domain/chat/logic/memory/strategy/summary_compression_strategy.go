@@ -192,7 +192,10 @@ func (s *SummaryCompressionStrategy) DeleteConversationSummary(ctx context.Conte
 func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
 	currentState *entity.ChatMemorySummary, trace *vo.ConversationTrace) (*entity.ChatMemorySummary, error) {
 	// 获取增量对话（只拉取摘要尚未覆盖的新增轮次，避免重复压缩）
-	coveredExchangeId := utils.Ternary(currentState == nil, 0, currentState.CoveredExchangeId)
+	coveredExchangeId := int64(0)
+	if currentState != nil {
+		coveredExchangeId = currentState.CoveredExchangeId
+	}
 	incrementalExchanges, err := s.repo.ListExchangesAfter(ctx, conversationId, coveredExchangeId)
 	if err != nil {
 		logx.Errorf("查询增量对话失败, conversationId=%s, err=%v", conversationId, err)
@@ -229,7 +232,10 @@ func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Conte
 
 		// 保存摘要快照（记录已覆盖的对话ID和数量）
 		lastExchange := batch[len(batch)-1]
-		coveredExchangeCount := utils.Ternary(workingState == nil, 0, workingState.CoveredExchangeCount+len(batch))
+		coveredExchangeCount := 0
+		if workingState != nil {
+			coveredExchangeCount = workingState.CoveredExchangeCount + len(batch)
+		}
 		workingState, err = s.saveSummarySnapshot(ctx, lastExchange, newSummary, coveredExchangeCount)
 		if err != nil {
 			logx.Errorf("保存会话摘要快照失败, conversationId=%s, err=%v", conversationId, err)
@@ -532,7 +538,10 @@ func (s *SummaryCompressionStrategy) normalizeSummary(payload *entity.Conversati
 		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
 		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
 	}
-	summaryEntity.Summary = utils.Ternary(strutil.IsNotBlank(summary), summary, s.synthesizeSummaryFromSections(summaryEntity))
+	summaryEntity.Summary = summary
+	if strutil.IsBlank(summary) {
+		summaryEntity.Summary = s.synthesizeSummaryFromSections(summaryEntity)
+	}
 	return summaryEntity
 }
 

@@ -74,7 +74,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 
 	// 填充文档实体字段
 	document.ID = documentId
-	document.DocumentName = utils.Ternary(strutil.IsNotBlank(document.DocumentName), strutil.Trim(document.DocumentName), header.Filename)
+	document.DocumentName = utils.BlankToDefault(strutil.Trim(document.DocumentName), header.Filename)
 	document.OriginalFileName = header.Filename
 	document.FileType = fileType
 	document.MimeType = mimeType

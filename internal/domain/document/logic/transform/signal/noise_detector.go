@@ -5,7 +5,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -28,7 +27,10 @@ func (d *NoiseDetector) Detect(detCtx *DetectorContext, text string, opts ...Det
 	}
 
 	// 获取当前行的出现频率（用于识别重复的页眉页脚）
-	frequency := utils.Ternary(detCtx.LineFrequency == nil, 0, detCtx.LineFrequency[text])
+	frequency := 0
+	if detCtx.LineFrequency != nil {
+		frequency = detCtx.LineFrequency[text]
+	}
 
 	// 频率 >= 2 的行可能是噪声
 	if frequency >= 2 {

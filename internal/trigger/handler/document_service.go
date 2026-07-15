@@ -7,7 +7,6 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/document"
-	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
 )
@@ -96,13 +95,17 @@ func (d *DocumentService) BuildIndex(ctx context.Context, req *document.BuildInd
 // QueryDocumentChunks 查询文档块列表
 func (d *DocumentService) QueryDocumentChunks(ctx context.Context, req *document.QueryDocumentChunksReq) (*document.QueryDocumentChunksResp, error) {
 	chunks, total, planId, err := d.lifeCycleLogic.QueryDocumentChunks(ctx, req.DocumentId, req.TaskId, req.PageNo, req.PageSize)
+	taskId := int64(0)
+	if total > 0 {
+		taskId = chunks[0].TaskId
+	}
 	return &document.QueryDocumentChunksResp{
 		DocumentId: req.DocumentId,
 		PageNo:     req.PageNo,
 		PageSize:   req.PageSize,
 		PlanId:     planId,
 		Records:    convert.ToDocumentChunkItemList(chunks),
-		TaskId:     utils.Ternary(total > 0, chunks[0].TaskId, 0),
+		TaskId:     taskId,
 		Total:      total,
 	}, err
 }

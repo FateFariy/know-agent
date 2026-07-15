@@ -3,6 +3,7 @@ package mq
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
@@ -40,14 +41,19 @@ func (m *RocketMQMessageProducer) Send(ctx context.Context, topic, key string, m
 	if err != nil {
 		return err
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	callback := func(ctx context.Context, result *primitive.SendResult, e error) {
 		if e != nil {
 			logx.Errorf("receive message error: %s\n", e)
 		}
+		wg.Done()
 	}
 	if err = m.p.SendAsync(ctx, callback, primitive.NewMessage(topic, messageJson)); err != nil {
 		return err
 	}
+	wg.Wait()
 
 	if err = m.p.Shutdown(); err != nil {
 		logx.Errorf("shutdown producer error: %s\n", err)

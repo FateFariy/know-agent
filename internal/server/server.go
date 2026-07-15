@@ -30,9 +30,9 @@ func NewServer(HTTP *rest.Server, parseConsumer *consumer.ParseDocumentConsumer,
 }
 
 func (s *Server) Start() {
-	s.HTTP.Start()
 	s.parseConsumer.Start()
 	s.buildIndexConsumer.Start()
+	s.HTTP.Start()
 }
 
 func (s *Server) Stop() {

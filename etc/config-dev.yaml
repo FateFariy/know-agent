@@ -39,7 +39,7 @@ Neo4j:
 
 MQ:
   Endpoint: 10.104.1.173:9876
-  ParseTopic: know-agent-document
+  ParseTopic: know-agent-parse
   IndexTopic: know-agent-index
   Enabled: false
 

@@ -706,7 +706,10 @@ func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *den.DocumentParent
 
 	// 当父块无内容时，使用首条子文档的内容作为回退
 	if strutil.IsBlank(parentText) {
-		return utils.Ternary(len(childDocuments) > 0, childDocuments[0].OriginalSnippet, "")
+		if len(childDocuments) == 0 {
+			return ""
+		}
+		return childDocuments[0].OriginalSnippet
 	}
 
 	var childSummaryBuilder strings.Builder

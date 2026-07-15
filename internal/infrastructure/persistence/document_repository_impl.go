@@ -116,8 +116,8 @@ func (d *DocumentRepositoryImpl) SelectDocumentPage(ctx context.Context, pageNo,
 
 // SelectDocumentById 获取文档
 func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documentId int64) (*entity.Document, error) {
-	document := &entity.Document{ID: documentId}
-	if err := d.dbWithContext(ctx).Model(&model.Document{}).First(document).Error; err != nil {
+	document := &entity.Document{}
+	if err := d.dbWithContext(ctx).Model(&model.Document{}).Where("id = ?", documentId).First(document).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrDocumentNotFound.Format(documentId)
 		}
@@ -170,8 +170,8 @@ func (d *DocumentRepositoryImpl) DeleteTaskByDocumentId(ctx context.Context, doc
 
 // SelectTaskById 根据任务ID获取任务
 func (d *DocumentRepositoryImpl) SelectTaskById(ctx context.Context, taskId int64) (*entity.DocumentTask, error) {
-	task := &entity.DocumentTask{ID: taskId}
-	if err := d.dbWithContext(ctx).Model(&model.DocumentTask{}).First(task).Error; err != nil {
+	task := &entity.DocumentTask{}
+	if err := d.dbWithContext(ctx).Model(&model.DocumentTask{}).Where("id = ?", taskId).First(task).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrTaskNotFound.Format(taskId)
 		}

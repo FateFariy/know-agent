@@ -306,16 +306,21 @@ func (s *ChunkStrategyLogicImpl) buildNormalizedSteps(pipelineType string, norma
 	baseStepMap map[int]*entity.DocumentStrategyStep, documentId int64) []*entity.DocumentStrategyStep {
 	return slice.Map(normalizedTypes, func(index, strategyType int) *entity.DocumentStrategyStep {
 		baseStep := baseStepMap[strategyType]
-		return &entity.DocumentStrategyStep{
+		step := &entity.DocumentStrategyStep{
 			DocumentId:      documentId,
 			PipelineType:    pipelineType,
 			StepNo:          index + 1,
 			StrategyType:    strategyType,
 			StrategyRole:    s.resolveRole(index, strategyType),
-			SourceType:      utils.Ternary(baseStep == nil, vo.StrategySourceTypeUserAdd, vo.StrategySourceTypeUserKeep),
+			SourceType:      vo.StrategySourceTypeUserAdd,
 			ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
-			RecommendReason: utils.Ternary(baseStep == nil, "用户手动追加该策略。", baseStep.RecommendReason),
+			RecommendReason: "用户手动追加该策略。",
 		}
+		if baseStep != nil {
+			step.SourceType = vo.StrategySourceTypeUserKeep
+			step.RecommendReason = baseStep.RecommendReason
+		}
+		return step
 	})
 }
 

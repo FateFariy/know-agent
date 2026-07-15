@@ -161,8 +161,8 @@ func (r *HierarchyResolver) buildListNode(signal *vo.DocumentStructureSignal, no
 		NodeNo:       nodeNo,
 		LineNo:       signal.LineNo,
 		NodeType:     utils.Ternary(signal.Kind == vo.SignalKindStepItem, vo.NodeTypeStep, vo.NodeTypeListItem),
-		ParentNodeNo: utils.Ternary(parent != nil, parent.NodeNo, 1),
-		Depth:        utils.Ternary(parent != nil, parent.Depth+1, 1),
+		ParentNodeNo: 1,
+		Depth:        1,
 		NodeCode:     utils.BlankToDefault(signal.NodeCode, utils.Ternary(signal.ItemIndex == 0, "", strconv.Itoa(signal.ItemIndex))),
 		Title:        signal.Title,
 		AnchorText:   utils.BlankToDefault(signal.NormalizedText, signal.Title),
@@ -171,6 +171,10 @@ func (r *HierarchyResolver) buildListNode(signal *vo.DocumentStructureSignal, no
 		Confidence:   signal.Confidence,
 	}
 	draft.AppendLine(signal.NormalizedText)
+	if parent != nil {
+		draft.ParentNodeNo = parent.NodeNo
+		draft.Depth = parent.Depth + 1
+	}
 	return draft
 }
 

@@ -69,7 +69,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 
 	// 构建提示词变量
 	templateVars := map[string]any{
-		"history":  utils.Ternary(strutil.IsNotBlank(historySummary), historySummary, "无历史上下文"),
+		"history":  utils.BlankToDefault(historySummary, "无历史上下文"),
 		"question": question,
 	}
 
@@ -165,7 +165,7 @@ func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, 
 	}
 
 	// 确定改写后的问题（优先使用LLM改写结果，否则回退到原问题）
-	rewrite := strutil.Trim(utils.Ternary(strutil.IsNotBlank(parsed.Rewrite), parsed.Rewrite, originalQuestion))
+	rewrite := strutil.Trim(utils.BlankToDefault(parsed.Rewrite, originalQuestion))
 	if strutil.IsBlank(rewrite) {
 		return nil
 	}
