@@ -4,34 +4,39 @@
       <article class="panel-card upload-card">
         <div class="panel-title">
           <div>
-            <h3>上传资料并进入推荐流程</h3>
+            <h3>上传文档并进入推荐流程</h3>
           </div>
         </div>
 
         <div class="upload-grid">
           <label class="field">
             <span>文档名称</span>
-            <input v-model="uploadForm.documentName" type="text" placeholder="不填则使用原始文件名" />
+            <input v-model="uploadForm.documentName" type="text"
+                   placeholder="不填则使用原始文件名" />
           </label>
 
           <label class="field">
             <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" type="text" placeholder="例如 operation_rule" />
+            <input v-model="uploadForm.knowledgeScopeCode" type="text"
+                   placeholder="例如 operation_rule" />
           </label>
 
           <label class="field">
             <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" type="text" placeholder="例如 运营规则" />
+            <input v-model="uploadForm.knowledgeScopeName" type="text"
+                   placeholder="例如 运营规则" />
           </label>
 
           <label class="field">
             <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" type="text" placeholder="例如 手册 / 规则 / 介绍" />
+            <input v-model="uploadForm.businessCategory" type="text"
+                   placeholder="例如 手册 / 规则 / 介绍" />
           </label>
 
           <label class="field">
             <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" type="text" placeholder="多个标签用英文逗号分隔" />
+            <input v-model="uploadForm.documentTags" type="text"
+                   placeholder="多个标签用英文逗号分隔" />
           </label>
 
           <label class="field">
@@ -42,14 +47,14 @@
 
         <div class="upload-footer">
           <div class="upload-hint">
-            <span>支持 PDF / DOC / DOCX / TXT / MD / HTML</span>
+            <span>支持 PDF / TXT / MD / HTML</span>
             <strong>{{ uploadForm.file ? uploadForm.file.name : '尚未选择文件' }}</strong>
           </div>
 
           <div class="upload-actions">
             <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
             <button class="primary-button" type="button" :disabled="uploading || !uploadForm.file"
-              @click="submitUpload">
+                    @click="submitUpload">
               {{ uploading ? '上传中...' : '上传并解析' }}
             </button>
           </div>
@@ -58,9 +63,7 @@
 
       <article class="panel-card tips-card">
         <div class="panel-title">
-          <div>
-            <h3>建议操作顺序</h3>
-          </div>
+          <h3>建议操作顺序</h3>
         </div>
 
         <ul class="tips-list">
@@ -83,8 +86,9 @@
         </div>
 
         <div class="list-actions">
-          <input v-model="keyword" class="search-input" type="text" placeholder="搜索文档名称或原始文件名"
-            @keydown.enter="submitSearch" />
+          <input v-model="keyword" class="search-input" type="text"
+                 placeholder="搜索文档名称或原始文件名"
+                 @keydown.enter="submitSearch" />
           <button class="ghost-button" type="button" @click="submitSearch">搜索</button>
         </div>
       </div>
@@ -117,53 +121,59 @@
         <div v-if="!listLoading && documents.length" class="document-table-scroll">
           <table class="document-table">
             <thead>
-              <tr>
-                <th>文档</th>
-                <th>类型</th>
-                <th>大小</th>
-                <th>更新时间</th>
-                <th>解析</th>
-                <th>策略</th>
-                <th>索引</th>
-                <th class="document-table-action-head">操作</th>
-              </tr>
+            <tr>
+              <th>文档</th>
+              <th>类型</th>
+              <th>大小</th>
+              <th>更新时间</th>
+              <th>解析</th>
+              <th>策略</th>
+              <th>索引</th>
+              <th class="document-table-action-head">操作</th>
+            </tr>
             </thead>
             <tbody>
-              <tr v-for="item in documents" :key="item.documentId" class="document-table-row">
-                <td class="document-cell document-cell-main">
-                  <button class="document-link-button" type="button" @click="openDocumentDetail(item.documentId)">
-                    <strong>{{ item.documentName }}</strong>
-                    <span>{{ item.originalFileName }}</span>
+            <tr v-for="item in documents" :key="item.documentId" class="document-table-row">
+              <td class="document-cell document-cell-main">
+                <button class="document-link-button" type="button"
+                        @click="openDocumentDetail(item.documentId)">
+                  <strong>{{ item.documentName }}</strong>
+                  <span>{{ item.originalFileName }}</span>
+                </button>
+              </td>
+              <td class="document-cell">
+                <span class="table-chip">{{ item.fileTypeName || '-' }}</span>
+              </td>
+              <td class="document-cell">
+                <strong>{{ formatFileSize(item.fileSize) }}</strong>
+              </td>
+              <td class="document-cell">
+                <strong>{{ formatDateTime(item.updateTime) }}</strong>
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :label="item.parseStatusName" :code="item.parseStatus"
+                                  type="parse" />
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :label="item.strategyStatusName" :code="item.strategyStatus"
+                                  type="strategy" />
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :label="item.indexStatusName" :code="item.indexStatus"
+                                  type="index" />
+              </td>
+              <td class="document-cell document-cell-action">
+                <div class="document-action-group">
+                  <button class="detail-link" type="button"
+                          @click="openDocumentDetail(item.documentId)">查看详情
                   </button>
-                </td>
-                <td class="document-cell">
-                  <span class="table-chip">{{ item.fileTypeName || '-' }}</span>
-                </td>
-                <td class="document-cell">
-                  <strong>{{ formatFileSize(item.fileSize) }}</strong>
-                </td>
-                <td class="document-cell">
-                  <strong>{{ formatDateTime(item.editTime) }}</strong>
-                </td>
-                <td class="document-cell">
-                  <AdminStatusBadge :label="item.parseStatusName" :code="item.parseStatus" type="parse" />
-                </td>
-                <td class="document-cell">
-                  <AdminStatusBadge :label="item.strategyStatusName" :code="item.strategyStatus" type="strategy" />
-                </td>
-                <td class="document-cell">
-                  <AdminStatusBadge :label="item.indexStatusName" :code="item.indexStatus" type="index" />
-                </td>
-                <td class="document-cell document-cell-action">
-                  <div class="document-action-group">
-                    <button class="detail-link" type="button" @click="openDocumentDetail(item.documentId)">查看详情</button>
-                    <button class="danger-link" type="button" :disabled="!canDeleteDocument(item)"
-                      :title="buildDeleteTitle(item)" @click="deleteDocument(item)">
-                      {{ isDeletingDocument(item.documentId) ? '删除中...' : '删除' }}
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                  <button class="danger-link" type="button" :disabled="!canDeleteDocument(item)"
+                          :title="buildDeleteTitle(item)" @click="deleteDocument(item)">
+                    {{ deletingDocumentId === item.documentId ? '删除中...' : '删除' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -171,15 +181,16 @@
 
       <div v-if="documents.length" class="pagination-bar">
         <button class="ghost-button" type="button" :disabled="currentPage <= 1 || listLoading"
-          @click="changePage(currentPage - 1)">
+                @click="changePage(currentPage - 1)">
           上一页
         </button>
         <div class="pagination-status">
           <strong>第 {{ currentPage }} / {{ totalPages }} 页</strong>
           <span>共 {{ total }} 条文档</span>
         </div>
-        <button class="ghost-button" type="button" :disabled="currentPage >= totalPages || listLoading"
-          @click="changePage(currentPage + 1)">
+        <button class="ghost-button" type="button"
+                :disabled="currentPage >= totalPages || listLoading"
+                @click="changePage(currentPage + 1)">
           下一页
         </button>
       </div>
@@ -188,24 +199,23 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { documentApi } from '@/api/document'
 import type {
-  DocumentInfo,
-  UploadDocumentReq,
-  QueryDocumentPageReq,
   DeleteDocumentReq,
-  UploadDocumentResp
+  DocumentInfo,
+  QueryDocumentPageReq,
+  UploadDocumentReq
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import { formatDateTime, formatFileSize, hasCode } from '@/utils/manageFormat'
+import { formatDateTime, formatFileSize } from '@/utils/manageFormat'
 
 const router = useRouter()
-const OPERATOR_ID = '10001'
+const OPERATOR_ID = 10001
 const DEFAULT_PAGE_SIZE = 12
 
-const uploadForm = reactive<UploadDocumentReq & { file: File | null }>({
+const uploadForm = reactive<UploadDocumentReq>({
   documentName: '',
   knowledgeScopeCode: '',
   knowledgeScopeName: '',
@@ -221,33 +231,36 @@ const documents = ref<DocumentInfo[]>([])
 const currentPage = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const total = ref(0)
-const deletingDocumentId = ref('')
-const pageNotice = reactive({
-  type: 'info',
-  message: ''
-})
+const deletingDocumentId = ref(0)
+const pageNotice = reactive({ type: 'info', message: '' })
 
 const totalPages = computed(() => {
   return Math.max(1, Math.ceil((total.value || 0) / pageSize.value))
 })
-const visibleParseReadyCount = computed(() => documents.value.filter((item) => hasCode(item.parseStatus, 3)).length)
-const visibleStrategyReadyCount = computed(() => documents.value.filter((item) => hasCode(item.strategyStatus, 3)).length)
-const visibleIndexReadyCount = computed(() => documents.value.filter((item) => hasCode(item.indexStatus, 3)).length)
+const visibleParseReadyCount = computed(() => documents.value.filter((item) => item.parseStatus === 3).length)
+const visibleStrategyReadyCount = computed(() => documents.value.filter((item) => item.strategyStatus === 3).length)
+const visibleIndexReadyCount = computed(() => documents.value.filter((item) => item.indexStatus === 3).length
+)
 
-function showNotice(message, type = 'info') {
+function showNotice(message: string, type = 'info'): void {
   pageNotice.type = type
   pageNotice.message = message
 }
 
-function clearNotice() {
+function clearNotice(): void {
   pageNotice.message = ''
 }
 
-function handleFileChange(event) {
-  uploadForm.file = event.target.files?.[0] || null
+function handleFileChange(event: Event): void {
+  const target = event.target
+  if (target instanceof HTMLInputElement && target.files) {
+    uploadForm.file = target.files[0] || null
+  } else {
+    uploadForm.file = null
+  }
 }
 
-function clearSelectedFile() {
+function clearSelectedFile(): void {
   uploadForm.file = null
   uploadForm.documentName = ''
   uploadForm.knowledgeScopeCode = ''
@@ -259,21 +272,21 @@ function clearSelectedFile() {
   }
 }
 
-async function loadDocuments(page = currentPage.value) {
+async function loadDocuments(page: number = currentPage.value): Promise<void> {
   listLoading.value = true
 
   try {
     const params: QueryDocumentPageReq = {
-      pageNo: Number(page),
+      pageNo: page,
       pageSize: pageSize.value,
       keyword: keyword.value.trim()
     }
-    const { data } = await documentApi.queryPage(params)
+    const { data } = await documentApi.queryDocumentPage(params)
 
-    documents.value = Array.isArray(data?.records) ? data.records : []
-    currentPage.value = Number(data?.pageNo || page)
-    pageSize.value = Number(data?.pageSize || pageSize.value)
-    total.value = Number(data?.total || 0)
+    documents.value = data?.records || []
+    currentPage.value = data?.pageNo || page
+    pageSize.value = data?.pageSize || pageSize.value
+    total.value = data?.total || 0
   } catch (error) {
     console.error('加载文档列表失败', error)
     showNotice(normalizeError(error, '加载文档列表失败'), 'danger')
@@ -283,46 +296,39 @@ async function loadDocuments(page = currentPage.value) {
   }
 }
 
-function submitSearch() {
+function submitSearch(): void {
   currentPage.value = 1
   loadDocuments(1)
 }
 
-function changePage(page) {
+function changePage(page: number): void {
   if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
   }
   loadDocuments(page)
 }
 
-function openDocumentDetail(documentId) {
+function openDocumentDetail(documentId: number): void {
   router.push({
     name: 'AdminDocumentDetail',
     params: {
-      documentId: String(documentId)
+      documentId: documentId
     }
   })
 }
 
-function isDeletingDocument(documentId) {
-  return String(deletingDocumentId.value || '') === String(documentId || '')
+function hasRunningDocumentTask(item: DocumentInfo): boolean {
+  return item?.latestTaskStatus === 1 || item?.latestTaskStatus === 2 || item?.parseStatus === 2 || item?.indexStatus === 2
 }
 
-function hasRunningDocumentTask(item) {
-  return hasCode(item?.latestTaskStatus, 1)
-    || hasCode(item?.latestTaskStatus, 2)
-    || hasCode(item?.parseStatus, 2)
-    || hasCode(item?.indexStatus, 2)
-}
-
-function canDeleteDocument(item) {
+function canDeleteDocument(item: DocumentInfo): boolean {
   if (!item?.documentId) {
     return false
   }
   return !listLoading.value && !deletingDocumentId.value && !hasRunningDocumentTask(item)
 }
 
-function buildDeleteTitle(item) {
+function buildDeleteTitle(item: DocumentInfo): string {
   if (hasRunningDocumentTask(item)) {
     return '请等待当前任务完成后再删除'
   }
@@ -332,7 +338,7 @@ function buildDeleteTitle(item) {
   return '删除文档以及关联的索引、存储文件'
 }
 
-async function submitUpload() {
+async function submitUpload(): Promise<void> {
   if (!uploadForm.file) {
     showNotice('请先选择要上传的文档。', 'danger')
     return
@@ -342,20 +348,20 @@ async function submitUpload() {
   clearNotice()
 
   try {
-    const data: UploadDocumentReq = {
-      documentName: uploadForm.documentName.trim() || undefined,
-      operatorId: Number(OPERATOR_ID),
-      knowledgeScopeCode: uploadForm.knowledgeScopeCode.trim() || undefined,
-      knowledgeScopeName: uploadForm.knowledgeScopeName.trim() || undefined,
-      businessCategory: uploadForm.businessCategory.trim() || undefined,
-      documentTags: uploadForm.documentTags.trim() || undefined
+    const documentReq: UploadDocumentReq = {
+      documentName: uploadForm.documentName?.trim() || undefined,
+      operatorId: OPERATOR_ID,
+      knowledgeScopeCode: uploadForm.knowledgeScopeCode?.trim() || undefined,
+      knowledgeScopeName: uploadForm.knowledgeScopeName?.trim() || undefined,
+      businessCategory: uploadForm.businessCategory?.trim() || undefined,
+      documentTags: uploadForm.documentTags?.trim() || undefined,
+      file: uploadForm.file
     }
-    const res = await documentApi.uploadFile(uploadForm.file, data)
-    const result = res.data as UploadDocumentResp
+    const { data } = await documentApi.uploadFile(uploadForm.file, documentReq)
     clearSelectedFile()
-    showNotice(`文档已上传，任务 ${result.taskId} 已进入解析与策略推荐队列。`, 'success')
+    showNotice(`文档已上传，任务 ${data?.taskId} 已进入解析与策略推荐队列。`, 'success')
     await loadDocuments(1)
-    openDocumentDetail(result.documentId)
+    openDocumentDetail(data?.documentId || 0)
   } catch (error) {
     console.error('上传文档失败', error)
     showNotice(normalizeError(error, '上传文档失败'), 'danger')
@@ -364,7 +370,7 @@ async function submitUpload() {
   }
 }
 
-async function deleteDocument(item: DocumentInfo) {
+async function deleteDocument(item: DocumentInfo): Promise<void> {
   if (!item?.documentId) {
     return
   }
@@ -374,8 +380,7 @@ async function deleteDocument(item: DocumentInfo) {
     return
   }
 
-  const documentId = String(item.documentId)
-  const documentName = item.documentName || item.originalFileName || documentId
+  const documentName = item.documentName || item.originalFileName || String(item.documentId)
   const confirmed = window.confirm(
     `确认删除文档《${documentName}》吗？\n\n将同时删除 MySQL 记录、向量库数据和 MinIO 存储文件，删除后不可恢复。`
   )
@@ -383,14 +388,14 @@ async function deleteDocument(item: DocumentInfo) {
     return
   }
 
-  deletingDocumentId.value = documentId
+  deletingDocumentId.value = item.documentId
   clearNotice()
 
   try {
     const params: DeleteDocumentReq = {
-      documentId: Number(item.documentId)
+      documentId: item.documentId
     }
-    await documentApi.deleteDoc(params)
+    await documentApi.deleteDocument(params)
     const nextPage = documents.value.length === 1 && currentPage.value > 1
       ? currentPage.value - 1
       : currentPage.value
@@ -400,7 +405,7 @@ async function deleteDocument(item: DocumentInfo) {
     console.error('删除文档失败', error)
     showNotice(normalizeError(error, '删除文档失败'), 'danger')
   } finally {
-    deletingDocumentId.value = ''
+    deletingDocumentId.value = 0
   }
 }
 
