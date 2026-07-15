@@ -305,7 +305,8 @@
                     "errorMessage",
                     "firstResponseTimeMs",
                     "totalResponseTimeMs",
-                    "createTime"
+                    "createTime",
+                    "updateTime"
                   ],
                   "properties": {
                     "answer": {
@@ -318,7 +319,381 @@
                     },
                     "debugTrace": {
                       "description": "调试轨迹",
-                      "type": "string"
+                      "type": "object",
+                      "required": [
+                        "executionMode",
+                        "chatMode",
+                        "originalQuestion",
+                        "rewriteQuestion",
+                        "rewriteSubQuestions",
+                        "retrievalQuestion",
+                        "agentQuestion",
+                        "navigationDecision",
+                        "historySummary",
+                        "longTermSummary",
+                        "recentHistoryTranscript",
+                        "answerRecentTranscript",
+                        "answerHistoryContext",
+                        "answerHistoryFollowUpQuestion",
+                        "historyCompressionApplied",
+                        "historyCoveredExchangeId",
+                        "historyCoveredExchangeCount",
+                        "historyCompressionCount",
+                        "currentDateText",
+                        "requiresFreshSearch",
+                        "requiresCurrentDateAnchoring",
+                        "subQuestions",
+                        "selectedDocumentId",
+                        "selectedTaskId",
+                        "retrievalNotes",
+                        "usedChannels",
+                        "toolTraces",
+                        "modelUsageTraces",
+                        "limitStats",
+                        "ragSystemPrompt",
+                        "ragUserPrompt",
+                        "noEvidenceReply"
+                      ],
+                      "properties": {
+                        "agentQuestion": {
+                          "description": "Agent问题",
+                          "type": "string"
+                        },
+                        "answerHistoryContext": {
+                          "description": "回答历史上下文",
+                          "type": "string"
+                        },
+                        "answerHistoryFollowUpQuestion": {
+                          "description": "回答历史追问",
+                          "type": "boolean"
+                        },
+                        "answerRecentTranscript": {
+                          "description": "回答近期转录",
+                          "type": "string"
+                        },
+                        "chatMode": {
+                          "description": "聊天模式",
+                          "type": "string"
+                        },
+                        "currentDateText": {
+                          "description": "当前日期文本",
+                          "type": "string"
+                        },
+                        "executionMode": {
+                          "description": "执行模式",
+                          "type": "string"
+                        },
+                        "historyCompressionApplied": {
+                          "description": "历史压缩已应用",
+                          "type": "boolean"
+                        },
+                        "historyCompressionCount": {
+                          "description": "历史压缩次数",
+                          "type": "integer"
+                        },
+                        "historyCoveredExchangeCount": {
+                          "description": "历史覆盖交换数量",
+                          "type": "integer"
+                        },
+                        "historyCoveredExchangeId": {
+                          "description": "历史覆盖交换ID",
+                          "type": "integer"
+                        },
+                        "historySummary": {
+                          "description": "历史摘要",
+                          "type": "string"
+                        },
+                        "limitStats": {
+                          "description": "限制统计",
+                          "type": "object",
+                          "required": [
+                            "modelCallsUsed",
+                            "modelCallsRunLimit",
+                            "modelCallsThreadLimit",
+                            "toolCallsUsed",
+                            "toolCallsRunLimit",
+                            "toolCallsThreadLimit",
+                            "limitTriggered",
+                            "limitReason"
+                          ],
+                          "properties": {
+                            "limitReason": {
+                              "description": "限制原因",
+                              "type": "string"
+                            },
+                            "limitTriggered": {
+                              "description": "是否触发限制",
+                              "type": "boolean"
+                            },
+                            "modelCallsRunLimit": {
+                              "description": "运行限制的模型调用次数",
+                              "type": "integer"
+                            },
+                            "modelCallsThreadLimit": {
+                              "description": "线程限制的模型调用次数",
+                              "type": "integer"
+                            },
+                            "modelCallsUsed": {
+                              "description": "已使用的模型调用次数",
+                              "type": "integer"
+                            },
+                            "toolCallsRunLimit": {
+                              "description": "运行限制的工具调用次数",
+                              "type": "integer"
+                            },
+                            "toolCallsThreadLimit": {
+                              "description": "线程限制的工具调用次数",
+                              "type": "integer"
+                            },
+                            "toolCallsUsed": {
+                              "description": "已使用的工具调用次数",
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "longTermSummary": {
+                          "description": "长期摘要",
+                          "type": "string"
+                        },
+                        "modelUsageTraces": {
+                          "description": "模型使用轨迹列表",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "stageName",
+                              "provider",
+                              "model",
+                              "promptTokens",
+                              "completionTokens",
+                              "totalTokens",
+                              "estimatedCost",
+                              "durationMs",
+                              "status"
+                            ],
+                            "properties": {
+                              "completionTokens": {
+                                "description": "完成token数",
+                                "type": "integer"
+                              },
+                              "durationMs": {
+                                "description": "持续时间毫秒",
+                                "type": "integer"
+                              },
+                              "estimatedCost": {
+                                "description": "预估成本",
+                                "type": "number"
+                              },
+                              "model": {
+                                "description": "模型名称",
+                                "type": "string"
+                              },
+                              "promptTokens": {
+                                "description": "提示词token数",
+                                "type": "integer"
+                              },
+                              "provider": {
+                                "description": "提供商",
+                                "type": "string"
+                              },
+                              "stageName": {
+                                "description": "阶段名称",
+                                "type": "string"
+                              },
+                              "status": {
+                                "description": "状态",
+                                "type": "string"
+                              },
+                              "totalTokens": {
+                                "description": "总token数",
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        },
+                        "navigationDecision": {
+                          "description": "文档导航决策",
+                          "type": "object",
+                          "required": [
+                            "navigationAction",
+                            "executionMode",
+                            "structureAnchor",
+                            "itemAnchor",
+                            "retrievalPlan",
+                            "summaryText",
+                            "queryContextHints",
+                            "softSectionHints"
+                          ],
+                          "properties": {
+                            "executionMode": {
+                              "description": "执行模式",
+                              "type": "string"
+                            },
+                            "itemAnchor": {
+                              "description": "项目锚点",
+                              "type": "object"
+                            },
+                            "navigationAction": {
+                              "description": "导航动作",
+                              "type": "string"
+                            },
+                            "queryContextHints": {
+                              "description": "查询上下文提示",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "retrievalPlan": {
+                              "description": "检索问题计划",
+                              "type": "object"
+                            },
+                            "softSectionHints": {
+                              "description": "软章节提示",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "structureAnchor": {
+                              "description": "结构锚点",
+                              "type": "object"
+                            },
+                            "summaryText": {
+                              "description": "摘要文本",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "noEvidenceReply": {
+                          "description": "无证据回复",
+                          "type": "string"
+                        },
+                        "originalQuestion": {
+                          "description": "原始问题",
+                          "type": "string"
+                        },
+                        "ragSystemPrompt": {
+                          "description": "RAG系统提示词",
+                          "type": "string"
+                        },
+                        "ragUserPrompt": {
+                          "description": "RAG用户提示词",
+                          "type": "string"
+                        },
+                        "recentHistoryTranscript": {
+                          "description": "近期历史转录",
+                          "type": "string"
+                        },
+                        "requiresCurrentDateAnchoring": {
+                          "description": "需要当前日期锚定",
+                          "type": "boolean"
+                        },
+                        "requiresFreshSearch": {
+                          "description": "需要新鲜搜索",
+                          "type": "boolean"
+                        },
+                        "retrievalNotes": {
+                          "description": "检索备注列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "retrievalQuestion": {
+                          "description": "检索问题",
+                          "type": "string"
+                        },
+                        "rewriteQuestion": {
+                          "description": "重写问题",
+                          "type": "string"
+                        },
+                        "rewriteSubQuestions": {
+                          "description": "重写子问题列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "selectedDocumentId": {
+                          "description": "选中的文档ID",
+                          "type": "integer"
+                        },
+                        "selectedTaskId": {
+                          "description": "选中的任务ID",
+                          "type": "integer"
+                        },
+                        "subQuestions": {
+                          "description": "检索子问题列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "toolTraces": {
+                          "description": "工具调用轨迹列表",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "toolName",
+                              "status",
+                              "inputSummary",
+                              "effectiveInput",
+                              "outputSummary",
+                              "errorMessage",
+                              "referenceCount",
+                              "topic",
+                              "durationMs"
+                            ],
+                            "properties": {
+                              "durationMs": {
+                                "description": "持续时间毫秒",
+                                "type": "integer"
+                              },
+                              "effectiveInput": {
+                                "description": "有效输入",
+                                "type": "string"
+                              },
+                              "errorMessage": {
+                                "description": "错误信息",
+                                "type": "string"
+                              },
+                              "inputSummary": {
+                                "description": "输入摘要",
+                                "type": "string"
+                              },
+                              "outputSummary": {
+                                "description": "输出摘要",
+                                "type": "string"
+                              },
+                              "referenceCount": {
+                                "description": "引用数量",
+                                "type": "integer"
+                              },
+                              "status": {
+                                "description": "状态",
+                                "type": "string"
+                              },
+                              "toolName": {
+                                "description": "工具名称",
+                                "type": "string"
+                              },
+                              "topic": {
+                                "description": "主题",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "usedChannels": {
+                          "description": "使用的渠道列表",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     },
                     "errorMessage": {
                       "description": "错误信息",
@@ -517,12 +892,12 @@
                       "durationMs",
                       "summaryText",
                       "errorMessage",
-                      "snapshot"
+                      "snapshotJson"
                     ],
                     "properties": {
                       "durationMs": {
                         "description": "持续时间毫秒",
-                        "type": "string"
+                        "type": "integer"
                       },
                       "endTime": {
                         "description": "结束时间",
@@ -544,7 +919,7 @@
                         "description": "父阶段ID",
                         "type": "string"
                       },
-                      "snapshot": {
+                      "snapshotJson": {
                         "description": "快照数据",
                         "type": "string"
                       },
@@ -942,7 +1317,8 @@
                       "errorMessage",
                       "firstResponseTimeMs",
                       "totalResponseTimeMs",
-                      "createTime"
+                      "createTime",
+                      "updateTime"
                     ],
                     "properties": {
                       "answer": {
@@ -955,7 +1331,381 @@
                       },
                       "debugTrace": {
                         "description": "调试轨迹",
-                        "type": "string"
+                        "type": "object",
+                        "required": [
+                          "executionMode",
+                          "chatMode",
+                          "originalQuestion",
+                          "rewriteQuestion",
+                          "rewriteSubQuestions",
+                          "retrievalQuestion",
+                          "agentQuestion",
+                          "navigationDecision",
+                          "historySummary",
+                          "longTermSummary",
+                          "recentHistoryTranscript",
+                          "answerRecentTranscript",
+                          "answerHistoryContext",
+                          "answerHistoryFollowUpQuestion",
+                          "historyCompressionApplied",
+                          "historyCoveredExchangeId",
+                          "historyCoveredExchangeCount",
+                          "historyCompressionCount",
+                          "currentDateText",
+                          "requiresFreshSearch",
+                          "requiresCurrentDateAnchoring",
+                          "subQuestions",
+                          "selectedDocumentId",
+                          "selectedTaskId",
+                          "retrievalNotes",
+                          "usedChannels",
+                          "toolTraces",
+                          "modelUsageTraces",
+                          "limitStats",
+                          "ragSystemPrompt",
+                          "ragUserPrompt",
+                          "noEvidenceReply"
+                        ],
+                        "properties": {
+                          "agentQuestion": {
+                            "description": "Agent问题",
+                            "type": "string"
+                          },
+                          "answerHistoryContext": {
+                            "description": "回答历史上下文",
+                            "type": "string"
+                          },
+                          "answerHistoryFollowUpQuestion": {
+                            "description": "回答历史追问",
+                            "type": "boolean"
+                          },
+                          "answerRecentTranscript": {
+                            "description": "回答近期转录",
+                            "type": "string"
+                          },
+                          "chatMode": {
+                            "description": "聊天模式",
+                            "type": "string"
+                          },
+                          "currentDateText": {
+                            "description": "当前日期文本",
+                            "type": "string"
+                          },
+                          "executionMode": {
+                            "description": "执行模式",
+                            "type": "string"
+                          },
+                          "historyCompressionApplied": {
+                            "description": "历史压缩已应用",
+                            "type": "boolean"
+                          },
+                          "historyCompressionCount": {
+                            "description": "历史压缩次数",
+                            "type": "integer"
+                          },
+                          "historyCoveredExchangeCount": {
+                            "description": "历史覆盖交换数量",
+                            "type": "integer"
+                          },
+                          "historyCoveredExchangeId": {
+                            "description": "历史覆盖交换ID",
+                            "type": "integer"
+                          },
+                          "historySummary": {
+                            "description": "历史摘要",
+                            "type": "string"
+                          },
+                          "limitStats": {
+                            "description": "限制统计",
+                            "type": "object",
+                            "required": [
+                              "modelCallsUsed",
+                              "modelCallsRunLimit",
+                              "modelCallsThreadLimit",
+                              "toolCallsUsed",
+                              "toolCallsRunLimit",
+                              "toolCallsThreadLimit",
+                              "limitTriggered",
+                              "limitReason"
+                            ],
+                            "properties": {
+                              "limitReason": {
+                                "description": "限制原因",
+                                "type": "string"
+                              },
+                              "limitTriggered": {
+                                "description": "是否触发限制",
+                                "type": "boolean"
+                              },
+                              "modelCallsRunLimit": {
+                                "description": "运行限制的模型调用次数",
+                                "type": "integer"
+                              },
+                              "modelCallsThreadLimit": {
+                                "description": "线程限制的模型调用次数",
+                                "type": "integer"
+                              },
+                              "modelCallsUsed": {
+                                "description": "已使用的模型调用次数",
+                                "type": "integer"
+                              },
+                              "toolCallsRunLimit": {
+                                "description": "运行限制的工具调用次数",
+                                "type": "integer"
+                              },
+                              "toolCallsThreadLimit": {
+                                "description": "线程限制的工具调用次数",
+                                "type": "integer"
+                              },
+                              "toolCallsUsed": {
+                                "description": "已使用的工具调用次数",
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "longTermSummary": {
+                            "description": "长期摘要",
+                            "type": "string"
+                          },
+                          "modelUsageTraces": {
+                            "description": "模型使用轨迹列表",
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "stageName",
+                                "provider",
+                                "model",
+                                "promptTokens",
+                                "completionTokens",
+                                "totalTokens",
+                                "estimatedCost",
+                                "durationMs",
+                                "status"
+                              ],
+                              "properties": {
+                                "completionTokens": {
+                                  "description": "完成token数",
+                                  "type": "integer"
+                                },
+                                "durationMs": {
+                                  "description": "持续时间毫秒",
+                                  "type": "integer"
+                                },
+                                "estimatedCost": {
+                                  "description": "预估成本",
+                                  "type": "number"
+                                },
+                                "model": {
+                                  "description": "模型名称",
+                                  "type": "string"
+                                },
+                                "promptTokens": {
+                                  "description": "提示词token数",
+                                  "type": "integer"
+                                },
+                                "provider": {
+                                  "description": "提供商",
+                                  "type": "string"
+                                },
+                                "stageName": {
+                                  "description": "阶段名称",
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "description": "状态",
+                                  "type": "string"
+                                },
+                                "totalTokens": {
+                                  "description": "总token数",
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          },
+                          "navigationDecision": {
+                            "description": "文档导航决策",
+                            "type": "object",
+                            "required": [
+                              "navigationAction",
+                              "executionMode",
+                              "structureAnchor",
+                              "itemAnchor",
+                              "retrievalPlan",
+                              "summaryText",
+                              "queryContextHints",
+                              "softSectionHints"
+                            ],
+                            "properties": {
+                              "executionMode": {
+                                "description": "执行模式",
+                                "type": "string"
+                              },
+                              "itemAnchor": {
+                                "description": "项目锚点",
+                                "type": "object"
+                              },
+                              "navigationAction": {
+                                "description": "导航动作",
+                                "type": "string"
+                              },
+                              "queryContextHints": {
+                                "description": "查询上下文提示",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "retrievalPlan": {
+                                "description": "检索问题计划",
+                                "type": "object"
+                              },
+                              "softSectionHints": {
+                                "description": "软章节提示",
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "structureAnchor": {
+                                "description": "结构锚点",
+                                "type": "object"
+                              },
+                              "summaryText": {
+                                "description": "摘要文本",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "noEvidenceReply": {
+                            "description": "无证据回复",
+                            "type": "string"
+                          },
+                          "originalQuestion": {
+                            "description": "原始问题",
+                            "type": "string"
+                          },
+                          "ragSystemPrompt": {
+                            "description": "RAG系统提示词",
+                            "type": "string"
+                          },
+                          "ragUserPrompt": {
+                            "description": "RAG用户提示词",
+                            "type": "string"
+                          },
+                          "recentHistoryTranscript": {
+                            "description": "近期历史转录",
+                            "type": "string"
+                          },
+                          "requiresCurrentDateAnchoring": {
+                            "description": "需要当前日期锚定",
+                            "type": "boolean"
+                          },
+                          "requiresFreshSearch": {
+                            "description": "需要新鲜搜索",
+                            "type": "boolean"
+                          },
+                          "retrievalNotes": {
+                            "description": "检索备注列表",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "retrievalQuestion": {
+                            "description": "检索问题",
+                            "type": "string"
+                          },
+                          "rewriteQuestion": {
+                            "description": "重写问题",
+                            "type": "string"
+                          },
+                          "rewriteSubQuestions": {
+                            "description": "重写子问题列表",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "selectedDocumentId": {
+                            "description": "选中的文档ID",
+                            "type": "integer"
+                          },
+                          "selectedTaskId": {
+                            "description": "选中的任务ID",
+                            "type": "integer"
+                          },
+                          "subQuestions": {
+                            "description": "检索子问题列表",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "toolTraces": {
+                            "description": "工具调用轨迹列表",
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "toolName",
+                                "status",
+                                "inputSummary",
+                                "effectiveInput",
+                                "outputSummary",
+                                "errorMessage",
+                                "referenceCount",
+                                "topic",
+                                "durationMs"
+                              ],
+                              "properties": {
+                                "durationMs": {
+                                  "description": "持续时间毫秒",
+                                  "type": "integer"
+                                },
+                                "effectiveInput": {
+                                  "description": "有效输入",
+                                  "type": "string"
+                                },
+                                "errorMessage": {
+                                  "description": "错误信息",
+                                  "type": "string"
+                                },
+                                "inputSummary": {
+                                  "description": "输入摘要",
+                                  "type": "string"
+                                },
+                                "outputSummary": {
+                                  "description": "输出摘要",
+                                  "type": "string"
+                                },
+                                "referenceCount": {
+                                  "description": "引用数量",
+                                  "type": "integer"
+                                },
+                                "status": {
+                                  "description": "状态",
+                                  "type": "string"
+                                },
+                                "toolName": {
+                                  "description": "工具名称",
+                                  "type": "string"
+                                },
+                                "topic": {
+                                  "description": "主题",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "usedChannels": {
+                            "description": "使用的渠道列表",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
                       },
                       "errorMessage": {
                         "description": "错误信息",
@@ -1414,7 +2164,8 @@
                             "errorMessage",
                             "firstResponseTimeMs",
                             "totalResponseTimeMs",
-                            "createTime"
+                            "createTime",
+                            "updateTime"
                           ],
                           "properties": {
                             "answer": {
@@ -1427,7 +2178,381 @@
                             },
                             "debugTrace": {
                               "description": "调试轨迹",
-                              "type": "string"
+                              "type": "object",
+                              "required": [
+                                "executionMode",
+                                "chatMode",
+                                "originalQuestion",
+                                "rewriteQuestion",
+                                "rewriteSubQuestions",
+                                "retrievalQuestion",
+                                "agentQuestion",
+                                "navigationDecision",
+                                "historySummary",
+                                "longTermSummary",
+                                "recentHistoryTranscript",
+                                "answerRecentTranscript",
+                                "answerHistoryContext",
+                                "answerHistoryFollowUpQuestion",
+                                "historyCompressionApplied",
+                                "historyCoveredExchangeId",
+                                "historyCoveredExchangeCount",
+                                "historyCompressionCount",
+                                "currentDateText",
+                                "requiresFreshSearch",
+                                "requiresCurrentDateAnchoring",
+                                "subQuestions",
+                                "selectedDocumentId",
+                                "selectedTaskId",
+                                "retrievalNotes",
+                                "usedChannels",
+                                "toolTraces",
+                                "modelUsageTraces",
+                                "limitStats",
+                                "ragSystemPrompt",
+                                "ragUserPrompt",
+                                "noEvidenceReply"
+                              ],
+                              "properties": {
+                                "agentQuestion": {
+                                  "description": "Agent问题",
+                                  "type": "string"
+                                },
+                                "answerHistoryContext": {
+                                  "description": "回答历史上下文",
+                                  "type": "string"
+                                },
+                                "answerHistoryFollowUpQuestion": {
+                                  "description": "回答历史追问",
+                                  "type": "boolean"
+                                },
+                                "answerRecentTranscript": {
+                                  "description": "回答近期转录",
+                                  "type": "string"
+                                },
+                                "chatMode": {
+                                  "description": "聊天模式",
+                                  "type": "string"
+                                },
+                                "currentDateText": {
+                                  "description": "当前日期文本",
+                                  "type": "string"
+                                },
+                                "executionMode": {
+                                  "description": "执行模式",
+                                  "type": "string"
+                                },
+                                "historyCompressionApplied": {
+                                  "description": "历史压缩已应用",
+                                  "type": "boolean"
+                                },
+                                "historyCompressionCount": {
+                                  "description": "历史压缩次数",
+                                  "type": "integer"
+                                },
+                                "historyCoveredExchangeCount": {
+                                  "description": "历史覆盖交换数量",
+                                  "type": "integer"
+                                },
+                                "historyCoveredExchangeId": {
+                                  "description": "历史覆盖交换ID",
+                                  "type": "integer"
+                                },
+                                "historySummary": {
+                                  "description": "历史摘要",
+                                  "type": "string"
+                                },
+                                "limitStats": {
+                                  "description": "限制统计",
+                                  "type": "object",
+                                  "required": [
+                                    "modelCallsUsed",
+                                    "modelCallsRunLimit",
+                                    "modelCallsThreadLimit",
+                                    "toolCallsUsed",
+                                    "toolCallsRunLimit",
+                                    "toolCallsThreadLimit",
+                                    "limitTriggered",
+                                    "limitReason"
+                                  ],
+                                  "properties": {
+                                    "limitReason": {
+                                      "description": "限制原因",
+                                      "type": "string"
+                                    },
+                                    "limitTriggered": {
+                                      "description": "是否触发限制",
+                                      "type": "boolean"
+                                    },
+                                    "modelCallsRunLimit": {
+                                      "description": "运行限制的模型调用次数",
+                                      "type": "integer"
+                                    },
+                                    "modelCallsThreadLimit": {
+                                      "description": "线程限制的模型调用次数",
+                                      "type": "integer"
+                                    },
+                                    "modelCallsUsed": {
+                                      "description": "已使用的模型调用次数",
+                                      "type": "integer"
+                                    },
+                                    "toolCallsRunLimit": {
+                                      "description": "运行限制的工具调用次数",
+                                      "type": "integer"
+                                    },
+                                    "toolCallsThreadLimit": {
+                                      "description": "线程限制的工具调用次数",
+                                      "type": "integer"
+                                    },
+                                    "toolCallsUsed": {
+                                      "description": "已使用的工具调用次数",
+                                      "type": "integer"
+                                    }
+                                  }
+                                },
+                                "longTermSummary": {
+                                  "description": "长期摘要",
+                                  "type": "string"
+                                },
+                                "modelUsageTraces": {
+                                  "description": "模型使用轨迹列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "stageName",
+                                      "provider",
+                                      "model",
+                                      "promptTokens",
+                                      "completionTokens",
+                                      "totalTokens",
+                                      "estimatedCost",
+                                      "durationMs",
+                                      "status"
+                                    ],
+                                    "properties": {
+                                      "completionTokens": {
+                                        "description": "完成token数",
+                                        "type": "integer"
+                                      },
+                                      "durationMs": {
+                                        "description": "持续时间毫秒",
+                                        "type": "integer"
+                                      },
+                                      "estimatedCost": {
+                                        "description": "预估成本",
+                                        "type": "number"
+                                      },
+                                      "model": {
+                                        "description": "模型名称",
+                                        "type": "string"
+                                      },
+                                      "promptTokens": {
+                                        "description": "提示词token数",
+                                        "type": "integer"
+                                      },
+                                      "provider": {
+                                        "description": "提供商",
+                                        "type": "string"
+                                      },
+                                      "stageName": {
+                                        "description": "阶段名称",
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "description": "状态",
+                                        "type": "string"
+                                      },
+                                      "totalTokens": {
+                                        "description": "总token数",
+                                        "type": "integer"
+                                      }
+                                    }
+                                  }
+                                },
+                                "navigationDecision": {
+                                  "description": "文档导航决策",
+                                  "type": "object",
+                                  "required": [
+                                    "navigationAction",
+                                    "executionMode",
+                                    "structureAnchor",
+                                    "itemAnchor",
+                                    "retrievalPlan",
+                                    "summaryText",
+                                    "queryContextHints",
+                                    "softSectionHints"
+                                  ],
+                                  "properties": {
+                                    "executionMode": {
+                                      "description": "执行模式",
+                                      "type": "string"
+                                    },
+                                    "itemAnchor": {
+                                      "description": "项目锚点",
+                                      "type": "object"
+                                    },
+                                    "navigationAction": {
+                                      "description": "导航动作",
+                                      "type": "string"
+                                    },
+                                    "queryContextHints": {
+                                      "description": "查询上下文提示",
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "retrievalPlan": {
+                                      "description": "检索问题计划",
+                                      "type": "object"
+                                    },
+                                    "softSectionHints": {
+                                      "description": "软章节提示",
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "structureAnchor": {
+                                      "description": "结构锚点",
+                                      "type": "object"
+                                    },
+                                    "summaryText": {
+                                      "description": "摘要文本",
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "noEvidenceReply": {
+                                  "description": "无证据回复",
+                                  "type": "string"
+                                },
+                                "originalQuestion": {
+                                  "description": "原始问题",
+                                  "type": "string"
+                                },
+                                "ragSystemPrompt": {
+                                  "description": "RAG系统提示词",
+                                  "type": "string"
+                                },
+                                "ragUserPrompt": {
+                                  "description": "RAG用户提示词",
+                                  "type": "string"
+                                },
+                                "recentHistoryTranscript": {
+                                  "description": "近期历史转录",
+                                  "type": "string"
+                                },
+                                "requiresCurrentDateAnchoring": {
+                                  "description": "需要当前日期锚定",
+                                  "type": "boolean"
+                                },
+                                "requiresFreshSearch": {
+                                  "description": "需要新鲜搜索",
+                                  "type": "boolean"
+                                },
+                                "retrievalNotes": {
+                                  "description": "检索备注列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "retrievalQuestion": {
+                                  "description": "检索问题",
+                                  "type": "string"
+                                },
+                                "rewriteQuestion": {
+                                  "description": "重写问题",
+                                  "type": "string"
+                                },
+                                "rewriteSubQuestions": {
+                                  "description": "重写子问题列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "selectedDocumentId": {
+                                  "description": "选中的文档ID",
+                                  "type": "integer"
+                                },
+                                "selectedTaskId": {
+                                  "description": "选中的任务ID",
+                                  "type": "integer"
+                                },
+                                "subQuestions": {
+                                  "description": "检索子问题列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "toolTraces": {
+                                  "description": "工具调用轨迹列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "toolName",
+                                      "status",
+                                      "inputSummary",
+                                      "effectiveInput",
+                                      "outputSummary",
+                                      "errorMessage",
+                                      "referenceCount",
+                                      "topic",
+                                      "durationMs"
+                                    ],
+                                    "properties": {
+                                      "durationMs": {
+                                        "description": "持续时间毫秒",
+                                        "type": "integer"
+                                      },
+                                      "effectiveInput": {
+                                        "description": "有效输入",
+                                        "type": "string"
+                                      },
+                                      "errorMessage": {
+                                        "description": "错误信息",
+                                        "type": "string"
+                                      },
+                                      "inputSummary": {
+                                        "description": "输入摘要",
+                                        "type": "string"
+                                      },
+                                      "outputSummary": {
+                                        "description": "输出摘要",
+                                        "type": "string"
+                                      },
+                                      "referenceCount": {
+                                        "description": "引用数量",
+                                        "type": "integer"
+                                      },
+                                      "status": {
+                                        "description": "状态",
+                                        "type": "string"
+                                      },
+                                      "toolName": {
+                                        "description": "工具名称",
+                                        "type": "string"
+                                      },
+                                      "topic": {
+                                        "description": "主题",
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                },
+                                "usedChannels": {
+                                  "description": "使用的渠道列表",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             },
                             "errorMessage": {
                               "description": "错误信息",
@@ -2097,7 +3222,7 @@
       }
     }
   },
-  "x-date": "2026-07-15 17:39:37",
+  "x-date": "2026-07-16 10:45:56",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

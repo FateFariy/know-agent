@@ -56,8 +56,8 @@ func (c *ChatService) GetExchangeDetail(ctx context.Context, req *chat.Conversat
 	}
 	return &chat.ConversationExchangeDetailResp{
 		ConversationId: req.ConversationId,
-		Exchange:       convert.ToConversationExchangeResp(detail),
-		StageTraces:    convert.ToConversationStageTraceRespList(stages),
+		Exchange:       convert.ToConversationExchange(detail),
+		StageTraces:    convert.ToConversationStageTraces(stages),
 	}, nil
 }
 

@@ -853,7 +853,7 @@ func (c *LogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, tu
 		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
 		References:          common.ToJSONArray(convCtx.UniqueReferences()),
 		UsedTools:           common.ToJSONArray(convCtx.SnapshotUsedTools()),
-		DebugTraceJson:      convCtx.DebugTraceJSON(),
+		DebugTrace:          convCtx.DebugTraceJSON(),
 		TurnStatus:          turnStatus,
 		ErrorMessage:        errorMsg,
 		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),

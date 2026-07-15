@@ -12,28 +12,28 @@ import (
 
 type HTTPServer interface {
 	// SaveKnowledgeScope 保存知识范围节点
-	SaveKnowledgeScope(ctx context.Context, req *KnowledgeScopeSaveReq) (*KnowledgeScopeItem, error)
+	SaveKnowledgeScope(ctx context.Context, req *KnowledgeScopeSaveReq) (*KnowledgeScopeResp, error)
 
 	// DeleteKnowledgeScope 删除知识范围节点
 	DeleteKnowledgeScope(ctx context.Context, req *KnowledgeScopeDeleteReq) (bool, error)
 
 	// ListKnowledgeScope 查询知识范围列表
-	ListKnowledgeScope(ctx context.Context) ([]*KnowledgeScopeItem, error)
+	ListKnowledgeScope(ctx context.Context) ([]*KnowledgeScopeResp, error)
 
 	// SaveKnowledgeTopic 保存知识主题节点
-	SaveKnowledgeTopic(ctx context.Context, req *KnowledgeTopicSaveReq) (*KnowledgeTopicItem, error)
+	SaveKnowledgeTopic(ctx context.Context, req *KnowledgeTopicSaveReq) (*KnowledgeTopicResp, error)
 
 	// DeleteKnowledgeTopic 删除知识主题节点
 	DeleteKnowledgeTopic(ctx context.Context, req *KnowledgeTopicDeleteReq) (bool, error)
 
 	// ListKnowledgeTopic 查询知识主题列表
-	ListKnowledgeTopic(ctx context.Context, req *KnowledgeTopicListReq) ([]*KnowledgeTopicItem, error)
+	ListKnowledgeTopic(ctx context.Context, req *KnowledgeTopicListReq) ([]*KnowledgeTopicResp, error)
 
 	// ListTopicDocumentRelation 查询主题文档关联
-	ListTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationListReq) ([]*TopicDocumentRelationItem, error)
+	ListTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationListReq) ([]*TopicDocumentRelationResp, error)
 
 	// SaveTopicDocumentRelation 保存主题文档关联
-	SaveTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationSaveReq) (*TopicDocumentRelationItem, error)
+	SaveTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationSaveReq) (*TopicDocumentRelationResp, error)
 
 	// RemoveTopicDocumentRelation 移除主题文档关联
 	RemoveTopicDocumentRelation(ctx context.Context, req *TopicDocumentRelationRemoveReq) (bool, error)

@@ -164,12 +164,12 @@
                     }
                   }
                 },
-                "totalPages": {
-                  "description": "总页数",
+                "total": {
+                  "description": "总条数",
                   "type": "integer"
                 },
-                "totalSize": {
-                  "description": "总条数",
+                "totalPages": {
+                  "description": "总页数",
                   "type": "integer"
                 }
               }
@@ -1042,7 +1042,7 @@
       }
     }
   },
-  "x-date": "2026-07-15 17:39:43",
+  "x-date": "2026-07-16 10:45:49",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

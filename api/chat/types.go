@@ -25,11 +25,98 @@ type ChannelExecutionResp struct {
 	CreateTime         string  `json:"createTime"`         // 创建时间
 }
 
+type ChatDebugTrace struct {
+	ExecutionMode                 string                      `json:"executionMode"`                 // 执行模式
+	ChatMode                      string                      `json:"chatMode"`                      // 聊天模式
+	OriginalQuestion              string                      `json:"originalQuestion"`              // 原始问题
+	RewriteQuestion               string                      `json:"rewriteQuestion"`               // 重写问题
+	RewriteSubQuestions           []string                    `json:"rewriteSubQuestions"`           // 重写子问题列表
+	RetrievalQuestion             string                      `json:"retrievalQuestion"`             // 检索问题
+	AgentQuestion                 string                      `json:"agentQuestion"`                 // Agent问题
+	NavigationDecision            *DocumentNavigationDecision `json:"navigationDecision"`            // 文档导航决策
+	HistorySummary                string                      `json:"historySummary"`                // 历史摘要
+	LongTermSummary               string                      `json:"longTermSummary"`               // 长期摘要
+	RecentHistoryTranscript       string                      `json:"recentHistoryTranscript"`       // 近期历史转录
+	AnswerRecentTranscript        string                      `json:"answerRecentTranscript"`        // 回答近期转录
+	AnswerHistoryContext          string                      `json:"answerHistoryContext"`          // 回答历史上下文
+	AnswerHistoryFollowUpQuestion bool                        `json:"answerHistoryFollowUpQuestion"` // 回答历史追问
+	HistoryCompressionApplied     bool                        `json:"historyCompressionApplied"`     // 历史压缩已应用
+	HistoryCoveredExchangeId      int64                       `json:"historyCoveredExchangeId"`      // 历史覆盖交换ID
+	HistoryCoveredExchangeCount   int                         `json:"historyCoveredExchangeCount"`   // 历史覆盖交换数量
+	HistoryCompressionCount       int                         `json:"historyCompressionCount"`       // 历史压缩次数
+	CurrentDateText               string                      `json:"currentDateText"`               // 当前日期文本
+	RequiresFreshSearch           bool                        `json:"requiresFreshSearch"`           // 需要新鲜搜索
+	RequiresCurrentDateAnchoring  bool                        `json:"requiresCurrentDateAnchoring"`  // 需要当前日期锚定
+	SubQuestions                  []string                    `json:"subQuestions"`                  // 检索子问题列表
+	SelectedDocumentId            int64                       `json:"selectedDocumentId"`            // 选中的文档ID
+	SelectedTaskId                int64                       `json:"selectedTaskId"`                // 选中的任务ID
+	RetrievalNotes                []string                    `json:"retrievalNotes"`                // 检索备注列表
+	UsedChannels                  []string                    `json:"usedChannels"`                  // 使用的渠道列表
+	ToolTraces                    []*ChatToolTrace            `json:"toolTraces"`                    // 工具调用轨迹列表
+	ModelUsageTraces              []*ChatModelUsageTrace      `json:"modelUsageTraces"`              // 模型使用轨迹列表
+	LimitStats                    *ChatLimitStats             `json:"limitStats"`                    // 限制统计
+	RagSystemPrompt               string                      `json:"ragSystemPrompt"`               // RAG系统提示词
+	RagUserPrompt                 string                      `json:"ragUserPrompt"`                 // RAG用户提示词
+	NoEvidenceReply               string                      `json:"noEvidenceReply"`               // 无证据回复
+}
+
+type ChatLimitStats struct {
+	ModelCallsUsed        int    `json:"modelCallsUsed"`        // 已使用的模型调用次数
+	ModelCallsRunLimit    int    `json:"modelCallsRunLimit"`    // 运行限制的模型调用次数
+	ModelCallsThreadLimit int    `json:"modelCallsThreadLimit"` // 线程限制的模型调用次数
+	ToolCallsUsed         int    `json:"toolCallsUsed"`         // 已使用的工具调用次数
+	ToolCallsRunLimit     int    `json:"toolCallsRunLimit"`     // 运行限制的工具调用次数
+	ToolCallsThreadLimit  int    `json:"toolCallsThreadLimit"`  // 线程限制的工具调用次数
+	LimitTriggered        bool   `json:"limitTriggered"`        // 是否触发限制
+	LimitReason           string `json:"limitReason"`           // 限制原因
+}
+
+type ChatModelUsageTrace struct {
+	StageName        string  `json:"stageName"`        // 阶段名称
+	Provider         string  `json:"provider"`         // 提供商
+	Model            string  `json:"model"`            // 模型名称
+	PromptTokens     int     `json:"promptTokens"`     // 提示词token数
+	CompletionTokens int     `json:"completionTokens"` // 完成token数
+	TotalTokens      int     `json:"totalTokens"`      // 总token数
+	EstimatedCost    float64 `json:"estimatedCost"`    // 预估成本
+	DurationMs       int64   `json:"durationMs"`       // 持续时间毫秒
+	Status           string  `json:"status"`           // 状态
+}
+
 type ChatReq struct {
 	Question           string `json:"question"`                                          // 问题内容
 	ConversationId     string `json:"conversationId,optional"`                           // 会话ID
 	ChatMode           string `json:"chatMode,options=document|open_chat|auto_document"` // 聊天模式
 	SelectedDocumentId string `json:"selectedDocumentId,optional"`                       // 选中的文档ID
+}
+
+type ChatToolTrace struct {
+	ToolName       string `json:"toolName"`       // 工具名称
+	Status         string `json:"status"`         // 状态
+	InputSummary   string `json:"inputSummary"`   // 输入摘要
+	EffectiveInput string `json:"effectiveInput"` // 有效输入
+	OutputSummary  string `json:"outputSummary"`  // 输出摘要
+	ErrorMessage   string `json:"errorMessage"`   // 错误信息
+	ReferenceCount int    `json:"referenceCount"` // 引用数量
+	Topic          string `json:"topic"`          // 主题
+	DurationMs     int64  `json:"durationMs"`     // 持续时间毫秒
+}
+
+type ConversationExchange struct {
+	ID                  string             `json:"exchangeId"`          // 对话交换ID
+	Question            string             `json:"question"`            // 问题内容
+	Answer              string             `json:"answer"`              // 回答内容
+	ThinkingSteps       []string           `json:"thinkingSteps"`       // 思维步骤列表
+	References          []*SearchReference `json:"references"`          // 检索引用列表
+	Recommendations     []string           `json:"recommendations"`     // 推荐问题列表
+	UsedTools           []string           `json:"usedTools"`           // 使用工具列表
+	DebugTrace          *ChatDebugTrace    `json:"debugTrace"`          // 调试轨迹
+	TurnStatus          int                `json:"status"`              // 对话状态
+	ErrorMessage        string             `json:"errorMessage"`        // 错误信息
+	FirstResponseTimeMs int64              `json:"firstResponseTimeMs"` // 首次响应时间毫秒
+	TotalResponseTimeMs int64              `json:"totalResponseTimeMs"` // 总响应时间毫秒
+	CreateTime          string             `json:"createTime"`          // 创建时间
+	UpdateTime          string             `json:"updateTime"`          // 最后更新时间
 }
 
 type ConversationExchangeDetailQueryReq struct {
@@ -38,43 +125,33 @@ type ConversationExchangeDetailQueryReq struct {
 }
 
 type ConversationExchangeDetailResp struct {
-	ConversationId string                        `json:"conversationId"` // 会话ID
-	Exchange       *ConversationExchangeResp     `json:"exchange"`       // 对话交换响应
-	StageTraces    []*ConversationTraceStageResp `json:"stageTraces"`    // 阶段追踪列表
-}
-
-type ConversationExchangeResp struct {
-	ID                  string                 `json:"exchangeId"`          // 对话交换ID
-	Question            string                 `json:"question"`            // 问题内容
-	Answer              string                 `json:"answer"`              // 回答内容
-	ThinkingSteps       []string               `json:"thinkingSteps"`       // 思维步骤列表
-	References          []*SearchReferenceResp `json:"references"`          // 检索引用列表
-	Recommendations     []string               `json:"recommendations"`     // 推荐问题列表
-	UsedTools           []string               `json:"usedTools"`           // 使用工具列表
-	DebugTraceJson      string                 `json:"debugTrace"`          // 调试轨迹
-	TurnStatus          int                    `json:"status"`              // 对话状态
-	ErrorMessage        string                 `json:"errorMessage"`        // 错误信息
-	FirstResponseTimeMs int64                  `json:"firstResponseTimeMs"` // 首次响应时间毫秒
-	TotalResponseTimeMs int64                  `json:"totalResponseTimeMs"` // 总响应时间毫秒
-	CreateTime          string                 `json:"createTime"`          // 创建时间
-	UpdateTime          string                 `json:"updateTime,optional"` // 最后更新时间
+	ConversationId string                    `json:"conversationId"` // 会话ID
+	Exchange       *ConversationExchange     `json:"exchange"`       // 对话交换响应
+	StageTraces    []*ConversationTraceStage `json:"stageTraces"`    // 阶段追踪列表
 }
 
 type ConversationIdentityReq struct {
 	ConversationId string `json:"conversationId"` // 会话ID
 }
 
+type ConversationItemAnchor struct {
+	ItemIndex       int    `json:"itemIndex"`       // 项目索引
+	ItemText        string `json:"itemText"`        // 项目文本
+	StructureNodeId int64  `json:"structureNodeId"` // 结构节点ID
+	CanonicalPath   string `json:"canonicalPath"`   // 规范路径
+}
+
 type ConversationMemorySummaryResp struct {
-	ConversationId       string               `json:"conversationId"`       // 会话ID
-	IsCompressed         bool                 `json:"IsCompressed"`         // 是否执行过记忆压缩
-	CoveredExchangeId    string               `json:"coveredExchangeId"`    // 压缩截止交互ID
-	CoveredExchangeCount int                  `json:"coveredExchangeCount"` // 压缩覆盖交互轮次
-	CompressionCount     int                  `json:"compressionCount"`     // 累计压缩次数
-	SummaryVersion       int                  `json:"summaryVersion"`       // 摘要版本号
-	SummaryText          string               `json:"summaryText"`          // 纯文本摘要
-	SummaryPayload       *ConversationSummary `json:"summaryPayload"`       // 结构化摘要载荷
-	LastSourceUpdateTime string               `json:"lastSourceUpdateTime"` // 原始对话最后更新时间
-	UpdateTime           string               `json:"updateTime"`           // 摘要更新时间戳
+	ConversationId       string          `json:"conversationId"`       // 会话ID
+	IsCompressed         bool            `json:"IsCompressed"`         // 是否执行过记忆压缩
+	CoveredExchangeId    string          `json:"coveredExchangeId"`    // 压缩截止交互ID
+	CoveredExchangeCount int             `json:"coveredExchangeCount"` // 压缩覆盖交互轮次
+	CompressionCount     int             `json:"compressionCount"`     // 累计压缩次数
+	SummaryVersion       int             `json:"summaryVersion"`       // 摘要版本号
+	SummaryText          string          `json:"summaryText"`          // 纯文本摘要
+	SummaryPayload       *SummaryPayload `json:"summaryPayload"`       // 结构化摘要载荷
+	LastSourceUpdateTime string          `json:"lastSourceUpdateTime"` // 原始对话最后更新时间
+	UpdateTime           string          `json:"updateTime"`           // 摘要更新时间戳
 }
 
 type ConversationResetResp struct {
@@ -117,7 +194,7 @@ type ConversationSessionResp struct {
 	SelectedDocumentName   string                         `json:"selectedDocumentName"`   // 选中文档名称
 	CreatedTime            string                         `json:"createdTime"`            // 创建时间
 	UpdatedTime            string                         `json:"updatedTime"`            // 更新时间
-	Exchanges              []*ConversationExchangeResp    `json:"exchanges"`              // 交互轮次列表
+	Exchanges              []*ConversationExchange        `json:"exchanges"`              // 交互轮次列表
 	MemorySummary          *ConversationMemorySummaryResp `json:"memorySummary"`          // 会话记忆摘要
 }
 
@@ -127,17 +204,16 @@ type ConversationStopResp struct {
 	Message        string `json:"message"`        // 消息
 }
 
-type ConversationSummary struct {
-	Summary          string   `json:"summary"`          // 摘要文本
-	ConversationGoal string   `json:"conversationGoal"` // 对话目标
-	StableFacts      []string `json:"stableFacts"`      // 稳定事实列表
-	UserPreferences  []string `json:"userPreferences"`  // 用户偏好列表
-	ResolvedPoints   []string `json:"resolvedPoints"`   // 已解决问题列表
-	PendingQuestions []string `json:"pendingQuestions"` // 待解决问题列表
-	RetrievalHints   []string `json:"retrievalHints"`   // 检索提示列表
+type ConversationStructureAnchor struct {
+	RootSectionCode   string `json:"rootSectionCode"`   // 根章节代码
+	RootSectionTitle  string `json:"rootSectionTitle"`  // 根章节标题
+	TargetSectionHint string `json:"targetSectionHint"` // 目标章节提示
+	StructureNodeId   int64  `json:"structureNodeId"`   // 结构节点ID
+	CanonicalPath     string `json:"canonicalPath"`     // 规范路径
+	ScopeMode         string `json:"scopeMode"`         // 范围模式
 }
 
-type ConversationTraceStageResp struct {
+type ConversationTraceStage struct {
 	ID            string `json:"id"`            // 阶段ID
 	TraceId       string `json:"traceId"`       // 追踪ID
 	StageCode     string `json:"stageCode"`     // 阶段代码
@@ -152,12 +228,28 @@ type ConversationTraceStageResp struct {
 	DurationMs    int64  `json:"durationMs"`    // 持续时间毫秒
 	SummaryText   string `json:"summaryText"`   // 摘要文本
 	ErrorMessage  string `json:"errorMessage"`  // 错误信息
-	SnapshotJson  string `json:"snapshot"`      // 快照数据
+	SnapshotJson  string `json:"snapshotJson"`  // 快照数据
+}
+
+type DocumentNavigationDecision struct {
+	NavigationAction  string                       `json:"navigationAction"`  // 导航动作
+	ExecutionMode     string                       `json:"executionMode"`     // 执行模式
+	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
+	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
+	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划
+	SummaryText       string                       `json:"summaryText"`       // 摘要文本
+	QueryContextHints []string                     `json:"queryContextHints"` // 查询上下文提示
+	SoftSectionHints  []string                     `json:"softSectionHints"`  // 软章节提示
 }
 
 type RetrievalObserveReq struct {
 	ConversationId string `json:"conversationId"` // 会话ID
 	ExchangeId     string `json:"exchangeId"`     // 对话ID
+}
+
+type RetrievalQuestionPlan struct {
+	RetrievalQuestion string   `json:"retrievalQuestion"` // 检索问题
+	SubQuestions      []string `json:"subQuestions"`      // 子问题列表
 }
 
 type RetrievalResultResp struct {
@@ -188,7 +280,7 @@ type RetrievalResultResp struct {
 	CreateTime       string  `json:"createTime"`       // 创建时间
 }
 
-type SearchReferenceResp struct {
+type SearchReference struct {
 	ReferenceId        string  `json:"referenceId"`        // 引用ID
 	SourceType         string  `json:"sourceType"`         // 来源类型
 	Title              string  `json:"title"`              // 标题
@@ -212,4 +304,14 @@ type SearchReferenceResp struct {
 	ToolName           string  `json:"toolName"`           // 工具名称
 	KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围代码
 	KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
+}
+
+type SummaryPayload struct {
+	Summary          string   `json:"summary"`          // 摘要文本
+	ConversationGoal string   `json:"conversationGoal"` // 对话目标
+	StableFacts      []string `json:"stableFacts"`      // 稳定事实列表
+	UserPreferences  []string `json:"userPreferences"`  // 用户偏好列表
+	ResolvedPoints   []string `json:"resolvedPoints"`   // 已解决问题列表
+	PendingQuestions []string `json:"pendingQuestions"` // 待解决问题列表
+	RetrievalHints   []string `json:"retrievalHints"`   // 检索提示列表
 }

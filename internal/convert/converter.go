@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -35,8 +36,8 @@ type DocumentConverter interface {
 	FromConfirmStrategyReq(src *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
 
 	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
-	ToDocumentListItem(src *den.Document) *document.DocumentListItem
-	ToDocumentListItemList(src []*den.Document) []*document.DocumentListItem
+	ToDocumentDetailResp(src *den.Document) *document.DocumentDetailResp
+	ToDocumentDetailRespList(src []*den.Document) []*document.DocumentDetailResp
 	ToKnowledgeDocumentOptionRespList(src []*dvo.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp
 	ToQueryStrategyPlanResp(src *den.Document) *document.QueryStrategyPlanResp
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
@@ -76,8 +77,9 @@ type ChatConverter interface {
 	ToConversationSessionResp(src *cvo.ConversationArchiveRecord) *chat.ConversationSessionResp
 	ToConversationSessionRespList(src []*cvo.ConversationArchiveRecord) []*chat.ConversationSessionResp
 	ToConversationResetResp(src *cvo.ConversationReset) *chat.ConversationResetResp
-	ToConversationExchangeResp(src *cen.ChatExchange) *chat.ConversationExchangeResp
-	ToConversationStageTraceRespList(src []*cen.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp
+	// goverter:map DebugTrace | ToChatDebugTrace
+	ToConversationExchange(src *cen.ChatExchange) *chat.ConversationExchange
+	ToConversationStageTraces(src []*cen.ChatExchangeTraceStage) []*chat.ConversationTraceStage
 	// goverter:map UpdateTime | TimeToStringMs
 	ToConversationMemorySummaryResp(src *cen.ChatMemorySummary) *chat.ConversationMemorySummaryResp
 	// goverter:map StartTime | TimeToStringMs
@@ -105,13 +107,13 @@ type KnowledgeConverter interface {
 	FromKnowledgeTopicSaveReq(src *knowledge.KnowledgeTopicSaveReq) *klen.KnowledgeTopicNode
 	FromKnowledgeTopicDocumentRelationSaveReq(src *knowledge.TopicDocumentRelationSaveReq) *klen.KnowledgeTopicDocumentRelation
 
-	ToKnowledgeScopeItem(src *klen.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem
-	ToKnowledgeTopicItem(src *klen.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem
-	ToKnowledgeScopeItemList(src []*klen.KnowledgeScopeNode) []*knowledge.KnowledgeScopeItem
-	ToKnowledgeTopicItemList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem
+	ToKnowledgeScopeResp(src *klen.KnowledgeScopeNode) *knowledge.KnowledgeScopeResp
+	ToKnowledgeTopicResp(src *klen.KnowledgeTopicNode) *knowledge.KnowledgeTopicResp
+	ToKnowledgeScopeRespList(src []*klen.KnowledgeScopeNode) []*knowledge.KnowledgeScopeResp
+	ToKnowledgeTopicRespList(src []*klen.KnowledgeTopicNode) []*knowledge.KnowledgeTopicResp
 
-	ToKnowledgeTopicDocumentRelationItem(src *klen.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationItem
-	ToKnowledgeTopicDocumentRelationItemList(src []*klen.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationItem
+	ToTopicDocumentRelationResp(src *klen.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationResp
+	ToTopicDocumentRelationRespList(src []*klen.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationResp
 	// goverter:map RouteStatus | ToRouteStatus
 	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
 	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
@@ -138,6 +140,14 @@ func ToChatQueryModeName(code int) string {
 	return cvo.ChatQueryModeName(code)
 }
 
+func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
+	var debugTrace chat.ChatDebugTrace
+	if err := json.Unmarshal([]byte(debugTraceJson), &debugTrace); err != nil {
+		return nil
+	}
+	return &debugTrace
+}
+
 func JsonArrayToStringSlice(src common.JSONArray) []string {
 	return common.JSONArrayTo(src, func(item any) string {
 		return item.(string)
@@ -148,9 +158,9 @@ func StringToStringSlice(src string) []string {
 	return strings.Split(src, ",")
 }
 
-func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReferenceResp {
-	return common.JSONArrayTo(src, func(item any) *chat.SearchReferenceResp {
-		return item.(*chat.SearchReferenceResp)
+func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReference {
+	return common.JSONArrayTo(src, func(item any) *chat.SearchReference {
+		return item.(*chat.SearchReference)
 	})
 }
 

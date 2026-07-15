@@ -19,7 +19,7 @@ type HTTPServer interface {
 	QueryDocumentPage(ctx context.Context, req *QueryDocumentPageReq) (*QueryDocumentPageResp, error)
 
 	// QueryDocumentDetail 查询文档详情
-	QueryDocumentDetail(ctx context.Context, req *QueryDocumentDetailReq) (*DocumentListItem, error)
+	QueryDocumentDetail(ctx context.Context, req *QueryDocumentDetailReq) (*DocumentDetailResp, error)
 
 	// GetDocumentOptions 获取知识文档选项
 	GetDocumentOptions(ctx context.Context) ([]*KnowledgeDocumentOptionResp, error)

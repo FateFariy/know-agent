@@ -67,7 +67,7 @@ type DocumentChunkItem struct {
 	ChunkText          string `json:"chunkText"`          // 分片文本内容
 }
 
-type DocumentListItem struct {
+type DocumentDetailResp struct {
 	ID                   string `json:"documentId"`           // 文档ID
 	DocumentName         string `json:"documentName"`         // 文档名称
 	OriginalFileName     string `json:"originalFileName"`     // 原始文件名
@@ -227,10 +227,10 @@ type QueryDocumentPageReq struct {
 }
 
 type QueryDocumentPageResp struct {
-	PageNo   int                 `json:"pageNo"`   // 页码
-	PageSize int                 `json:"pageSize"` // 每页大小
-	Total    int64               `json:"total"`    // 总记录数
-	Records  []*DocumentListItem `json:"records"`  // 文档列表
+	PageNo   int                   `json:"pageNo"`   // 页码
+	PageSize int                   `json:"pageSize"` // 每页大小
+	Total    int64                 `json:"total"`    // 总记录数
+	Records  []*DocumentDetailResp `json:"records"`  // 文档列表
 }
 
 type QueryStrategyPlanReq struct {

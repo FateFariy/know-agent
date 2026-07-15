@@ -27,13 +27,13 @@ func (r *ChatReq) Validate() (err error) {
 	if strutil.IsBlank(r.Question) {
 		return fmt.Errorf("question 不能为空")
 	}
-	if r.ChatMode == OpenChat && r.SelectedDocumentId != 0 {
+	if r.ChatMode == OpenChat && r.SelectedDocumentId != "" {
 		return fmt.Errorf("open_chat 模式 selectedDocumentId 必须为空")
 	}
-	if r.ChatMode == AutoDoc && r.SelectedDocumentId != 0 {
+	if r.ChatMode == AutoDoc && r.SelectedDocumentId != "" {
 		return fmt.Errorf("auto_document 模式 selectedDocumentId 必须为空")
 	}
-	if r.SelectedDocumentId == 0 {
+	if r.SelectedDocumentId == "" {
 		return fmt.Errorf("document 模式必须传 selectedDocumentId")
 	}
 	return nil

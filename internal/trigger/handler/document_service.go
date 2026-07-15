@@ -41,14 +41,14 @@ func (d *DocumentService) QueryDocumentPage(ctx context.Context, req *document.Q
 		PageNo:   req.PageNo,
 		PageSize: req.PageSize,
 		Total:    total,
-		Records:  convert.ToDocumentListItemList(documents),
+		Records:  convert.ToDocumentDetailRespList(documents),
 	}, err
 }
 
 // QueryDocumentDetail 查询文档详情
-func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document.QueryDocumentDetailReq) (*document.DocumentListItem, error) {
+func (d *DocumentService) QueryDocumentDetail(ctx context.Context, req *document.QueryDocumentDetailReq) (*document.DocumentDetailResp, error) {
 	detail, err := d.lifeCycleLogic.QueryDocumentDetail(ctx, utils.StringToInt64(req.DocumentId))
-	return convert.ToDocumentListItem(detail), err
+	return convert.ToDocumentDetailResp(detail), err
 }
 
 // GetDocumentOptions 获取知识文档选项

@@ -42,7 +42,7 @@ type KnowledgeScopeDeleteReq struct {
 	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
-type KnowledgeScopeItem struct {
+type KnowledgeScopeResp struct {
 	ID              string `json:"id"`              // 主键ID
 	ScopeCode       string `json:"scopeCode"`       // 范围编码
 	ScopeName       string `json:"scopeName"`       // 范围名称
@@ -70,7 +70,11 @@ type KnowledgeTopicDeleteReq struct {
 	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
-type KnowledgeTopicItem struct {
+type KnowledgeTopicListReq struct {
+	ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
+}
+
+type KnowledgeTopicResp struct {
 	ID                  string `json:"id"`                  // 主键ID
 	TopicCode           string `json:"topicCode"`           // 主题编码
 	TopicName           string `json:"topicName"`           // 主题名称
@@ -81,10 +85,6 @@ type KnowledgeTopicItem struct {
 	AnswerShape         string `json:"answerShape"`         // 答复形态
 	ExecutionPreference string `json:"executionPreference"` // 执行偏好
 	SortOrder           int    `json:"sortOrder"`           // 排序
-}
-
-type KnowledgeTopicListReq struct {
-	ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
 }
 
 type KnowledgeTopicSaveReq struct {
@@ -101,7 +101,17 @@ type KnowledgeTopicSaveReq struct {
 	OperatorId          string `json:"operatorId,optional"`          // 操作人ID
 }
 
-type TopicDocumentRelationItem struct {
+type TopicDocumentRelationListReq struct {
+	TopicCode string `json:"topicCode"` // 主题编码
+}
+
+type TopicDocumentRelationRemoveReq struct {
+	TopicCode  string `json:"topicCode"`           // 主题编码
+	DocumentId string `json:"documentId"`          // 文档ID
+	OperatorId string `json:"operatorId,optional"` // 操作人ID
+}
+
+type TopicDocumentRelationResp struct {
 	TopicCode          string  `json:"topicCode"`          // 主题编码
 	DocumentId         string  `json:"documentId"`         // 文档ID
 	DocumentName       string  `json:"documentName"`       // 文档名称
@@ -112,16 +122,6 @@ type TopicDocumentRelationItem struct {
 	RelationScore      float64 `json:"relationScore"`      // 关联分数
 	RelationSource     string  `json:"relationSource"`     // 关联来源
 	Reason             string  `json:"reason"`             // 理由
-}
-
-type TopicDocumentRelationListReq struct {
-	TopicCode string `json:"topicCode"` // 主题编码
-}
-
-type TopicDocumentRelationRemoveReq struct {
-	TopicCode  string `json:"topicCode"`           // 主题编码
-	DocumentId string `json:"documentId"`          // 文档ID
-	OperatorId string `json:"operatorId,optional"` // 操作人ID
 }
 
 type TopicDocumentRelationSaveReq struct {

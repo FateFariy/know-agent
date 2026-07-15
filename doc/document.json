@@ -721,7 +721,7 @@
                 },
                 "operatorId": {
                   "description": "操作人ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "planId": {
                   "description": "方案ID",
@@ -1492,7 +1492,7 @@
                 },
                 "operatorId": {
                   "description": "操作人ID",
-                  "type": "integer"
+                  "type": "string"
                 },
                 "parentSteps": {
                   "description": "父块步骤",
@@ -2290,7 +2290,7 @@
                 },
                 "operatorId": {
                   "description": "操作人ID",
-                  "type": "integer"
+                  "type": "string"
                 }
               }
             }
@@ -2333,7 +2333,7 @@
       }
     }
   },
-  "x-date": "2026-07-15 17:39:29",
+  "x-date": "2026-07-16 10:46:03",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

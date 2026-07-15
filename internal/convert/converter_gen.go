@@ -81,6 +81,7 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 	var pModelChatDialogue *model.ChatDialogue
 	if source != nil {
 		var modelChatDialogue model.ChatDialogue
+		modelChatDialogue.ID = (*source).ID
 		modelChatDialogue.ConversationId = (*source).ConversationId
 		modelChatDialogue.SessionStatus = (*source).SessionStatus
 		modelChatDialogue.ChatMode = (*source).ChatMode
@@ -102,7 +103,7 @@ func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 		modelChatExchange.References = commonJSONArrayToCommonJSONArray((*source).References)
 		modelChatExchange.Recommendations = commonJSONArrayToCommonJSONArray((*source).Recommendations)
 		modelChatExchange.UsedTools = commonJSONArrayToCommonJSONArray((*source).UsedTools)
-		modelChatExchange.DebugTraceJson = (*source).DebugTraceJson
+		modelChatExchange.DebugTrace = (*source).DebugTrace
 		modelChatExchange.TurnStatus = (*source).TurnStatus
 		modelChatExchange.ErrorMessage = (*source).ErrorMessage
 		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
@@ -163,27 +164,27 @@ func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.C
 	}
 	return pModelChatRetrievalResultList
 }
-func ToConversationExchangeResp(source *entity.ChatExchange) *chat.ConversationExchangeResp {
-	var pChatConversationExchangeResp *chat.ConversationExchangeResp
+func ToConversationExchange(source *entity.ChatExchange) *chat.ConversationExchange {
+	var pChatConversationExchange *chat.ConversationExchange
 	if source != nil {
-		var chatConversationExchangeResp chat.ConversationExchangeResp
-		chatConversationExchangeResp.ID = Int64ToString((*source).ID)
-		chatConversationExchangeResp.Question = (*source).Question
-		chatConversationExchangeResp.Answer = (*source).Answer
-		chatConversationExchangeResp.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
-		chatConversationExchangeResp.References = JsonArrayToSearchReferences((*source).References)
-		chatConversationExchangeResp.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
-		chatConversationExchangeResp.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
-		chatConversationExchangeResp.DebugTraceJson = (*source).DebugTraceJson
-		chatConversationExchangeResp.TurnStatus = (*source).TurnStatus
-		chatConversationExchangeResp.ErrorMessage = (*source).ErrorMessage
-		chatConversationExchangeResp.FirstResponseTimeMs = (*source).FirstResponseTimeMs
-		chatConversationExchangeResp.TotalResponseTimeMs = (*source).TotalResponseTimeMs
-		chatConversationExchangeResp.CreateTime = TimeToString((*source).CreateTime)
-		chatConversationExchangeResp.UpdateTime = TimeToString((*source).UpdateTime)
-		pChatConversationExchangeResp = &chatConversationExchangeResp
+		var chatConversationExchange chat.ConversationExchange
+		chatConversationExchange.ID = Int64ToString((*source).ID)
+		chatConversationExchange.Question = (*source).Question
+		chatConversationExchange.Answer = (*source).Answer
+		chatConversationExchange.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
+		chatConversationExchange.References = JsonArrayToSearchReferences((*source).References)
+		chatConversationExchange.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
+		chatConversationExchange.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
+		chatConversationExchange.DebugTrace = ToChatDebugTrace((*source).DebugTrace)
+		chatConversationExchange.TurnStatus = (*source).TurnStatus
+		chatConversationExchange.ErrorMessage = (*source).ErrorMessage
+		chatConversationExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
+		chatConversationExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		chatConversationExchange.CreateTime = TimeToString((*source).CreateTime)
+		chatConversationExchange.UpdateTime = TimeToString((*source).UpdateTime)
+		pChatConversationExchange = &chatConversationExchange
 	}
-	return pChatConversationExchangeResp
+	return pChatConversationExchange
 }
 func ToConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.ConversationMemorySummaryResp {
 	var pChatConversationMemorySummaryResp *chat.ConversationMemorySummaryResp
@@ -196,7 +197,7 @@ func ToConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.Con
 		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
 		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
 		chatConversationMemorySummaryResp.SummaryText = (*source).SummaryText
-		chatConversationMemorySummaryResp.SummaryPayload = pEntityConversationSummaryToPChatConversationSummary((*source).SummaryPayload)
+		chatConversationMemorySummaryResp.SummaryPayload = pEntityConversationSummaryToPChatSummaryPayload((*source).SummaryPayload)
 		chatConversationMemorySummaryResp.LastSourceUpdateTime = TimeToString((*source).LastSourceUpdateTime)
 		chatConversationMemorySummaryResp.UpdateTime = TimeToStringMs((*source).UpdateTime)
 		pChatConversationMemorySummaryResp = &chatConversationMemorySummaryResp
@@ -235,9 +236,9 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 		chatConversationSessionResp.CreatedTime = TimeToString((*source).CreatedTime)
 		chatConversationSessionResp.UpdatedTime = TimeToString((*source).UpdatedTime)
 		if (*source).Exchanges != nil {
-			chatConversationSessionResp.Exchanges = make([]*chat.ConversationExchangeResp, len((*source).Exchanges))
+			chatConversationSessionResp.Exchanges = make([]*chat.ConversationExchange, len((*source).Exchanges))
 			for i := 0; i < len((*source).Exchanges); i++ {
-				chatConversationSessionResp.Exchanges[i] = ToConversationExchangeResp((*source).Exchanges[i])
+				chatConversationSessionResp.Exchanges[i] = ToConversationExchange((*source).Exchanges[i])
 			}
 		}
 		chatConversationSessionResp.MemorySummary = ToConversationMemorySummaryResp((*source).MemorySummary)
@@ -255,15 +256,15 @@ func ToConversationSessionRespList(source []*vo.ConversationArchiveRecord) []*ch
 	}
 	return pChatConversationSessionRespList
 }
-func ToConversationStageTraceRespList(source []*entity.ChatExchangeTraceStage) []*chat.ConversationTraceStageResp {
-	var pChatConversationTraceStageRespList []*chat.ConversationTraceStageResp
+func ToConversationStageTraces(source []*entity.ChatExchangeTraceStage) []*chat.ConversationTraceStage {
+	var pChatConversationTraceStageList []*chat.ConversationTraceStage
 	if source != nil {
-		pChatConversationTraceStageRespList = make([]*chat.ConversationTraceStageResp, len(source))
+		pChatConversationTraceStageList = make([]*chat.ConversationTraceStage, len(source))
 		for i := 0; i < len(source); i++ {
-			pChatConversationTraceStageRespList[i] = pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source[i])
+			pChatConversationTraceStageList[i] = pEntityChatExchangeTraceStageToPChatConversationTraceStage(source[i])
 		}
 	}
-	return pChatConversationTraceStageRespList
+	return pChatConversationTraceStageList
 }
 func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.RetrievalResultResp {
 	var pChatRetrievalResultRespList []*chat.RetrievalResultResp
@@ -278,49 +279,49 @@ func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.Retriev
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
 }
-func pEntityChatExchangeTraceStageToPChatConversationTraceStageResp(source *entity.ChatExchangeTraceStage) *chat.ConversationTraceStageResp {
-	var pChatConversationTraceStageResp *chat.ConversationTraceStageResp
+func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.ChatExchangeTraceStage) *chat.ConversationTraceStage {
+	var pChatConversationTraceStage *chat.ConversationTraceStage
 	if source != nil {
-		var chatConversationTraceStageResp chat.ConversationTraceStageResp
-		chatConversationTraceStageResp.ID = Int64ToString((*source).ID)
-		chatConversationTraceStageResp.TraceId = (*source).TraceId
-		chatConversationTraceStageResp.StageCode = (*source).StageCode
-		chatConversationTraceStageResp.StageName = (*source).StageName
-		chatConversationTraceStageResp.StageOrder = (*source).StageOrder
-		chatConversationTraceStageResp.StageLevel = (*source).StageLevel
-		chatConversationTraceStageResp.ParentStageId = Int64ToString((*source).ParentStageId)
-		chatConversationTraceStageResp.ExecutionMode = (*source).ExecutionMode
-		chatConversationTraceStageResp.StageState = ToChatQueryModeName((*source).StageState)
-		chatConversationTraceStageResp.StartTime = TimeToString((*source).StartTime)
-		chatConversationTraceStageResp.EndTime = TimeToString((*source).EndTime)
-		chatConversationTraceStageResp.DurationMs = (*source).DurationMs
+		var chatConversationTraceStage chat.ConversationTraceStage
+		chatConversationTraceStage.ID = Int64ToString((*source).ID)
+		chatConversationTraceStage.TraceId = (*source).TraceId
+		chatConversationTraceStage.StageCode = (*source).StageCode
+		chatConversationTraceStage.StageName = (*source).StageName
+		chatConversationTraceStage.StageOrder = (*source).StageOrder
+		chatConversationTraceStage.StageLevel = (*source).StageLevel
+		chatConversationTraceStage.ParentStageId = Int64ToString((*source).ParentStageId)
+		chatConversationTraceStage.ExecutionMode = (*source).ExecutionMode
+		chatConversationTraceStage.StageState = ToChatQueryModeName((*source).StageState)
+		chatConversationTraceStage.StartTime = TimeToString((*source).StartTime)
+		chatConversationTraceStage.EndTime = TimeToString((*source).EndTime)
+		chatConversationTraceStage.DurationMs = (*source).DurationMs
 		if (*source).SummaryText != nil {
-			chatConversationTraceStageResp.SummaryText = *(*source).SummaryText
+			chatConversationTraceStage.SummaryText = *(*source).SummaryText
 		}
 		if (*source).ErrorMessage != nil {
-			chatConversationTraceStageResp.ErrorMessage = *(*source).ErrorMessage
+			chatConversationTraceStage.ErrorMessage = *(*source).ErrorMessage
 		}
 		if (*source).SnapshotJson != nil {
-			chatConversationTraceStageResp.SnapshotJson = *(*source).SnapshotJson
+			chatConversationTraceStage.SnapshotJson = *(*source).SnapshotJson
 		}
-		pChatConversationTraceStageResp = &chatConversationTraceStageResp
+		pChatConversationTraceStage = &chatConversationTraceStage
 	}
-	return pChatConversationTraceStageResp
+	return pChatConversationTraceStage
 }
-func pEntityConversationSummaryToPChatConversationSummary(source *entity.ConversationSummary) *chat.ConversationSummary {
-	var pChatConversationSummary *chat.ConversationSummary
+func pEntityConversationSummaryToPChatSummaryPayload(source *entity.ConversationSummary) *chat.SummaryPayload {
+	var pChatSummaryPayload *chat.SummaryPayload
 	if source != nil {
-		var chatConversationSummary chat.ConversationSummary
-		chatConversationSummary.Summary = (*source).Summary
-		chatConversationSummary.ConversationGoal = (*source).ConversationGoal
-		chatConversationSummary.StableFacts = (*source).StableFacts
-		chatConversationSummary.UserPreferences = (*source).UserPreferences
-		chatConversationSummary.ResolvedPoints = (*source).ResolvedPoints
-		chatConversationSummary.PendingQuestions = (*source).PendingQuestions
-		chatConversationSummary.RetrievalHints = (*source).RetrievalHints
-		pChatConversationSummary = &chatConversationSummary
+		var chatSummaryPayload chat.SummaryPayload
+		chatSummaryPayload.Summary = (*source).Summary
+		chatSummaryPayload.ConversationGoal = (*source).ConversationGoal
+		chatSummaryPayload.StableFacts = (*source).StableFacts
+		chatSummaryPayload.UserPreferences = (*source).UserPreferences
+		chatSummaryPayload.ResolvedPoints = (*source).ResolvedPoints
+		chatSummaryPayload.PendingQuestions = (*source).PendingQuestions
+		chatSummaryPayload.RetrievalHints = (*source).RetrievalHints
+		pChatSummaryPayload = &chatSummaryPayload
 	}
-	return pChatConversationSummary
+	return pChatSummaryPayload
 }
 func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution
@@ -533,53 +534,53 @@ func ToDocumentChunkModelList(source []*entity1.DocumentChunk) []*model.Document
 	}
 	return pModelDocumentChunkList
 }
-func ToDocumentListItem(source *entity1.Document) *document.DocumentListItem {
-	var pDocumentDocumentListItem *document.DocumentListItem
+func ToDocumentDetailResp(source *entity1.Document) *document.DocumentDetailResp {
+	var pDocumentDocumentDetailResp *document.DocumentDetailResp
 	if source != nil {
-		var documentDocumentListItem document.DocumentListItem
-		documentDocumentListItem.ID = Int64ToString((*source).ID)
-		documentDocumentListItem.DocumentName = (*source).DocumentName
-		documentDocumentListItem.OriginalFileName = (*source).OriginalFileName
-		documentDocumentListItem.FileType = (*source).FileType
-		documentDocumentListItem.FileTypeName = (*source).FileTypeName
-		documentDocumentListItem.FileSize = (*source).FileSize
-		documentDocumentListItem.CharCount = (*source).CharCount
-		documentDocumentListItem.TokenCount = (*source).TokenCount
-		documentDocumentListItem.ParseStatus = (*source).ParseStatus
-		documentDocumentListItem.ParseStatusName = (*source).ParseStatusName
-		documentDocumentListItem.StrategyStatus = (*source).StrategyStatus
-		documentDocumentListItem.StrategyStatusName = (*source).StrategyStatusName
-		documentDocumentListItem.IndexStatus = (*source).IndexStatus
-		documentDocumentListItem.IndexStatusName = (*source).IndexStatusName
+		var documentDocumentDetailResp document.DocumentDetailResp
+		documentDocumentDetailResp.ID = Int64ToString((*source).ID)
+		documentDocumentDetailResp.DocumentName = (*source).DocumentName
+		documentDocumentDetailResp.OriginalFileName = (*source).OriginalFileName
+		documentDocumentDetailResp.FileType = (*source).FileType
+		documentDocumentDetailResp.FileTypeName = (*source).FileTypeName
+		documentDocumentDetailResp.FileSize = (*source).FileSize
+		documentDocumentDetailResp.CharCount = (*source).CharCount
+		documentDocumentDetailResp.TokenCount = (*source).TokenCount
+		documentDocumentDetailResp.ParseStatus = (*source).ParseStatus
+		documentDocumentDetailResp.ParseStatusName = (*source).ParseStatusName
+		documentDocumentDetailResp.StrategyStatus = (*source).StrategyStatus
+		documentDocumentDetailResp.StrategyStatusName = (*source).StrategyStatusName
+		documentDocumentDetailResp.IndexStatus = (*source).IndexStatus
+		documentDocumentDetailResp.IndexStatusName = (*source).IndexStatusName
 		if (*source).ParseErrorMsg != nil {
-			documentDocumentListItem.ParseErrorMsg = *(*source).ParseErrorMsg
+			documentDocumentDetailResp.ParseErrorMsg = *(*source).ParseErrorMsg
 		}
-		documentDocumentListItem.KnowledgeScopeCode = (*source).KnowledgeScopeCode
-		documentDocumentListItem.KnowledgeScopeName = (*source).KnowledgeScopeName
-		documentDocumentListItem.BusinessCategory = (*source).BusinessCategory
-		documentDocumentListItem.DocumentTags = (*source).DocumentTags
-		documentDocumentListItem.CurrentPlanId = Int64ToString((*source).CurrentPlanId)
-		documentDocumentListItem.LastIndexTaskId = Int64ToString((*source).LastIndexTaskId)
-		documentDocumentListItem.LatestTaskId = Int64ToString((*source).LatestTaskId)
-		documentDocumentListItem.LatestTaskType = (*source).LatestTaskType
-		documentDocumentListItem.LatestTaskTypeName = (*source).LatestTaskTypeName
-		documentDocumentListItem.LatestTaskStatus = (*source).LatestTaskStatus
-		documentDocumentListItem.LatestTaskStatusName = (*source).LatestTaskStatusName
-		documentDocumentListItem.CreateTime = TimeToString((*source).CreateTime)
-		documentDocumentListItem.UpdateTime = TimeToString((*source).UpdateTime)
-		pDocumentDocumentListItem = &documentDocumentListItem
+		documentDocumentDetailResp.KnowledgeScopeCode = (*source).KnowledgeScopeCode
+		documentDocumentDetailResp.KnowledgeScopeName = (*source).KnowledgeScopeName
+		documentDocumentDetailResp.BusinessCategory = (*source).BusinessCategory
+		documentDocumentDetailResp.DocumentTags = (*source).DocumentTags
+		documentDocumentDetailResp.CurrentPlanId = Int64ToString((*source).CurrentPlanId)
+		documentDocumentDetailResp.LastIndexTaskId = Int64ToString((*source).LastIndexTaskId)
+		documentDocumentDetailResp.LatestTaskId = Int64ToString((*source).LatestTaskId)
+		documentDocumentDetailResp.LatestTaskType = (*source).LatestTaskType
+		documentDocumentDetailResp.LatestTaskTypeName = (*source).LatestTaskTypeName
+		documentDocumentDetailResp.LatestTaskStatus = (*source).LatestTaskStatus
+		documentDocumentDetailResp.LatestTaskStatusName = (*source).LatestTaskStatusName
+		documentDocumentDetailResp.CreateTime = TimeToString((*source).CreateTime)
+		documentDocumentDetailResp.UpdateTime = TimeToString((*source).UpdateTime)
+		pDocumentDocumentDetailResp = &documentDocumentDetailResp
 	}
-	return pDocumentDocumentListItem
+	return pDocumentDocumentDetailResp
 }
-func ToDocumentListItemList(source []*entity1.Document) []*document.DocumentListItem {
-	var pDocumentDocumentListItemList []*document.DocumentListItem
+func ToDocumentDetailRespList(source []*entity1.Document) []*document.DocumentDetailResp {
+	var pDocumentDocumentDetailRespList []*document.DocumentDetailResp
 	if source != nil {
-		pDocumentDocumentListItemList = make([]*document.DocumentListItem, len(source))
+		pDocumentDocumentDetailRespList = make([]*document.DocumentDetailResp, len(source))
 		for i := 0; i < len(source); i++ {
-			pDocumentDocumentListItemList[i] = ToDocumentListItem(source[i])
+			pDocumentDocumentDetailRespList[i] = ToDocumentDetailResp(source[i])
 		}
 	}
-	return pDocumentDocumentListItemList
+	return pDocumentDocumentDetailRespList
 }
 func ToDocumentModel(source *entity1.Document) *model.Document {
 	var pModelDocument *model.Document
@@ -1000,6 +1001,7 @@ func pEntityDocumentStructureNodeToPModelDocumentStructureNode(source *entity1.D
 	var pModelDocumentStructureNode *model.DocumentStructureNode
 	if source != nil {
 		var modelDocumentStructureNode model.DocumentStructureNode
+		modelDocumentStructureNode.ID = (*source).ID
 		modelDocumentStructureNode.DocumentId = (*source).DocumentId
 		modelDocumentStructureNode.ParseTaskId = (*source).ParseTaskId
 		modelDocumentStructureNode.NodeNo = (*source).NodeNo
@@ -1160,32 +1162,6 @@ func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.Know
 	}
 	return pModelKnowledgeRouteTrace
 }
-func ToKnowledgeScopeItem(source *entity2.KnowledgeScopeNode) *knowledge.KnowledgeScopeItem {
-	var pKnowledgeKnowledgeScopeItem *knowledge.KnowledgeScopeItem
-	if source != nil {
-		var knowledgeKnowledgeScopeItem knowledge.KnowledgeScopeItem
-		knowledgeKnowledgeScopeItem.ID = Int64ToString((*source).ID)
-		knowledgeKnowledgeScopeItem.ScopeCode = NormalizeString((*source).ScopeCode)
-		knowledgeKnowledgeScopeItem.ScopeName = NormalizeString((*source).ScopeName)
-		knowledgeKnowledgeScopeItem.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
-		knowledgeKnowledgeScopeItem.Description = NormalizeString((*source).Description)
-		knowledgeKnowledgeScopeItem.Aliases = NormalizeString((*source).Aliases)
-		knowledgeKnowledgeScopeItem.Examples = NormalizeString((*source).Examples)
-		knowledgeKnowledgeScopeItem.SortOrder = (*source).SortOrder
-		pKnowledgeKnowledgeScopeItem = &knowledgeKnowledgeScopeItem
-	}
-	return pKnowledgeKnowledgeScopeItem
-}
-func ToKnowledgeScopeItemList(source []*entity2.KnowledgeScopeNode) []*knowledge.KnowledgeScopeItem {
-	var pKnowledgeKnowledgeScopeItemList []*knowledge.KnowledgeScopeItem
-	if source != nil {
-		pKnowledgeKnowledgeScopeItemList = make([]*knowledge.KnowledgeScopeItem, len(source))
-		for i := 0; i < len(source); i++ {
-			pKnowledgeKnowledgeScopeItemList[i] = ToKnowledgeScopeItem(source[i])
-		}
-	}
-	return pKnowledgeKnowledgeScopeItemList
-}
 func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.KnowledgeScopeNode {
 	var pModelKnowledgeScopeNode *model.KnowledgeScopeNode
 	if source != nil {
@@ -1202,33 +1178,31 @@ func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.Knowle
 	}
 	return pModelKnowledgeScopeNode
 }
-func ToKnowledgeTopicDocumentRelationItem(source *entity2.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationItem {
-	var pKnowledgeTopicDocumentRelationItem *knowledge.TopicDocumentRelationItem
+func ToKnowledgeScopeResp(source *entity2.KnowledgeScopeNode) *knowledge.KnowledgeScopeResp {
+	var pKnowledgeKnowledgeScopeResp *knowledge.KnowledgeScopeResp
 	if source != nil {
-		var knowledgeTopicDocumentRelationItem knowledge.TopicDocumentRelationItem
-		knowledgeTopicDocumentRelationItem.TopicCode = NormalizeString((*source).TopicCode)
-		knowledgeTopicDocumentRelationItem.DocumentId = Int64ToString((*source).DocumentId)
-		knowledgeTopicDocumentRelationItem.DocumentName = NormalizeString((*source).DocumentName)
-		knowledgeTopicDocumentRelationItem.KnowledgeScopeCode = NormalizeString((*source).KnowledgeScopeCode)
-		knowledgeTopicDocumentRelationItem.KnowledgeScopeName = NormalizeString((*source).KnowledgeScopeName)
-		knowledgeTopicDocumentRelationItem.BusinessCategory = NormalizeString((*source).BusinessCategory)
-		knowledgeTopicDocumentRelationItem.DocumentTags = NormalizeString((*source).DocumentTags)
-		knowledgeTopicDocumentRelationItem.RelationScore = (*source).RelationScore
-		knowledgeTopicDocumentRelationItem.RelationSource = NormalizeString((*source).RelationSource)
-		knowledgeTopicDocumentRelationItem.Reason = NormalizeString((*source).Reason)
-		pKnowledgeTopicDocumentRelationItem = &knowledgeTopicDocumentRelationItem
+		var knowledgeKnowledgeScopeResp knowledge.KnowledgeScopeResp
+		knowledgeKnowledgeScopeResp.ID = Int64ToString((*source).ID)
+		knowledgeKnowledgeScopeResp.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeScopeResp.ScopeName = NormalizeString((*source).ScopeName)
+		knowledgeKnowledgeScopeResp.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		knowledgeKnowledgeScopeResp.Description = NormalizeString((*source).Description)
+		knowledgeKnowledgeScopeResp.Aliases = NormalizeString((*source).Aliases)
+		knowledgeKnowledgeScopeResp.Examples = NormalizeString((*source).Examples)
+		knowledgeKnowledgeScopeResp.SortOrder = (*source).SortOrder
+		pKnowledgeKnowledgeScopeResp = &knowledgeKnowledgeScopeResp
 	}
-	return pKnowledgeTopicDocumentRelationItem
+	return pKnowledgeKnowledgeScopeResp
 }
-func ToKnowledgeTopicDocumentRelationItemList(source []*entity2.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationItem {
-	var pKnowledgeTopicDocumentRelationItemList []*knowledge.TopicDocumentRelationItem
+func ToKnowledgeScopeRespList(source []*entity2.KnowledgeScopeNode) []*knowledge.KnowledgeScopeResp {
+	var pKnowledgeKnowledgeScopeRespList []*knowledge.KnowledgeScopeResp
 	if source != nil {
-		pKnowledgeTopicDocumentRelationItemList = make([]*knowledge.TopicDocumentRelationItem, len(source))
+		pKnowledgeKnowledgeScopeRespList = make([]*knowledge.KnowledgeScopeResp, len(source))
 		for i := 0; i < len(source); i++ {
-			pKnowledgeTopicDocumentRelationItemList[i] = ToKnowledgeTopicDocumentRelationItem(source[i])
+			pKnowledgeKnowledgeScopeRespList[i] = ToKnowledgeScopeResp(source[i])
 		}
 	}
-	return pKnowledgeTopicDocumentRelationItemList
+	return pKnowledgeKnowledgeScopeRespList
 }
 func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation {
 	var pModelKnowledgeTopicDocumentRelation *model.KnowledgeTopicDocumentRelation
@@ -1243,34 +1217,6 @@ func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumen
 		pModelKnowledgeTopicDocumentRelation = &modelKnowledgeTopicDocumentRelation
 	}
 	return pModelKnowledgeTopicDocumentRelation
-}
-func ToKnowledgeTopicItem(source *entity2.KnowledgeTopicNode) *knowledge.KnowledgeTopicItem {
-	var pKnowledgeKnowledgeTopicItem *knowledge.KnowledgeTopicItem
-	if source != nil {
-		var knowledgeKnowledgeTopicItem knowledge.KnowledgeTopicItem
-		knowledgeKnowledgeTopicItem.ID = Int64ToString((*source).ID)
-		knowledgeKnowledgeTopicItem.TopicCode = NormalizeString((*source).TopicCode)
-		knowledgeKnowledgeTopicItem.TopicName = NormalizeString((*source).TopicName)
-		knowledgeKnowledgeTopicItem.ScopeCode = NormalizeString((*source).ScopeCode)
-		knowledgeKnowledgeTopicItem.Description = NormalizeString((*source).Description)
-		knowledgeKnowledgeTopicItem.Aliases = NormalizeString((*source).Aliases)
-		knowledgeKnowledgeTopicItem.Examples = NormalizeString((*source).Examples)
-		knowledgeKnowledgeTopicItem.AnswerShape = NormalizeString((*source).AnswerShape)
-		knowledgeKnowledgeTopicItem.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
-		knowledgeKnowledgeTopicItem.SortOrder = (*source).SortOrder
-		pKnowledgeKnowledgeTopicItem = &knowledgeKnowledgeTopicItem
-	}
-	return pKnowledgeKnowledgeTopicItem
-}
-func ToKnowledgeTopicItemList(source []*entity2.KnowledgeTopicNode) []*knowledge.KnowledgeTopicItem {
-	var pKnowledgeKnowledgeTopicItemList []*knowledge.KnowledgeTopicItem
-	if source != nil {
-		pKnowledgeKnowledgeTopicItemList = make([]*knowledge.KnowledgeTopicItem, len(source))
-		for i := 0; i < len(source); i++ {
-			pKnowledgeKnowledgeTopicItemList[i] = ToKnowledgeTopicItem(source[i])
-		}
-	}
-	return pKnowledgeKnowledgeTopicItemList
 }
 func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.KnowledgeTopicNode {
 	var pModelKnowledgeTopicNode *model.KnowledgeTopicNode
@@ -1289,4 +1235,60 @@ func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.Knowle
 		pModelKnowledgeTopicNode = &modelKnowledgeTopicNode
 	}
 	return pModelKnowledgeTopicNode
+}
+func ToKnowledgeTopicResp(source *entity2.KnowledgeTopicNode) *knowledge.KnowledgeTopicResp {
+	var pKnowledgeKnowledgeTopicResp *knowledge.KnowledgeTopicResp
+	if source != nil {
+		var knowledgeKnowledgeTopicResp knowledge.KnowledgeTopicResp
+		knowledgeKnowledgeTopicResp.ID = Int64ToString((*source).ID)
+		knowledgeKnowledgeTopicResp.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeKnowledgeTopicResp.TopicName = NormalizeString((*source).TopicName)
+		knowledgeKnowledgeTopicResp.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeTopicResp.Description = NormalizeString((*source).Description)
+		knowledgeKnowledgeTopicResp.Aliases = NormalizeString((*source).Aliases)
+		knowledgeKnowledgeTopicResp.Examples = NormalizeString((*source).Examples)
+		knowledgeKnowledgeTopicResp.AnswerShape = NormalizeString((*source).AnswerShape)
+		knowledgeKnowledgeTopicResp.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
+		knowledgeKnowledgeTopicResp.SortOrder = (*source).SortOrder
+		pKnowledgeKnowledgeTopicResp = &knowledgeKnowledgeTopicResp
+	}
+	return pKnowledgeKnowledgeTopicResp
+}
+func ToKnowledgeTopicRespList(source []*entity2.KnowledgeTopicNode) []*knowledge.KnowledgeTopicResp {
+	var pKnowledgeKnowledgeTopicRespList []*knowledge.KnowledgeTopicResp
+	if source != nil {
+		pKnowledgeKnowledgeTopicRespList = make([]*knowledge.KnowledgeTopicResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeKnowledgeTopicRespList[i] = ToKnowledgeTopicResp(source[i])
+		}
+	}
+	return pKnowledgeKnowledgeTopicRespList
+}
+func ToTopicDocumentRelationResp(source *entity2.KnowledgeTopicDocumentRelation) *knowledge.TopicDocumentRelationResp {
+	var pKnowledgeTopicDocumentRelationResp *knowledge.TopicDocumentRelationResp
+	if source != nil {
+		var knowledgeTopicDocumentRelationResp knowledge.TopicDocumentRelationResp
+		knowledgeTopicDocumentRelationResp.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeTopicDocumentRelationResp.DocumentId = Int64ToString((*source).DocumentId)
+		knowledgeTopicDocumentRelationResp.DocumentName = NormalizeString((*source).DocumentName)
+		knowledgeTopicDocumentRelationResp.KnowledgeScopeCode = NormalizeString((*source).KnowledgeScopeCode)
+		knowledgeTopicDocumentRelationResp.KnowledgeScopeName = NormalizeString((*source).KnowledgeScopeName)
+		knowledgeTopicDocumentRelationResp.BusinessCategory = NormalizeString((*source).BusinessCategory)
+		knowledgeTopicDocumentRelationResp.DocumentTags = NormalizeString((*source).DocumentTags)
+		knowledgeTopicDocumentRelationResp.RelationScore = (*source).RelationScore
+		knowledgeTopicDocumentRelationResp.RelationSource = NormalizeString((*source).RelationSource)
+		knowledgeTopicDocumentRelationResp.Reason = NormalizeString((*source).Reason)
+		pKnowledgeTopicDocumentRelationResp = &knowledgeTopicDocumentRelationResp
+	}
+	return pKnowledgeTopicDocumentRelationResp
+}
+func ToTopicDocumentRelationRespList(source []*entity2.KnowledgeTopicDocumentRelation) []*knowledge.TopicDocumentRelationResp {
+	var pKnowledgeTopicDocumentRelationRespList []*knowledge.TopicDocumentRelationResp
+	if source != nil {
+		pKnowledgeTopicDocumentRelationRespList = make([]*knowledge.TopicDocumentRelationResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeTopicDocumentRelationRespList[i] = ToTopicDocumentRelationResp(source[i])
+		}
+	}
+	return pKnowledgeTopicDocumentRelationRespList
 }

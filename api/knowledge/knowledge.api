@@ -78,10 +78,10 @@ type (
 	}
 )
 
-// ==================== 响应类型定义 ====================
+// ==================== 响应类型定义====================
 type (
-	// 知识范围项
-	KnowledgeScopeItem {
+	// 知识范围响应
+	KnowledgeScopeResp {
 		ID              string `json:"id"` // 主键ID
 		ScopeCode       string `json:"scopeCode"` // 范围编码
 		ScopeName       string `json:"scopeName"` // 范围名称
@@ -91,8 +91,8 @@ type (
 		Examples        string `json:"examples"` // 示例
 		SortOrder       int    `json:"sortOrder"` // 排序
 	}
-	// 知识主题项
-	KnowledgeTopicItem {
+	// 知识主题响应
+	KnowledgeTopicResp {
 		ID                  string `json:"id"` // 主键ID
 		TopicCode           string `json:"topicCode"` // 主题编码
 		TopicName           string `json:"topicName"` // 主题名称
@@ -104,8 +104,8 @@ type (
 		ExecutionPreference string `json:"executionPreference"` // 执行偏好
 		SortOrder           int    `json:"sortOrder"` // 排序
 	}
-	// 主题文档关联项
-	TopicDocumentRelationItem {
+	// 主题文档关联响应
+	TopicDocumentRelationResp {
 		TopicCode          string  `json:"topicCode"` // 主题编码
 		DocumentId         string  `json:"documentId"` // 文档ID
 		DocumentName       string  `json:"documentName"` // 文档名称
@@ -117,7 +117,15 @@ type (
 		RelationSource     string  `json:"relationSource"` // 关联来源
 		Reason             string  `json:"reason"` // 理由
 	}
-	// 知识路由追踪列表项
+	// 分页查询知识路由追踪响应
+	KnowledgeRouteTracePageResp {
+		PageNo     int                        `json:"pageNo"` // 页码
+		PageSize   int                        `json:"pageSize"` // 每页大小
+		Total      int64                      `json:"total"` // 总条数
+		TotalPages int                        `json:"totalPages"` // 总页数
+		Records    []*KnowledgeRouteTraceItem `json:"records"` // 列表数据
+	}
+	// 知识路由追踪明细
 	KnowledgeRouteTraceItem {
 		ID                  string  `json:"id"` // 主键ID
 		ConversationId      string  `json:"conversationId"` // 会话ID
@@ -135,17 +143,9 @@ type (
 		ErrorMsg            string  `json:"errorMsg"` // 错误信息
 		CreateTime          string  `json:"createTime"` // 创建时间
 	}
-	// 分页查询知识路由追踪响应
-	KnowledgeRouteTracePageResp {
-		PageNo     int                        `json:"pageNo"` // 页码
-		PageSize   int                        `json:"pageSize"` // 每页大小
-		Total      int64                      `json:"total"` // 总条数
-		TotalPages int                        `json:"totalPages"` // 总页数
-		Records    []*KnowledgeRouteTraceItem `json:"records"` // 列表数据
-	}
 )
 
-// ==================== 知识管理服务 ====================
+// ==================== 知识管理服务====================
 @server (
 	group:  knowledge
 	desc:   "知识管理服务"
@@ -154,7 +154,7 @@ type (
 service knowledge {
 	@doc "保存知识范围节点"
 	@handler SaveKnowledgeScope
-	post /scope/save (KnowledgeScopeSaveReq) returns (KnowledgeScopeItem)
+	post /scope/save (KnowledgeScopeSaveReq) returns (KnowledgeScopeResp)
 
 	@doc "删除知识范围节点"
 	@handler DeleteKnowledgeScope
@@ -162,11 +162,11 @@ service knowledge {
 
 	@doc "查询知识范围列表"
 	@handler ListKnowledgeScope
-	post /scope/list returns ([]*KnowledgeScopeItem)
+	post /scope/list returns ([]*KnowledgeScopeResp)
 
 	@doc "保存知识主题节点"
 	@handler SaveKnowledgeTopic
-	post /topic/save (KnowledgeTopicSaveReq) returns (KnowledgeTopicItem)
+	post /topic/save (KnowledgeTopicSaveReq) returns (KnowledgeTopicResp)
 
 	@doc "删除知识主题节点"
 	@handler DeleteKnowledgeTopic
@@ -174,15 +174,15 @@ service knowledge {
 
 	@doc "查询知识主题列表"
 	@handler ListKnowledgeTopic
-	post /topic/list (KnowledgeTopicListReq) returns ([]*KnowledgeTopicItem)
+	post /topic/list (KnowledgeTopicListReq) returns ([]*KnowledgeTopicResp)
 
 	@doc "查询主题文档关联"
 	@handler ListTopicDocumentRelation
-	post /topic/document/list (TopicDocumentRelationListReq) returns ([]*TopicDocumentRelationItem)
+	post /topic/document/list (TopicDocumentRelationListReq) returns ([]*TopicDocumentRelationResp)
 
 	@doc "保存主题文档关联"
 	@handler SaveTopicDocumentRelation
-	post /topic/document/save (TopicDocumentRelationSaveReq) returns (TopicDocumentRelationItem)
+	post /topic/document/save (TopicDocumentRelationSaveReq) returns (TopicDocumentRelationResp)
 
 	@doc "删除主题文档关联"
 	@handler DeleteTopicDocumentRelation
