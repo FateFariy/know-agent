@@ -9,6 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/api/knowledge"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/mq"
 	"github.com/swiftbit/know-agent/internal/svc"
 	"github.com/swiftbit/know-agent/internal/trigger/consumer"
 )
@@ -19,23 +20,27 @@ type Server struct {
 	HTTP               *rest.Server
 	parseConsumer      *consumer.ParseDocumentConsumer
 	buildIndexConsumer *consumer.BuildIndexConsumer
+	rocketMQProducer   *mq.RocketMQMessageProducer
 }
 
-func NewServer(HTTP *rest.Server, parseConsumer *consumer.ParseDocumentConsumer, buildIndexConsumer *consumer.BuildIndexConsumer) *Server {
+func NewServer(HTTP *rest.Server, parseConsumer *consumer.ParseDocumentConsumer, buildIndexConsumer *consumer.BuildIndexConsumer, rocketMQProducer *mq.RocketMQMessageProducer) *Server {
 	return &Server{
 		HTTP:               HTTP,
 		parseConsumer:      parseConsumer,
 		buildIndexConsumer: buildIndexConsumer,
+		rocketMQProducer:   rocketMQProducer,
 	}
 }
 
 func (s *Server) Start() {
+	s.rocketMQProducer.Start()
 	s.parseConsumer.Start()
 	s.buildIndexConsumer.Start()
 	s.HTTP.Start()
 }
 
 func (s *Server) Stop() {
+	s.rocketMQProducer.Close()
 	s.HTTP.Stop()
 }
 

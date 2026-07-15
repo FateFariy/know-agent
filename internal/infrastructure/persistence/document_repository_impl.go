@@ -271,8 +271,13 @@ func (d *DocumentRepositoryImpl) SelectPlanById(ctx context.Context, planId int6
 // SelectLatestPlanVersion 根据文档ID获取最新方案/策略版本
 func (d *DocumentRepositoryImpl) SelectLatestPlanVersion(ctx context.Context, documentId int64) (int, error) {
 	plan := &model.DocumentStrategyPlan{DocumentId: documentId}
-	err := d.dbWithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error
-	return plan.PlanVersion, err
+	if err := d.dbWithContext(ctx).Select("plan_version").Where(plan).Order("plan_version DESC").First(plan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return plan.PlanVersion, nil
 }
 
 // ========== 步骤相关 ==========

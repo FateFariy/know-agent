@@ -3,7 +3,6 @@ package mq
 import (
 	"context"
 	"encoding/json"
-	"sync"
 
 	"github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
@@ -27,36 +26,31 @@ func NewRocketMQMessageProducer(svcCtx *svc.ServiceContext) *RocketMQMessageProd
 	if err != nil {
 		panic(err)
 	}
-
 	return &RocketMQMessageProducer{
 		p: p,
 	}
 }
 
-func (m *RocketMQMessageProducer) Send(ctx context.Context, topic, key string, message any) error {
+// Start 启动生产者
+func (m *RocketMQMessageProducer) Start() {
 	if err := m.p.Start(); err != nil {
-		return err
+		panic(err)
 	}
+}
+
+// Send 发送消息
+func (m *RocketMQMessageProducer) Send(ctx context.Context, topic, key string, message any) error {
 	messageJson, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
+	_, err = m.p.SendSync(ctx, primitive.NewMessage(topic, messageJson))
+	return err
+}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	callback := func(ctx context.Context, result *primitive.SendResult, e error) {
-		if e != nil {
-			logx.Errorf("receive message error: %s\n", e)
-		}
-		wg.Done()
+// Close 关闭生产者
+func (m *RocketMQMessageProducer) Close() {
+	if err := m.p.Shutdown(); err != nil {
+		logx.Errorf("rocketmq producer shutdown failed: %v", err)
 	}
-	if err = m.p.SendAsync(ctx, callback, primitive.NewMessage(topic, messageJson)); err != nil {
-		return err
-	}
-	wg.Wait()
-
-	if err = m.p.Shutdown(); err != nil {
-		logx.Errorf("shutdown producer error: %s\n", err)
-	}
-	return nil
 }

@@ -8,6 +8,9 @@ Auth:
   AccessSecret: your-access-secret-key
   AccessExpire: 2h
 
+Middlewares:
+  Recover: false
+
 Mysql:
   Host: 10.104.0.165
   Port: 3306

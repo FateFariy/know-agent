@@ -21,7 +21,7 @@ type DocumentStrategyPlan struct {
 	RecommendReason  string                    `gorm:"column:recommend_reason"`  // 推荐理由
 	AdjustNote       string                    `gorm:"column:adjust_note"`       // 调整备注
 	ConfirmUserId    int64                     `gorm:"column:confirm_user_id"`   // 确认人ID
-	ConfirmTime      time.Time                 `gorm:"column:confirm_time"`      // 确认时间
+	ConfirmTime      *time.Time                `gorm:"column:confirm_time"`      // 确认时间
 	PlanSourceName   string                    `gorm:"-"`                        // 方案来源名称
 	PlanStatusName   string                    `gorm:"-"`                        // 方案状态名称
 	Normalized       bool                      `gorm:"-"`                        // 是否归一化

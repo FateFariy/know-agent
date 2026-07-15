@@ -68,13 +68,11 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	// 加载文档与任务实体
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
-		Warnf("查询解析文档失败: documentId=%d, err=%v", documentId, err)
 		return err
 	}
 
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
-		Warnf("查询解析任务失败: taskId=%d, err=%v", taskId, err)
 		return err
 	}
 
@@ -245,22 +243,18 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	// 加载任务相关实体，失败直接返回，交由调度层观察
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
-		Warnf("查询索引任务失败, taskId=%d, err=%v", taskId, err)
 		return err
 	}
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
-		Warnf("查询索引任务文档失败, documentId=%d, err=%v", documentId, err)
 		return err
 	}
 	plan, err := d.repo.SelectPlanById(ctx, planId)
 	if err != nil {
-		Warnf("查询索引任务方案失败, planId=%d, err=%v", planId, err)
 		return err
 	}
 	pipelineSteps, err := d.repo.SelectStepListByPlanId(ctx, planId)
 	if err != nil {
-		Warnf("查询索引任务步骤失败, planId=%d, err=%v", planId, err)
 		return err
 	}
 
@@ -361,12 +355,10 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	persistBlocksTx := func(txCtx context.Context) error {
 		// 批量写入父块
 		if err = d.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
-			Warnf("插入父块失败: documentId=%d, err=%v", documentId, err)
 			return err
 		}
 		// 批量写入子块
 		if err = d.repo.InsertChunkBatch(txCtx, childChunks); err != nil {
-			Warnf("插入块失败: documentId=%d, err=%v", documentId, err)
 			return err
 		}
 		// 记录"切块后处理完成"日志

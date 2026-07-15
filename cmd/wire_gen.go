@@ -100,6 +100,6 @@ func WireApp(c *config.Config) *server.Server {
 	asyncProcessingLogicImpl := logic2.NewAsyncProcessingLogicImpl(documentRepositoryImpl, documentPort, chunkStrategyLogicImpl, structureNodeLogicImpl, textPreProcessLogicImpl, profileLogicImpl)
 	parseDocumentConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessingLogicImpl)
 	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessingLogicImpl)
-	serverServer := server.NewServer(restServer, parseDocumentConsumer, buildIndexConsumer)
+	serverServer := server.NewServer(restServer, parseDocumentConsumer, buildIndexConsumer, rocketMQMessageProducer)
 	return serverServer
 }

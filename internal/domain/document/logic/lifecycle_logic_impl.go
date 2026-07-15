@@ -346,7 +346,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				RecommendReason: basePlan.RecommendReason,
 				AdjustNote:      cmd.AdjustNote,
 				ConfirmUserId:   cmd.OperatorId,
-				ConfirmTime:     time.Now(),
+				ConfirmTime:     utils.Pointer(time.Now()),
 			}
 			newPlan.FillAndProcessPipeline(normalizedStepList)
 			newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
@@ -402,7 +402,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				PlanSource:    utils.Ternary(basePlan.PlanSource == 0, vo.PlanSourceSystemRecommend, basePlan.PlanSource),
 				AdjustNote:    cmd.AdjustNote,
 				ConfirmUserId: cmd.OperatorId,
-				ConfirmTime:   time.Now(),
+				ConfirmTime:   utils.Pointer(time.Now()),
 			}); err != nil {
 				return err
 			}
@@ -466,7 +466,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 
 	// 状态校验：文档必须完成解析且策略已确认
 	if document.ParseStatus != vo.ParseStatusParseSuccess || document.StrategyStatus != vo.StrategyStatusConfirmed {
-		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, "当前文档尚未完成\"解析成功 + 策略确认\"，不能构建索引")
+		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, `当前文档尚未完成"解析成功 + 策略确认"，不能构建索引`)
 	}
 
 	// 方案一致性校验：请求的方案需与文档当前生效方案一致
