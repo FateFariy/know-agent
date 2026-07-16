@@ -12,14 +12,16 @@
         </div>
 
         <div class="header-actions">
-          <button class="primary-button" type="button" :disabled="loadingSessions" @click="loadSessions">
+          <button class="primary-button" type="button" :disabled="loadingSessions"
+                  @click="loadSessions()">
             {{ loadingSessions ? '正在刷新...' : '刷新会话列表' }}
           </button>
         </div>
       </div>
 
       <div class="stat-badges">
-        <span v-for="item in summaryStats" :key="item.label" class="stat-badge" :title="item.description">
+        <span v-for="item in summaryStats" :key="item.label" class="stat-badge"
+              :title="item.description">
           <span class="stat-label">{{ item.label }}</span>
           <strong class="stat-value">{{ item.value }}</strong>
         </span>
@@ -29,12 +31,8 @@
     <section class="filter-bar">
       <label class="filter-field search-field">
         <span>搜索会话</span>
-        <input
-          v-model.trim="keyword"
-          type="text"
-          placeholder="按会话ID、文档名、问题或回答筛选"
-          @keydown.enter.prevent="applyFilters"
-        />
+        <input v-model.trim="keyword" type="text" placeholder="按会话ID、文档名、问题或回答筛选"
+               @keydown.enter.prevent="applyFilters" />
       </label>
 
       <label class="filter-field">
@@ -59,10 +57,12 @@
       </label>
 
       <div class="filter-actions">
-        <button class="ghost-button" type="button" :disabled="loadingSessions" @click="resetFilters">
+        <button class="ghost-button" type="button" :disabled="loadingSessions"
+                @click="resetFilters">
           重置筛选
         </button>
-        <button class="primary-button inline-primary" type="button" :disabled="loadingSessions" @click="applyFilters">
+        <button class="primary-button inline-primary" type="button" :disabled="loadingSessions"
+                @click="applyFilters">
           应用筛选
         </button>
       </div>
@@ -75,22 +75,19 @@
     </div>
 
     <div v-else class="session-list">
-      <article
-        v-for="session in sessions"
-        :key="session.conversationId"
-        class="session-item"
-        :class="`status-${sessionTone(session)}`"
-      >
+      <article v-for="session in sessions" :key="session.conversationId" class="session-item"
+               :class="`status-${sessionTone(session)}`">
         <RouterLink :to="detailTarget(session)" class="session-link">
           <div class="session-top">
             <div class="session-chips">
               <span class="chip mode-chip">{{ formatChatMode(session.chatMode) }}</span>
               <span v-if="session.running" class="chip running-chip">实时执行中</span>
-              <span v-else-if="session.latestTurnStatus" class="chip" :class="`chip-${statusTone(session.latestTurnStatus)}`">
+              <span v-else-if="session.latestTurnStatus" class="chip"
+                    :class="`chip-${statusTone(session.latestTurnStatus)}`">
                 {{ formatStatusLabel(session.latestTurnStatus) }}
               </span>
             </div>
-            <span class="session-time">{{ formatTime(session.updatedAt) }}</span>
+            <span class="session-time">{{ formatTime(session.updatedTime) }}</span>
           </div>
 
           <h3 class="session-title">{{ sessionTitle(session) }}</h3>
@@ -109,21 +106,18 @@
 
         <div class="session-foot">
           <RouterLink :to="detailTarget(session)" class="foot-link">查看整页详情</RouterLink>
-          <RouterLink
-            v-if="session.latestExchangeId"
-            :to="exchangeTarget(session)"
-            class="foot-link subtle"
-          >
+          <RouterLink v-if="session.latestExchangeId" :to="exchangeTarget(session)"
+                      class="foot-link subtle">
             {{ exchangeLinkLabel(session) }}
           </RouterLink>
         </div>
       </article>
     </div>
 
-    <nav v-if="!loadingSessions && totalPagesCount > 0" class="pagination">
+    <nav v-if="!loadingSessions && total > 0" class="pagination">
       <div class="pagination-info">
         <strong>第 {{ pageNo }} / {{ totalPages }} 页</strong>
-        <span>共 {{ totalSize }} 条会话记录</span>
+        <span>共 {{ total }} 条会话记录</span>
       </div>
 
       <div class="pagination-controls">
@@ -138,19 +132,17 @@
         </label>
 
         <div class="page-buttons">
-          <button class="page-btn" type="button" :disabled="!canPrev" @click="goPrevPage">上一页</button>
-          <button
-            v-for="(item, index) in paginationItems"
-            :key="`page-${item}-${index}`"
-            class="page-btn"
-            :class="{ active: item === pageNo, gap: item === '...'}"
-            type="button"
-            :disabled="item === '...'"
-            @click="typeof item === 'string' && item !== '...' ? goPage(item) : null"
-          >
+          <button class="page-btn" type="button" :disabled="!canPrev" @click="goPrevPage">上一页
+          </button>
+          <button v-for="(item, index) in paginationItems" :key="`page-${item}-${index}`"
+                  class="page-btn"
+                  :class="{ active: item === pageNo, gap: item === '...' }" type="button"
+                  :disabled="item === '...'"
+                  @click="typeof item === 'string' && item !== '...' ? goPage(item) : null">
             {{ item }}
           </button>
-          <button class="page-btn" type="button" :disabled="!canNext" @click="goNextPage">下一页</button>
+          <button class="page-btn" type="button" :disabled="!canNext" @click="goNextPage">下一页
+          </button>
         </div>
       </div>
     </nav>
@@ -160,7 +152,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { chatApi } from '../../api/api'
+import { chatApi } from '@/api/chat'
+import type {
+  ConversationSessionListReq,
+  ConversationSessionListResp,
+  ConversationSessionResp
+} from '@/types'
 import {
   formatChatMode,
   formatStatusLabel,
@@ -171,34 +168,48 @@ import {
   sessionTitle,
   statusTone,
   truncate
-} from './observabilityHelpers'
+} from '@/utils/observabilityHelpers'
 
-const sessions = ref([])
+const sessions = ref<ConversationSessionResp[]>([])
 const loadingSessions = ref(false)
 const pageError = ref('')
 const keyword = ref('')
-const modeFilter = ref('ALL')
-const statusFilter = ref('ALL')
-const pageNo = ref('1')
-const pageSize = ref('12')
-const totalSize = ref('0')
-const totalPages = ref('0')
+const modeFilter = ref('')
+const statusFilter = ref('')
+const pageNo = ref(1)
+const pageSize = ref(12)
+const total = ref(0)
+const totalPages = ref(0)
 
-const currentPageNumber = computed(() => Number(pageNo.value || '1') || 1)
-const totalPagesCount = computed(() => Number(totalPages.value || '0') || 0)
-const canPrev = computed(() => currentPageNumber.value > 1)
-const canNext = computed(() => totalPagesCount.value > 0 && currentPageNumber.value < totalPagesCount.value)
+const canPrev = computed(() => pageNo.value > 1)
+const canNext = computed(() => total.value > 0 && pageNo.value < total.value)
 
-const summaryStats = computed(() => {
-  const total = totalSize.value
-  const running = sessions.value.filter((item) => item.running).length
-  const documentMode = sessions.value.filter((item) => item.chatMode === 'DOCUMENT').length
-  const failed = sessions.value.filter((item) => item.latestTurnStatus === 'FAILED').length
+interface SummaryStat {
+  label: string
+  value: string | number
+  description: string
+}
+
+const summaryStats = computed<SummaryStat[]>(() => {
+  let running = 0
+  let documentMode = 0
+  let failed = 0
+  for (const session of sessions.value) {
+    if (session.running) {
+      running++
+    }
+    if (session.chatMode === 'DOCUMENT') {
+      documentMode++
+    }
+    if (session.latestTurnStatus === 'FAILED') {
+      failed++
+    }
+  }
 
   return [
     {
       label: '会话总数',
-      value: total,
+      value: total.value,
       description: '后台当前可回看的全部业务会话数'
     },
     {
@@ -219,38 +230,38 @@ const summaryStats = computed(() => {
   ]
 })
 
-const paginationItems = computed(() => {
-  const total = totalPagesCount.value
-  const current = currentPageNumber.value
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, index) => String(index + 1))
+const paginationItems = computed<(string | number)[]>(() => {
+  const current = pageNo.value
+  if (total.value <= 7) {
+    return Array.from({ length: total.value }, (_, index) => String(index + 1))
   }
   if (current <= 4) {
-    return ['1', '2', '3', '4', '5', '...', String(total)]
+    return [1, 2, 3, 4, 5, '...', total.value]
   }
-  if (current >= total - 3) {
-    return ['1', '...', String(total - 4), String(total - 3), String(total - 2), String(total - 1), String(total)]
+  if (current >= total.value - 3) {
+    return [1, '...', total.value - 4, total.value - 3, total.value - 2, total.value - 1, String(total.value)]
   }
-  return ['1', '...', String(current - 1), String(current), String(current + 1), '...', String(total)]
+  return [1, '...', current - 1, current, current + 1, '...', String(total.value)]
 })
 
-async function loadSessions(options = {}) {
+async function loadSessions(options: ConversationSessionListReq = {}): Promise<void> {
   loadingSessions.value = true
   pageError.value = ''
 
   try {
-    const page = await chatApi.listSessionsPage({
+    const res = await chatApi.listSessions({
       keyword: options.keyword ?? keyword.value,
       chatMode: options.chatMode ?? modeFilter.value,
       turnStatus: options.turnStatus ?? statusFilter.value,
       pageNo: options.pageNo || pageNo.value,
       pageSize: options.pageSize || pageSize.value
     })
-    sessions.value = page.sessions || []
-    pageNo.value = page.pageNo || '1'
-    pageSize.value = page.pageSize || pageSize.value
-    totalSize.value = page.totalSize || '0'
-    totalPages.value = page.totalPages || '0'
+    const data = res.data as ConversationSessionListResp
+    sessions.value = data.records || []
+    pageNo.value = data.pageNo
+    pageSize.value = data.pageSize
+    total.value = data.total
+    totalPages.value = data.totalPages
   } catch (error) {
     pageError.value = normalizeError(error, '加载会话列表失败')
   } finally {
@@ -258,14 +269,14 @@ async function loadSessions(options = {}) {
   }
 }
 
-function sessionTone(session) {
+function sessionTone(session: ConversationSessionResp): string {
   if (session.running) {
     return 'running'
   }
   return statusTone(session.latestTurnStatus)
 }
 
-function goPage(nextPageNo) {
+function goPage(nextPageNo: number | string): void {
   if (!nextPageNo || nextPageNo === pageNo.value || loadingSessions.value) {
     return
   }
@@ -273,59 +284,59 @@ function goPage(nextPageNo) {
     keyword: keyword.value,
     chatMode: modeFilter.value,
     turnStatus: statusFilter.value,
-    pageNo: String(nextPageNo),
+    pageNo: Number(nextPageNo),
     pageSize: pageSize.value
   })
 }
 
-function goPrevPage() {
+function goPrevPage(): void {
   if (!canPrev.value) {
     return
   }
-  goPage(String(currentPageNumber.value - 1))
+  goPage(pageNo.value - 1)
 }
 
-function goNextPage() {
+function goNextPage(): void {
   if (!canNext.value) {
     return
   }
-  goPage(String(currentPageNumber.value + 1))
+  goPage(pageNo.value + 1)
 }
 
-function handlePageSizeChange() {
+function handlePageSizeChange(): void {
   loadSessions({
     keyword: keyword.value,
     chatMode: modeFilter.value,
     turnStatus: statusFilter.value,
-    pageNo: '1',
+    pageNo: 1,
     pageSize: pageSize.value
   })
 }
 
-function applyFilters() {
+function applyFilters(): void {
   loadSessions({
     keyword: keyword.value,
     chatMode: modeFilter.value,
     turnStatus: statusFilter.value,
-    pageNo: '1',
+    pageNo: 1,
     pageSize: pageSize.value
   })
 }
 
-function resetFilters() {
+function resetFilters(): void {
   keyword.value = ''
-  modeFilter.value = 'ALL'
-  statusFilter.value = 'ALL'
+  modeFilter.value = ''
+  statusFilter.value = ''
   loadSessions({
     keyword: '',
-    chatMode: 'ALL',
-    turnStatus: 'ALL',
-    pageNo: '1',
+    chatMode: '',
+    turnStatus: '',
+    pageNo: 1,
     pageSize: pageSize.value
   })
 }
 
-function detailTarget(session) {
+function detailTarget(session: ConversationSessionResp) {
   return {
     name: 'AdminObservabilitySession',
     params: {
@@ -334,7 +345,7 @@ function detailTarget(session) {
   }
 }
 
-function exchangeTarget(session) {
+function exchangeTarget(session: ConversationSessionResp) {
   return {
     name: 'AdminObservabilityExchangeDetail',
     params: {
@@ -344,7 +355,7 @@ function exchangeTarget(session) {
   }
 }
 
-function exchangeLinkLabel(session) {
+function exchangeLinkLabel(session: ConversationSessionResp): string {
   if (session.running) {
     return '直达当前轮次'
   }
@@ -383,7 +394,7 @@ onMounted(loadSessions)
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 .header-copy h2 {
@@ -426,7 +437,7 @@ onMounted(loadSessions)
 .stat-value {
   color: var(--color-text-strong);
   font-size: 14px;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 /* ── Buttons ── */
@@ -640,7 +651,7 @@ onMounted(loadSessions)
 }
 
 .meta-id {
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans), serif;
   font-size: 11px;
   color: var(--color-muted);
   word-break: break-all;
