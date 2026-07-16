@@ -95,6 +95,33 @@ export interface KnowledgeRouteTraceItem {
   createTime: string;
 }
 
+/** 路由候选基础类型 */
+export interface BaseRouteCandidate {
+  score: number
+  reason: string
+  scoreText: string
+}
+
+/** 知识范围路由候选 */
+export interface ScopeRouteCandidate extends BaseRouteCandidate {
+  scopeCode: string
+  scopeName: string
+}
+
+/** 主题路由候选 */
+export interface TopicRouteCandidate extends BaseRouteCandidate {
+  topicCode: string
+  topicName: string
+  scopeCode: string
+}
+
+/** 文档路由候选 */
+export interface DocumentRouteCandidate extends BaseRouteCandidate {
+  documentId: string
+  documentName: string
+  lastIndexTaskId: string
+}
+
 // ====================== 顶层响应类型 ======================
 /** 知识范围响应 */
 export interface KnowledgeScopeResp {
@@ -106,11 +133,6 @@ export interface KnowledgeScopeResp {
   aliases: string;
   examples: string;
   sortOrder: number;
-}
-
-/** 删除知识范围响应 */
-export interface KnowledgeScopeDeleteResp {
-  success: boolean;
 }
 
 /** 知识主题响应 */
@@ -127,11 +149,6 @@ export interface KnowledgeTopicResp {
   sortOrder: number;
 }
 
-/** 删除知识主题响应 */
-export interface KnowledgeTopicDeleteResp {
-  success: boolean;
-}
-
 /** 主题文档关联响应 */
 export interface TopicDocumentRelationResp {
   topicCode: string;
@@ -144,11 +161,6 @@ export interface TopicDocumentRelationResp {
   relationScore: number;
   relationSource: string;
   reason: string;
-}
-
-/** 移除主题文档关联响应 */
-export interface TopicDocumentRelationRemoveResp {
-  success: boolean;
 }
 
 /** 分页查询知识路由追踪响应 */

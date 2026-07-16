@@ -923,7 +923,7 @@ import type {
   TaskLog
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import { formatCount, formatDateTime } from '@/utils/manageFormat'
+import { formatCount, formatDateTime } from '@/utils/format.ts'
 import {
   buildPipelineStepPayload,
   buildStrategyPreview,

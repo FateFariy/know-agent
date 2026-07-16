@@ -64,6 +64,6 @@ export const knowledgeApi = {
 
   // 查询知识路由轨迹分页列表
   queryRouteTracePage(params?: KnowledgeRouteTracePageReq): Promise<Response<KnowledgeRouteTracePageResp>> {
-    return axios.post('/manage/knowledge/route/trace/page/query', params || {})
+    return axios.post('/manage/knowledge/route/trace/page/query', params)
   },
 }

@@ -209,7 +209,7 @@ import type {
   UploadDocumentReq
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import { formatDateTime, formatFileSize } from '@/utils/manageFormat'
+import { formatDateTime, formatFileSize } from '@/utils/format.ts'
 
 const router = useRouter()
 const OPERATOR_ID = '10001'
