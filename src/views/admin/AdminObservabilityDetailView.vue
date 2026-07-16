@@ -345,68 +345,6 @@
         </div>
       </section>
 
-      <section v-if="stageTraces.length > 0 && stageBenchmarks.length > 0" class="observe-section">
-        <h3 class="section-title">
-          <span class="section-kicker">Performance Benchmark</span>
-          阶段性能基准对比
-        </h3>
-        <p class="section-desc">对比当前执行与历史基准（P50/P90/P99），识别异常慢的阶段。</p>
-
-        <div class="benchmark-grid">
-          <article v-for="trace in stageTraces.filter(t => t.durationMs)" :key="trace.id"
-                   class="benchmark-card">
-            <div class="benchmark-header">
-              <strong>{{ trace.stageName }}</strong>
-              <span v-if="findBenchmark(trace.stageCode, trace.executionMode)"
-                    class="benchmark-level"
-                    :class="`level-${formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode, trace.executionMode))?.level}`">
-                {{ formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode,
-                trace.executionMode))?.text || '-' }}
-              </span>
-            </div>
-            <div class="benchmark-metrics">
-              <div class="bm-item">
-                <span class="bm-label">本次</span>
-                <span class="bm-value bm-actual">{{ trace.durationMs }} ms</span>
-              </div>
-              <template v-if="findBenchmark(trace.stageCode, trace.executionMode)">
-                <div class="bm-item">
-                  <span class="bm-label">P50</span>
-                  <span
-                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p50DurationMs || '-'
-                    }}
-                    ms</span>
-                </div>
-                <div class="bm-item">
-                  <span class="bm-label">P90</span>
-                  <span
-                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p90DurationMs || '-'
-                    }}
-                    ms</span>
-                </div>
-                <div class="bm-item">
-                  <span class="bm-label">P99</span>
-                  <span
-                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p99DurationMs || '-'
-                    }}
-                    ms</span>
-                </div>
-                <div class="bm-item">
-                  <span class="bm-label">样本数</span>
-                  <span
-                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).sampleCount
-                    }}</span>
-                </div>
-              </template>
-              <div v-else class="bm-item">
-                <span class="bm-label">基准</span>
-                <span class="bm-value">暂无数据</span>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <div v-if="traceDetailOpen && overlayInspector" class="trace-overlay"
            @click="closeTraceDetail">
         <aside class="trace-panel" @click.stop>
@@ -507,7 +445,7 @@ import type {
   ConversationExchangeDetailResp,
   ConversationSessionResp,
   ConversationTraceStage,
-  RetrievalResultResp
+  RetrievalResultResp, Snapshot
 } from '@/types'
 import type { ExchangeStage, StageInspector } from '@/utils/observabilityHelpers'
 import {
@@ -552,7 +490,6 @@ const activeTraceStage = computed<ConversationTraceStage | null>(() => {
   }
   return stageTraces.value.find((item) => String(item.id) === selectedTraceId.value) ?? stageTraces.value[0] ?? null
 })
-const activeTraceInspector = computed<StageInspector | null>(() => buildTraceStageInspector(activeTraceStage.value, activeExchange.value))
 const exchangeStages = computed<ExchangeStage[]>(() => buildExchangeStages(activeSession.value, activeExchange.value))
 
 const currentExchangeNarrative = computed<string>(() => {
@@ -579,69 +516,12 @@ const maxTraceDuration = computed<number>(() => {
 
 const groupedRetrievalResults = computed<ReturnType<typeof groupResultsBySubQuestion>>(() => groupResultsBySubQuestion(retrievalResults.value))
 
-interface StageBenchmark {
-  stageCode: string
-  executionMode: string
-  p50DurationMs: number
-  p90DurationMs: number
-  p99DurationMs: number
-  sampleCount: number
-}
-
-const stageBenchmarks = ref<StageBenchmark[]>([])
-const loadingBenchmarks = ref(false)
-
-async function loadStageBenchmarks(): Promise<void> {
-  loadingBenchmarks.value = true
-  try {
-    const data = await chatApi.getStageBenchmarks()
-    stageBenchmarks.value = data || []
-  } catch (error) {
-    stageBenchmarks.value = []
-  } finally {
-    loadingBenchmarks.value = false
-  }
-}
-
-function findBenchmark(stageCode: string, executionMode: string): StageBenchmark | null {
-  if (!stageBenchmarks.value || !stageBenchmarks.value.length) {
-    return null
-  }
-  return stageBenchmarks.value.find(
-    (b) => b.stageCode === stageCode && b.executionMode === executionMode
-  ) || null
-}
-
-interface BenchmarkComparison {
-  level: 'excellent' | 'good' | 'warning' | 'slow'
-  text: string
-}
-
-function formatBenchmarkComparison(actualMs: number, benchmark: StageBenchmark): BenchmarkComparison | null {
-  if (!benchmark || !actualMs) {
-    return null
-  }
-  const p50 = benchmark.p50DurationMs || 0
-  const p90 = benchmark.p90DurationMs || 0
-  const p99 = benchmark.p99DurationMs || 0
-
-  if (actualMs <= p50) {
-    return { level: 'excellent', text: '优秀（≤ P50）' }
-  } else if (actualMs <= p90) {
-    return { level: 'good', text: '良好（P50-P90）' }
-  } else if (actualMs <= p99) {
-    return { level: 'warning', text: '偏慢（P90-P99）' }
-  } else {
-    return { level: 'slow', text: '异常慢（> P99）' }
-  }
-}
-
 const activePromptTab = ref('system')
 
-const evidenceBudgetSnapshot = computed(() => {
+const evidenceBudgetSnapshot = computed<Snapshot | null>(() => {
   const traces = stageTraces.value || []
   const budgetTrace = traces.find((item) => item.stageCode === 'EVIDENCE_BUDGET')
-  return budgetTrace?.snapshot || null
+  return budgetTrace?.snapshotJson ? JSON.parse(budgetTrace.snapshotJson) : null
 })
 
 const ragSystemPrompt = computed(() => activeExchange.value?.debugTrace?.ragSystemPrompt || '')
@@ -688,11 +568,10 @@ async function loadPage(): Promise<void> {
         exchangeId: exchangeId.value
       })
     ])
-    activeSession.value = sessionRes.data
-    activeExchangeDetail.value = exchangeDetailRes.data
+    activeSession.value = sessionRes.data || null
+    activeExchangeDetail.value = exchangeDetailRes.data || null
     selectedTraceId.value = String(exchangeDetailRes.data?.stageTraces?.[0]?.id || '')
-    loadRetrievalObserveData()
-    loadStageBenchmarks()
+    await loadRetrievalObserveData()
   } catch (error) {
     activeSession.value = null
     activeExchangeDetail.value = null
@@ -747,11 +626,6 @@ function findStageTrace(stageTitle: string): ConversationTraceStage | null {
   return null
 }
 
-interface ExchangeStage {
-  key: string
-  title: string
-}
-
 function canOpenStage(stage: ExchangeStage): boolean {
   if (!stage) {
     return false
@@ -796,7 +670,7 @@ watchEffect(() => {
     hasExchangeDetail: Boolean(activeExchangeDetail.value),
     conversationId: conversationId.value,
     exchangeId: exchangeId.value,
-    selectedTraceid: selectedTraceId.value,
+    selectedTraceId: selectedTraceId.value,
     traceDetailOpen: traceDetailOpen.value,
     overlayTitle: overlayInspector.value?.title || ''
   }

@@ -5,6 +5,7 @@
     "axios": "^1.18.1",
     "element-plus": "^2.14.3",
     "highlight.js": "^11.11.1",
+    "json-bigint": "^1.0.0",
     "pinia": "^2.3.1",
     "vue": "^3.5.39",
     "vue-router": "^4.6.4"
@@ -25,6 +26,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",
+    "@types/json-bigint": "^1.0.4",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/tsconfig": "^0.9.1",
