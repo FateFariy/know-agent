@@ -1,7 +1,7 @@
-import { normalizeCode } from './manageFormat'
+import type { DocumentStrategyPlan, DocumentStrategyStep, StrategyStepItem } from '@/types'
 
 export interface StrategyItem {
-  type: string
+  type: number
   label: string
   description: string
 }
@@ -18,38 +18,24 @@ export interface StrategyPreviewItem extends StrategyItem {
   order: string
 }
 
-export interface PipelineStep {
-  stepNo: string
-  strategyType: string
-}
-
-export interface PipelineSteps {
-  steps: { strategyType: string }[]
-}
-
-export interface DocumentStrategyPlan {
-  parentPipeline?: PipelineSteps | null
-  childPipeline?: PipelineSteps | null
-}
-
 export const STRATEGY_LIBRARY: StrategyItem[] = [
   {
-    type: '1',
+    type: 1,
     label: '基于文档结构切块',
     description: '优先保留标题和章节边界'
   },
   {
-    type: '2',
+    type: 2,
     label: '递归分块',
     description: '对超长内容继续裁剪兜底'
   },
   {
-    type: '3',
+    type: 3,
     label: '语义分块',
     description: '优化主题边界和段落完整性'
   },
   {
-    type: '4',
+    type: 4,
     label: '大模型智能切块',
     description: '处理复杂内容和低质量文本'
   }
@@ -70,62 +56,55 @@ export const STRATEGY_PIPELINE_LIBRARY: StrategyPipelineItem[] = [
   }
 ]
 
-export function normalizeStrategyTypeList(selectedTypes: unknown[], strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): string[] {
-  const seen = new Set<string>()
+export function normalizeStrategyTypeList(selectedTypes: number[], strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): number[] {
+  const seen = new Set<number>()
   const availableTypes = new Set(strategyLibrary.map((item) => item.type))
-  const orderedTypes: string[] = [];
-  (selectedTypes ?? []).forEach((item) => {
-    const strategyType = normalizeCode(item)
-    if (!strategyType || seen.has(strategyType) || !availableTypes.has(strategyType)) {
-      return
+  const orderedTypes: number[] = []
+  selectedTypes.forEach((item) => {
+    if (item && !seen.has(item) && availableTypes.has(item)) {
+      seen.add(item)
+      orderedTypes.push(item)
     }
-    seen.add(strategyType)
-    orderedTypes.push(strategyType)
   })
 
   return orderedTypes
 }
 
-export function buildStrategyPreview(
-  selectedTypes: unknown[],
-  strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY
-): StrategyPreviewItem[] {
-  return normalizeStrategyTypeList(selectedTypes, strategyLibrary)
-    .map((type, index) => {
-      const strategy = strategyLibrary.find((item) => item.type === type)
-      return strategy ? { ...strategy, index, order: String(index + 1).padStart(2, '0') } : null
-    })
-    .filter((item): item is StrategyPreviewItem => item !== null)
+export function buildStrategyPreview(selectedTypes: number[], strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): StrategyPreviewItem[] {
+  const typeMap = new Map<number, StrategyItem>();
+  strategyLibrary.forEach(item => typeMap.set(item.type, item))
+
+  const typeList = normalizeStrategyTypeList(selectedTypes, strategyLibrary)
+
+  return typeList.map((type, index) => {
+    const strategy = typeMap.get(type)!;
+    const order = String(index + 1).padStart(2, '0')
+    return { ...strategy, index, order }
+  })
 }
 
-export function buildStrategySignature(
-  selectedTypes: unknown[],
-  strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY
-): string {
+export function buildStrategySignature(selectedTypes: number[], strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): string {
   return normalizeStrategyTypeList(selectedTypes, strategyLibrary).join('|')
 }
 
-export function resolvePlanPipeline(plan: DocumentStrategyPlan | null | undefined, pipelineKey: string | null | undefined): PipelineSteps | null {
+export function resolveStrategySteps(plan: DocumentStrategyPlan | null | undefined, pipelineKey: string | null | undefined): DocumentStrategyStep[] {
   if (!plan || !pipelineKey) {
-    return null
+    return []
   }
-  return pipelineKey === 'parent' ? plan.parentPipeline ?? null : plan.childPipeline ?? null
+  return pipelineKey === 'parent' ? plan.parentPipeline?.steps ?? [] : plan.childPipeline?.steps ?? []
 }
 
 export function extractPipelineStrategyTypes(plan: DocumentStrategyPlan | null | undefined, pipelineKey: string | null | undefined,
-                                             strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): string[] {
-  const pipeline = resolvePlanPipeline(plan, pipelineKey)
-  return Array.isArray(pipeline?.steps)
-    ? normalizeStrategyTypeList(pipeline.steps.map((item) => item.strategyType), strategyLibrary)
-    : []
+                                             strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): number[] {
+  const steps = resolveStrategySteps(plan, pipelineKey)
+  const types = steps.map((item) => item.strategyType)
+  return normalizeStrategyTypeList(types, strategyLibrary)
 }
 
-export function buildPipelineStepPayload(
-  selectedTypes: unknown[],
-  strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY
-): PipelineStep[] {
-  return buildStrategyPreview(selectedTypes, strategyLibrary).map((item, index) => ({
-    stepNo: String(index + 1),
+export function buildPipelineStepPayload(selectedTypes: number[], strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY): StrategyStepItem[] {
+  const previewItems = buildStrategyPreview(selectedTypes, strategyLibrary)
+  return previewItems.map((item, index) => ({
+    stepNo: index + 1,
     strategyType: item.type
   }))
 }

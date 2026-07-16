@@ -24,7 +24,7 @@ import type {
   DocumentProfileDetailReq,
   DocumentProfileRegenerateReq,
   DocumentProfileBatchRegenerateReq,
-  KnowledgeDocumentOptionResp,
+  KnowledgeDocumentOptionResp, QueryDocumentPageResp
 } from '@/types'
 
 export const documentApi = {
@@ -56,7 +56,7 @@ export const documentApi = {
   },
 
   // 查询文档分页
-  queryDocumentPage(params?: QueryDocumentPageReq): Promise<Response<PageResult<DocumentDetailResp>>> {
+  queryDocumentPage(params?: QueryDocumentPageReq): Promise<Response<QueryDocumentPageResp>> {
     return axios.post('/manage/document/page/query', params)
   },
 

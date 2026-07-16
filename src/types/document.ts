@@ -35,7 +35,7 @@ export interface QueryStrategyPlanReq {
 /** 策略步骤子项（公共内嵌实体） */
 export interface StrategyStepItem {
   stepNo: number;
-  strategyType: 1 | 2 | 3;
+  strategyType: number;
 }
 
 /** 确认文档策略方案请求 */
