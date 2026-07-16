@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import JSONbig from 'json-bigint';
 
 export const baseURL = (import.meta.env.MODE === 'production')
   ? '/api/v1/' // 生产环境使用相对路径，由nginx代理
@@ -12,6 +13,15 @@ const instance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  transformResponse: [
+    function(data) {
+      try {
+        return JSONbig({ storeAsString: true }).parse(data);
+      } catch {
+        return data;
+      }
+    }
+  ]
 })
 
 instance.interceptors.request.use(

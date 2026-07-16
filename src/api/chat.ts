@@ -7,6 +7,7 @@ import type {
   ChannelExecutionResp,
   ConversationStopResp,
   ConversationResetResp,
+  ConversationMemorySummaryResp,
   ConversationExchangeDetailResp,
   ChatReq,
   ConversationIdentityReq,
@@ -42,7 +43,7 @@ export const chatApi = {
   },
 
   // 重建构建会话摘要
-  rebuildSummary(params: ConversationIdentityReq): Promise<Response<ConversationResetResp>> {
+  rebuildSummary(params: ConversationIdentityReq): Promise<Response<ConversationMemorySummaryResp>> {
     return axios.post('/chat/session/summary/rebuild', params)
   },
 

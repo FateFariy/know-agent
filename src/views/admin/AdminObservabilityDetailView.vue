@@ -1,10 +1,8 @@
 <template>
   <section class="round-detail-page">
     <div class="detail-toolbar">
-      <RouterLink
-        :to="{ name: 'AdminObservabilitySession', params: { conversationId } }"
-        class="back-link"
-      >
+      <RouterLink :to="{ name: 'AdminObservabilitySession', params: { conversationId } }"
+                  class="back-link">
         <ArrowLeftIcon class="tool-icon" />
         返回会话轮次列表
       </RouterLink>
@@ -30,8 +28,8 @@
         </div>
 
         <div class="stat-badges">
-          <span class="stat-badge" :class="`badge-${statusTone(activeExchange.status)}`">
-            {{ formatStatusLabel(activeExchange.status) }}
+          <span class="stat-badge" :class="`badge-${turnStatusTone(activeExchange.turnStatus)}`">
+            {{ formatTurnStatusLabel(activeExchange.turnStatus) }}
           </span>
           <span class="stat-badge mode-badge">{{ formatChatMode(activeSession?.chatMode) }}</span>
           <span v-if="activeExchange.debugTrace?.executionMode" class="stat-badge neutral-badge">
@@ -48,15 +46,20 @@
           </div>
           <div class="meta-pair">
             <dt>执行时间</dt>
-            <dd>{{ formatDateTime(activeExchange.editTime || activeExchange.createTime) }}</dd>
+            <dd>{{ activeExchange.updateTime || activeExchange.createTime }}</dd>
           </div>
           <div class="meta-pair">
             <dt>总耗时</dt>
-            <dd>{{ activeExchange.totalResponseTimeMs ? `${activeExchange.totalResponseTimeMs} ms` : '无' }}</dd>
+            <dd>
+              {{ activeExchange.totalResponseTimeMs ? `${activeExchange.totalResponseTimeMs} ms` : '无'
+              }}
+            </dd>
           </div>
           <div class="meta-pair">
             <dt>引用 / 推荐</dt>
-            <dd>{{ activeExchange.references?.length || 0 }} / {{ activeExchange.recommendations?.length || 0 }}</dd>
+            <dd>{{ activeExchange.references?.length || 0 }} /
+              {{ activeExchange.recommendations?.length || 0 }}
+            </dd>
           </div>
           <div class="meta-pair">
             <dt>总 Token / 成本</dt>
@@ -70,37 +73,30 @@
           <span class="section-kicker">Trace Timeline</span>
           执行阶段时间线
         </h3>
-        <p class="section-desc">先浏览整个执行顺序，再点击某个阶段进入子页面查看这个阶段的详细过程。</p>
+        <p class="section-desc">
+          先浏览整个执行顺序，再点击某个阶段进入子页面查看这个阶段的详细过程。</p>
 
         <div v-if="!stageTraces.length" class="empty-card compact-empty">
           当前轮次还没有可展示的阶段轨迹。
         </div>
 
         <div v-else class="timeline-list">
-          <article
-            v-for="(trace, index) in stageTraces"
-            :key="trace.stageId"
-            class="timeline-item"
-            :class="{ active: String(trace.stageId) === selectedTraceStageId }"
-          >
+          <article v-for="(trace, index) in stageTraces" :key="trace.id" class="timeline-item"
+                   :class="{ active: String(trace.id) === selectedTraceId }">
             <div class="timeline-indicator">
-              <span class="timeline-dot" :class="`dot-${statusTone(trace.stageState)}`"></span>
+              <span class="timeline-dot" :class="`dot-${stageStateTone(trace.stageState)}`"></span>
               <span v-if="index < stageTraces.length - 1" class="timeline-line"></span>
             </div>
 
-            <button
-              type="button"
-              class="timeline-content"
-              @click="openTraceDetail(trace.stageId)"
-            >
+            <button type="button" class="timeline-content" @click="openTraceDetail(trace.id)">
               <div class="timeline-header">
                 <div class="timeline-title">
                   <strong>{{ trace.stageName }}</strong>
-                  <span class="timeline-badge" :class="`badge-${statusTone(trace.stageState)}`">
-                    {{ formatStatusLabel(trace.stageState) }}
+                  <span class="timeline-badge" :class="`badge-${stageStateTone(trace.stageState)}`">
+                    {{ formatStageStateLabel(trace.stageState) }}
                   </span>
                 </div>
-                <span class="timeline-time">{{ formatDateTime(trace.startTime) }}</span>
+                <span class="timeline-time">{{ trace.startTime }}</span>
               </div>
 
               <p class="timeline-summary">{{ trace.summaryText || '当前阶段已记录。' }}</p>
@@ -124,7 +120,8 @@
           <span class="section-kicker">Round Summary</span>
           这轮回答的关键结果
         </h3>
-        <p class="section-desc">这里是当前轮次的摘要信息，帮助你快速判断这轮是否正常，再决定要点开哪个阶段。</p>
+        <p class="section-desc">
+          这里是当前轮次的摘要信息，帮助你快速判断这轮是否正常，再决定要点开哪个阶段。</p>
 
         <div class="summary-list">
           <article v-for="stage in exchangeStages" :key="stage.key" class="summary-item">
@@ -135,12 +132,9 @@
                 <p>{{ stage.subtitle }}</p>
               </div>
               <div v-if="stage.chips?.length" class="summary-chips">
-                <span
-                  v-for="item in stage.chips"
-                  :key="`${stage.key}-${item.label}-${item.value}`"
-                  class="summary-chip"
-                  :class="`chip-${item.tone || 'neutral'}`"
-                >
+                <span v-for="item in stage.chips" :key="`${stage.key}-${item.label}-${item.value}`"
+                      class="summary-chip"
+                      :class="`chip-${item.tone || 'neutral'}`">
                   {{ item.label }}：{{ item.value }}
                 </span>
               </div>
@@ -153,23 +147,20 @@
             </div>
 
             <dl v-if="stage.textBlocks?.length" class="summary-pairs">
-              <div v-for="item in stage.textBlocks.slice(0, 2)" :key="`${stage.key}-${item.label}`" class="summary-pair">
+              <div v-for="item in stage.textBlocks.slice(0, 2)" :key="`${stage.key}-${item.label}`"
+                   class="summary-pair">
                 <dt>{{ item.label }}</dt>
                 <dd>{{ item.code ? truncate(item.value, 90) : item.value }}</dd>
               </div>
             </dl>
 
             <div v-if="stage.listBlocks?.length" class="summary-preview">
-              <span class="preview-label">{{ stage.listBlocks[0].label }}</span>
-              <p>{{ stage.listBlocks[0].items.slice(0, 2).join('；') || '无' }}</p>
+              <span class="preview-label">{{ stage.listBlocks[0]?.label }}</span>
+              <p>{{ stage.listBlocks[0]?.items.slice(0, 2).join('；') || '无' }}</p>
             </div>
 
-            <button
-              v-if="canOpenStage(stage)"
-              class="summary-link"
-              type="button"
-              @click="openSummaryStage(stage)"
-            >
+            <button v-if="canOpenStage(stage)" class="summary-link" type="button"
+                    @click="openSummaryStage(stage)">
               查看这个阶段的执行过程 →
             </button>
           </article>
@@ -187,18 +178,32 @@
           <article v-for="exec in channelExecutions" :key="exec.id" class="channel-card">
             <div class="channel-card-header">
               <strong>{{ formatChannelType(exec.channelType) }}</strong>
-              <span class="stat-badge" :class="`badge-${exec.executionState === 1 ? 'completed' : 'failed'}`">
+              <span class="stat-badge"
+                    :class="`badge-${exec.executionState === 1 ? 'completed' : 'failed'}`">
                 {{ formatExecutionState(exec.executionState) }}
               </span>
             </div>
-            <p v-if="exec.subQuestion" class="channel-sub-question">子问题 {{ exec.subQuestionIndex }}：{{ truncate(exec.subQuestion, 60) }}</p>
+            <p v-if="exec.subQuestion" class="channel-sub-question">子问题 {{ exec.subQuestionIndex
+              }}：{{
+                truncate(exec.subQuestion, 60) }}</p>
             <div class="channel-metrics">
-              <div class="metric-item"><span class="metric-label">召回数</span><span class="metric-value">{{ exec.recalledCount }}</span></div>
-              <div class="metric-item"><span class="metric-label">闸门后</span><span class="metric-value">{{ exec.acceptedCount }}</span></div>
-              <div class="metric-item"><span class="metric-label">最终选入</span><span class="metric-value metric-highlight">{{ exec.finalSelectedCount }}</span></div>
-              <div class="metric-item"><span class="metric-label">耗时</span><span class="metric-value">{{ exec.durationMs ? `${exec.durationMs} ms` : '-' }}</span></div>
-              <div class="metric-item"><span class="metric-label">平均分</span><span class="metric-value">{{ formatScore(exec.avgScore) }}</span></div>
-              <div class="metric-item"><span class="metric-label">分数区间</span><span class="metric-value">{{ formatScore(exec.minScore) }} ~ {{ formatScore(exec.maxScore) }}</span></div>
+              <div class="metric-item"><span class="metric-label">召回数</span><span
+                class="metric-value">{{
+                  exec.recalledCount }}</span></div>
+              <div class="metric-item"><span class="metric-label">闸门后</span><span
+                class="metric-value">{{
+                  exec.acceptedCount }}</span></div>
+              <div class="metric-item"><span class="metric-label">最终选入</span><span
+                class="metric-value metric-highlight">{{ exec.finalSelectedCount }}</span></div>
+              <div class="metric-item"><span class="metric-label">耗时</span><span
+                class="metric-value">{{ exec.durationMs
+                ? `${exec.durationMs} ms` : '-' }}</span></div>
+              <div class="metric-item"><span class="metric-label">平均分</span><span
+                class="metric-value">{{
+                  formatScore(exec.avgScore) }}</span></div>
+              <div class="metric-item"><span class="metric-label">分数区间</span><span
+                class="metric-value">{{
+                  formatScore(exec.minScore) }} ~ {{ formatScore(exec.maxScore) }}</span></div>
             </div>
             <div v-if="exec.errorMessage" class="channel-error">{{ exec.errorMessage }}</div>
           </article>
@@ -224,35 +229,41 @@
             <div class="results-table-wrapper">
               <table class="results-table">
                 <thead>
-                  <tr>
-                    <th>排名变化</th>
-                    <th>文档块</th>
-                    <th>原始分</th>
-                    <th>RRF 分</th>
-                    <th>Rerank 分</th>
-                    <th>状态</th>
-                  </tr>
+                <tr>
+                  <th>排名变化</th>
+                  <th>文档块</th>
+                  <th>原始分</th>
+                  <th>RRF 分</th>
+                  <th>Rerank 分</th>
+                  <th>状态</th>
+                </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="result in channel.results" :key="result.id" :class="{ 'row-selected': result.isSelected }">
-                    <td class="rank-cell">
-                      {{ result.channelRank || '-' }}
-                      <span v-if="result.finalRank" class="rank-arrow">→ {{ result.finalRank }}</span>
-                    </td>
-                    <td class="chunk-cell">
-                      <div class="chunk-doc-name">{{ result.documentName || '未知文档' }}</div>
-                      <div v-if="result.sectionPath" class="chunk-section">{{ result.sectionPath }}</div>
-                      <div v-if="result.chunkTextPreview" class="chunk-preview-text">{{ truncate(result.chunkTextPreview, 120) }}</div>
-                    </td>
-                    <td>{{ formatScore(result.originalScore) }}</td>
-                    <td>{{ formatScore(result.rrfScore) }}</td>
-                    <td>{{ formatScore(result.rerankScore) }}</td>
-                    <td>
-                      <span v-if="result.isSelected" class="selection-badge badge-selected">已选入</span>
-                      <span v-else-if="!result.gatePassed" class="selection-badge badge-filtered">闸门过滤</span>
-                      <span v-else class="selection-badge badge-omitted">未选入</span>
-                    </td>
-                  </tr>
+                <tr v-for="result in channel.results" :key="result.id"
+                    :class="{ 'row-selected': result.isSelected }">
+                  <td class="rank-cell">
+                    {{ result.channelRank || '-' }}
+                    <span v-if="result.finalRank" class="rank-arrow">→ {{ result.finalRank }}</span>
+                  </td>
+                  <td class="chunk-cell">
+                    <div class="chunk-doc-name">{{ result.documentName || '未知文档' }}</div>
+                    <div v-if="result.sectionPath" class="chunk-section">{{ result.sectionPath }}
+                    </div>
+                    <div v-if="result.chunkTextPreview" class="chunk-preview-text">{{
+                        truncate(result.chunkTextPreview, 120) }}
+                    </div>
+                  </td>
+                  <td>{{ formatScore(result.originalScore) }}</td>
+                  <td>{{ formatScore(result.rrfScore) }}</td>
+                  <td>{{ formatScore(result.rerankScore) }}</td>
+                  <td>
+                    <span v-if="result.isSelected"
+                          class="selection-badge badge-selected">已选入</span>
+                    <span v-else-if="!result.gatePassed"
+                          class="selection-badge badge-filtered">闸门过滤</span>
+                    <span v-else class="selection-badge badge-omitted">未选入</span>
+                  </td>
+                </tr>
                 </tbody>
               </table>
             </div>
@@ -274,29 +285,40 @@
           </div>
           <div class="budget-item">
             <span class="budget-label">单子问题预算</span>
-            <span class="budget-value">{{ evidenceBudgetSnapshot.perSubQuestionBudget || 0 }} 字符</span>
+            <span class="budget-value">{{ evidenceBudgetSnapshot.perSubQuestionBudget || 0
+              }} 字符</span>
           </div>
           <div class="budget-item">
             <span class="budget-label">已纳入</span>
-            <span class="budget-value metric-highlight">{{ evidenceBudgetSnapshot.renderedReferenceCount || 0 }} 条</span>
+            <span
+              class="budget-value metric-highlight">{{ evidenceBudgetSnapshot.renderedReferenceCount || 0
+              }}
+              条</span>
           </div>
           <div class="budget-item">
             <span class="budget-label">已省略</span>
-            <span class="budget-value">{{ evidenceBudgetSnapshot.omittedReferenceCount || 0 }} 条</span>
+            <span class="budget-value">{{ evidenceBudgetSnapshot.omittedReferenceCount || 0
+              }} 条</span>
           </div>
         </div>
 
         <div v-if="evidenceBudgetSnapshot.renderedReferenceDetails?.length" class="evidence-group">
           <h4 class="evidence-group-title evidence-included">已纳入 Prompt 的证据</h4>
           <ul class="evidence-list">
-            <li v-for="(detail, idx) in evidenceBudgetSnapshot.renderedReferenceDetails" :key="`rendered-${idx}`">{{ detail }}</li>
+            <li v-for="(detail, idx) in evidenceBudgetSnapshot.renderedReferenceDetails"
+                :key="`rendered-${idx}`">{{
+                detail }}
+            </li>
           </ul>
         </div>
 
         <div v-if="evidenceBudgetSnapshot.omittedReferenceDetails?.length" class="evidence-group">
           <h4 class="evidence-group-title evidence-omitted">因预算限制省略的证据</h4>
           <ul class="evidence-list">
-            <li v-for="(detail, idx) in evidenceBudgetSnapshot.omittedReferenceDetails" :key="`omitted-${idx}`">{{ detail }}</li>
+            <li v-for="(detail, idx) in evidenceBudgetSnapshot.omittedReferenceDetails"
+                :key="`omitted-${idx}`">{{
+                detail }}
+            </li>
           </ul>
         </div>
       </section>
@@ -309,18 +331,12 @@
         <p class="section-desc">查看最终喂给模型的完整 Prompt。</p>
 
         <div class="prompt-tabs">
-          <button
-            type="button"
-            class="prompt-tab"
-            :class="{ active: activePromptTab === 'system' }"
-            @click="activePromptTab = 'system'"
-          >System Prompt</button>
-          <button
-            type="button"
-            class="prompt-tab"
-            :class="{ active: activePromptTab === 'user' }"
-            @click="activePromptTab = 'user'"
-          >User Prompt</button>
+          <button type="button" class="prompt-tab" :class="{ active: activePromptTab === 'system' }"
+                  @click="activePromptTab = 'system'">System Prompt
+          </button>
+          <button type="button" class="prompt-tab" :class="{ active: activePromptTab === 'user' }"
+                  @click="activePromptTab = 'user'">User Prompt
+          </button>
         </div>
 
         <div class="prompt-content">
@@ -337,19 +353,15 @@
         <p class="section-desc">对比当前执行与历史基准（P50/P90/P99），识别异常慢的阶段。</p>
 
         <div class="benchmark-grid">
-          <article
-            v-for="trace in stageTraces.filter(t => t.durationMs)"
-            :key="trace.stageId"
-            class="benchmark-card"
-          >
+          <article v-for="trace in stageTraces.filter(t => t.durationMs)" :key="trace.id"
+                   class="benchmark-card">
             <div class="benchmark-header">
               <strong>{{ trace.stageName }}</strong>
-              <span
-                v-if="findBenchmark(trace.stageCode, trace.executionMode)"
-                class="benchmark-level"
-                :class="`level-${formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode, trace.executionMode))?.level}`"
-              >
-                {{ formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode, trace.executionMode))?.text || '-' }}
+              <span v-if="findBenchmark(trace.stageCode, trace.executionMode)"
+                    class="benchmark-level"
+                    :class="`level-${formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode, trace.executionMode))?.level}`">
+                {{ formatBenchmarkComparison(trace.durationMs, findBenchmark(trace.stageCode,
+                trace.executionMode))?.text || '-' }}
               </span>
             </div>
             <div class="benchmark-metrics">
@@ -360,19 +372,30 @@
               <template v-if="findBenchmark(trace.stageCode, trace.executionMode)">
                 <div class="bm-item">
                   <span class="bm-label">P50</span>
-                  <span class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p50DurationMs || '-' }} ms</span>
+                  <span
+                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p50DurationMs || '-'
+                    }}
+                    ms</span>
                 </div>
                 <div class="bm-item">
                   <span class="bm-label">P90</span>
-                  <span class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p90DurationMs || '-' }} ms</span>
+                  <span
+                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p90DurationMs || '-'
+                    }}
+                    ms</span>
                 </div>
                 <div class="bm-item">
                   <span class="bm-label">P99</span>
-                  <span class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p99DurationMs || '-' }} ms</span>
+                  <span
+                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).p99DurationMs || '-'
+                    }}
+                    ms</span>
                 </div>
                 <div class="bm-item">
                   <span class="bm-label">样本数</span>
-                  <span class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).sampleCount }}</span>
+                  <span
+                    class="bm-value">{{ findBenchmark(trace.stageCode, trace.executionMode).sampleCount
+                    }}</span>
                 </div>
               </template>
               <div v-else class="bm-item">
@@ -384,30 +407,30 @@
         </div>
       </section>
 
-      <div
-        v-if="traceDetailOpen && overlayInspector"
-        class="trace-overlay"
-        @click="closeTraceDetail"
-      >
+      <div v-if="traceDetailOpen && overlayInspector" class="trace-overlay"
+           @click="closeTraceDetail">
         <aside class="trace-panel" @click.stop>
           <div class="panel-head">
             <div>
               <span class="section-kicker">Trace Detail</span>
               <h3>{{ overlayInspector.title }}</h3>
-              <p class="section-desc">{{ overlayInspector.summary || '这个阶段已经执行完成，下面是它记录下来的结构化细节。' }}</p>
+              <p class="section-desc">{{ overlayInspector.summary || '这个阶段已经执行完成，下面是它记录下来的结构化细节。'
+                }}</p>
             </div>
             <button class="panel-close" type="button" @click="closeTraceDetail">关闭</button>
           </div>
 
           <div class="panel-metrics">
-            <span>状态：{{ formatStatusLabel(overlayInspector.status) }}</span>
-            <span>开始：{{ formatDateTime(overlayInspector.startTime) }}</span>
-            <span>结束：{{ formatDateTime(overlayInspector.endTime) }}</span>
-            <span>耗时：{{ overlayInspector.durationMs ? `${overlayInspector.durationMs} ms` : '无' }}</span>
+            <span>状态：{{ formatStageStateLabel(overlayInspector.stageState) }}</span>
+            <span>开始：{{ overlayInspector.startTime }}</span>
+            <span>结束：{{ overlayInspector.endTime }}</span>
+            <span>耗时：{{ overlayInspector.durationMs ? `${overlayInspector.durationMs} ms` : '无'
+              }}</span>
           </div>
 
           <div v-if="overlayInspector.summaryItems?.length" class="detail-grid">
-            <div v-for="item in overlayInspector.summaryItems" :key="`trace-item-${item.label}`" class="detail-block">
+            <div v-for="item in overlayInspector.summaryItems" :key="`trace-item-${item.label}`"
+                 class="detail-block">
               <span>{{ item.label }}</span>
               <pre v-if="item.code" class="code-block">{{ item.value }}</pre>
               <strong v-else>{{ item.value }}</strong>
@@ -415,7 +438,8 @@
           </div>
 
           <div v-if="overlayInspector.listSections?.length" class="detail-list-stack">
-            <section v-for="item in overlayInspector.listSections" :key="`trace-list-${item.label}`" class="detail-list-block">
+            <section v-for="item in overlayInspector.listSections" :key="`trace-list-${item.label}`"
+                     class="detail-list-block">
               <span>{{ item.label }}</span>
               <ol v-if="item.ordered" class="plain-list ordered-list">
                 <li v-for="(entry, index) in item.items" :key="`trace-list-${item.label}-${index}`">
@@ -431,19 +455,23 @@
           </div>
 
           <div v-if="overlayInspector.tableSections?.length" class="table-section-stack">
-            <section v-for="table in overlayInspector.tableSections" :key="`trace-table-${table.label}`" class="table-section">
+            <section v-for="table in overlayInspector.tableSections"
+                     :key="`trace-table-${table.label}`"
+                     class="table-section">
               <span class="table-label">{{ table.label }}</span>
               <div class="table-wrapper">
                 <table class="detail-table">
                   <thead>
-                    <tr>
-                      <th v-for="column in table.columns" :key="`col-${column}`">{{ column }}</th>
-                    </tr>
+                  <tr>
+                    <th v-for="column in table.columns" :key="`col-${column}`">{{ column }}</th>
+                  </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(row, rowIndex) in table.rows" :key="`row-${table.label}-${rowIndex}`">
-                      <td v-for="(cell, cellIndex) in row.cells" :key="`cell-${rowIndex}-${cellIndex}`">{{ cell }}</td>
-                    </tr>
+                  <tr v-for="(row, rowIndex) in table.rows" :key="`row-${table.label}-${rowIndex}`">
+                    <td v-for="(cell, cellIndex) in row.cells"
+                        :key="`cell-${rowIndex}-${cellIndex}`">{{ cell }}
+                    </td>
+                  </tr>
                   </tbody>
                 </table>
               </div>
@@ -453,7 +481,9 @@
           <details v-if="overlayInspector.advancedItems?.length" class="advanced-panel">
             <summary>查看这个阶段的原始快照</summary>
             <div class="advanced-grid">
-              <div v-for="item in overlayInspector.advancedItems" :key="`trace-advanced-${item.label}`" class="advanced-block">
+              <div v-for="item in overlayInspector.advancedItems"
+                   :key="`trace-advanced-${item.label}`"
+                   class="advanced-block">
                 <span>{{ item.label }}</span>
                 <pre v-if="item.code" class="code-block">{{ item.value }}</pre>
                 <strong v-else>{{ item.value }}</strong>
@@ -466,86 +496,102 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch, watchEffect } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
-import { chatApi } from '../../api/api'
+import { chatApi } from '@/api/chat'
+import type {
+  ChannelExecutionResp,
+  ConversationExchange,
+  ConversationExchangeDetailResp,
+  ConversationSessionResp,
+  ConversationTraceStage,
+  RetrievalResultResp
+} from '@/types'
+import type { ExchangeStage, StageInspector } from '@/utils/observabilityHelpers'
 import {
   buildExchangeStages,
   buildExchangeStatusNarrative,
   buildTraceStageInspector,
   buildUsageStageInspector,
-  formatChatMode,
-  formatDateTime,
-  formatExecutionMode,
-  formatRelationType,
-  formatRetrievalMode,
-  formatStatusLabel,
   formatChannelType,
+  formatChatMode,
+  formatExecutionMode,
   formatExecutionState,
   formatScore,
+  formatStageStateLabel,
+  formatTurnStatusLabel,
   groupResultsBySubQuestion,
   normalizeError,
-  stageHasAdvancedDetails,
-  statusTone,
-  truncate
-} from './observabilityHelpers'
+  stageStateTone,
+  truncate,
+  turnStatusTone
+} from '@/utils/observabilityHelpers'
 
 const route = useRoute()
 
 const loadingPage = ref(false)
-const activeSession = ref(null)
-const activeExchangeDetail = ref(null)
+const activeSession = ref<ConversationSessionResp | null>(null)
+const activeExchangeDetail = ref<ConversationExchangeDetailResp | null>(null)
 const pageError = ref('')
 const traceDetailOpen = ref(false)
-const selectedTraceStageId = ref('')
-const overlayInspector = ref(null)
-const retrievalResults = ref([])
-const channelExecutions = ref([])
+const selectedTraceId = ref('')
+const overlayInspector = ref<StageInspector | null>(null)
+const retrievalResults = ref<RetrievalResultResp[]>([])
+const channelExecutions = ref<ChannelExecutionResp[]>([])
 const loadingRetrievalData = ref(false)
 
 const conversationId = computed(() => String(route.params.conversationId || ''))
 const exchangeId = computed(() => String(route.params.exchangeId || ''))
-const activeExchange = computed(() => activeExchangeDetail.value?.exchange || null)
-const stageTraces = computed(() => activeExchangeDetail.value?.stageTraces || [])
-const activeTraceStage = computed(() => {
-  if (!selectedTraceStageId.value) {
-    return stageTraces.value[0] || null
+const activeExchange = computed<ConversationExchange | null>(() => activeExchangeDetail.value?.exchange || null)
+const stageTraces = computed<ConversationTraceStage[]>(() => activeExchangeDetail.value?.stageTraces || [])
+const activeTraceStage = computed<ConversationTraceStage | null>(() => {
+  if (!selectedTraceId.value) {
+    return stageTraces.value[0] ?? null
   }
-  return stageTraces.value.find((item) => String(item.stageId) === selectedTraceStageId.value) || stageTraces.value[0] || null
+  return stageTraces.value.find((item) => String(item.id) === selectedTraceId.value) ?? stageTraces.value[0] ?? null
 })
-const activeTraceInspector = computed(() => buildTraceStageInspector(activeTraceStage.value, activeExchange.value))
-const exchangeStages = computed(() => buildExchangeStages(activeSession.value, activeExchange.value))
+const activeTraceInspector = computed<StageInspector | null>(() => buildTraceStageInspector(activeTraceStage.value, activeExchange.value))
+const exchangeStages = computed<ExchangeStage[]>(() => buildExchangeStages(activeSession.value, activeExchange.value))
 
-const currentExchangeNarrative = computed(() => {
+const currentExchangeNarrative = computed<string>(() => {
   if (!activeExchange.value) {
     return '这页只负责看这一轮的执行链路。'
   }
   return buildExchangeStatusNarrative(activeExchange.value)
 })
 
-const totalTokenCount = computed(() => {
+const totalTokenCount = computed<number>(() => {
   const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
   return traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
 })
 
-const totalCostText = computed(() => {
+const totalCostText = computed<string>(() => {
   const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
   const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
   return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
 })
 
-const maxTraceDuration = computed(() => {
+const maxTraceDuration = computed<number>(() => {
   return stageTraces.value.reduce((max, item) => Math.max(max, Number(item?.durationMs || 0)), 0)
 })
 
-const groupedRetrievalResults = computed(() => groupResultsBySubQuestion(retrievalResults.value))
+const groupedRetrievalResults = computed<ReturnType<typeof groupResultsBySubQuestion>>(() => groupResultsBySubQuestion(retrievalResults.value))
 
-const stageBenchmarks = ref([])
+interface StageBenchmark {
+  stageCode: string
+  executionMode: string
+  p50DurationMs: number
+  p90DurationMs: number
+  p99DurationMs: number
+  sampleCount: number
+}
+
+const stageBenchmarks = ref<StageBenchmark[]>([])
 const loadingBenchmarks = ref(false)
 
-async function loadStageBenchmarks() {
+async function loadStageBenchmarks(): Promise<void> {
   loadingBenchmarks.value = true
   try {
     const data = await chatApi.getStageBenchmarks()
@@ -557,7 +603,7 @@ async function loadStageBenchmarks() {
   }
 }
 
-function findBenchmark(stageCode, executionMode) {
+function findBenchmark(stageCode: string, executionMode: string): StageBenchmark | null {
   if (!stageBenchmarks.value || !stageBenchmarks.value.length) {
     return null
   }
@@ -566,7 +612,12 @@ function findBenchmark(stageCode, executionMode) {
   ) || null
 }
 
-function formatBenchmarkComparison(actualMs, benchmark) {
+interface BenchmarkComparison {
+  level: 'excellent' | 'good' | 'warning' | 'slow'
+  text: string
+}
+
+function formatBenchmarkComparison(actualMs: number, benchmark: StageBenchmark): BenchmarkComparison | null {
   if (!benchmark || !actualMs) {
     return null
   }
@@ -597,19 +648,25 @@ const ragSystemPrompt = computed(() => activeExchange.value?.debugTrace?.ragSyst
 const ragUserPrompt = computed(() => activeExchange.value?.debugTrace?.ragUserPrompt || '')
 const hasPromptData = computed(() => Boolean(ragSystemPrompt.value || ragUserPrompt.value))
 
-async function loadRetrievalObserveData() {
+async function loadRetrievalObserveData(): Promise<void> {
   if (!conversationId.value || !exchangeId.value) {
     return
   }
   loadingRetrievalData.value = true
   try {
-    const [results, executions] = await Promise.all([
-      chatApi.getRetrievalResults(conversationId.value, exchangeId.value),
-      chatApi.getChannelExecutions(conversationId.value, exchangeId.value)
+    const [resultsRes, executionsRes] = await Promise.all([
+      chatApi.getRetrievalResults({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      }),
+      chatApi.getChannelExecutions({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      })
     ])
-    retrievalResults.value = results || []
-    channelExecutions.value = executions || []
-  } catch (error) {
+    retrievalResults.value = resultsRes.data || []
+    channelExecutions.value = executionsRes.data || []
+  } catch {
     retrievalResults.value = []
     channelExecutions.value = []
   } finally {
@@ -617,20 +674,23 @@ async function loadRetrievalObserveData() {
   }
 }
 
-async function loadPage() {
+async function loadPage(): Promise<void> {
   if (!conversationId.value || !exchangeId.value) {
     return
   }
   loadingPage.value = true
   pageError.value = ''
   try {
-    const [session, exchangeDetail] = await Promise.all([
-      chatApi.getSession(conversationId.value),
-      chatApi.getExchangeDetail(conversationId.value, exchangeId.value)
+    const [sessionRes, exchangeDetailRes] = await Promise.all([
+      chatApi.getSessionDetail({ conversationId: conversationId.value }),
+      chatApi.getExchangeDetail({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      })
     ])
-    activeSession.value = session
-    activeExchangeDetail.value = exchangeDetail
-    selectedTraceStageId.value = String(exchangeDetail?.stageTraces?.[0]?.stageId || '')
+    activeSession.value = sessionRes.data
+    activeExchangeDetail.value = exchangeDetailRes.data
+    selectedTraceId.value = String(exchangeDetailRes.data?.stageTraces?.[0]?.id || '')
     loadRetrievalObserveData()
     loadStageBenchmarks()
   } catch (error) {
@@ -642,18 +702,18 @@ async function loadPage() {
   }
 }
 
-function openTraceDetail(stageId) {
-  selectedTraceStageId.value = String(stageId || '')
+function openTraceDetail(id: string | number): void {
+  selectedTraceId.value = String(id || '')
   overlayInspector.value = buildTraceStageInspector(activeTraceStage.value, activeExchange.value)
   traceDetailOpen.value = true
 }
 
-function closeTraceDetail() {
+function closeTraceDetail(): void {
   traceDetailOpen.value = false
   overlayInspector.value = null
 }
 
-function traceBarWidth(trace) {
+function traceBarWidth(trace: ConversationTraceStage): string {
   const duration = Number(trace?.durationMs || 0)
   const maxDuration = maxTraceDuration.value
   if (!duration || !maxDuration) {
@@ -662,7 +722,7 @@ function traceBarWidth(trace) {
   return `${Math.max((duration / maxDuration) * 100, 6)}%`
 }
 
-function findStageTrace(stageTitle) {
+function findStageTrace(stageTitle: string): ConversationTraceStage | null {
   if (!stageTitle) {
     return null
   }
@@ -687,14 +747,19 @@ function findStageTrace(stageTitle) {
   return null
 }
 
-function canOpenStage(stage) {
+interface ExchangeStage {
+  key: string
+  title: string
+}
+
+function canOpenStage(stage: ExchangeStage): boolean {
   if (!stage) {
     return false
   }
   return stage.key === 'usage' || Boolean(findStageTrace(stage.title))
 }
 
-function openSummaryStage(stage) {
+function openSummaryStage(stage: ExchangeStage): void {
   if (!stage) {
     return
   }
@@ -707,7 +772,7 @@ function openSummaryStage(stage) {
   if (!trace) {
     return
   }
-  selectedTraceStageId.value = String(trace.stageId)
+  selectedTraceId.value = String(trace.id)
   overlayInspector.value = buildTraceStageInspector(trace, activeExchange.value)
   traceDetailOpen.value = true
 }
@@ -717,7 +782,7 @@ watch([conversationId, exchangeId], () => {
   activeExchangeDetail.value = null
   traceDetailOpen.value = false
   overlayInspector.value = null
-  selectedTraceStageId.value = ''
+  selectedTraceId.value = ''
   loadPage()
 }, { immediate: true })
 
@@ -731,7 +796,7 @@ watchEffect(() => {
     hasExchangeDetail: Boolean(activeExchangeDetail.value),
     conversationId: conversationId.value,
     exchangeId: exchangeId.value,
-    selectedTraceStageId: selectedTraceStageId.value,
+    selectedTraceid: selectedTraceId.value,
     traceDetailOpen: traceDetailOpen.value,
     overlayTitle: overlayInspector.value?.title || ''
   }
@@ -759,7 +824,10 @@ watchEffect(() => {
   gap: 8px;
 }
 
-.tool-icon { width: 16px; height: 16px; }
+.tool-icon {
+  width: 16px;
+  height: 16px;
+}
 
 .back-link,
 .ghost-button {
@@ -781,7 +849,10 @@ watchEffect(() => {
   background: var(--color-surface-soft);
 }
 
-.ghost-button:disabled { opacity: 0.55; cursor: default; }
+.ghost-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 /* ── Page Header ── */
 .page-header {
@@ -832,12 +903,35 @@ watchEffect(() => {
   font-weight: 600;
 }
 
-.mode-badge { background: rgba(23, 48, 79, 0.07); color: #17304f; }
-.neutral-badge { background: rgba(23, 48, 79, 0.06); color: var(--color-muted-strong); }
-.badge-completed { background: rgba(21, 115, 91, 0.1); color: var(--color-success); }
-.badge-failed { background: rgba(179, 76, 47, 0.1); color: var(--color-danger); }
-.badge-stopped { background: rgba(168, 101, 32, 0.1); color: var(--color-warning); }
-.badge-running { background: rgba(13, 124, 124, 0.1); color: #0d7c7c; }
+.mode-badge {
+  background: rgba(23, 48, 79, 0.07);
+  color: #17304f;
+}
+
+.neutral-badge {
+  background: rgba(23, 48, 79, 0.06);
+  color: var(--color-muted-strong);
+}
+
+.badge-completed {
+  background: rgba(21, 115, 91, 0.1);
+  color: var(--color-success);
+}
+
+.badge-failed {
+  background: rgba(179, 76, 47, 0.1);
+  color: var(--color-danger);
+}
+
+.badge-stopped {
+  background: rgba(168, 101, 32, 0.1);
+  color: var(--color-warning);
+}
+
+.badge-running {
+  background: rgba(13, 124, 124, 0.1);
+  color: #0d7c7c;
+}
 
 .header-meta {
   display: flex;
@@ -910,10 +1004,21 @@ watchEffect(() => {
   border: 2px solid #fff;
 }
 
-.dot-running { background: #0d7c7c; }
-.dot-completed { background: var(--color-success); }
-.dot-failed { background: var(--color-danger); }
-.dot-stopped { background: var(--color-warning); }
+.dot-running {
+  background: #0d7c7c;
+}
+
+.dot-completed {
+  background: var(--color-success);
+}
+
+.dot-failed {
+  background: var(--color-danger);
+}
+
+.dot-stopped {
+  background: var(--color-warning);
+}
 
 .timeline-line {
   width: 2px;
@@ -1076,10 +1181,25 @@ watchEffect(() => {
   font-weight: 600;
 }
 
-.chip-neutral { background: rgba(23, 48, 79, 0.06); color: var(--color-muted-strong); }
-.chip-completed { background: rgba(21, 115, 91, 0.1); color: var(--color-success); }
-.chip-failed { background: rgba(179, 76, 47, 0.1); color: var(--color-danger); }
-.chip-warning { background: rgba(168, 101, 32, 0.1); color: var(--color-warning); }
+.chip-neutral {
+  background: rgba(23, 48, 79, 0.06);
+  color: var(--color-muted-strong);
+}
+
+.chip-completed {
+  background: rgba(21, 115, 91, 0.1);
+  color: var(--color-success);
+}
+
+.chip-failed {
+  background: rgba(179, 76, 47, 0.1);
+  color: var(--color-danger);
+}
+
+.chip-warning {
+  background: rgba(168, 101, 32, 0.1);
+  color: var(--color-warning);
+}
 
 .summary-metrics {
   display: flex;
@@ -1738,10 +1858,25 @@ watchEffect(() => {
   font-weight: 600;
 }
 
-.level-excellent { background: #d4edda; color: #155724; }
-.level-good { background: #d1ecf1; color: #0c5460; }
-.level-warning { background: #fff3cd; color: #856404; }
-.level-slow { background: #f8d7da; color: #721c24; }
+.level-excellent {
+  background: #d4edda;
+  color: #155724;
+}
+
+.level-good {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.level-warning {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.level-slow {
+  background: #f8d7da;
+  color: #721c24;
+}
 
 .benchmark-metrics {
   display: grid;
@@ -1758,7 +1893,15 @@ watchEffect(() => {
   font-size: 12px;
 }
 
-.bm-label { color: var(--color-muted); }
-.bm-value { font-weight: 600; }
-.bm-actual { color: var(--color-primary); }
+.bm-label {
+  color: var(--color-muted);
+}
+
+.bm-value {
+  font-weight: 600;
+}
+
+.bm-actual {
+  color: var(--color-primary);
+}
 </style>

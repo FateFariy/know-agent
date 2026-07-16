@@ -4,7 +4,7 @@ export interface ChatReq {
   question: string;
   conversationId?: string;
   /** 聊天模式 */
-  chatMode: "document" | "open_chat" | "auto_document";
+  chatMode: 'document' | 'open_chat' | 'auto_document';
   selectedDocumentId?: string;
 }
 
@@ -193,7 +193,7 @@ export interface ConversationExchange {
   recommendations: string[];
   usedTools: string[];
   debugTrace: ChatDebugTrace | null;
-  status: number;
+  turnStatus: number;
   errorMessage: string;
   firstResponseTimeMs: number;
   totalResponseTimeMs: number;
@@ -204,7 +204,7 @@ export interface ConversationExchange {
 /** 会话记忆摘要 */
 export interface ConversationMemorySummaryResp {
   conversationId: string;
-  IsCompressed: boolean;
+  isCompressed: boolean;
   coveredExchangeId: string;
   coveredExchangeCount: number;
   compressionCount: number;
@@ -225,7 +225,7 @@ export interface ConversationTraceStage {
   stageLevel: number;
   parentStageId: string;
   executionMode: string;
-  stageState: string;
+  stageState: number;
   startTime: string;
   endTime: string;
   durationMs: number;
@@ -251,7 +251,7 @@ export interface ConversationSessionResp {
   latestUserMessage: string;
   latestAssistantMessage: string;
   latestExchangeId: string;
-  latestTurnStatus: string;
+  latestTurnStatus: number;
   latestTurnErrorMessage: string;
   chatMode: string;
   selectedDocumentId: string;
@@ -315,6 +315,8 @@ export interface RetrievalResultResp {
   chunkTextPreview: string;
   chunkCharCount: number;
   createTime: string;
+  documentId: string;
+  documentName: string;
 }
 
 /** 渠道执行明细 */
@@ -338,4 +340,93 @@ export interface ChannelExecutionResp {
   minScore: number;
   errorMessage: string;
   createTime: string;
+}
+
+export interface Snapshot {
+  recommendationCount?: number;
+  recommendations?: string[];
+  finalStatus?: string;
+  referenceCount?: number;
+  answerLength?: number;
+  errorMessage?: string;
+  clarificationReply?: string;
+  clarificationReason?: string;
+  clarificationOptions?: string[];
+  targetSection?: string;
+  parentSection?: string;
+  childCount?: number;
+  previousSibling?: string;
+  nextSibling?: string;
+  answer?: string;
+  targetItemIndex?: string,
+  notes?: string[],
+  matchedItemCount?: number;
+  retrievalQuestion?: string;
+  usedChannels?: string[];
+  retrievalNotes?: string[];
+  subQuestionCount?: number;
+  subQuestions?: (SubQuestion | string)[];
+  references?: Reference[];
+  totalBudget?: number;
+  perSubQuestionBudget?: number;
+  renderedReferenceCount?: number;
+  omittedReferenceCount?: number;
+  renderedReferenceDetails?: string[];
+  omittedReferenceDetails?: string[];
+  systemPrompt?: string;
+  userPrompt?: string;
+  firstResponseTimeMs?: number;
+  chatMode?: string;
+  executionMode?: string;
+  requiresRealTimeSearch?: boolean;
+  requiresCurrentDateAnchoring?: boolean;
+  confidence?: number;
+  routeStatus?: string;
+  candidateDocumentCount?: number;
+  confidentTopDocument?: boolean;
+  topDocumentId?: string;
+  topDocumentName?: string;
+  targetSectionHint?: string;
+  navigationSummary?: string;
+  compressionApplied?: boolean;
+  coveredExchangeId?: string;
+  coveredExchangeCount?: number;
+  compressionCount?: number;
+  longTermSummary?: string;
+  recentTranscript?: string;
+  recentQuestionTranscript?: string;
+  originalQuestion?: string;
+  historyContext?: string;
+  rewriteQuestion?: string;
+  rawModelOutput?: string;
+  rewriteOverrideEnabled?: boolean;
+  rewriteTemperature?: number;
+  rewriteTopP?: number;
+  rewriteThinking?: boolean;
+}
+
+export interface SubQuestion {
+  index: number;
+  question: string;
+  referenceCount: number;
+  documentCount: number;
+  fusedCandidateCount: number;
+  parentCandidateCount: number;
+  rerankedCandidateCount: number;
+  channelTraces: ChannelTrace[];
+  references: Reference[];
+}
+
+export interface ChannelTrace {
+  channelName: string;
+  recalledCount: number;
+  acceptedCount: number;
+}
+
+export interface Reference {
+  referenceId: string;
+  documentName: string;
+  title: string;
+  sectionPath: string;
+  channel: string;
 }

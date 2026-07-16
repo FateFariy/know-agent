@@ -44,7 +44,7 @@
         <ol class="flow-list">
           <li>
             <strong>上传文档</strong>
-            <span>通过假登录后的管理台上传 PDF / Word / Markdown 文档。</span>
+            <span>登录管理后台上传 PDF / Word / Markdown 文档。</span>
           </li>
           <li>
             <strong>查看系统推荐策略</strong>

@@ -1,3 +1,4 @@
+/** 通用格式化函数 */
 /**
  * 把后端返回的各种数字 / 空值统一规整成字符串 code。
  *
@@ -78,7 +79,7 @@ export function formatFileSize(value: unknown): string {
  * @param value - 表示计数的数值（数字或数字字符串）
  * @returns 千位分隔符格式的计数字符串（如 `1,234`），无效时返回 `'0'`
  */
-export function formatCount(value: unknown): string {
+export function formatCount(value: string | number): string {
   const count = Number(value ?? 0);
   if (!Number.isFinite(count)) {
     return '0';

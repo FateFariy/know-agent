@@ -15,12 +15,8 @@
           <ArrowPathIcon class="tool-icon" />
           {{ loadingSession ? '刷新中...' : '刷新会话详情' }}
         </button>
-        <button
-          class="primary-button"
-          type="button"
-          :disabled="!activeSession || rebuildingSummary"
-          @click="rebuildSummary"
-        >
+        <button class="primary-button" type="button" :disabled="!activeSession || rebuildingSummary"
+          @click="rebuildSummary">
           <SparklesIcon class="tool-icon" />
           {{ rebuildingSummary ? '正在重建摘要...' : '重建长期摘要' }}
         </button>
@@ -45,8 +41,9 @@
         <div class="stat-badges">
           <span class="stat-badge mode-badge">{{ formatChatMode(activeSession.chatMode) }}</span>
           <span v-if="activeSession.running" class="stat-badge running-badge">当前会话仍在执行</span>
-          <span v-else-if="activeSession.latestTurnStatus" class="stat-badge" :class="`badge-${statusTone(activeSession.latestTurnStatus)}`">
-            最近一轮{{ formatStatusLabel(activeSession.latestTurnStatus) }}
+          <span v-else-if="activeSession.latestTurnStatus" class="stat-badge"
+            :class="`badge-${turnStatusTone(activeSession.latestTurnStatus)}`">
+            最近一轮{{ formatStageStateLabel(activeSession.latestTurnStatus) }}
           </span>
           <span class="stat-badge neutral-badge">会话ID {{ activeSession.conversationId }}</span>
           <span v-for="item in sessionMetrics" :key="item.label" class="stat-badge">
@@ -74,19 +71,23 @@
           </div>
           <div class="context-item">
             <dt>Checkpoint / 消息数</dt>
-            <dd>{{ activeSession.checkpointCount || 0 }} / {{ activeSession.messageCount || 0 }}</dd>
+            <dd>{{ activeSession.checkpointCount || 0 }} / {{ activeSession.messageCount || 0 }}
+            </dd>
           </div>
         </dl>
 
-        <div v-if="activeSession.memorySummary?.compressionApplied" class="memory-block">
+        <div v-if="activeSession.memorySummary?.isCompressed">" class="memory-block">
           <h4 class="memory-title">
             <span class="section-kicker">Memory</span>
             长期摘要快照
           </h4>
           <div class="memory-chips">
-            <span class="memory-chip">covered {{ activeSession.memorySummary?.coveredExchangeCount ?? 0 }}</span>
-            <span class="memory-chip">version {{ activeSession.memorySummary?.summaryVersion ?? 0 }}</span>
-            <span class="memory-chip">compress {{ activeSession.memorySummary?.compressionCount ?? 0 }}</span>
+            <span class="memory-chip">covered {{ activeSession.memorySummary?.coveredExchangeCount ?? 0
+            }}</span>
+            <span class="memory-chip">version {{ activeSession.memorySummary?.summaryVersion ?? 0
+            }}</span>
+            <span class="memory-chip">compress {{ activeSession.memorySummary?.compressionCount ?? 0
+            }}</span>
           </div>
           <pre class="code-block">{{ activeSession.memorySummary?.summaryText || '无' }}</pre>
         </div>
@@ -108,12 +109,8 @@
         </div>
 
         <div v-else class="rounds-list">
-          <article
-            v-for="(exchange, index) in assistantExchanges"
-            :key="exchange.exchangeId"
-            class="round-item"
-            :class="`status-${statusTone(exchange.status)}`"
-          >
+          <article v-for="(exchange, index) in assistantExchanges" :key="exchange.exchangeId" class="round-item"
+            :class="`status-${turnStatusTone(exchange.turnStatus)}`">
             <div class="round-indicator">
               <span class="round-dot"></span>
               <span v-if="index < assistantExchanges.length - 1" class="round-line"></span>
@@ -123,23 +120,27 @@
               <div class="round-header">
                 <div class="round-badges">
                   <span class="round-seq">第 {{ index + 1 }} 轮</span>
-                  <span class="round-badge" :class="`badge-${statusTone(exchange.status)}`">
-                    {{ formatStatusLabel(exchange.status) }}
+                  <span class="round-badge" :class="`badge-${turnStatusTone(exchange.turnStatus)}`">
+                    {{ formatStageStateLabel(exchange.turnStatus) }}
                   </span>
                   <span v-if="exchange.debugTrace?.executionMode" class="round-badge mode-badge">
                     {{ formatExecutionMode(exchange.debugTrace.executionMode) }}
                   </span>
                 </div>
-                <span class="round-time">{{ formatDateTime(exchange.editTime || exchange.createTime) }}</span>
+                <span class="round-time">{{ exchange.updateTime || exchange.createTime }}</span>
               </div>
 
               <div class="round-qa">
-                <p class="qa-question"><strong>问：</strong>{{ exchange.question || '未记录问题' }}</p>
-                <p class="qa-answer"><strong>答：</strong>{{ truncate(exchange.answer || '还没有回答内容', 200) }}</p>
+                <p class="qa-question"><strong>问：</strong>{{ exchange.question || '未记录问题' }}
+                </p>
+                <p class="qa-answer">
+                  <strong>答：</strong>{{ truncate(exchange.answer || '还没有回答内容', 200) }}
+                </p>
               </div>
 
               <div class="round-meta">
-                <span>耗时 {{ exchange.totalResponseTimeMs ? `${exchange.totalResponseTimeMs} ms` : '无' }}</span>
+                <span>耗时 {{ exchange.totalResponseTimeMs ? `${exchange.totalResponseTimeMs} ms` : '无'
+                }}</span>
                 <span>引用 {{ exchange.references?.length || 0 }}</span>
                 <span>推荐 {{ exchange.recommendations?.length || 0 }}</span>
                 <span>Token {{ exchangeTokenCount(exchange) }}</span>
@@ -155,40 +156,43 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ArrowLeftIcon, ArrowPathIcon, SparklesIcon } from '@heroicons/vue/24/outline'
-import { chatApi } from '../../api/api'
+import { chatApi } from '@/api/chat'
+import type { ConversationExchange, ConversationSessionResp } from '@/types'
 import {
   formatChatMode,
-  formatDateTime,
-  formatExecutionMode,
-  formatStatusLabel,
+  formatExecutionMode, formatStageStateLabel,
   listAssistantExchanges,
   normalizeError,
   sessionPreview,
   sessionTitle,
-  statusTone,
-  truncate
-} from './observabilityHelpers'
+  truncate, turnStatusTone
+} from '@/utils/observabilityHelpers'
 
 const route = useRoute()
 
 const loadingSession = ref(false)
 const pollingSession = ref(false)
-const activeSession = ref(null)
+const activeSession = ref<ConversationSessionResp | null>(null)
 const pageError = ref('')
 const rebuildingSummary = ref(false)
 
 const POLL_INTERVAL_MS = 2500
-let pollTimer = 0
+let pollTimer: ReturnType<typeof setTimeout> = 0
 let sessionRequestInFlight = false
 
 const conversationId = computed(() => String(route.params.conversationId || ''))
-const assistantExchanges = computed(() => listAssistantExchanges(activeSession.value))
+const assistantExchanges = computed<ConversationExchange[]>(() => listAssistantExchanges(activeSession.value))
 
-const sessionMetrics = computed(() => {
+interface SessionMetric {
+  label: string
+  value: string | number
+}
+
+const sessionMetrics = computed<SessionMetric[]>(() => {
   if (!activeSession.value) {
     return []
   }
@@ -203,16 +207,20 @@ const sessionMetrics = computed(() => {
     },
     {
       label: '长期摘要',
-      value: activeSession.value.memorySummary?.compressionApplied ? '已形成' : '未形成'
+      value: activeSession.value.memorySummary?.isCompressed ? '已形成' : '未形成'
     },
     {
       label: '最近更新时间',
-      value: formatDateTime(activeSession.value.updatedAt)
+      value: activeSession.value.updatedTime
     }
   ]
 })
 
-async function loadSession(options = {}) {
+interface LoadSessionOptions {
+  silent?: boolean
+}
+
+async function loadSession(options: LoadSessionOptions = {}): Promise<void> {
   if (!conversationId.value || sessionRequestInFlight) {
     return
   }
@@ -227,7 +235,8 @@ async function loadSession(options = {}) {
   pageError.value = ''
 
   try {
-    activeSession.value = await chatApi.getSession(conversationId.value)
+    const { data } = await chatApi.getSessionDetail({ conversationId: conversationId.value })
+    activeSession.value = data || null
   } catch (error) {
     activeSession.value = null
     pageError.value = normalizeError(error, '加载会话详情失败')
@@ -239,7 +248,7 @@ async function loadSession(options = {}) {
   }
 }
 
-function schedulePolling() {
+function schedulePolling(): void {
   clearTimeout(pollTimer)
   if (!activeSession.value?.running) {
     return
@@ -249,7 +258,7 @@ function schedulePolling() {
   }, POLL_INTERVAL_MS)
 }
 
-async function rebuildSummary() {
+async function rebuildSummary(): Promise<void> {
   if (!conversationId.value || rebuildingSummary.value) {
     return
   }
@@ -258,11 +267,11 @@ async function rebuildSummary() {
   pageError.value = ''
 
   try {
-    const summary = await chatApi.rebuildConversationSummary(conversationId.value)
+    const { data } = await chatApi.rebuildSummary({ conversationId: conversationId.value })
     if (activeSession.value?.conversationId === conversationId.value) {
       activeSession.value = {
         ...activeSession.value,
-        memorySummary: summary
+        memorySummary: data || null
       }
     }
   } catch (error) {
@@ -272,7 +281,7 @@ async function rebuildSummary() {
   }
 }
 
-function exchangeTarget(exchange) {
+function exchangeTarget(exchange: ConversationExchange) {
   return {
     name: 'AdminObservabilityExchangeDetail',
     params: {
@@ -282,13 +291,13 @@ function exchangeTarget(exchange) {
   }
 }
 
-function exchangeTokenCount(exchange) {
+function exchangeTokenCount(exchange: ConversationExchange): string | number {
   const traces = exchange?.debugTrace?.modelUsageTraces || []
   const total = traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
   return total || '无'
 }
 
-function exchangeCost(exchange) {
+function exchangeCost(exchange: ConversationExchange): string {
   const traces = exchange?.debugTrace?.modelUsageTraces || []
   const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
   return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
@@ -330,7 +339,10 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.tool-icon { width: 16px; height: 16px; }
+.tool-icon {
+  width: 16px;
+  height: 16px;
+}
 
 .back-link,
 .ghost-button {
@@ -365,9 +377,15 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.primary-button:hover:not(:disabled) { opacity: 0.88; }
+.primary-button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .primary-button:disabled,
-.ghost-button:disabled { opacity: 0.55; cursor: default; }
+.ghost-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 .live-chip {
   display: inline-flex;
@@ -437,16 +455,50 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.mode-badge { background: rgba(23, 48, 79, 0.07); color: #17304f; }
-.running-badge { background: rgba(13, 124, 124, 0.1); color: #0d7c7c; }
-.neutral-badge { background: rgba(23, 48, 79, 0.06); color: var(--color-muted-strong); }
-.badge-completed { background: rgba(21, 115, 91, 0.1); color: var(--color-success); }
-.badge-failed { background: rgba(179, 76, 47, 0.1); color: var(--color-danger); }
-.badge-stopped { background: rgba(168, 101, 32, 0.1); color: var(--color-warning); }
-.badge-running { background: rgba(13, 124, 124, 0.1); color: #0d7c7c; }
+.mode-badge {
+  background: rgba(23, 48, 79, 0.07);
+  color: #17304f;
+}
 
-.stat-label { color: var(--color-muted); font-weight: 400; }
-.stat-value { color: var(--color-text-strong); font-family: 'Fira Code', var(--font-sans); }
+.running-badge {
+  background: rgba(13, 124, 124, 0.1);
+  color: #0d7c7c;
+}
+
+.neutral-badge {
+  background: rgba(23, 48, 79, 0.06);
+  color: var(--color-muted-strong);
+}
+
+.badge-completed {
+  background: rgba(21, 115, 91, 0.1);
+  color: var(--color-success);
+}
+
+.badge-failed {
+  background: rgba(179, 76, 47, 0.1);
+  color: var(--color-danger);
+}
+
+.badge-stopped {
+  background: rgba(168, 101, 32, 0.1);
+  color: var(--color-warning);
+}
+
+.badge-running {
+  background: rgba(13, 124, 124, 0.1);
+  color: #0d7c7c;
+}
+
+.stat-label {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.stat-value {
+  color: var(--color-text-strong);
+  font-family: 'Fira Code', var(--font-sans);
+}
 
 /* ── Context Section ── */
 .context-section {
@@ -475,7 +527,9 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
-.context-item:last-child { border-bottom: none; }
+.context-item:last-child {
+  border-bottom: none;
+}
 
 .context-item dt {
   flex-shrink: 0;
@@ -579,10 +633,21 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-.status-running .round-dot { background: #0d7c7c; }
-.status-completed .round-dot { background: var(--color-success); }
-.status-failed .round-dot { background: var(--color-danger); }
-.status-stopped .round-dot { background: var(--color-warning); }
+.status-running .round-dot {
+  background: #0d7c7c;
+}
+
+.status-completed .round-dot {
+  background: var(--color-success);
+}
+
+.status-failed .round-dot {
+  background: var(--color-danger);
+}
+
+.status-stopped .round-dot {
+  background: var(--color-warning);
+}
 
 .round-line {
   width: 2px;
@@ -653,8 +718,13 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.qa-question { color: var(--color-text); }
-.qa-answer { color: var(--color-muted-strong); }
+.qa-question {
+  color: var(--color-text);
+}
+
+.qa-answer {
+  color: var(--color-muted-strong);
+}
 
 .round-meta {
   display: flex;
@@ -684,7 +754,9 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
 }
 
-.compact-empty { padding: 24px 16px; }
+.compact-empty {
+  padding: 24px 16px;
+}
 
 .inline-notice {
   padding: 10px 14px;

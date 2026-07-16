@@ -83,8 +83,8 @@
               <span class="chip mode-chip">{{ formatChatMode(session.chatMode) }}</span>
               <span v-if="session.running" class="chip running-chip">实时执行中</span>
               <span v-else-if="session.latestTurnStatus" class="chip"
-                    :class="`chip-${statusTone(session.latestTurnStatus)}`">
-                {{ formatStatusLabel(session.latestTurnStatus) }}
+                    :class="`chip-${turnStatusTone(session.latestTurnStatus)}`">
+                {{ formatTurnStatusLabel(session.latestTurnStatus) }}
               </span>
             </div>
             <span class="session-time">{{ formatTime(session.updatedTime) }}</span>
@@ -160,14 +160,12 @@ import type {
 } from '@/types'
 import {
   formatChatMode,
-  formatStatusLabel,
-  formatTime,
+  formatTime, formatTurnStatusLabel,
   normalizeError,
   sessionMessageCount,
   sessionPreview,
   sessionTitle,
-  statusTone,
-  truncate
+  truncate, turnStatusTone
 } from '@/utils/observabilityHelpers'
 
 const sessions = ref<ConversationSessionResp[]>([])
@@ -198,10 +196,10 @@ const summaryStats = computed<SummaryStat[]>(() => {
     if (session.running) {
       running++
     }
-    if (session.chatMode === 'DOCUMENT') {
+    if (session.chatMode === 'document') {
       documentMode++
     }
-    if (session.latestTurnStatus === 'FAILED') {
+    if (session.latestTurnStatus === 3) {
       failed++
     }
   }
@@ -273,7 +271,7 @@ function sessionTone(session: ConversationSessionResp): string {
   if (session.running) {
     return 'running'
   }
-  return statusTone(session.latestTurnStatus)
+  return formatTurnStatusLabel(session.latestTurnStatus)
 }
 
 function goPage(nextPageNo: number | string): void {
@@ -359,7 +357,7 @@ function exchangeLinkLabel(session: ConversationSessionResp): string {
   if (session.running) {
     return '直达当前轮次'
   }
-  if (session.latestTurnStatus === 'FAILED' || session.latestTurnStatus === 'STOPPED') {
+  if (session.latestTurnStatus === 2 || session.latestTurnStatus === 3) {
     return '直达异常轮次'
   }
   return '直达最近轮次'
