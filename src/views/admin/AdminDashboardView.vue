@@ -70,7 +70,9 @@
         </div>
 
         <div v-if="loading" class="empty-block">正在加载后台概览...</div>
-        <div v-else-if="!documents.length" class="empty-block">当前还没有文档，先去“文档接入”页面上传一份资料。</div>
+        <div v-else-if="!documents.length" class="empty-block">
+          当前还没有文档，先去“文档接入”页面上传一份资料。
+        </div>
 
         <div v-else class="recent-list">
           <article v-for="item in documents.slice(0, 6)" :key="item.documentId" class="recent-item">
@@ -92,13 +94,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { manageApi } from '../../api/api'
-import AdminStatusBadge from '../../components/admin/AdminStatusBadge.vue'
-import { formatCount, hasCode } from '../../utils/manageFormat'
+import { documentApi } from '@/api/document'
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
+import { formatCount } from '@/utils/format.ts'
+import type { DocumentDetailResp } from '@/types'
 
 const router = useRouter()
 const loading = ref(false)
-const documents = ref([])
+const documents = ref<DocumentDetailResp[]>([])
 const summary = reactive({
   total: 0,
   parseSuccess: 0,
@@ -110,17 +113,30 @@ async function loadDashboard() {
   loading.value = true
 
   try {
-    const data = await manageApi.queryDocumentPage({
+    const { data } = await documentApi.queryDocumentPage({
       pageNo: 1,
       pageSize: 50,
       keyword: ''
     })
-    documents.value = Array.isArray(data?.records) ? data.records : []
-
-    summary.total = Number(data?.total || documents.value.length || 0)
-    summary.parseSuccess = documents.value.filter((item) => hasCode(item.parseStatus, 3)).length
-    summary.strategyConfirmed = documents.value.filter((item) => hasCode(item.strategyStatus, 3)).length
-    summary.indexSuccess = documents.value.filter((item) => hasCode(item.indexStatus, 3)).length
+    documents.value = data?.records || []
+    summary.total = data?.total || documents.value.length || 0
+    let parseSuccess = 0
+    let strategyConfirmed = 0
+    let indexSuccess = 0
+    documents.value.forEach((item) => {
+      if (item.parseStatus === 3) {
+        parseSuccess++
+      }
+      if (item.strategyStatus === 3) {
+        strategyConfirmed++
+      }
+      if (item.indexStatus === 3) {
+        indexSuccess++
+      }
+    })
+    summary.parseSuccess = parseSuccess
+    summary.strategyConfirmed = strategyConfirmed
+    summary.indexSuccess = indexSuccess
   } catch (error) {
     console.error('加载后台概览失败', error)
     documents.value = []
@@ -312,6 +328,7 @@ onMounted(loadDashboard)
 }
 
 @media (max-width: 1080px) {
+
   .metrics-grid,
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
@@ -319,6 +336,7 @@ onMounted(loadDashboard)
 }
 
 @media (max-width: 768px) {
+
   .panel-header,
   .recent-item {
     flex-direction: column;
