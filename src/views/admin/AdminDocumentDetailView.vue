@@ -11,7 +11,7 @@
       <div v-if="showBuildBlockingOverlay" class="build-overlay">
         <div class="build-overlay-card">
           <div class="build-overlay-head">
-            <span class="build-overlay-spinner" aria-hidden="true"></span>
+            <span aria-hidden="true" class="build-overlay-spinner"></span>
             <div>
               <h3>{{ buildOverlayTitle }}</h3>
               <p class="build-overlay-text">{{ buildOverlayDescription }}</p>
@@ -24,10 +24,10 @@
           </div>
 
           <div class="build-overlay-stage-list">
-            <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`" class="build-overlay-stage"
-              :class="`build-overlay-stage-${stage.status}`">
+            <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`"
+              :class="`build-overlay-stage-${stage.status}`" class="build-overlay-stage">
               <span class="build-overlay-stage-icon">
-                <span v-if="stage.status === 'current'" class="stage-spinner" aria-hidden="true"></span>
+                <span v-if="stage.status === 'current'" aria-hidden="true" class="stage-spinner"></span>
                 <span v-else>{{ stage.order }}</span>
               </span>
               <div class="build-overlay-stage-copy">
@@ -37,7 +37,8 @@
             </article>
           </div>
 
-          <p class="build-overlay-tip">执行期间页面已暂时锁定，避免重复发起构建或误改当前策略链路。</p>
+          <p class="build-overlay-tip">
+            执行期间页面已暂时锁定，避免重复发起构建或误改当前策略链路。</p>
         </div>
       </div>
     </transition>
@@ -48,10 +49,11 @@
           <div>
             <h3>任务执行详情</h3>
             <p class="drawer-subtitle">
-              任务 {{ documentDetail?.latestTaskId || '-' }} · {{ documentDetail?.latestTaskTypeName || '暂无任务类型' }}
+              任务 {{ documentDetail?.latestTaskId || '-' }} ·
+              {{ documentDetail?.latestTaskTypeName || '暂无任务类型' }}
             </p>
           </div>
-          <button class="icon-button" type="button" aria-label="关闭任务执行详情" @click="closeLogDrawer">
+          <button aria-label="关闭任务执行详情" class="icon-button" type="button" @click="closeLogDrawer">
             <XMarkIcon class="drawer-icon" />
           </button>
         </div>
@@ -59,12 +61,12 @@
         <div class="drawer-summary">
           <div class="summary-chip">
             <span>当前状态</span>
-            <AdminStatusBadge :label="documentDetail?.latestTaskStatusName || '暂无状态'"
-              :code="documentDetail?.latestTaskStatus" type="task" />
+            <AdminStatusBadge :code="documentDetail?.latestTaskStatus"
+              :label="documentDetail?.latestTaskStatusName || '暂无状态'" type="task" />
           </div>
           <div class="summary-chip">
             <span>索引状态</span>
-            <AdminStatusBadge :label="documentDetail?.indexStatusName || '暂无状态'" :code="documentDetail?.indexStatus"
+            <AdminStatusBadge :code="documentDetail?.indexStatus" :label="documentDetail?.indexStatusName || '暂无状态'"
               type="index" />
           </div>
         </div>
@@ -94,14 +96,15 @@
             <h3>Chunk 详情</h3>
             <p class="drawer-subtitle">
               <template v-if="chunkDetail?.chunk">
-                子块 C#{{ chunkDetail.chunk.chunkNo || '-' }} · 父块 P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}
+                子块 C#{{ chunkDetail.chunk.chunkNo || '-' }} · 父块
+                P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}
               </template>
               <template v-else>
                 正在读取切块详情
               </template>
             </p>
           </div>
-          <button class="icon-button" type="button" aria-label="关闭 Chunk 详情" @click="closeChunkDetailDrawer">
+          <button aria-label="关闭 Chunk 详情" class="icon-button" type="button" @click="closeChunkDetailDrawer">
             <XMarkIcon class="drawer-icon" />
           </button>
         </div>
@@ -120,7 +123,8 @@
             </div>
             <div class="summary-chip">
               <span>同父子块</span>
-              <strong>{{ chunkDetail.parentBlock?.childCount || chunkDetail.siblingChunks?.length || 0 }}</strong>
+              <strong>{{ chunkDetail.parentBlock?.childCount || chunkDetail.siblingChunks?.length || 0
+              }}</strong>
             </div>
           </div>
 
@@ -140,27 +144,29 @@
             <pre class="chunk-detail-text">{{ chunkDetail?.chunk.chunkText || '' }}</pre>
           </section>
 
-          <section ref="parentBlockSectionRef" class="chunk-detail-section chunk-detail-section-parent"
+          <section v-if="chunkDetail.parentBlock" ref="parentBlockSectionRef"
             :class="{ 'chunk-detail-section-focused': chunkDetailFocusMode === 'parent' }"
-            v-if="chunkDetail.parentBlock">
+            class="chunk-detail-section chunk-detail-section-parent">
             <div class="chunk-detail-head">
               <div class="chunk-detail-title-group">
                 <span class="chunk-kind-badge chunk-kind-badge-parent">Parent Context</span>
                 <h4>所属父块 P#{{ chunkDetail.parentBlock.parentBlockNo || '-' }}</h4>
               </div>
-              <span>子块范围 C#{{ chunkDetail.parentBlock.startChunkNo || '-' }} - C#{{ chunkDetail.parentBlock.endChunkNo
-                || '-' }}</span>
+              <span>子块范围 C#{{ chunkDetail.parentBlock.startChunkNo || '-'
+              }} - C#{{ chunkDetail.parentBlock.endChunkNo
+                  || '-' }}</span>
             </div>
             <div class="chunk-detail-meta">
               <span>章节：{{ chunkDetail.parentBlock.sectionPath || '未识别章节' }}</span>
               <span>字符：{{ formatCount(chunkDetail.parentBlock.charCount) }}</span>
               <span>Token：{{ formatCount(chunkDetail.parentBlock.tokenCount) }}</span>
             </div>
-            <pre class="chunk-detail-text parent-block-text">{{ chunkDetail.parentBlock.parentText }}</pre>
+            <pre class="chunk-detail-text parent-block-text">{{ chunkDetail.parentBlock.parentText
+            }}</pre>
           </section>
 
-          <section class="chunk-detail-section"
-            v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length">
+          <section v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length"
+            class="chunk-detail-section">
             <div class="chunk-detail-head">
               <h4>同父子块关系</h4>
               <span>点击可切换查看其他子块</span>
@@ -177,26 +183,26 @@
             </p>
             <div class="chunk-relation-track">
               <template v-for="(item, index) in chunkDetail.siblingChunks" :key="`track-${item.chunkId}`">
-                <button class="chunk-relation-node" :class="{ active: isCurrentChunk(item) }" type="button"
+                <button :class="{ active: isCurrentChunk(item) }" class="chunk-relation-node" type="button"
                   @click="openChunkDetail(item.chunkId)">
                   <strong>C#{{ item.chunkNo || '-' }}</strong>
                   <span>{{ buildSiblingOrderLabel(index, chunkDetail.siblingChunks.length) }}</span>
                 </button>
-                <div v-if="index < chunkDetail.siblingChunks.length - 1" class="chunk-relation-line"
-                  :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1]) }">
+                <div v-if="index < chunkDetail.siblingChunks.length - 1"
+                  :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1] || null) }"
+                  class="chunk-relation-line">
                 </div>
               </template>
             </div>
             <div class="sibling-chunk-list">
               <button v-for="item in chunkDetail.siblingChunks" :key="`sibling-${item.chunkId}`"
-                class="sibling-chunk-card"
-                :class="{ active: normalizeCode(item.chunkId) === normalizeCode(chunkDetail.chunk.chunkId) }"
-                type="button" @click="openChunkDetail(item.chunkId)">
+                :class="{ active: item.chunkId === chunkDetail.chunk.chunkId }" class="sibling-chunk-card" type="button"
+                @click="openChunkDetail(item.chunkId)">
                 <div class="sibling-chunk-head">
                   <strong>子块 C#{{ item.chunkNo || '-' }}</strong>
                   <span>{{ buildChunkRelationText(item) }}</span>
                 </div>
-                <p>{{ item.sectionPath || '未识别章节' }}</p>
+                <span>{{ item.sectionPath || '未识别章节' }}</span>
                 <span>{{ item.chunkText }}</span>
               </button>
             </div>
@@ -219,22 +225,22 @@
         <p class="page-top-caption">围绕单个文档完成策略确认、索引构建、验证 Chunk 结果与任务追踪。</p>
       </div>
       <div class="page-top-actions">
-        <button class="ghost-button" type="button" :disabled="loading" @click="loadAll">
+        <button :disabled="loading" class="ghost-button" type="button" @click="loadAll">
           {{ loading ? '刷新中...' : '刷新详情' }}
         </button>
       </div>
     </div>
 
-    <div v-if="pageNotice.message" class="page-notice" :class="`page-notice-${pageNotice.type}`">
+    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
       {{ pageNotice.message }}
     </div>
 
     <article v-if="documentDetail" class="panel-card detail-card">
       <div class="detail-content">
-        <nav class="workbench-nav" aria-label="文档工作台章节导航">
-          <button v-for="item in workbenchSections" :key="`workbench-nav-${item.key}`" class="workbench-nav-item"
-            :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]" type="button"
-            @click="scrollToWorkbenchSection(item.key)">
+        <nav aria-label="文档工作台章节导航" class="workbench-nav">
+          <button v-for="item in workbenchSections" :key="`workbench-nav-${item.key}`"
+            :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]"
+            class="workbench-nav-item" type="button" @click="scrollToWorkbenchSection(item.key)">
             <span class="workbench-nav-step">{{ item.step }}</span>
             <span class="workbench-nav-copy">
               <strong>{{ item.label }}</strong>
@@ -259,16 +265,17 @@
             <div class="overview-document-main">
               <p class="overview-document-kicker">Current Document</p>
               <h3>{{ documentDetail.documentName }}</h3>
-              <p v-if="showOriginalFileName" class="overview-document-subtitle">{{ documentDetail.originalFileName }}
+              <p v-if="showOriginalFileName" class="overview-document-subtitle">
+                {{ documentDetail.originalFileName }}
               </p>
             </div>
             <div class="overview-document-side">
               <div class="detail-statuses">
-                <AdminStatusBadge :label="documentDetail.parseStatusName" :code="documentDetail.parseStatus"
+                <AdminStatusBadge :code="documentDetail.parseStatus" :label="documentDetail.parseStatusName"
                   type="parse" />
-                <AdminStatusBadge :label="documentDetail.strategyStatusName" :code="documentDetail.strategyStatus"
+                <AdminStatusBadge :code="documentDetail.strategyStatus" :label="documentDetail.strategyStatusName"
                   type="strategy" />
-                <AdminStatusBadge :label="documentDetail.indexStatusName" :code="documentDetail.indexStatus"
+                <AdminStatusBadge :code="documentDetail.indexStatus" :label="documentDetail.indexStatusName"
                   type="index" />
               </div>
               <span class="overview-document-phase">{{ workflowCurrentPhase.title }}</span>
@@ -276,7 +283,7 @@
           </div>
 
           <div class="workspace-guidance-grid overview-guidance-grid">
-            <article class="workspace-guidance-card" :class="`workspace-guidance-card-${workflowCurrentPhase.tone}`">
+            <article :class="`workspace-guidance-card-${workflowCurrentPhase.tone}`" class="workspace-guidance-card">
               <span class="workspace-guidance-kicker">当前阶段</span>
               <strong>{{ workflowCurrentPhase.title }}</strong>
               <p>{{ workflowCurrentPhase.description }}</p>
@@ -324,9 +331,9 @@
             {{ documentDetail.parseErrorMsg }}
           </div>
 
-          <div class="strategy-status-bar" v-if="strategySystemStages.length">
+          <div v-if="strategySystemStages.length" class="strategy-status-bar">
             <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
-              class="strategy-status-step" :class="`strategy-status-step-${item.status}`">
+              :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
               <div class="strategy-status-index">{{ item.order }}</div>
               <div class="strategy-status-copy">
                 <strong>{{ item.label }}</strong>
@@ -344,36 +351,38 @@
               <div class="strategy-intro">
                 <p class="strategy-intro-kicker">Recommendation Summary</p>
                 <p class="strategy-intro-copy">
-                  {{ strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。' }}
+                  {{ strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。'
+                  }}
                 </p>
               </div>
 
               <div class="strategy-flow-stack">
                 <section v-for="pipeline in strategyPipelineLibrary" :key="`recommended-${pipeline.key}`"
-                  class="strategy-lane strategy-lane-recommended" :class="`strategy-lane-${pipeline.key}`">
+                  :class="`strategy-lane-${pipeline.key}`" class="strategy-lane strategy-lane-recommended">
                   <div class="strategy-lane-header">
                     <div class="strategy-lane-titlebox">
-                      <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                        'Retrieval Recall Pipeline' }}</p>
+                      <p class="strategy-lane-kicker">
+                        {{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                          'Retrieval Recall Pipeline' }}</p>
                       <h5>{{ pipeline.label }}</h5>
                     </div>
                     <p class="strategy-lane-description">{{ pipeline.description }}</p>
                   </div>
 
-                  <div v-if="resolvePlanPipeline(strategyPlan.plan, pipeline.key)?.steps?.length" class="timeline-list"
-                    :class="`timeline-list-${pipeline.key}`">
-                    <template v-for="(step, index) in resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps"
-                      :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}`">
+                  <div v-if="resolveStrategySteps(strategyPlan.plan, pipeline.key)?.length"
+                    :class="`timeline-list-${pipeline.key}`" class="timeline-list">
+                    <template v-for="(step, index) in resolveStrategySteps(strategyPlan.plan, pipeline.key)"
+                      :key="`${strategyPlan?.plan?.planId}-${pipeline.key}-${step.stepNo}`">
                       <article class="timeline-item">
                         <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}</div>
                         <div class="timeline-main">
-                          <strong>{{ step.strategyName }}</strong>
+                          <strong>{{ step.strategyTypeName }}</strong>
                           <p>{{ step.recommendReason || step.strategyRoleName }}</p>
                         </div>
                       </article>
-                      <div v-if="index < resolvePlanPipeline(strategyPlan.plan, pipeline.key).steps.length - 1"
-                        :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}-arrow`" class="flow-arrow">
-                        <span class="flow-arrow-icon" aria-hidden="true">↓</span>
+                      <div v-if="index < resolveStrategySteps(strategyPlan.plan, pipeline.key).length - 1"
+                        :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`" class="flow-arrow">
+                        <span aria-hidden="true" class="flow-arrow-icon">↓</span>
                       </div>
                     </template>
                   </div>
@@ -389,23 +398,25 @@
                     <p class="strategy-adjust-kicker">Adjustment Workspace</p>
                     <h5>双流水线调整</h5>
                   </div>
-                  <p class="strategy-adjust-description">分别配置父块回答流水线和子块召回流水线，并通过上移 / 下移调整顺序。</p>
+                  <p class="strategy-adjust-description">分别配置父块回答流水线和子块召回流水线，并通过上移
+                    / 下移调整顺序。</p>
                 </div>
 
                 <div class="strategy-flow-stack strategy-flow-stack-edit">
                   <section v-for="pipeline in strategyPipelineLibrary" :key="`editor-${pipeline.key}`"
-                    class="strategy-lane strategy-lane-edit" :class="`strategy-lane-${pipeline.key}`">
+                    :class="`strategy-lane-${pipeline.key}`" class="strategy-lane strategy-lane-edit">
                     <div class="strategy-lane-header">
                       <div class="strategy-lane-titlebox">
-                        <p class="strategy-lane-kicker">{{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                          'Retrieval Recall Pipeline' }}</p>
+                        <p class="strategy-lane-kicker">
+                          {{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                            'Retrieval Recall Pipeline' }}</p>
                         <h5>{{ pipeline.label }}</h5>
                       </div>
                       <p class="strategy-lane-description">{{ pipeline.description }}</p>
                     </div>
 
-                    <div class="selected-flow-board" :class="`selected-flow-board-${pipeline.key}`">
-                      <span class="selected-flow-label" :class="`selected-flow-label-${pipeline.key}`">当前配置</span>
+                    <div :class="`selected-flow-board-${pipeline.key}`" class="selected-flow-board">
+                      <span :class="`selected-flow-label-${pipeline.key}`" class="selected-flow-label">当前配置</span>
 
                       <div v-if="getSelectedStrategyPreview(pipeline.key).length"
                         class="sequence-board selected-flow-sequence">
@@ -419,12 +430,13 @@
                                 <span>{{ row.leftItem.description }}</span>
                               </div>
                               <div class="selected-flow-actions">
-                                <button class="flow-action-button" type="button" :disabled="row.leftItem.index === 0"
+                                <button :disabled="row.leftItem.index === 0" class="flow-action-button" type="button"
                                   @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
                                   上移
                                 </button>
-                                <button class="flow-action-button" type="button"
+                                <button
                                   :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  class="flow-action-button" type="button"
                                   @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
                                   下移
                                 </button>
@@ -432,8 +444,10 @@
                             </article>
                             <div v-else class="sequence-card-placeholder"></div>
 
-                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction ===
-                              'rtl' ? '←' : '→' }}</div>
+                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
+                              {{ row.direction ===
+                                'rtl' ? '←' : '→' }}
+                            </div>
                             <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
                             <article v-if="row.rightItem" class="selected-flow-card sequence-card">
@@ -443,12 +457,13 @@
                                 <span>{{ row.rightItem.description }}</span>
                               </div>
                               <div class="selected-flow-actions">
-                                <button class="flow-action-button" type="button" :disabled="row.rightItem.index === 0"
+                                <button :disabled="row.rightItem.index === 0" class="flow-action-button" type="button"
                                   @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
                                   上移
                                 </button>
-                                <button class="flow-action-button" type="button"
+                                <button
                                   :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  class="flow-action-button" type="button"
                                   @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
                                   下移
                                 </button>
@@ -458,7 +473,7 @@
                           </div>
 
                           <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
-                            class="sequence-down-row" :class="`sequence-down-row-${row.downColumn}`">
+                            :class="`sequence-down-row-${row.downColumn}`" class="sequence-down-row">
                             <span class="sequence-down-arrow">↓</span>
                           </div>
                         </template>
@@ -469,11 +484,10 @@
                       </div>
                     </div>
 
-                    <div class="strategy-picker" :class="`strategy-picker-${pipeline.key}`">
+                    <div :class="`strategy-picker-${pipeline.key}`" class="strategy-picker">
                       <button v-for="item in strategyLibrary" :key="`${pipeline.key}-${item.type}`"
-                        class="strategy-chip"
-                        :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }" type="button"
-                        @click="toggleStrategy(item.type, pipeline.key)">
+                        :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
+                        class="strategy-chip" type="button" @click="toggleStrategy(item.type, pipeline.key)">
                         <div class="strategy-chip-top">
                           <span class="strategy-chip-state">{{
                             getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' :
@@ -486,9 +500,9 @@
                       </button>
                     </div>
 
-                    <div class="preview-box" :class="`preview-box-${pipeline.key}`">
-                      <span class="preview-box-title" :class="`preview-box-title-${pipeline.key}`">{{ pipeline.label
-                        }}最终提交顺序</span>
+                    <div :class="`preview-box-${pipeline.key}`" class="preview-box">
+                      <span :class="`preview-box-title-${pipeline.key}`" class="preview-box-title">{{ pipeline.label
+                      }}最终提交顺序</span>
                       <div v-if="getSelectedStrategyPreview(pipeline.key).length" class="preview-flow">
                         <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
                           :key="`preview-${pipeline.key}-${item.type}`">
@@ -497,7 +511,8 @@
                             class="preview-arrow" />
                         </template>
                       </div>
-                      <p v-else class="preview-empty">还没有选中策略，无法生成当前流水线的最终提交顺序。</p>
+                      <p v-else class="preview-empty">
+                        还没有选中策略，无法生成当前流水线的最终提交顺序。</p>
                     </div>
                   </section>
                 </div>
@@ -527,7 +542,8 @@
             <article class="execution-summary-card">
               <span>构建执行</span>
               <strong>{{ buildStepBadge }}</strong>
-              <p>{{ hasBuildInFlightStatus ? '系统正在执行构建，请留意下方轨迹。' : '确认完成后即可发起构建。' }}</p>
+              <p>{{ hasBuildInFlightStatus ? '系统正在执行构建，请留意下方轨迹。' : '确认完成后即可发起构建。'
+              }}</p>
             </article>
             <article class="execution-summary-card">
               <span>当前任务</span>
@@ -537,33 +553,33 @@
           </div>
 
           <div class="confirm-actions">
-            <input v-model="adjustNote" class="adjust-input" type="text" placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" />
+            <input v-model="adjustNote" class="adjust-input" placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" type="text" />
             <div class="strategy-submit-actions">
-              <article class="action-stage-card" :class="`action-stage-${confirmStepState}`">
+              <article :class="`action-stage-${confirmStepState}`" class="action-stage-card">
                 <div class="action-stage-head">
                   <span class="action-stage-index">01</span>
                   <span class="action-stage-badge">{{ confirmStepBadge }}</span>
                 </div>
                 <strong>先确认策略方案</strong>
                 <p>{{ confirmStepDescription }}</p>
-                <button class="action-button action-button-confirm" type="button" :disabled="!canConfirmStrategyAction"
+                <button :disabled="!canConfirmStrategyAction" class="action-button action-button-confirm" type="button"
                   @click="submitConfirmStrategy">
                   <span>{{ confirmButtonLabel }}</span>
-                  <CheckCircleIcon class="action-button-icon" aria-hidden="true" />
+                  <CheckCircleIcon aria-hidden="true" class="action-button-icon" />
                 </button>
               </article>
 
-              <article class="action-stage-card" :class="`action-stage-${buildStepState}`">
+              <article :class="`action-stage-${buildStepState}`" class="action-stage-card">
                 <div class="action-stage-head">
                   <span class="action-stage-index">02</span>
                   <span class="action-stage-badge">{{ buildStepBadge }}</span>
                 </div>
                 <strong>再执行构建索引</strong>
                 <p>{{ buildStepDescription }}</p>
-                <button class="action-button action-button-build" type="button" :disabled="!canBuildIndexAction"
+                <button :disabled="!canBuildIndexAction" class="action-button action-button-build" type="button"
                   @click="submitBuildIndex">
                   <span>{{ buildButtonLabel }}</span>
-                  <ArrowRightIcon class="action-button-icon" aria-hidden="true" />
+                  <ArrowRightIcon aria-hidden="true" class="action-button-icon" />
                 </button>
               </article>
             </div>
@@ -575,7 +591,7 @@
                 <strong>{{ buildTrackerTitle }}</strong>
                 <p class="build-progress-text">{{ buildTrackerDescription }}</p>
               </div>
-              <span class="build-pulse" :class="{ 'build-pulse-static': !isBuildPolling }">
+              <span :class="{ 'build-pulse-static': !isBuildPolling }" class="build-pulse">
                 {{ isBuildPolling ? '实时轮询中' : '轨迹已保留' }}
               </span>
             </div>
@@ -583,9 +599,9 @@
             <div class="sequence-board build-stage-board">
               <template v-for="(row, rowIndex) in buildStageRows" :key="`build-row-${rowIndex}`">
                 <div class="sequence-row">
-                  <article v-if="row.leftItem" class="stage-card sequence-card" :class="`stage-${row.leftItem.status}`">
+                  <article v-if="row.leftItem" :class="`stage-${row.leftItem.status}`" class="stage-card sequence-card">
                     <div class="stage-order">
-                      <span v-if="row.leftItem.status === 'current'" class="stage-spinner" aria-hidden="true"></span>
+                      <span v-if="row.leftItem.status === 'current'" aria-hidden="true" class="stage-spinner"></span>
                       <span v-else>{{ row.leftItem.order }}</span>
                     </div>
                     <div class="stage-body">
@@ -596,14 +612,15 @@
                   </article>
                   <div v-else class="sequence-card-placeholder"></div>
 
-                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{ row.direction === 'rtl' ?
-                    '←' : '→' }}</div>
+                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
+                    {{ row.direction === 'rtl' ? '←' : '→' }}
+                  </div>
                   <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
-                  <article v-if="row.rightItem" class="stage-card sequence-card"
-                    :class="`stage-${row.rightItem.status}`">
+                  <article v-if="row.rightItem" :class="`stage-${row.rightItem.status}`"
+                    class="stage-card sequence-card">
                     <div class="stage-order">
-                      <span v-if="row.rightItem.status === 'current'" class="stage-spinner" aria-hidden="true"></span>
+                      <span v-if="row.rightItem.status === 'current'" aria-hidden="true" class="stage-spinner"></span>
                       <span v-else>{{ row.rightItem.order }}</span>
                     </div>
                     <div class="stage-body">
@@ -615,8 +632,8 @@
                   <div v-else class="sequence-card-placeholder"></div>
                 </div>
 
-                <div v-if="rowIndex < buildStageRows.length - 1" class="sequence-down-row"
-                  :class="`sequence-down-row-${row.downColumn}`">
+                <div v-if="rowIndex < buildStageRows.length - 1" :class="`sequence-down-row-${row.downColumn}`"
+                  class="sequence-down-row">
                   <span class="sequence-down-arrow">↓</span>
                 </div>
               </template>
@@ -624,8 +641,8 @@
 
             <div class="tracker-footer">
               <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
-              <span>状态 {{ buildTaskSnapshot?.taskStatusName || (hasCode(documentDetail.indexStatus, 3) ? '成功' : '未知')
-                }}</span>
+              <span>状态 {{ buildTaskSnapshot?.taskStatusName || (documentDetail?.indexStatus === 3 ? '成功' : '未知')
+              }}</span>
               <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
             </div>
           </div>
@@ -641,14 +658,15 @@
             </div>
             <div class="chunk-section-actions">
               <span class="workbench-section-pill">{{ chunkSectionStatusText }}</span>
-              <span v-if="chunkQuery?.taskId">任务 {{ chunkQuery.taskId }} · {{ chunkQuery.total || 0 }} 条</span>
+              <span v-if="chunkQuery?.taskId">任务 {{ chunkQuery.taskId
+              }} · {{ chunkQuery.total || 0 }} 条</span>
               <span v-else>当前还没有可展示的 chunk</span>
               <div v-if="chunkRecords.length" class="chunk-view-switch">
-                <button class="chunk-view-button" :class="{ active: chunkDisplayMode === 'grouped' }" type="button"
+                <button :class="{ active: chunkDisplayMode === 'grouped' }" class="chunk-view-button" type="button"
                   @click="chunkDisplayMode = 'grouped'">
                   按父块分组
                 </button>
-                <button class="chunk-view-button" :class="{ active: chunkDisplayMode === 'flat' }" type="button"
+                <button :class="{ active: chunkDisplayMode === 'flat' }" class="chunk-view-button" type="button"
                   @click="chunkDisplayMode = 'flat'">
                   平铺列表
                 </button>
@@ -695,8 +713,8 @@
 
             <div v-if="chunkDisplayMode === 'grouped'" class="chunk-group-list">
               <article v-for="group in chunkGroupedRecords"
-                :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`" class="chunk-group-card"
-                :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }">
+                :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`"
+                :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }" class="chunk-group-card">
                 <div class="chunk-group-head">
                   <div class="chunk-group-head-main">
                     <strong>父块 P#{{ group.parentBlockNo || '-' }}</strong>
@@ -714,8 +732,10 @@
                       </button>
                     </div>
                     <div class="chunk-group-meta">
-                      <span>子块 {{ group.items.length }}/{{ group.parentChildCount || group.items.length }}</span>
-                      <span>子块范围 C#{{ group.parentStartChunkNo || '-' }} - C#{{ group.parentEndChunkNo || '-' }}</span>
+                      <span>子块 {{ group.items.length
+                      }}/{{ group.parentChildCount || group.items.length }}</span>
+                      <span>子块范围 C#{{ group.parentStartChunkNo || '-'
+                      }} - C#{{ group.parentEndChunkNo || '-' }}</span>
                     </div>
                   </div>
                 </div>
@@ -746,11 +766,12 @@
                     </div>
                     <div class="chunk-cell chunk-cell-section" data-label="章节 / 标识">
                       <strong>{{ item.sectionPath || '未识别章节' }}</strong>
-                      <span>父块 P#{{ item.parentBlockNo || '-' }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
+                      <span>父块 P#{{ item.parentBlockNo || '-'
+                      }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
                     </div>
                     <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
                       <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
-                      <span class="chunk-chip" :class="`chunk-chip-${normalizeCode(item.vectorStatus) || '0'}`">
+                      <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
                         {{ item.vectorStatusName || '未知状态' }}
                       </span>
                     </div>
@@ -791,7 +812,7 @@
                 </div>
                 <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
                   <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
-                  <span class="chunk-chip" :class="`chunk-chip-${normalizeCode(item.vectorStatus) || '0'}`">
+                  <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
                     {{ item.vectorStatusName || '未知状态' }}
                   </span>
                 </div>
@@ -808,15 +829,15 @@
             </div>
 
             <div class="pagination-bar chunk-pagination-bar">
-              <button class="ghost-button" type="button" :disabled="chunkCurrentPage <= 1 || chunkLoading"
+              <button :disabled="chunkCurrentPage <= 1 || chunkLoading" class="ghost-button" type="button"
                 @click="changeChunkPage(chunkCurrentPage - 1)">
                 上一页
               </button>
               <div class="pagination-status">
                 <label class="page-size-control">
                   <span>每页显示</span>
-                  <select class="page-size-select" :value="chunkCurrentPageSize" :disabled="chunkLoading"
-                    @change="changeChunkPageSize($event.target.value)">
+                  <select :disabled="chunkLoading" :value="chunkCurrentPageSize" class="page-size-select"
+                    @change="changeChunkPageSize(($event.currentTarget as HTMLSelectElement).value)">
                     <option v-for="size in chunkPageSizeOptions" :key="`chunk-page-size-${size}`" :value="size">
                       {{ size }} 条
                     </option>
@@ -825,7 +846,7 @@
                 <strong>第 {{ chunkCurrentPage }} / {{ chunkTotalPages }} 页</strong>
                 <span>共 {{ chunkTotalCount }} 条 Chunk，当前页 {{ chunkRecords.length }} 条</span>
               </div>
-              <button class="ghost-button" type="button" :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading"
+              <button :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading" class="ghost-button" type="button"
                 @click="changeChunkPage(chunkCurrentPage + 1)">
                 下一页
               </button>
@@ -843,7 +864,7 @@
             </div>
             <div class="task-section-actions">
               <span class="workbench-section-pill">{{ taskSectionStatusText }}</span>
-              <button class="ghost-button" type="button" :disabled="!documentDetail.latestTaskId"
+              <button :disabled="!documentDetail.latestTaskId" class="ghost-button" type="button"
                 @click="openLogDrawer">
                 查看完整任务时间线
               </button>
@@ -851,7 +872,9 @@
           </div>
 
           <div v-if="logLoading" class="empty-block compact-empty">正在加载任务日志...</div>
-          <div v-else-if="!taskLogs.length" class="empty-block compact-empty">当前文档还没有可查看的任务日志。</div>
+          <div v-else-if="!taskLogs.length" class="empty-block compact-empty">
+            当前文档还没有可查看的任务日志。
+          </div>
 
           <div v-else class="summary-log-list">
             <article v-for="log in taskLogs.slice(0, 3)" :key="log.id" class="summary-log-item">
@@ -872,39 +895,87 @@
   </section>
 </template>
 
-<script setup lang="ts">
+<script lang="ts" setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CheckCircleIcon,
+  XMarkIcon
+} from '@heroicons/vue/24/outline'
 import { documentApi } from '@/api/document.ts'
 import type {
-  DocumentInfo,
-  QueryStrategyPlanResp,
-  QueryTaskLogsResp,
-  QueryDocumentChunksResp,
-  QueryDocumentChunkDetailResp,
+  BuildIndexReq,
   BuildIndexResp,
-  TaskLog,
+  ConfirmStrategyReq,
+  DocumentChunkItem,
+  DocumentDetailResp,
+  QueryDocumentChunkDetailReq,
+  QueryDocumentChunkDetailResp,
+  QueryDocumentChunksReq,
+  QueryDocumentChunksResp,
   QueryDocumentDetailReq,
   QueryStrategyPlanReq,
+  QueryStrategyPlanResp,
   QueryTaskLogsReq,
-  QueryDocumentChunksReq,
-  QueryDocumentChunkDetailReq,
-  ConfirmStrategyReq,
-  BuildIndexReq
+  QueryTaskLogsResp,
+  TaskLog
 } from '@/types'
-import AdminStatusBadge from '../../components/admin/AdminStatusBadge.vue'
-import { formatCount, formatDateTime, hasCode, normalizeCode } from '../../utils/manageFormat'
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
+import { formatCount, formatDateTime } from '@/utils/manageFormat'
 import {
-  STRATEGY_LIBRARY,
-  STRATEGY_PIPELINE_LIBRARY,
   buildPipelineStepPayload,
   buildStrategyPreview,
   buildStrategySignature,
   extractPipelineStrategyTypes,
   normalizeStrategyTypeList,
-  resolvePlanPipeline
+  resolveStrategySteps,
+  STRATEGY_LIBRARY,
+  STRATEGY_PIPELINE_LIBRARY,
+  type StrategyItem,
+  type StrategyPreviewItem
 } from '@/utils/documentStrategyPipeline'
+
+interface PageNotice {
+  type: 'info' | 'success' | 'danger' | 'warning'
+  message: string
+}
+
+interface ChunkGroup {
+  items: DocumentChunkItem[]
+  parentBlockId: string
+  parentBlockNo: number
+  parentChildCount: number
+  parentEndChunkNo: number
+  parentStartChunkNo: number
+  sectionPath: string
+  groupKey: string
+}
+
+interface BuildStageStatus {
+  code: number
+  order: string
+  label: string
+  description: string
+  status: 'pending' | 'current' | 'completed' | 'failed'
+  statusLabel: string
+}
+
+interface WorkbenchSection {
+  key: string
+  step: string
+  label: string
+  caption: string
+  status: string
+}
+
+interface SequenceRow<T = StrategyPreviewItem | BuildStageStatus> {
+  direction: 'ltr' | 'rtl'
+  leftItem: T | null
+  rightItem: T | null
+  downColumn: 'left' | 'right'
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -912,184 +983,185 @@ const OPERATOR_ID = '10001'
 const DEFAULT_CHUNK_PAGE_SIZE = 20
 const CHUNK_PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
-const strategyLibrary = STRATEGY_LIBRARY
+const strategyLibrary: StrategyItem[] = STRATEGY_LIBRARY
 const strategyPipelineLibrary = STRATEGY_PIPELINE_LIBRARY
 
-const BUILD_STAGE_LIBRARY = [
-  { code: '5', order: '01', label: '切块执行', description: '按照当前策略链路生成原始 chunk' },
-  { code: '6', order: '02', label: '切块后处理', description: '清洗空块并整理最终可入库片段' },
-  { code: '7', order: '03', label: '向量化', description: '生成 embedding 并写入 PGVector' },
-  { code: '8', order: '04', label: '入库完成', description: '回写状态并将本次索引标记为可用' }
-]
+const BUILD_STAGE_LIBRARY: Array<{
+  code: number;
+  order: string;
+  label: string;
+  description: string
+}> = [
+    { code: 5, order: '01', label: '切块执行', description: '按照当前策略链路生成原始 chunk' },
+    { code: 6, order: '02', label: '切块后处理', description: '清洗空块并整理最终可入库片段' },
+    { code: 7, order: '03', label: '向量化', description: '生成 embedding 并写入 PGVector' },
+    { code: 8, order: '04', label: '入库完成', description: '回写状态并将本次索引标记为可用' }
+  ]
 
-const BUILD_STAGE_CODE_SET = new Set(BUILD_STAGE_LIBRARY.map((item) => item.code))
+const BUILD_STAGE_CODE_SET = new Set<number>(BUILD_STAGE_LIBRARY.map((item) => item.code))
 
-const documentDetail = ref<DocumentInfo>(null)
-const strategyPlan = ref<QueryStrategyPlanResp>(null)
-const selectedParentStrategyTypes = ref<string[]>([])
-const selectedChildStrategyTypes = ref<string[]>([])
-const adjustNote = ref('')
+const documentDetail = ref<DocumentDetailResp | null>(null)
+const strategyPlan = ref<QueryStrategyPlanResp | null>(null)
+const selectedParentStrategyTypes = ref<number[]>([])
+const selectedChildStrategyTypes = ref<number[]>([])
+const adjustNote = ref<string>('')
 const taskLogs = ref<TaskLog[]>([])
-const taskLogSnapshot = ref<QueryTaskLogsResp>(null)
-const buildTaskSnapshot = ref<QueryTaskLogsResp>(null)
-const chunkQuery = ref<QueryDocumentChunksResp>(null)
-const chunkDetail = ref<QueryDocumentChunkDetailResp>(null)
-const chunkDisplayMode = ref('grouped')
-const chunkGroupCollapsedMap = ref({})
-const chunkPageNo = ref(1)
-const chunkPageSize = ref(DEFAULT_CHUNK_PAGE_SIZE)
-const loading = ref(false)
-const planLoading = ref(false)
-const confirmLoading = ref(false)
-const buildLoading = ref(false)
-const logLoading = ref(false)
-const chunkLoading = ref(false)
-const chunkDetailLoading = ref(false)
-const logDrawerOpen = ref(false)
-const chunkDetailDrawerOpen = ref(false)
-const planPollTimer = ref(null)
-const buildPollTimer = ref(null)
-const buildTrackerRef = ref(null)
-const parentBlockSectionRef = ref(null)
-const overviewSectionRef = ref(null)
-const strategySectionRef = ref(null)
-const executionSectionRef = ref(null)
-const chunkSectionRef = ref(null)
-const taskSectionRef = ref(null)
-const chunkDetailFocusMode = ref('chunk')
-const activeWorkbenchSection = ref('overview')
-const pageNotice = reactive({
+const taskLogSnapshot = ref<QueryTaskLogsResp | null>(null)
+const buildTaskSnapshot = ref<QueryTaskLogsResp | null>(null)
+const chunkQuery = ref<QueryDocumentChunksResp | null>(null)
+const chunkDetail = ref<QueryDocumentChunkDetailResp | null>(null)
+const chunkDisplayMode = ref<'grouped' | 'flat'>('grouped')
+const chunkGroupCollapsedMap = ref<Record<string, boolean>>({})
+const chunkPageNo = ref<number>(1)
+const chunkPageSize = ref<number>(DEFAULT_CHUNK_PAGE_SIZE)
+const loading = ref<boolean>(false)
+const planLoading = ref<boolean>(false)
+const confirmLoading = ref<boolean>(false)
+const buildLoading = ref<boolean>(false)
+const logLoading = ref<boolean>(false)
+const chunkLoading = ref<boolean>(false)
+const chunkDetailLoading = ref<boolean>(false)
+const logDrawerOpen = ref<boolean>(false)
+const chunkDetailDrawerOpen = ref<boolean>(false)
+const planPollTimer = ref<ReturnType<typeof setInterval> | undefined>(undefined)
+const buildPollTimer = ref<ReturnType<typeof setInterval> | undefined>(undefined)
+const buildTrackerRef = ref<HTMLElement | null>(null)
+const parentBlockSectionRef = ref<HTMLElement | null>(null)
+const overviewSectionRef = ref<HTMLElement | null>(null)
+const strategySectionRef = ref<HTMLElement | null>(null)
+const executionSectionRef = ref<HTMLElement | null>(null)
+const chunkSectionRef = ref<HTMLElement | null>(null)
+const taskSectionRef = ref<HTMLElement | null>(null)
+const chunkDetailFocusMode = ref<'chunk' | 'parent'>('chunk')
+const activeWorkbenchSection = ref<string>('overview')
+const pageNotice = reactive<PageNotice>({
   type: 'info',
   message: ''
 })
 
-const documentId = computed(() => String(route.params.documentId || ''))
-const showOriginalFileName = computed(() => {
+const documentId = computed<string>(() => String(route.params.documentId || ''))
+const showOriginalFileName = computed<boolean>(() => {
   const documentName = String(documentDetail.value?.documentName || '').trim()
   const originalFileName = String(documentDetail.value?.originalFileName || '').trim()
   return Boolean(originalFileName) && originalFileName !== documentName
 })
-const isBuildPolling = computed(() => buildPollTimer.value != null)
-const selectedParentStrategyPreview = computed(() => buildStrategyPreview(selectedParentStrategyTypes.value, strategyLibrary))
-const selectedChildStrategyPreview = computed(() => buildStrategyPreview(selectedChildStrategyTypes.value, strategyLibrary))
-const selectedParentStrategyRows = computed(() => buildSequenceRows(selectedParentStrategyPreview.value))
-const selectedChildStrategyRows = computed(() => buildSequenceRows(selectedChildStrategyPreview.value))
-const confirmedParentStrategyTypes = computed(() => extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary))
-const confirmedChildStrategyTypes = computed(() => extractPipelineStrategyTypes(strategyPlan.value?.plan, 'child', strategyLibrary))
-const chunkRecords = computed(() => Array.isArray(chunkQuery.value?.records) ? chunkQuery.value.records : [])
-const chunkTotalCount = computed(() => Number(chunkQuery.value?.total || chunkRecords.value.length || 0))
-const chunkCurrentPage = computed(() => Number(chunkQuery.value?.pageNo || chunkPageNo.value || 1))
-const chunkCurrentPageSize = computed(() => Number(chunkQuery.value?.pageSize || chunkPageSize.value || DEFAULT_CHUNK_PAGE_SIZE))
-const chunkPageSizeOptions = computed(() => {
+const isBuildPolling = computed<boolean>(() => buildPollTimer.value != null)
+const selectedParentStrategyPreview = computed<StrategyPreviewItem[]>(() => buildStrategyPreview(selectedParentStrategyTypes.value, strategyLibrary))
+const selectedChildStrategyPreview = computed<StrategyPreviewItem[]>(() => buildStrategyPreview(selectedChildStrategyTypes.value, strategyLibrary))
+const selectedParentStrategyRows = computed<SequenceRow<StrategyPreviewItem>[]>(() => buildSequenceRows(selectedParentStrategyPreview.value))
+const selectedChildStrategyRows = computed<SequenceRow<StrategyPreviewItem>[]>(() => buildSequenceRows(selectedChildStrategyPreview.value))
+const confirmedParentStrategyTypes = computed<number[]>(() => extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary))
+const confirmedChildStrategyTypes = computed<number[]>(() => extractPipelineStrategyTypes(strategyPlan.value?.plan, 'child', strategyLibrary))
+const chunkRecords = computed<DocumentChunkItem[]>(() => chunkQuery.value?.records || [])
+const chunkTotalCount = computed<number>(() => chunkQuery.value?.total || chunkRecords.value?.length || 0)
+const chunkCurrentPage = computed<number>(() => chunkQuery.value?.pageNo || chunkPageNo.value || 1)
+const chunkCurrentPageSize = computed<number>(() => chunkQuery.value?.pageSize || chunkPageSize.value || DEFAULT_CHUNK_PAGE_SIZE)
+const chunkPageSizeOptions = computed<number[]>(() => {
   return Array.from(new Set([...CHUNK_PAGE_SIZE_OPTIONS, chunkCurrentPageSize.value]))
     .sort((left, right) => left - right)
 })
-const chunkTotalPages = computed(() => {
+const chunkTotalPages = computed<number>(() => {
   return Math.max(1, Math.ceil(chunkTotalCount.value / Math.max(1, chunkCurrentPageSize.value)))
 })
-const chunkParentCount = computed(() => {
-  return new Set(
-    chunkRecords.value
-      .map((item) => normalizeCode(item.parentBlockId))
-      .filter(Boolean)
-  ).size
+const chunkParentCount = computed<number>(() => {
+  return new Set(chunkRecords.value.map(item => item.parentBlockId).filter(Boolean)).size
 })
-const chunkVectorReadyCount = computed(() => {
-  return chunkRecords.value.filter((item) => normalizeCode(item.vectorStatus) === '3').length
+const chunkVectorReadyCount = computed<number>(() => {
+  return chunkRecords.value.filter(item => item.vectorStatus === 3).length
 })
-const chunkVectorPendingCount = computed(() => {
-  return chunkRecords.value.filter((item) => normalizeCode(item.vectorStatus) !== '3').length
+const chunkVectorPendingCount = computed<number>(() => {
+  return chunkRecords.value.filter(item => item.vectorStatus !== 3).length
 })
-const chunkAverageTokens = computed(() => {
+const chunkAverageTokens = computed<number>(() => {
   if (!chunkRecords.value.length) {
     return 0
   }
 
-  const totalTokens = chunkRecords.value.reduce((sum, item) => sum + Number(item.tokenCount || 0), 0)
+  const totalTokens = chunkRecords.value.reduce((sum, item) => sum + item.tokenCount, 0)
   return Math.round(totalTokens / chunkRecords.value.length)
 })
-const chunkGroupedRecords = computed(() => {
-  const groupMap = new Map()
+const chunkGroupedRecords = computed<ChunkGroup[]>(() => {
+  const groupMap = new Map<string, Omit<ChunkGroup, 'groupKey'>>()
   chunkRecords.value.forEach((item) => {
-    const parentKey = normalizeCode(item.parentBlockId) || `unbound-${normalizeCode(item.chunkId)}`
+    const parentKey = item.parentBlockId || `unbound-${item.chunkId}`
     if (!groupMap.has(parentKey)) {
       groupMap.set(parentKey, {
+        items: [],
         parentBlockId: item.parentBlockId,
         parentBlockNo: item.parentBlockNo,
         parentChildCount: item.parentChildCount,
-        parentStartChunkNo: item.parentStartChunkNo,
         parentEndChunkNo: item.parentEndChunkNo,
-        sectionPath: item.sectionPath,
-        items: []
+        parentStartChunkNo: item.parentStartChunkNo,
+        sectionPath: item.sectionPath
       })
     }
-    groupMap.get(parentKey).items.push(item)
+    groupMap.get(parentKey)!.items.push(item)
   })
   return Array.from(groupMap.values())
     .map((group) => ({
       ...group,
-      groupKey: normalizeCode(group.parentBlockId) || `unbound-${normalizeCode(group.items[0]?.chunkId)}`,
+      groupKey: group.parentBlockId || `unbound-${group.items[0]?.chunkId}`,
       items: [...group.items].sort((left, right) => Number(left.chunkNo || 0) - Number(right.chunkNo || 0))
     }))
-    .sort((left, right) => Number(left.parentBlockNo || 0) - Number(right.parentBlockNo || 0))
+    .sort((left, right) => (left.parentBlockNo || 0) - (right.parentBlockNo || 0))
 })
-const hasBuildTaskSnapshot = computed(() => hasCode(buildTaskSnapshot.value?.taskType, 2))
-const activeBuildTaskId = computed(() => {
-  if (hasCode(documentDetail.value?.latestTaskType, 2)) {
+const hasBuildTaskSnapshot = computed<boolean>(() => buildTaskSnapshot.value?.taskType === 2)
+const activeBuildTaskId = computed<string>(() => {
+  if (documentDetail.value?.latestTaskType === 2) {
     return documentDetail.value?.latestTaskId || ''
   }
   return documentDetail.value?.lastIndexTaskId || ''
 })
-const hasSelectedStrategy = computed(() => selectedParentStrategyPreview.value.length > 0 && selectedChildStrategyPreview.value.length > 0)
-const hasConfirmedStrategy = computed(() => Boolean(documentDetail.value?.currentPlanId) && hasCode(documentDetail.value?.strategyStatus, 3))
-const hasUnconfirmedStrategyChanges = computed(() => {
+const hasSelectedStrategy = computed<boolean>(() => selectedParentStrategyPreview.value.length > 0 && selectedChildStrategyPreview.value.length > 0)
+const hasConfirmedStrategy = computed<boolean>(() => Boolean(documentDetail.value?.currentPlanId) && documentDetail.value?.strategyStatus === 3)
+const hasUnconfirmedStrategyChanges = computed<boolean>(() => {
   return buildStrategySignature(selectedParentStrategyTypes.value, strategyLibrary) !== buildStrategySignature(confirmedParentStrategyTypes.value, strategyLibrary)
     || buildStrategySignature(selectedChildStrategyTypes.value, strategyLibrary) !== buildStrategySignature(confirmedChildStrategyTypes.value, strategyLibrary)
     || Boolean(adjustNote.value.trim())
 })
-const hasBuildInFlightStatus = computed(() => {
-  const taskStatus = normalizeCode(buildTaskSnapshot.value?.taskStatus)
+const hasBuildInFlightStatus = computed<boolean>(() => {
+  const taskStatus = (buildTaskSnapshot.value?.taskStatus)
   return buildLoading.value
-    || taskStatus === '1'
-    || taskStatus === '2'
-    || hasCode(documentDetail.value?.indexStatus, 2)
-    || (hasCode(documentDetail.value?.latestTaskType, 2) && ['1', '2'].includes(normalizeCode(documentDetail.value?.latestTaskStatus)))
+    || taskStatus === 1
+    || taskStatus === 2
+    || documentDetail.value?.indexStatus === 2
+    || (documentDetail.value?.latestTaskType === 2 && [1, 2].includes(documentDetail.value?.latestTaskStatus))
 })
-const showBuildBlockingOverlay = computed(() => hasBuildInFlightStatus.value)
+const showBuildBlockingOverlay = computed<boolean>(() => hasBuildInFlightStatus.value)
 
-const showBuildTracker = computed(() => {
+const showBuildTracker = computed<boolean>(() => {
   return Boolean(activeBuildTaskId.value) || hasBuildTaskSnapshot.value
 })
 
-const activeBuildStageLabel = computed(() => {
+const activeBuildStageLabel = computed<string>(() => {
   const currentStageItem = buildStageItems.value.find((item) => item.status === 'current')
   if (currentStageItem) {
     return currentStageItem.label
   }
   if (hasBuildInFlightStatus.value) {
-    return buildTaskSnapshot.value?.currentStageName || BUILD_STAGE_LIBRARY[0].label
+    return buildTaskSnapshot.value?.currentStageName || BUILD_STAGE_LIBRARY[0]!.label
   }
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(documentDetail.value?.indexStatus, 3)) {
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || documentDetail.value?.indexStatus === 3) {
     return BUILD_STAGE_LIBRARY[BUILD_STAGE_LIBRARY.length - 1]?.label || '入库完成'
   }
   return ''
 })
 
-const canConfirmStrategyAction = computed(() => {
+const canConfirmStrategyAction = computed<boolean>(() => {
   return hasSelectedStrategy.value
     && !confirmLoading.value
     && !hasBuildInFlightStatus.value
     && (!hasConfirmedStrategy.value || hasUnconfirmedStrategyChanges.value)
 })
 
-const canBuildIndexAction = computed(() => {
+const canBuildIndexAction = computed<boolean>(() => {
   return hasSelectedStrategy.value
     && hasConfirmedStrategy.value
     && !hasUnconfirmedStrategyChanges.value
     && !hasBuildInFlightStatus.value
 })
 
-const confirmStepState = computed(() => {
+const confirmStepState = computed<'current' | 'locked' | 'completed' | 'ready'>(() => {
   if (confirmLoading.value) {
     return 'current'
   }
@@ -1102,7 +1174,7 @@ const confirmStepState = computed(() => {
   return 'ready'
 })
 
-const buildStepState = computed(() => {
+const buildStepState = computed<'current' | 'locked' | 'ready'>(() => {
   if (buildLoading.value || hasBuildInFlightStatus.value) {
     return 'current'
   }
@@ -1112,12 +1184,18 @@ const buildStepState = computed(() => {
   return 'ready'
 })
 
-const strategySystemStages = computed(() => {
-  const parseStatus = normalizeCode(documentDetail.value?.parseStatus)
-  const parseFailed = parseStatus === '4'
-  const parseReady = parseStatus === '3'
-  const parentReady = Boolean(resolvePlanPipeline(strategyPlan.value?.plan, 'parent')?.steps?.length)
-  const childReady = Boolean(resolvePlanPipeline(strategyPlan.value?.plan, 'child')?.steps?.length)
+const strategySystemStages = computed<Array<{
+  code: string
+  order: string
+  label: string
+  description: string
+  status: 'pending' | 'current' | 'completed' | 'failed'
+}>>(() => {
+  const parseStatus = documentDetail.value?.parseStatus
+  const parseFailed = parseStatus === 4
+  const parseReady = parseStatus === 3
+  const parentReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'parent').length)
+  const childReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'child').length)
   const confirmed = hasConfirmedStrategy.value
 
   return [
@@ -1152,7 +1230,7 @@ const strategySystemStages = computed(() => {
   ]
 })
 
-const confirmStepBadge = computed(() => {
+const confirmStepBadge = computed<string>(() => {
   if (confirmLoading.value) {
     return '确认中'
   }
@@ -1168,7 +1246,7 @@ const confirmStepBadge = computed(() => {
   return '待确认'
 })
 
-const buildStepBadge = computed(() => {
+const buildStepBadge = computed<string>(() => {
   if (buildLoading.value) {
     return '启动中'
   }
@@ -1181,10 +1259,10 @@ const buildStepBadge = computed(() => {
   if (hasUnconfirmedStrategyChanges.value) {
     return '待重新确认'
   }
-  return hasCode(documentDetail.value?.indexStatus, 3) ? '可再次执行' : '已解锁'
+  return documentDetail.value?.indexStatus === 3 ? '可再次执行' : '已解锁'
 })
 
-const confirmStepDescription = computed(() => {
+const confirmStepDescription = computed<string>(() => {
   if (!hasSelectedStrategy.value) {
     return '请先分别完成父块流水线和子块流水线配置，再提交这次最终执行方案。'
   }
@@ -1197,7 +1275,7 @@ const confirmStepDescription = computed(() => {
   return '推荐双流水线已经生成，请先确认当前方案，再继续执行索引构建。'
 })
 
-const buildStepDescription = computed(() => {
+const buildStepDescription = computed<string>(() => {
   if (buildLoading.value) {
     return '系统正在创建索引构建任务，并同步最新阶段轨迹，请稍候。'
   }
@@ -1213,13 +1291,13 @@ const buildStepDescription = computed(() => {
   if (hasUnconfirmedStrategyChanges.value) {
     return '当前有未确认的双流水线调整，请先重新确认方案，再执行索引构建。'
   }
-  if (hasCode(documentDetail.value?.indexStatus, 3)) {
+  if (documentDetail.value?.indexStatus === 3) {
     return '最近一次构建已经完成；如果方案没变，这里也支持你再次发起构建。'
   }
   return '确认完成后可直接点击，构建进度会显示在下方，无需再往上查找。'
 })
 
-const confirmButtonLabel = computed(() => {
+const confirmButtonLabel = computed<string>(() => {
   if (confirmLoading.value) {
     return '确认中...'
   }
@@ -1232,7 +1310,7 @@ const confirmButtonLabel = computed(() => {
   return '确认策略方案'
 })
 
-const buildButtonLabel = computed(() => {
+const buildButtonLabel = computed<string>(() => {
   if (buildLoading.value) {
     return '构建启动中...'
   }
@@ -1248,8 +1326,13 @@ const buildButtonLabel = computed(() => {
   return '构建索引执行'
 })
 
-const workflowCurrentPhase = computed(() => {
-  if (documentDetail.value?.parseErrorMsg || hasCode(documentDetail.value?.parseStatus, 4)) {
+const workflowCurrentPhase = computed<{
+  tone: 'danger' | 'neutral' | 'primary' | 'warning' | 'success'
+  shortLabel: string
+  title: string
+  description: string
+}>(() => {
+  if (documentDetail.value?.parseErrorMsg || documentDetail.value?.parseStatus === 4) {
     return {
       tone: 'danger',
       shortLabel: '需处理',
@@ -1257,7 +1340,7 @@ const workflowCurrentPhase = computed(() => {
       description: documentDetail.value?.parseErrorMsg || '请先排查解析异常，再继续后续推荐与构建流程。'
     }
   }
-  if (!hasCode(documentDetail.value?.parseStatus, 3)) {
+  if (documentDetail.value?.parseStatus !== 3) {
     return {
       tone: 'neutral',
       shortLabel: '待解析',
@@ -1297,7 +1380,7 @@ const workflowCurrentPhase = computed(() => {
       description: '你已经修改过双流水线，需要重新确认后才能继续构建。'
     }
   }
-  if (hasCode(documentDetail.value?.indexStatus, 3)) {
+  if (documentDetail.value?.indexStatus === 3) {
     return {
       tone: 'success',
       shortLabel: '已完成',
@@ -1313,14 +1396,14 @@ const workflowCurrentPhase = computed(() => {
   }
 })
 
-const workflowNextAction = computed(() => {
-  if (documentDetail.value?.parseErrorMsg || hasCode(documentDetail.value?.parseStatus, 4)) {
+const workflowNextAction = computed<{ title: string, description: string }>(() => {
+  if (documentDetail.value?.parseErrorMsg || documentDetail.value?.parseStatus === 4) {
     return {
       title: '先查看错误并修正文档',
       description: '建议先检查解析错误和最近任务日志，解决异常后再继续后续流程。'
     }
   }
-  if (!hasCode(documentDetail.value?.parseStatus, 3)) {
+  if (documentDetail.value?.parseStatus !== 3) {
     return {
       title: '等待解析完成',
       description: '当前还不需要人工操作，解析完成后刷新页面查看策略推荐结果。'
@@ -1350,7 +1433,7 @@ const workflowNextAction = computed(() => {
       description: '构建已经开始，重点关注下方阶段轨迹与任务状态变化。'
     }
   }
-  if (!hasCode(documentDetail.value?.indexStatus, 3)) {
+  if (documentDetail.value?.indexStatus !== 3) {
     return {
       title: '执行构建索引',
       description: '当前方案已确认，下一步就是进入执行区启动索引构建。'
@@ -1362,11 +1445,11 @@ const workflowNextAction = computed(() => {
   }
 })
 
-const strategySectionStatusText = computed(() => {
+const strategySectionStatusText = computed<string>(() => {
   if (planLoading.value) {
     return '读取中'
   }
-  if (documentDetail.value?.parseErrorMsg || hasCode(documentDetail.value?.parseStatus, 4)) {
+  if (documentDetail.value?.parseErrorMsg || documentDetail.value?.parseStatus === 4) {
     return '不可用'
   }
   if (!strategyPlan.value?.planReady) {
@@ -1384,7 +1467,7 @@ const strategySectionStatusText = computed(() => {
   return '可调整'
 })
 
-const executionSectionStatusText = computed(() => {
+const executionSectionStatusText = computed<string>(() => {
   if (buildLoading.value) {
     return '启动中'
   }
@@ -1400,13 +1483,13 @@ const executionSectionStatusText = computed(() => {
   if (hasUnconfirmedStrategyChanges.value) {
     return '待重新确认'
   }
-  if (hasCode(documentDetail.value?.indexStatus, 3)) {
+  if (documentDetail.value?.indexStatus === 3) {
     return '已完成'
   }
   return '可构建'
 })
 
-const chunkSectionStatusText = computed(() => {
+const chunkSectionStatusText = computed<string>(() => {
   if (chunkLoading.value) {
     return '加载中'
   }
@@ -1416,7 +1499,7 @@ const chunkSectionStatusText = computed(() => {
   return '暂无数据'
 })
 
-const taskSectionStatusText = computed(() => {
+const taskSectionStatusText = computed<string>(() => {
   if (logLoading.value) {
     return '读取中'
   }
@@ -1429,7 +1512,7 @@ const taskSectionStatusText = computed(() => {
   return '暂无任务'
 })
 
-const workbenchSections = computed(() => {
+const workbenchSections = computed<WorkbenchSection[]>(() => {
   return [
     {
       key: 'overview',
@@ -1469,76 +1552,71 @@ const workbenchSections = computed(() => {
   ]
 })
 
-const buildTrackerTitle = computed(() => {
+const buildTrackerTitle = computed<string>(() => {
   if (!showBuildTracker.value) {
     return ''
   }
-  if (hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 4)) {
+  if (hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 4) {
     return `最近一次构建在「${buildTaskSnapshot.value?.currentStageName || '未知阶段'}」失败`
   }
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(documentDetail.value?.indexStatus, 3)) {
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || documentDetail.value?.indexStatus === 3) {
     return '最近一次索引构建已完成'
   }
   return `当前阶段：${hasBuildTaskSnapshot.value ? (buildTaskSnapshot.value?.currentStageName || '索引构建中') : '索引构建中'}`
 })
 
-const buildTrackerDescription = computed(() => {
+const buildTrackerDescription = computed<string>(() => {
   if (!showBuildTracker.value) {
     return ''
   }
-  if (hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 4)) {
+  if (hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 4) {
     return buildTaskSnapshot.value?.errorMsg || '请展开右侧时间线查看失败阶段和具体报错。'
   }
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(documentDetail.value?.indexStatus, 3)) {
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || documentDetail.value?.indexStatus === 3) {
     return '即使任务执行很快，这里也会保留完整阶段轨迹，方便复盘和教学演示。'
   }
   return '系统正在自动轮询任务状态，阶段完成后会保留已完成轨迹，不会一闪而过。'
 })
 
-const buildStageItems = computed(() => {
-  const taskStatus = normalizeCode(buildTaskSnapshot.value?.taskStatus)
-  const currentStage = normalizeCode(buildTaskSnapshot.value?.currentStage)
+const buildStageItems = computed<BuildStageStatus[]>(() => {
+  const taskStatus = (buildTaskSnapshot.value?.taskStatus)
+  const currentStage = (buildTaskSnapshot.value?.currentStage)
   const activeStage = currentStage || (hasBuildInFlightStatus.value ? BUILD_STAGE_LIBRARY[0]?.code || '' : '')
-  const logs = Array.isArray(buildTaskSnapshot.value?.logs) ? buildTaskSnapshot.value.logs : []
-  const completedStages = new Set()
-  const failedStages = new Set()
-  const touchedStages = new Set()
+  const logs = buildTaskSnapshot.value?.logs || []
+  const completedStages = new Set<number>()
+  const failedStages = new Set<number>()
+  const touchedStages = new Set<number>()
 
   logs.forEach((log) => {
-    const stageCode = normalizeCode(log.stageType)
-    if (!BUILD_STAGE_CODE_SET.has(stageCode)) {
+    if (!BUILD_STAGE_CODE_SET.has(log.stageType)) {
       return
     }
-    touchedStages.add(stageCode)
-    if (hasCode(log.eventType, 2)) {
-      completedStages.add(stageCode)
+    touchedStages.add(log.stageType)
+    if (log.eventType === 2) {
+      completedStages.add(log.stageType)
     }
-    if (hasCode(log.eventType, 3)) {
-      failedStages.add(stageCode)
+    if (log.eventType === 3) {
+      failedStages.add(log.stageType)
     }
   })
 
   const currentIndex = BUILD_STAGE_LIBRARY.findIndex((item) => item.code === activeStage)
   return BUILD_STAGE_LIBRARY.map((stage, index) => {
-    let status = 'pending'
+    let status: 'pending' | 'current' | 'completed' | 'failed' = 'pending'
     let statusLabel = '等待执行'
-    if (failedStages.has(stage.code) || (taskStatus === '4' && activeStage === stage.code)) {
+    if (failedStages.has(stage.code) || (taskStatus === 4 && activeStage === stage.code)) {
       status = 'failed'
       statusLabel = '执行失败'
-    }
-    else if (taskStatus === '3') {
+    } else if (taskStatus === 3) {
       status = 'completed'
       statusLabel = '已完成'
-    }
-    else if ((taskStatus === '1' || taskStatus === '2' || (hasBuildInFlightStatus.value && !currentStage)) && activeStage === stage.code) {
+    } else if ((taskStatus === 1 || taskStatus === 2 || (hasBuildInFlightStatus.value && !currentStage)) && activeStage === stage.code) {
       status = 'current'
       statusLabel = '当前阶段'
-    }
-    else if (completedStages.has(stage.code) || ((taskStatus === '1' || taskStatus === '2') && currentIndex > index)) {
+    } else if (completedStages.has(stage.code) || ((taskStatus === 1 || taskStatus === 2) && currentIndex > index)) {
       status = 'completed'
       statusLabel = '已完成'
-    }
-    else if (touchedStages.has(stage.code)) {
+    } else if (touchedStages.has(stage.code)) {
       status = 'completed'
       statusLabel = '已完成'
     }
@@ -1546,38 +1624,38 @@ const buildStageItems = computed(() => {
   })
 })
 
-const buildStageRows = computed(() => buildSequenceRows(buildStageItems.value))
-const buildOverlayTitle = computed(() => {
+const buildStageRows = computed<SequenceRow<BuildStageStatus>[]>(() => buildSequenceRows(buildStageItems.value))
+const buildOverlayTitle = computed<string>(() => {
   if (buildLoading.value && !activeBuildTaskId.value && !hasBuildTaskSnapshot.value) {
     return '正在发起索引构建任务'
   }
   return activeBuildStageLabel.value ? `当前执行到「${activeBuildStageLabel.value}」` : '索引构建执行中'
 })
 
-const buildOverlayDescription = computed(() => {
+const buildOverlayDescription = computed<string>(() => {
   if (buildLoading.value && !activeBuildTaskId.value && !hasBuildTaskSnapshot.value) {
     return '系统正在锁定当前确认方案并创建异步任务，稍后会自动进入四个执行阶段。'
   }
   return '构建中的四个阶段会实时刷新，当前步骤会显示转圈提示，完成后自动解除页面锁定。'
 })
 
-function showNotice(message, type = 'info') {
+function showNotice(message: string, type: PageNotice['type'] = 'info'): void {
   pageNotice.type = type
   pageNotice.message = message
 }
 
-function clearNotice() {
+function clearNotice(): void {
   pageNotice.message = ''
 }
 
-function buildChunkRelationText(chunk) {
+function buildChunkRelationText(chunk: DocumentChunkItem | null): string {
   if (!chunk) {
     return '父子关系未知'
   }
   const parentNo = chunk.parentBlockNo || '-'
-  const total = Number(chunk.parentChildCount || 0)
-  const currentChunkNo = Number(chunk.chunkNo || 0)
-  const startChunkNo = Number(chunk.parentStartChunkNo || 0)
+  const total = chunk.parentChildCount
+  const currentChunkNo = chunk.chunkNo
+  const startChunkNo = chunk.parentStartChunkNo
   if (total > 0 && currentChunkNo > 0 && startChunkNo > 0) {
     const siblingIndex = currentChunkNo - startChunkNo + 1
     return `父块 P#${parentNo} · 同父第 ${siblingIndex}/${total} 子块`
@@ -1585,56 +1663,52 @@ function buildChunkRelationText(chunk) {
   return `父块 P#${parentNo} · 共 ${total || 0} 子块`
 }
 
-function isCurrentChunk(chunk) {
-  return normalizeCode(chunk?.chunkId) === normalizeCode(chunkDetail.value?.chunk?.chunkId)
+function isCurrentChunk(chunk: DocumentChunkItem | null): boolean {
+  return chunk?.chunkId === chunkDetail.value?.chunk?.chunkId
 }
 
-function buildSiblingOrderLabel(index, total) {
-  const current = Number(index || 0) + 1
-  return `第${current}/${total || 0}子块`
+function buildSiblingOrderLabel(index: number, total: number): string {
+  return `第${index + 1}/${total}子块`
 }
 
-function formatChunkCodeList(chunks) {
-  const chunkList = Array.isArray(chunks) ? chunks : []
-  return chunkList
-    .map((item) => `C#${item?.chunkNo || '-'}`)
-    .join('、')
+function formatChunkCodeList(chunks: DocumentChunkItem[]): string {
+  return chunks.map((item) => `C#${item?.chunkNo || '-'}`).join('、')
 }
 
-function isChunkGroupCollapsed(groupKey) {
+function isChunkGroupCollapsed(groupKey: string): boolean {
   return Boolean(chunkGroupCollapsedMap.value[groupKey])
 }
 
-function toggleChunkGroup(groupKey) {
+function toggleChunkGroup(groupKey: string): void {
   chunkGroupCollapsedMap.value = {
     ...chunkGroupCollapsedMap.value,
     [groupKey]: !chunkGroupCollapsedMap.value[groupKey]
   }
 }
 
-function setAllChunkGroupsCollapsed(collapsed) {
-  const nextMap = {}
+function setAllChunkGroupsCollapsed(collapsed: boolean): void {
+  const nextMap: Record<string, boolean> = {}
   chunkGroupedRecords.value.forEach((group) => {
     nextMap[group.groupKey] = collapsed
   })
   chunkGroupCollapsedMap.value = nextMap
 }
 
-function scrollToWorkbenchSection(key) {
+function scrollToWorkbenchSection(key: string): void {
   activeWorkbenchSection.value = key
 }
 
-function goBack() {
+function goBack(): void {
   router.push({ name: 'AdminDocuments' })
 }
 
-function buildSequenceRows(items) {
+function buildSequenceRows<T extends StrategyPreviewItem | BuildStageStatus>(items: T[]): SequenceRow<T>[] {
   const sourceList = Array.isArray(items) ? items : []
-  const rows = []
+  const rows: SequenceRow<T>[] = []
   for (let index = 0; index < sourceList.length; index += 2) {
     const pair = sourceList.slice(index, index + 2)
-    const rowIndex = rows.length
-    const direction = rowIndex % 2 === 0 ? 'ltr' : 'rtl'
+    const rowIndex: number = rows.length
+    const direction: 'ltr' | 'rtl' = rowIndex % 2 === 0 ? 'ltr' : 'rtl'
     const leftItem = direction === 'ltr' ? pair[0] || null : pair[1] || null
     const rightItem = direction === 'ltr' ? pair[1] || null : pair[0] || null
     rows.push({
@@ -1647,11 +1721,11 @@ function buildSequenceRows(items) {
   return rows
 }
 
-function getSelectedStrategyTypes(pipelineKey) {
+function getSelectedStrategyTypes(pipelineKey: string): number[] {
   return pipelineKey === 'parent' ? selectedParentStrategyTypes.value : selectedChildStrategyTypes.value
 }
 
-function setSelectedStrategyTypes(pipelineKey, nextList) {
+function setSelectedStrategyTypes(pipelineKey: string, nextList: number[]): void {
   const normalizedList = normalizeStrategyTypeList(nextList, strategyLibrary)
   if (pipelineKey === 'parent') {
     selectedParentStrategyTypes.value = normalizedList
@@ -1660,50 +1734,41 @@ function setSelectedStrategyTypes(pipelineKey, nextList) {
   selectedChildStrategyTypes.value = normalizedList
 }
 
-function getSelectedStrategyPreview(pipelineKey) {
+function getSelectedStrategyPreview(pipelineKey: string): StrategyPreviewItem[] {
   return pipelineKey === 'parent' ? selectedParentStrategyPreview.value : selectedChildStrategyPreview.value
 }
 
-function getSelectedStrategyRows(pipelineKey) {
+function getSelectedStrategyRows(pipelineKey: string): SequenceRow<StrategyPreviewItem>[] {
   return pipelineKey === 'parent' ? selectedParentStrategyRows.value : selectedChildStrategyRows.value
 }
 
-function toggleStrategy(type, pipelineKey) {
-  if (hasBuildInFlightStatus.value) {
-    return
-  }
-  const normalizedType = normalizeCode(type)
-  if (!normalizedType) {
+function toggleStrategy(type: number, pipelineKey: string): void {
+  if (hasBuildInFlightStatus.value || !type) {
     return
   }
   const currentTypes = getSelectedStrategyTypes(pipelineKey)
-  if (currentTypes.includes(normalizedType)) {
-    setSelectedStrategyTypes(pipelineKey, currentTypes.filter((item) => item !== normalizedType))
+  if (currentTypes.includes(type)) {
+    setSelectedStrategyTypes(pipelineKey, currentTypes.filter((item) => item !== type))
     return
   }
-  setSelectedStrategyTypes(pipelineKey, [...currentTypes, normalizedType])
+  setSelectedStrategyTypes(pipelineKey, [...currentTypes, type])
 }
 
-function moveStrategy(type, direction, pipelineKey) {
-  if (hasBuildInFlightStatus.value) {
-    return
-  }
-  const sourceType = normalizeCode(type)
+function moveStrategy(sourceType: number, direction: number, pipelineKey: string): void {
+  if (hasBuildInFlightStatus.value) return
+
   const orderedTypes = normalizeStrategyTypeList(getSelectedStrategyTypes(pipelineKey), strategyLibrary)
-  const sourceIndex = orderedTypes.indexOf(sourceType)
-  if (sourceIndex < 0) {
-    return
-  }
-  const targetIndex = sourceIndex + direction
-  if (targetIndex < 0 || targetIndex >= orderedTypes.length) {
-    return
-  }
-  const nextList = [...orderedTypes]
-    ;[nextList[sourceIndex], nextList[targetIndex]] = [nextList[targetIndex], nextList[sourceIndex]]
-  setSelectedStrategyTypes(pipelineKey, nextList)
+  const sourceIdx = orderedTypes.indexOf(sourceType)
+  const targetIdx = sourceIdx + direction
+
+  if (sourceIdx < 0 || targetIdx < 0 || targetIdx >= orderedTypes.length) return
+
+  const list = [...orderedTypes];
+  [list[sourceIdx], list[targetIdx]] = [list[targetIdx] || 0, list[sourceIdx] || 0]
+  setSelectedStrategyTypes(pipelineKey, list)
 }
 
-function focusBuildTracker() {
+function focusBuildTracker(): void {
   nextTick(() => {
     buildTrackerRef.value?.scrollIntoView({
       behavior: 'smooth',
@@ -1712,16 +1777,16 @@ function focusBuildTracker() {
   })
 }
 
-async function loadDocumentDetail() {
-  const params: QueryDocumentDetailReq = { documentId: Number(documentId.value) }
-  const res = await documentApi.queryDetail(params)
+async function loadDocumentDetail(): Promise<void> {
+  const params: QueryDocumentDetailReq = { documentId: documentId.value }
+  const res = await documentApi.queryDocumentDetail(params)
   documentDetail.value = res.data || null
 }
 
-async function loadStrategyPlan() {
+async function loadStrategyPlan(): Promise<void> {
   planLoading.value = true
   try {
-    const params: QueryStrategyPlanReq = { documentId: Number(documentId.value) }
+    const params: QueryStrategyPlanReq = { documentId: documentId.value }
     const res = await documentApi.queryStrategyPlan(params)
     strategyPlan.value = res.data || null
     selectedParentStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary)
@@ -1732,7 +1797,7 @@ async function loadStrategyPlan() {
   }
 }
 
-async function loadTaskLogs() {
+async function loadTaskLogs(): Promise<void> {
   const latestTaskId = documentDetail.value?.latestTaskId
   if (!latestTaskId) {
     taskLogs.value = []
@@ -1742,7 +1807,7 @@ async function loadTaskLogs() {
   logLoading.value = true
   try {
     const params: QueryTaskLogsReq = {
-      taskId: Number(latestTaskId),
+      taskId: latestTaskId,
       pageNo: 1,
       pageSize: 30
     }
@@ -1758,7 +1823,7 @@ async function loadTaskLogs() {
   }
 }
 
-async function loadBuildTaskLogs() {
+async function loadBuildTaskLogs(): Promise<void> {
   const buildTaskId = activeBuildTaskId.value
   if (!buildTaskId) {
     buildTaskSnapshot.value = null
@@ -1766,7 +1831,7 @@ async function loadBuildTaskLogs() {
   }
   try {
     const params: QueryTaskLogsReq = {
-      taskId: Number(buildTaskId),
+      taskId: buildTaskId,
       pageNo: 1,
       pageSize: 30
     }
@@ -1778,7 +1843,12 @@ async function loadBuildTaskLogs() {
   }
 }
 
-async function loadDocumentChunks(page = chunkCurrentPage.value, options: { resetCollapse?: boolean; resetChunkDetail?: boolean } = {}) {
+interface LoadDocumentChunksOptions {
+  resetCollapse?: boolean
+  resetChunkDetail?: boolean
+}
+
+async function loadDocumentChunks(page: number = chunkCurrentPage.value, options: LoadDocumentChunksOptions = {}): Promise<void> {
   const {
     resetCollapse = true,
     resetChunkDetail = false
@@ -1792,14 +1862,14 @@ async function loadDocumentChunks(page = chunkCurrentPage.value, options: { rese
       chunkDetailFocusMode.value = 'chunk'
     }
     const params: QueryDocumentChunksReq = {
-      documentId: Number(documentId.value),
-      pageNo: Number(page),
+      documentId: documentId.value,
+      pageNo: page,
       pageSize: chunkPageSize.value
     }
     const res = await documentApi.queryChunks(params)
     chunkQuery.value = res.data || null
-    chunkPageNo.value = Number(chunkQuery.value?.pageNo || page || 1)
-    chunkPageSize.value = Number(chunkQuery.value?.pageSize || chunkPageSize.value || DEFAULT_CHUNK_PAGE_SIZE)
+    chunkPageNo.value = chunkQuery.value?.pageNo || page || 1
+    chunkPageSize.value = chunkQuery.value?.pageSize || chunkPageSize.value || DEFAULT_CHUNK_PAGE_SIZE
     if (resetCollapse) {
       chunkGroupCollapsedMap.value = {}
     }
@@ -1811,7 +1881,7 @@ async function loadDocumentChunks(page = chunkCurrentPage.value, options: { rese
   }
 }
 
-function changeChunkPage(page) {
+function changeChunkPage(page: number): void {
   if (page < 1 || page > chunkTotalPages.value || page === chunkCurrentPage.value || chunkLoading.value) {
     return
   }
@@ -1821,8 +1891,8 @@ function changeChunkPage(page) {
   })
 }
 
-function changeChunkPageSize(pageSize) {
-  const nextPageSize = Number(pageSize || DEFAULT_CHUNK_PAGE_SIZE)
+function changeChunkPageSize(pageSize: number|string): void {
+  const nextPageSize = Number(pageSize)
   if (!Number.isFinite(nextPageSize) || nextPageSize <= 0 || nextPageSize === chunkCurrentPageSize.value || chunkLoading.value) {
     return
   }
@@ -1834,7 +1904,7 @@ function changeChunkPageSize(pageSize) {
   })
 }
 
-async function loadAll() {
+async function loadAll(): Promise<void> {
   loading.value = true
   clearNotice()
   try {
@@ -1853,7 +1923,7 @@ async function loadAll() {
   }
 }
 
-async function submitConfirmStrategy() {
+async function submitConfirmStrategy(): Promise<void> {
   if (!strategyPlan.value?.plan?.planId) {
     showNotice('当前还没有可确认的策略方案。', 'danger')
     return
@@ -1871,10 +1941,10 @@ async function submitConfirmStrategy() {
   clearNotice()
   try {
     const params: ConfirmStrategyReq = {
-      documentId: Number(documentId.value),
+      documentId: documentId.value,
       basePlanId: strategyPlan.value.plan.planId,
       adjustNote: adjustNote.value.trim() || undefined,
-      operatorId: Number(OPERATOR_ID),
+      operatorId: OPERATOR_ID,
       parentSteps: buildPipelineStepPayload(selectedParentStrategyTypes.value, strategyLibrary),
       childSteps: buildPipelineStepPayload(selectedChildStrategyTypes.value, strategyLibrary)
     }
@@ -1889,7 +1959,7 @@ async function submitConfirmStrategy() {
   }
 }
 
-async function submitBuildIndex() {
+async function submitBuildIndex(): Promise<void> {
   if (!hasSelectedStrategy.value) {
     showNotice('请先选择并确认父块 / 子块双流水线，再执行索引构建。', 'danger')
     return
@@ -1911,9 +1981,9 @@ async function submitBuildIndex() {
   clearNotice()
   try {
     const params: BuildIndexReq = {
-      documentId: Number(documentId.value),
+      documentId: documentId.value,
       planId: documentDetail.value.currentPlanId,
-      operatorId: Number(OPERATOR_ID)
+      operatorId: OPERATOR_ID
     }
     const res = await documentApi.buildIndex(params)
     const result = res.data as BuildIndexResp
@@ -1929,7 +1999,7 @@ async function submitBuildIndex() {
   }
 }
 
-async function openChunkDetail(chunkId: number, focusMode: string = 'chunk') {
+async function openChunkDetail(chunkId: string, focusMode: 'chunk' | 'parent' = 'chunk'): Promise<void> {
   if (!chunkId) {
     return
   }
@@ -1938,8 +2008,8 @@ async function openChunkDetail(chunkId: number, focusMode: string = 'chunk') {
   chunkDetailFocusMode.value = focusMode
   try {
     const params: QueryDocumentChunkDetailReq = {
-      documentId: Number(documentId.value),
-      chunkId: Number(chunkId),
+      documentId: documentId.value,
+      chunkId: chunkId,
       taskId: chunkQuery.value?.taskId || undefined
     }
     const res = await documentApi.queryChunkDetail(params)
@@ -1957,43 +2027,43 @@ async function openChunkDetail(chunkId: number, focusMode: string = 'chunk') {
   }
 }
 
-function openParentBlockDetail(group) {
+function openParentBlockDetail(group: ChunkGroup): void {
   if (!group?.items?.length) {
     return
   }
-  openChunkDetail(group.items[0].chunkId, 'parent')
+  openChunkDetail(group.items[0]?.chunkId || '', 'parent')
 }
 
-function openLogDrawer() {
+function openLogDrawer(): void {
   logDrawerOpen.value = true
   loadTaskLogs()
 }
 
-function closeLogDrawer() {
+function closeLogDrawer(): void {
   logDrawerOpen.value = false
 }
 
-function closeChunkDetailDrawer() {
+function closeChunkDetailDrawer(): void {
   chunkDetailDrawerOpen.value = false
   chunkDetailFocusMode.value = 'chunk'
 }
 
-function clearBuildPolling() {
+function clearBuildPolling(): void {
   if (buildPollTimer.value) {
-    window.clearInterval(buildPollTimer.value)
-    buildPollTimer.value = null
+    window.clearInterval(buildPollTimer.value || 0)
+    buildPollTimer.value = undefined
   }
 }
 
-function startBuildPolling() {
+function startBuildPolling(): void {
   clearBuildPolling()
   let pollCount = 0
   buildPollTimer.value = window.setInterval(async () => {
     pollCount += 1
     try {
       await loadAll()
-      const building = hasCode(documentDetail.value?.indexStatus, 2)
-        || (hasCode(documentDetail.value?.latestTaskType, 2) && ['1', '2'].includes(normalizeCode(documentDetail.value?.latestTaskStatus)))
+      const building = documentDetail.value?.indexStatus === 2
+        || (documentDetail.value?.latestTaskType === 2 && [1, 2].includes(documentDetail.value?.latestTaskStatus))
       if (!building || pollCount >= 30) {
         clearBuildPolling()
       }
@@ -2004,7 +2074,7 @@ function startBuildPolling() {
   }, 3000)
 }
 
-function startPlanPolling() {
+function startPlanPolling(): void {
   if (planPollTimer.value) {
     window.clearInterval(planPollTimer.value)
   }
@@ -2014,14 +2084,14 @@ function startPlanPolling() {
     try {
       await loadDocumentDetail()
       await loadStrategyPlan()
-      if (strategyPlan.value?.planReady || normalizeCode(strategyPlan.value?.parseStatus) === '4' || pollCount >= 8) {
-        window.clearInterval(planPollTimer.value)
-        planPollTimer.value = null
+      if (strategyPlan.value?.planReady || strategyPlan.value?.parseStatus === 4 || pollCount >= 8) {
+        window.clearInterval(planPollTimer.value || 0)
+        planPollTimer.value = undefined
       }
     } catch (error) {
       console.error('轮询策略结果失败', error)
-      window.clearInterval(planPollTimer.value)
-      planPollTimer.value = null
+      window.clearInterval(planPollTimer.value || 0)
+      planPollTimer.value = undefined
     }
   }, 2500)
 }
@@ -2056,8 +2126,7 @@ watch(documentDetail, (value) => {
     clearBuildPolling()
     return
   }
-  const building = hasCode(value.indexStatus, 2)
-    || (hasCode(value.latestTaskType, 2) && ['1', '2'].includes(normalizeCode(value.latestTaskStatus)))
+  const building = value.indexStatus === 2 || (value.latestTaskType === 2 && [1, 2].includes(value.latestTaskStatus))
   if (building && !buildPollTimer.value) {
     startBuildPolling()
     return
@@ -2070,7 +2139,7 @@ watch(documentDetail, (value) => {
 onMounted(async () => {
   await loadAll()
   await nextTick()
-  if (!strategyPlan.value?.planReady && normalizeCode(strategyPlan.value?.parseStatus) !== '4') {
+  if (!strategyPlan.value?.planReady && strategyPlan.value?.parseStatus !== 4) {
     startPlanPolling()
   }
 })
@@ -2078,7 +2147,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (planPollTimer.value) {
     window.clearInterval(planPollTimer.value)
-    planPollTimer.value = null
+    planPollTimer.value = undefined
   }
   clearBuildPolling()
 })
@@ -2301,8 +2370,7 @@ onBeforeUnmount(() => {
 .icon-button:focus-visible,
 .action-button:focus-visible {
   outline: none;
-  box-shadow:
-    0 0 0 3px rgba(37, 87, 214, 0.16),
+  box-shadow: 0 0 0 3px rgba(37, 87, 214, 0.16),
     0 12px 22px rgba(15, 23, 42, 0.12);
 }
 
@@ -2768,7 +2836,7 @@ onBeforeUnmount(() => {
 }
 
 .section-headline.pipeline-headline h4 {
-  font-family: var(--font-display);
+  font-family: var(--font-display), serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -3826,7 +3894,7 @@ onBeforeUnmount(() => {
 }
 
 .selected-flow-label {
-  font-family: var(--font-display);
+  font-family: var(--font-display), serif;
   font-size: 24px !important;
   font-weight: 900;
   letter-spacing: -0.03em;
