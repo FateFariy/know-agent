@@ -320,7 +320,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		return nil, nil, err
 	}
 
-	var newPlan *entity.DocumentStrategyPlan
+	newPlan := basePlan
 	confirmTx := func(txCtx context.Context) error {
 		// 根据是否变更处理方案
 		if changed {
@@ -349,7 +349,6 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				ConfirmTime:     utils.Pointer(time.Now()),
 			}
 			newPlan.FillAndProcessPipeline(normalizedStepList)
-			newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
 
 			// 更新文档的当前方案ID为新方案
 			document.CurrentPlanId = newPlan.ID
@@ -452,6 +451,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	if err = d.repo.Do(ctx, confirmTx); err != nil {
 		return nil, nil, err
 	}
+
+	newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
 
 	return newPlan, document, nil
 }

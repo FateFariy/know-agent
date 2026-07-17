@@ -76,7 +76,7 @@ func NewRedSync(client *redis.Client) *redsync.Redsync {
 // NewArkEmbedding 创建 ark embedding 模型
 func NewArkEmbedding(c *config.Config) embedding.Embedder {
 	apiType := arkemb.APITypeText
-	if strings.Contains(c.Embedding.APIType, string(arkemb.APITypeMultiModal)) {
+	if strings.Contains(string(arkemb.APITypeMultiModal), c.Embedding.APIType) {
 		apiType = arkemb.APITypeMultiModal
 	}
 	emb, err := arkemb.NewEmbedder(context.TODO(), &arkemb.EmbeddingConfig{

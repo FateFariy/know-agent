@@ -90,7 +90,7 @@ type ChunkConf struct {
 type EmbeddingConf struct {
 	Model      string // 模型名称
 	APIKey     string // API密钥
-	APIType    string `json:",omitempty,default=text,options=text|multi_model"` // API类型
+	APIType    string `json:",omitempty,default=text,options=text|multi_modal"` // API类型
 	Dimensions int    // 嵌入维度
 }
 

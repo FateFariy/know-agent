@@ -480,7 +480,7 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 		buildCompleteLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageVectorize,
+			StageType:    vo.TaskStageStoreComplete,
 			EventType:    vo.TaskEventComplete,
 			LogLevel:     vo.LogLevelInfo,
 			OperatorType: vo.OperatorTypeSystem,

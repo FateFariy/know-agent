@@ -576,27 +576,27 @@ func normalizeConfidence(confidence float64) float64 {
 //  3. 从问题中抽取短语，对文档内章节本地打分匹配 → 纯本地策略
 //  4. 回退到图谱服务的 FindBestSection（一般基于向量/关键词检索）→ 最终兜底
 func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
-	// 步骤 0：入参/依赖校验 — 无 documentId 或无结构图谱查询器时直接放弃
+	// 入参/依赖校验 — 无 documentId 或无结构图谱查询器时直接放弃
 	if documentId == 0 || r.structureGraphQuerier == nil {
 		return nil
 	}
-	// 步骤 1：章节编号直接定位（最高置信度）
+	// 章节编号直接定位（最高置信度）
 	section := r.resolveBySectionCode(ctx, documentId, originalQuestion, rewrittenQuestion)
 	if section != nil {
 		return section
 	}
-	// 步骤 2：章节索引服务检索（可选依赖，可能为 nil）
+	// 章节索引服务检索（可选依赖，可能为 nil）
 	section = r.resolveByNavigationIndex(ctx, documentId, originalQuestion, rewrittenQuestion)
 	if section != nil {
 		return section
 	}
-	// 步骤 3：从问题中抽取短语，对文档内章节做本地打分匹配
+	// 从问题中抽取短语，对文档内章节做本地打分匹配
 	phrases := r.buildSectionPhrases(originalQuestion, rewrittenQuestion)
 	section = r.resolveByLocalStructure(ctx, documentId, phrases)
 	if section != nil {
 		return section
 	}
-	// 步骤 4：最终兜底 — 调用图谱服务的 FindBestSection（一般由图谱实现做向量/关键词混合检索）
+	// 最终兜底 — 调用图谱服务的 FindBestSection（一般由图谱实现做向量/关键词混合检索）
 	section, err := r.structureGraphQuerier.FindBestSection(ctx, documentId, rewrittenQuestion, "")
 	if err != nil {
 		logx.Errorf("FindBestSection 调用失败: documentId=%d, err=%v", documentId, err)
@@ -611,14 +611,14 @@ func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, d
 	// 合并原始与改写问题，提高命中概率
 	combined := strutil.Trim(originalQuestion) + " " + strutil.Trim(rewrittenQuestion)
 
-	// 子步骤 1：按 "1.2.3" 类小数编号正则抽取，逐条在图谱中查找
+	// 按 "1.2.3" 类小数编号正则抽取，逐条在图谱中查找
 	for _, code := range sectionCodePattern.FindAllString(combined, -1) {
 		section, err := r.structureGraphQuerier.FindSectionByCode(ctx, documentId, code)
 		if err == nil && section != nil {
 			return section
 		}
 	}
-	// 子步骤 2：按 "第 3 章 / 第三节" 中文编号正则抽取，先解析为阿拉伯数字再在图谱中查找
+	// 按 "第 3 章 / 第三节" 中文编号正则抽取，先解析为阿拉伯数字再在图谱中查找
 	for _, m := range chineseSectionReferencePattern.FindAllStringSubmatch(combined, -1) {
 		// 正则捕获组长度不足，跳过
 		if len(m) < 2 {
@@ -748,6 +748,7 @@ func (r *DocumentQuestionRouterImpl) buildSectionPhrases(originalQuestion, rewri
 }
 
 // scoreSection 对单个章节按标题 / 显示路径 / 锚点文本 / 正文叠加打分。
+//
 // 评分规则：对每个候选短语在章节的四个字段中做 "包含匹配"，取最高得分作为章节分数。
 // 基础分 + 短语长度的线性加权；路径/标题权重最高，正文最低（正文匹配噪声较大）。
 func scoreSection(section *entity.GraphSection, phrases []string) float64 {

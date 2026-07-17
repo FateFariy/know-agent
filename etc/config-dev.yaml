@@ -3,13 +3,13 @@ Http:
   Host: 0.0.0.0
   Port: 8080
   Mode: dev
+  Middlewares:
+    Recover: false
+    Timeout: false
 
 Auth:
   AccessSecret: your-access-secret-key
   AccessExpire: 2h
-
-Middlewares:
-  Recover: false
 
 Mysql:
   Host: 10.104.0.165
@@ -57,7 +57,7 @@ StructureParsing:
 Embedding:
   Model: doubao-embedding-vision-251215
   APIKey: REPLACE_YOUR_ARK_KEY
-  APIType: text
+  APIType: multi_modal
   Dimensions: 1024
 
 Chunk:
