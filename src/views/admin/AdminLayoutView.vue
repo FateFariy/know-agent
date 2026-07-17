@@ -8,14 +8,8 @@
 
       <nav class="sidebar-nav">
         <span class="nav-group-label">主要功能</span>
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          class="nav-item"
-          :class="{ active: isNavItemActive(item.to) }"
-          @click="sidebarOpen = false"
-        >
+        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="nav-item"
+          :class="{ active: isNavItemActive(item.to) }" @click="sidebarOpen = false">
           <component :is="item.icon" class="nav-icon" />
           <span>{{ item.label }}</span>
         </RouterLink>
@@ -30,11 +24,7 @@
               <span class="user-role">管理员</span>
             </div>
           </div>
-          <button class="logout-btn" type="button" title="退出登录" @click="logout">
-            <ArrowLeftOnRectangleIcon class="nav-icon" />
-          </button>
         </div>
-        <IcpFooter class="admin-icp" />
       </div>
     </aside>
 
@@ -71,24 +61,19 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import {
-  ArrowLeftOnRectangleIcon,
   Bars3Icon,
   ClipboardDocumentListIcon,
   CommandLineIcon,
+  EyeIcon,
   HomeModernIcon,
-  ShareIcon,
-  EyeIcon
+  ShareIcon
 } from '@heroicons/vue/24/outline'
-import IcpFooter from '../../components/IcpFooter.vue'
-import { adminAuthApi } from '../../api/api'
-import { clearAdminAuth, getAdminUsername } from '../../utils/adminAuth'
 
 const route = useRoute()
-const router = useRouter()
 const sidebarOpen = ref(false)
 
 const navItems = [
@@ -100,20 +85,9 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => route.meta?.title || '管理后台')
-const username = computed(() => getAdminUsername())
+const username = 'admin'
 
-async function logout() {
-  try {
-    await adminAuthApi.logout()
-  } catch {
-    // token 失效或网络异常时，前端仍然要允许本地退出。
-  } finally {
-    clearAdminAuth()
-    router.replace('/admin/login')
-  }
-}
-
-function isNavItemActive(targetPath) {
+function isNavItemActive(targetPath: string) {
   if (!targetPath) {
     return false
   }

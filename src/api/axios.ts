@@ -6,6 +6,15 @@ export const baseURL = (import.meta.env.MODE === 'production')
   ? '/api/v1/' // 生产环境使用相对路径，由nginx代理
   : 'http://localhost:8080' // 开发环境使用本地开发服务器地址
 
+export class APIError extends Error {
+  status: number;
+  constructor(message: string, status: number, cause: unknown) {
+    super(message)
+    this.name = 'APIError'
+    this.status = status
+    this.cause = cause
+  }
+}
 
 const instance = axios.create({
   baseURL: baseURL,
