@@ -12,16 +12,16 @@
           <span>{{ item.label }}</span>
         </span>
       </div>
-      <button class="primary-button" type="button" :disabled="loading" @click="loadTraces()">
+      <button :disabled="loading" class="primary-button" type="button" @click="loadTraces()">
         {{ loading ? '正在刷新...' : '刷新追踪' }}
       </button>
     </header>
 
     <!-- 洞察区（可折叠） -->
-    <section class="insight-bar" :class="{ collapsed: insightCollapsed }">
+    <section :class="{ collapsed: insightCollapsed }" class="insight-bar">
       <div class="insight-bar-toggle" @click="insightCollapsed = !insightCollapsed">
         <span>路由洞察</span>
-        <span class="collapse-arrow" :class="{ collapsed: insightCollapsed }">&#9660;</span>
+        <span :class="{ collapsed: insightCollapsed }" class="collapse-arrow">&#9660;</span>
       </div>
       <div v-show="!insightCollapsed" class="insight-panels">
         <article class="insight-panel">
@@ -36,8 +36,8 @@
                 <strong>{{ item.value }}</strong>
               </div>
               <div class="health-track">
-                <span class="health-fill" :class="`health-fill-${item.tone}`"
-                      :style="{ width: item.percent }"></span>
+                <span :class="`health-fill-${item.tone}`" :style="{ width: item.percent }"
+                      class="health-fill"></span>
               </div>
               <small>{{ item.description }}</small>
             </article>
@@ -55,8 +55,9 @@
                 <strong>{{ item.documentName }}</strong>
                 <span>出现 {{ item.count }} 次 · 均值 {{ item.averageConfidenceText }}</span>
               </div>
-              <span class="top-doc-badge" :class="{ warning: item.lowConfidenceCount > 0 }">
-                {{ item.lowConfidenceCount > 0 ? `${item.lowConfidenceCount} 次低置信` : '全部成功'
+              <span :class="{ warning: item.lowConfidenceCount > 0 }" class="top-doc-badge">
+                {{
+                  item.lowConfidenceCount > 0 ? `${item.lowConfidenceCount} 次低置信` : '全部成功'
                 }}
               </span>
             </article>
@@ -84,7 +85,7 @@
         <div class="sidebar-toolbar">
           <input v-model.trim="filters.conversationId" class="sidebar-search"
                  placeholder="按会话 ID 筛选..."
-                 @keydown.enter="loadTraces(1)" />
+                 @keydown.enter="loadTraces(1)"/>
           <div class="sidebar-filters">
             <select v-model="filters.mode" class="filter-select-sm">
               <option value="">全部模式</option>
@@ -99,10 +100,10 @@
             </select>
           </div>
           <div class="sidebar-filter-actions">
-            <button class="ghost-button-sm" type="button" :disabled="loading" @click="resetFilters">
+            <button :disabled="loading" class="ghost-button-sm" type="button" @click="resetFilters">
               重置
             </button>
-            <button class="primary-button-sm" type="button" :disabled="loading"
+            <button :disabled="loading" class="primary-button-sm" type="button"
                     @click="loadTraces(1                      )">筛选
             </button>
           </div>
@@ -111,14 +112,16 @@
         <div class="trace-record-list">
           <div v-if="loading" class="list-empty">正在加载...</div>
           <div v-else-if="!normalizedRecords.length" class="list-empty">暂无追踪记录</div>
-          <article v-else v-for="item in normalizedRecords" :key="item.id" class="trace-record-card"
-                   :class="{ active: selectedId === item.id }" @click="selectRecord(item)">
+          <article v-for="item in normalizedRecords" v-else :key="item.id" :class="{ active: selectedId === item.id }"
+                   class="trace-record-card" @click="selectRecord(item)">
             <div class="record-card-chips">
               <span class="trace-chip trace-chip-neutral">{{ item.modeLabel }}</span>
-              <span class="trace-chip" :class="`trace-chip-${item.statusTone}`">{{ item.statusLabel
+              <span :class="`trace-chip-${item.statusTone}`" class="trace-chip">{{
+                  item.statusLabel
                 }}</span>
-              <span class="trace-chip"
-                    :class="`trace-chip-${item.confidenceBand.tone}`">{{ item.confidenceText
+              <span :class="`trace-chip-${item.confidenceBand.tone}`"
+                    class="trace-chip">{{
+                  item.confidenceText
                 }}</span>
             </div>
             <p class="record-card-question">{{ item.question || '未记录问题' }}</p>
@@ -130,13 +133,13 @@
         </div>
 
         <nav class="sidebar-pagination">
-          <button class="ghost-button-sm" type="button"
-                  :disabled="Number(page.pageNo) <= 1 || loading"
+          <button :disabled="Number(page.pageNo) <= 1 || loading" class="ghost-button-sm"
+                  type="button"
                   @click="changePage(Number(page.pageNo) - 1)">上一页
           </button>
           <span>{{ page.pageNo }} / {{ page.totalPages || '0' }}</span>
-          <button class="ghost-button-sm" type="button"
-                  :disabled="Number(page.pageNo) >= Number(page.totalPages || 0) || loading"
+          <button :disabled="Number(page.pageNo) >= Number(page.totalPages || 0) || loading" class="ghost-button-sm"
+                  type="button"
                   @click="changePage(Number(page.pageNo) + 1)">下一页
           </button>
         </nav>
@@ -153,15 +156,17 @@
           <div class="detail-head">
             <div class="detail-head-chips">
               <span class="trace-chip trace-chip-neutral">{{ selectedRecord.modeLabel }}</span>
-              <span class="trace-chip"
-                    :class="`trace-chip-${selectedRecord.statusTone}`">{{ selectedRecord.statusLabel
+              <span :class="`trace-chip-${selectedRecord.statusTone}`"
+                    class="trace-chip">{{
+                  selectedRecord.statusLabel
                 }}</span>
-              <span class="trace-chip" :class="`trace-chip-${selectedRecord.confidenceBand.tone}`">
+              <span :class="`trace-chip-${selectedRecord.confidenceBand.tone}`" class="trace-chip">
                 {{ selectedRecord.confidenceBand.label }} · {{ selectedRecord.confidenceText }}
               </span>
             </div>
             <h4>{{ selectedRecord.question || '未记录问题' }}</h4>
-            <p class="detail-rewrite">改写问题：{{ selectedRecord.rewriteQuestion || '未记录改写问题'
+            <p class="detail-rewrite">改写问题：{{
+                selectedRecord.rewriteQuestion || '未记录改写问题'
               }}</p>
             <div class="detail-meta-row">
               <span>{{ selectedRecord.createTime }}</span>
@@ -186,7 +191,8 @@
               <p class="summary-label">候选规模</p>
               <strong>{{ selectedRecord.candidateDocumentCount }} 文档 /
                 {{ selectedRecord.candidateTopicCount }} 主题 / {{
-                  selectedRecord.candidateScopeCount }} 范围</strong>
+                  selectedRecord.candidateScopeCount
+                }} 范围</strong>
               <span>{{ candidateConclusion(selectedRecord) }}</span>
             </article>
             <article class="summary-card">
@@ -204,8 +210,8 @@
             </div>
             <div class="doc-timeline">
               <article v-for="(candidate, index) in selectedRecord.documents"
-                       :key="`doc-${candidate.documentId || index}`" class="doc-timeline-item"
-                       :class="{ 'doc-timeline-top': index === 0 }">
+                       :key="`doc-${candidate.documentId || index}`" :class="{ 'doc-timeline-top': index === 0 }"
+                       class="doc-timeline-item">
                 <div class="doc-timeline-rank">{{ index + 1 }}</div>
                 <div class="doc-timeline-body">
                   <strong>{{ candidate.documentName || candidate.documentId }}</strong>
@@ -225,7 +231,8 @@
               </div>
               <div v-if="selectedRecord.scopes.length" class="candidate-chip-list">
                 <span v-for="(c, i) in selectedRecord.scopes" :key="`scope-${c.scopeCode || i}`"
-                      class="candidate-chip">{{ c.scopeName || c.scopeCode }} · {{ c.scoreText
+                      class="candidate-chip">{{ c.scopeName || c.scopeCode }} · {{
+                    c.scoreText
                   }}</span>
               </div>
               <p v-else class="candidate-empty">当前没有显式范围候选。</p>
@@ -237,7 +244,8 @@
               </div>
               <div v-if="selectedRecord.topics.length" class="candidate-chip-list">
                 <span v-for="(c, i) in selectedRecord.topics" :key="`topic-${c.topicCode || i}`"
-                      class="candidate-chip">{{ c.topicName || c.topicCode }} · {{ c.scoreText
+                      class="candidate-chip">{{ c.topicName || c.topicCode }} · {{
+                    c.scoreText
                   }}</span>
               </div>
               <p v-else class="candidate-empty">当前没有显式主题候选。</p>
@@ -259,10 +267,10 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { knowledgeApi } from '@/api/knowledge'
-import type { KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq } from '@/types'
+<script lang="ts" setup>
+import {computed, onMounted, reactive, ref} from 'vue'
+import {knowledgeApi} from '@/api/knowledge'
+import type {KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq} from '@/types'
 import type {
   DocumentDistributionItem,
   NormalizedRouteTrace,
@@ -320,10 +328,10 @@ interface HeaderStat {
 }
 
 const headerStats = computed<HeaderStat[]>(() => [
-  { label: '总追踪量', value: page.totalSize },
-  { label: '成功率', value: traceStats.value.successRateText },
-  { label: '平均置信度', value: traceStats.value.averageConfidenceText },
-  { label: 'shadow 命中率', value: traceStats.value.shadowHitRateText },
+  {label: '总追踪量', value: page.totalSize},
+  {label: '成功率', value: traceStats.value.successRateText},
+  {label: '平均置信度', value: traceStats.value.averageConfidenceText},
+  {label: 'shadow 命中率', value: traceStats.value.shadowHitRateText},
   {
     label: '低置信或失败',
     value: traceStats.value.lowConfidenceCount + traceStats.value.failedCount
@@ -337,7 +345,7 @@ interface SummaryCard {
 }
 
 const summaryCards = computed<SummaryCard[]>(() => [
-  { label: '总追踪量', value: page.totalSize, description: '符合当前筛选条件的全部路由记录数' },
+  {label: '总追踪量', value: page.totalSize, description: '符合当前筛选条件的全部路由记录数'},
   {
     label: '本页 auto',
     value: traceStats.value?.autoCount,
@@ -436,7 +444,7 @@ async function loadTraces(nextPage: number = page.pageNo): Promise<void> {
       pageNo: nextPage,
       pageSize: page.pageSize
     }
-    const { data } = await knowledgeApi.queryRouteTracePage(params)
+    const {data} = await knowledgeApi.queryRouteTracePage(params)
     records.value = data?.records || []
     page.pageNo = data?.pageNo || 1
     page.pageSize = data?.pageSize || 20

@@ -8,7 +8,7 @@
       <div v-if="showBuildBlockingOverlay" class="build-overlay">
         <div class="build-overlay-card">
           <div class="build-overlay-head">
-            <span class="build-overlay-spinner" aria-hidden="true"></span>
+            <span aria-hidden="true" class="build-overlay-spinner"></span>
             <div>
               <p class="section-eyebrow">Index Build Running</p>
               <h3>{{ buildOverlayTitle }}</h3>
@@ -23,11 +23,11 @@
 
           <div class="build-overlay-stage-list">
             <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`"
-                     class="build-overlay-stage"
-                     :class="`build-overlay-stage-${stage.status}`">
+                     :class="`build-overlay-stage-${stage.status}`"
+                     class="build-overlay-stage">
               <span class="build-overlay-stage-icon">
-                <span v-if="stage.status === 'current'" class="stage-spinner"
-                      aria-hidden="true"></span>
+                <span v-if="stage.status === 'current'" aria-hidden="true"
+                      class="stage-spinner"></span>
                 <span v-else>{{ stage.order }}</span>
               </span>
               <div class="build-overlay-stage-copy">
@@ -55,21 +55,21 @@
             </p>
           </div>
           <button class="icon-button" type="button" @click="closeLogDrawer">
-            <XMarkIcon class="drawer-icon" />
+            <XMarkIcon class="drawer-icon"/>
           </button>
         </div>
 
         <div class="drawer-summary">
           <div class="summary-chip">
             <span>当前状态</span>
-            <AdminStatusBadge :label="selectedDocument?.latestTaskStatusName || '暂无状态'"
-                              :code="selectedDocument?.latestTaskStatus" type="task" />
+            <AdminStatusBadge :code="selectedDocument?.latestTaskStatus"
+                              :label="selectedDocument?.latestTaskStatusName || '暂无状态'" type="task"/>
           </div>
           <div class="summary-chip">
             <span>索引状态</span>
-            <AdminStatusBadge :label="selectedDocument?.indexStatusName || '暂无状态'"
-                              :code="selectedDocument?.indexStatus"
-                              type="index" />
+            <AdminStatusBadge :code="selectedDocument?.indexStatus"
+                              :label="selectedDocument?.indexStatusName || '暂无状态'"
+                              type="index"/>
           </div>
         </div>
 
@@ -104,37 +104,36 @@
         <div class="upload-grid">
           <label class="field">
             <span>文档名称</span>
-            <input v-model="uploadForm.documentName" type="text"
-                   placeholder="不填则使用原始文件名" />
+            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" type="text"
-                   placeholder="例如 operation_rule" />
+            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" type="text"
-                   placeholder="例如 运营规则" />
+            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则" type="text"/>
           </label>
 
           <label class="field">
             <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" type="text"
-                   placeholder="例如 手册 / 规则 / 介绍" />
+            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" type="text"
-                   placeholder="多个标签用英文逗号分隔" />
+            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>选择文件</span>
-            <input ref="fileInputRef" type="file" class="file-input" @change="handleFileChange" />
+            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange"/>
           </label>
         </div>
 
@@ -145,7 +144,7 @@
 
         <div class="upload-actions">
           <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
-          <button class="primary-button" type="button" :disabled="uploading || !uploadForm.file"
+          <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button"
                   @click="submitUpload">
             {{ uploading ? '上传中...' : '上传并解析' }}
           </button>
@@ -169,7 +168,7 @@
       </article>
     </div>
 
-    <div v-if="pageNotice.message" class="page-notice" :class="`page-notice-${pageNotice.type}`">
+    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
       {{ pageNotice.message }}
     </div>
 
@@ -182,17 +181,16 @@
           </div>
 
           <div class="list-actions">
-            <input v-model="keyword" class="search-input" type="text"
-                   placeholder="搜索文档名称或原始文件名"
-                   @keydown.enter="loadDocuments()" />
+            <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名"
+                   type="text"
+                   @keydown.enter="loadDocuments()"/>
             <button class="ghost-button" type="button" @click="loadDocuments()">搜索</button>
           </div>
         </div>
 
         <div class="document-list">
-          <button v-for="item in documents" :key="item.documentId" class="document-row"
-                  :class="{ active: normalizeCode(selectedDocumentId) === normalizeCode(item.documentId) }"
-                  type="button"
+          <button v-for="item in documents" :key="item.documentId" :class="{ active: selectedDocumentId === item.documentId }"
+                  class="document-row" type="button"
                   @click="selectDocument(item.documentId)">
             <div class="document-row-main">
               <div class="document-row-title">
@@ -206,12 +204,12 @@
               </div>
             </div>
             <div class="document-row-status">
-              <AdminStatusBadge :label="item.parseStatusName" :code="item.parseStatus"
-                                type="parse" />
-              <AdminStatusBadge :label="item.strategyStatusName" :code="item.strategyStatus"
-                                type="strategy" />
-              <AdminStatusBadge :label="item.indexStatusName" :code="item.indexStatus"
-                                type="index" />
+              <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
+                                type="parse"/>
+              <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName"
+                                type="strategy"/>
+              <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
+                                type="index"/>
             </div>
           </button>
 
@@ -236,15 +234,15 @@
             </div>
 
             <div class="detail-statuses">
-              <AdminStatusBadge :label="selectedDocument.parseStatusName"
-                                :code="selectedDocument.parseStatus"
-                                type="parse" />
-              <AdminStatusBadge :label="selectedDocument.strategyStatusName"
-                                :code="selectedDocument.strategyStatus"
-                                type="strategy" />
-              <AdminStatusBadge :label="selectedDocument.indexStatusName"
-                                :code="selectedDocument.indexStatus"
-                                type="index" />
+              <AdminStatusBadge :code="selectedDocument.parseStatus"
+                                :label="selectedDocument.parseStatusName"
+                                type="parse"/>
+              <AdminStatusBadge :code="selectedDocument.strategyStatus"
+                                :label="selectedDocument.strategyStatusName"
+                                type="strategy"/>
+              <AdminStatusBadge :code="selectedDocument.indexStatus"
+                                :label="selectedDocument.indexStatusName"
+                                type="index"/>
             </div>
           </div>
 
@@ -264,17 +262,18 @@
             <div class="meta-item">
               <span>字符 / Token</span>
               <strong>{{ formatCount(selectedDocument.charCount) }} /
-                {{ formatCount(selectedDocument.tokenCount)
+                {{
+                  formatCount(selectedDocument.tokenCount)
                 }}</strong>
             </div>
           </div>
 
           <div class="detail-secondary-actions">
-            <button class="ghost-button" type="button" :disabled="planLoading"
+            <button :disabled="planLoading" class="ghost-button" type="button"
                     @click="loadSelectedDocumentDetail">
               {{ planLoading ? '刷新中...' : '刷新详情' }}
             </button>
-            <button class="ghost-button" type="button" :disabled="!selectedDocument.latestTaskId"
+            <button :disabled="!selectedDocument.latestTaskId" class="ghost-button" type="button"
                     @click="openLogDrawer">
               查看任务时间线
             </button>
@@ -291,9 +290,9 @@
               {{ selectedDocument.parseErrorMsg }}
             </div>
 
-            <div class="strategy-status-bar" v-if="strategySystemStages.length">
+            <div v-if="strategySystemStages.length" class="strategy-status-bar">
               <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
-                       class="strategy-status-step" :class="`strategy-status-step-${item.status}`">
+                       :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
                 <div class="strategy-status-index">{{ item.order }}</div>
                 <div class="strategy-status-copy">
                   <strong>{{ item.label }}</strong>
@@ -311,7 +310,8 @@
                 <div class="strategy-intro">
                   <p class="strategy-intro-kicker">Recommendation Summary</p>
                   <p class="strategy-intro-copy">
-                    {{ strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。'
+                    {{
+                      strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。'
                     }}
                   </p>
                 </div>
@@ -319,37 +319,39 @@
                 <div class="strategy-flow-stack">
                   <section v-for="pipeline in strategyPipelineLibrary"
                            :key="`recommended-${pipeline.key}`"
-                           class="strategy-lane strategy-lane-recommended"
-                           :class="`strategy-lane-${pipeline.key}`">
+                           :class="`strategy-lane-${pipeline.key}`"
+                           class="strategy-lane strategy-lane-recommended">
                     <div class="strategy-lane-header">
-                      <div class="strategy-lane-titlebox">
+                      <div class="strategy-lane-title-box">
                         <p class="strategy-lane-kicker">
-                          {{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                          'Retrieval Recall Pipeline' }}</p>
+                          {{
+                            pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                              'Retrieval Recall Pipeline'
+                          }}</p>
                         <h5>{{ pipeline.label }}</h5>
                       </div>
                       <p class="strategy-lane-description">{{ pipeline.description }}</p>
                     </div>
 
-                    <div
-                      v-if="resolveStrategySteps(strategyPlan?.plan, pipeline.key)?.steps?.length"
-                      class="timeline-list" :class="`timeline-list-${pipeline.key}`">
+                    <div v-if="resolveStrategySteps(strategyPlan?.plan, pipeline.key).length"
+                         :class="`timeline-list-${pipeline.key}`"
+                         class="timeline-list">
                       <template
-                        v-for="(step, index) in resolveStrategySteps(strategyPlan?.plan, pipeline.key).steps"
-                        :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}`">
+                        v-for="(step, index) in resolveStrategySteps(strategyPlan?.plan, pipeline.key)"
+                        :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}`">
                         <article class="timeline-item">
                           <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}
                           </div>
                           <div class="timeline-main">
-                            <strong>{{ step.strategyName }}</strong>
+                            <strong>{{ step.strategyTypeName }}</strong>
                             <p>{{ step.recommendReason || step.strategyRoleName }}</p>
                           </div>
                         </article>
                         <div
-                          v-if="index < resolveStrategySteps(strategyPlan.plan, pipeline.key).steps.length - 1"
-                          :key="`${strategyPlan.plan.planId}-${pipeline.key}-${step.stepNo}-arrow`"
+                          v-if="index < resolveStrategySteps(strategyPlan?.plan, pipeline.key).length - 1"
+                          :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`"
                           class="flow-arrow">
-                          <ArrowDownIcon class="flow-arrow-icon" />
+                          <ArrowDownIcon class="flow-arrow-icon"/>
                         </div>
                       </template>
                     </div>
@@ -361,7 +363,7 @@
 
                 <div class="strategy-adjust-shell">
                   <div class="strategy-adjust-header">
-                    <div class="strategy-adjust-titlebox">
+                    <div class="strategy-adjust-title-box">
                       <p class="strategy-adjust-kicker">Adjustment Workspace</p>
                       <h5>双流水线调整</h5>
                     </div>
@@ -372,22 +374,24 @@
                   <div class="strategy-flow-stack strategy-flow-stack-edit">
                     <section v-for="pipeline in strategyPipelineLibrary"
                              :key="`editor-${pipeline.key}`"
-                             class="strategy-lane strategy-lane-edit"
-                             :class="`strategy-lane-${pipeline.key}`">
+                             :class="`strategy-lane-${pipeline.key}`"
+                             class="strategy-lane strategy-lane-edit">
                       <div class="strategy-lane-header">
-                        <div class="strategy-lane-titlebox">
+                        <div class="strategy-lane-title-box">
                           <p class="strategy-lane-kicker">
-                            {{ pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                            'Retrieval Recall Pipeline' }}</p>
+                            {{
+                              pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                                'Retrieval Recall Pipeline'
+                            }}</p>
                           <h5>{{ pipeline.label }}</h5>
                         </div>
                         <p class="strategy-lane-description">{{ pipeline.description }}</p>
                       </div>
 
-                      <div class="selected-flow-board"
-                           :class="`selected-flow-board-${pipeline.key}`">
-                        <span class="selected-flow-label"
-                              :class="`selected-flow-label-${pipeline.key}`">当前配置</span>
+                      <div :class="`selected-flow-board-${pipeline.key}`"
+                           class="selected-flow-board">
+                        <span :class="`selected-flow-label-${pipeline.key}`"
+                              class="selected-flow-label">当前配置</span>
 
                         <div v-if="getSelectedStrategyPreview(pipeline.key).length"
                              class="sequence-board selected-flow-sequence">
@@ -401,13 +405,13 @@
                                   <span>{{ row.leftItem.description }}</span>
                                 </div>
                                 <div class="selected-flow-actions">
-                                  <button class="flow-action-button" type="button"
-                                          :disabled="row.leftItem.index === 0"
+                                  <button :disabled="row.leftItem.index === 0" class="flow-action-button"
+                                          type="button"
                                           @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
                                     上移
                                   </button>
-                                  <button class="flow-action-button" type="button"
-                                          :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  <button :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" class="flow-action-button"
+                                          type="button"
                                           @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
                                     下移
                                   </button>
@@ -416,8 +420,10 @@
                               <div v-else class="sequence-card-placeholder"></div>
 
                               <div v-if="row.leftItem && row.rightItem"
-                                   class="sequence-inline-arrow">{{ row.direction
-                              === 'rtl' ? '←' : '→' }}
+                                   class="sequence-inline-arrow">{{
+                                  row.direction
+                                  === 'rtl' ? '←' : '→'
+                                }}
                               </div>
                               <div v-else
                                    class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
@@ -430,13 +436,13 @@
                                   <span>{{ row.rightItem.description }}</span>
                                 </div>
                                 <div class="selected-flow-actions">
-                                  <button class="flow-action-button" type="button"
-                                          :disabled="row.rightItem.index === 0"
+                                  <button :disabled="row.rightItem.index === 0" class="flow-action-button"
+                                          type="button"
                                           @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
                                     上移
                                   </button>
-                                  <button class="flow-action-button" type="button"
-                                          :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  <button :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" class="flow-action-button"
+                                          type="button"
                                           @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
                                     下移
                                   </button>
@@ -446,8 +452,8 @@
                             </div>
 
                             <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
-                                 class="sequence-down-row"
-                                 :class="`sequence-down-row-${row.downColumn}`">
+                                 :class="`sequence-down-row-${row.downColumn}`"
+                                 class="sequence-down-row">
                               <span class="sequence-down-arrow">↓</span>
                             </div>
                           </template>
@@ -458,11 +464,11 @@
                         </div>
                       </div>
 
-                      <div class="strategy-picker" :class="`strategy-picker-${pipeline.key}`">
+                      <div :class="`strategy-picker-${pipeline.key}`" class="strategy-picker">
                         <button v-for="item in strategyLibrary"
                                 :key="`${pipeline.key}-${item.type}`"
-                                class="strategy-chip"
                                 :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
+                                class="strategy-chip"
                                 type="button"
                                 @click="toggleStrategy(item.type, pipeline.key)">
                           <div class="strategy-chip-top">
@@ -472,16 +478,16 @@
                             </span>
                             <CheckCircleIcon
                               v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
-                              class="strategy-chip-check" />
+                              class="strategy-chip-check"/>
                           </div>
                           <strong>{{ item.label }}</strong>
                           <span>{{ item.description }}</span>
                         </button>
                       </div>
 
-                      <div class="preview-box" :class="`preview-box-${pipeline.key}`">
-                        <span class="preview-box-title"
-                              :class="`preview-box-title-${pipeline.key}`">
+                      <div :class="`preview-box-${pipeline.key}`" class="preview-box">
+                        <span :class="`preview-box-title-${pipeline.key}`"
+                              class="preview-box-title">
                           {{ pipeline.label }}最终提交顺序
                         </span>
                         <div v-if="getSelectedStrategyPreview(pipeline.key).length"
@@ -492,7 +498,7 @@
                             <span class="preview-tag">{{ item.label }}</span>
                             <ArrowRightIcon
                               v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
-                              class="preview-arrow" />
+                              class="preview-arrow"/>
                           </template>
                         </div>
                         <p v-else class="preview-empty">
@@ -504,31 +510,31 @@
               </div>
 
               <div class="confirm-actions">
-                <input v-model="adjustNote" class="adjust-input" type="text"
-                       placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" />
+                <input v-model="adjustNote" class="adjust-input" placeholder="补充说明，例如：增加大模型智能切块用于复杂段落"
+                       type="text"/>
                 <div class="strategy-submit-actions">
-                  <article class="action-stage-card" :class="`action-stage-${confirmStepState}`">
+                  <article :class="`action-stage-${confirmStepState}`" class="action-stage-card">
                     <div class="action-stage-head">
                       <span class="action-stage-index">01</span>
                       <span class="action-stage-badge">{{ confirmStepBadge }}</span>
                     </div>
                     <strong>先确认策略方案</strong>
                     <p>{{ confirmStepDescription }}</p>
-                    <button class="action-button action-button-confirm" type="button"
-                            :disabled="!canConfirmStrategyAction" @click="submitConfirmStrategy">
+                    <button :disabled="!canConfirmStrategyAction" class="action-button action-button-confirm"
+                            type="button" @click="submitConfirmStrategy">
                       {{ confirmButtonLabel }}
                     </button>
                   </article>
 
-                  <article class="action-stage-card" :class="`action-stage-${buildStepState}`">
+                  <article :class="`action-stage-${buildStepState}`" class="action-stage-card">
                     <div class="action-stage-head">
                       <span class="action-stage-index">02</span>
                       <span class="action-stage-badge">{{ buildStepBadge }}</span>
                     </div>
                     <strong>再执行构建索引</strong>
                     <p>{{ buildStepDescription }}</p>
-                    <button class="action-button action-button-build" type="button"
-                            :disabled="!canBuildIndexAction"
+                    <button :disabled="!canBuildIndexAction" class="action-button action-button-build"
+                            type="button"
                             @click="submitBuildIndex">
                       {{ buildButtonLabel }}
                     </button>
@@ -544,7 +550,7 @@
                     <strong>{{ buildTrackerTitle }}</strong>
                     <p class="build-progress-text">{{ buildTrackerDescription }}</p>
                   </div>
-                  <span class="build-pulse" :class="{ 'build-pulse-static': !isBuildPolling }">
+                  <span :class="{ 'build-pulse-static': !isBuildPolling }" class="build-pulse">
                     {{ isBuildPolling ? '实时轮询中' : '轨迹已保留' }}
                   </span>
                 </div>
@@ -553,11 +559,11 @@
                   <template v-for="(row, rowIndex) in buildStageRows"
                             :key="`build-row-${rowIndex}`">
                     <div class="sequence-row">
-                      <article v-if="row.leftItem" class="stage-card sequence-card"
-                               :class="`stage-${row.leftItem.status}`">
+                      <article v-if="row.leftItem" :class="`stage-${row.leftItem.status}`"
+                               class="stage-card sequence-card">
                         <div class="stage-order">
-                          <span v-if="row.leftItem.status === 'current'" class="stage-spinner"
-                                aria-hidden="true"></span>
+                          <span v-if="row.leftItem.status === 'current'" aria-hidden="true"
+                                class="stage-spinner"></span>
                           <span v-else>{{ row.leftItem.order }}</span>
                         </div>
                         <div class="stage-body">
@@ -573,11 +579,11 @@
                       </div>
                       <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
-                      <article v-if="row.rightItem" class="stage-card sequence-card"
-                               :class="`stage-${row.rightItem.status}`">
+                      <article v-if="row.rightItem" :class="`stage-${row.rightItem.status}`"
+                               class="stage-card sequence-card">
                         <div class="stage-order">
-                          <span v-if="row.rightItem.status === 'current'" class="stage-spinner"
-                                aria-hidden="true"></span>
+                          <span v-if="row.rightItem.status === 'current'" aria-hidden="true"
+                                class="stage-spinner"></span>
                           <span v-else>{{ row.rightItem.order }}</span>
                         </div>
                         <div class="stage-body">
@@ -589,8 +595,8 @@
                       <div v-else class="sequence-card-placeholder"></div>
                     </div>
 
-                    <div v-if="rowIndex < buildStageRows.length - 1" class="sequence-down-row"
-                         :class="`sequence-down-row-${row.downColumn}`">
+                    <div v-if="rowIndex < buildStageRows.length - 1" :class="`sequence-down-row-${row.downColumn}`"
+                         class="sequence-down-row">
                       <span class="sequence-down-arrow">↓</span>
                     </div>
                   </template>
@@ -598,8 +604,10 @@
 
                 <div class="tracker-footer">
                   <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
-                  <span>状态 {{ buildTaskSnapshot?.taskStatusName || (hasCode(selectedDocument.indexStatus, 3) ? '成功' :
-                    '未知') }}</span>
+                  <span>状态 {{
+                      buildTaskSnapshot?.taskStatusName || (selectedDocument.indexStatus === 3 ? '成功' :
+                        '未知')
+                    }}</span>
                   <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
                 </div>
               </div>
@@ -609,13 +617,14 @@
           <section class="detail-section">
             <div class="section-headline section-headline-major section-headline-chunk">
               <h4>解析后的 Chunk 列表</h4>
-              <span v-if="chunkQuery?.taskId">任务 {{ chunkQuery.taskId
+              <span v-if="chunkQuery?.taskId">任务 {{
+                  chunkQuery.taskId
                 }} · {{ chunkQuery.total || 0 }} 条</span>
               <span v-else>当前还没有可展示的 chunk</span>
             </div>
 
             <div v-if="chunkLoading" class="empty-block compact-empty">正在加载 Chunk 列表...</div>
-            <div v-else-if="!chunkRecords.length" class="empty-block compact-empty">
+            <div v-else-if="!chunkRecords?.length" class="empty-block compact-empty">
               当前文档还没有 Chunk 数据。请先完成索引构建，或等待构建任务继续执行。
             </div>
 
@@ -628,8 +637,7 @@
                   </div>
                   <div class="chunk-status-group">
                     <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
-                    <span class="chunk-chip"
-                          :class="`chunk-chip-${normalizeCode(item.vectorStatus) || '0'}`">
+                    <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
                       {{ item.vectorStatusName || '未知状态' }}
                     </span>
                   </div>
@@ -673,20 +681,15 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import {
-  ArrowDownIcon,
-  ArrowRightIcon,
-  CheckCircleIcon,
-  XMarkIcon
-} from '@heroicons/vue/24/outline'
-import { documentApi } from '@/api/document'
+<script lang="ts" setup>
+import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
+import {ArrowDownIcon, ArrowRightIcon, CheckCircleIcon, XMarkIcon} from '@heroicons/vue/24/outline'
+import {documentApi} from '@/api/document'
 import type {
   BuildIndexReq,
   BuildIndexResp,
   ConfirmStrategyReq,
-  DocumentInfo,
+  DocumentDetailResp,
   QueryDocumentChunksReq,
   QueryDocumentChunksResp,
   QueryDocumentPageReq,
@@ -699,13 +702,7 @@ import type {
   UploadDocumentResp
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import {
-  formatCount,
-  formatDateTime,
-  formatFileSize,
-  hasCode,
-  normalizeCode
-} from '@/utils/format.ts'
+import {formatCount, formatDateTime, formatFileSize,} from '@/utils/format.ts'
 import {
   buildPipelineStepPayload,
   buildStrategyPreview,
@@ -714,21 +711,41 @@ import {
   normalizeStrategyTypeList,
   resolveStrategySteps,
   STRATEGY_LIBRARY,
-  STRATEGY_PIPELINE_LIBRARY
+  STRATEGY_PIPELINE_LIBRARY,
+  type StrategyPreviewItem
 } from '@/utils/documentStrategyPipeline'
 
 const strategyLibrary = STRATEGY_LIBRARY
 const strategyPipelineLibrary = STRATEGY_PIPELINE_LIBRARY
 
-const BUILD_STAGE_LIBRARY = [
+interface BuildStageItem {
+  code: number | string
+  order: string
+  label: string
+  description: string
+}
+
+interface BuildStageStatusItem extends BuildStageItem {
+  status: string
+  statusLabel: string
+}
+
+type SequenceRow<T> = {
+  direction: 'ltr' | 'rtl'
+  leftItem: T | null
+  rightItem: T | null
+  downColumn: 'left' | 'right'
+}
+
+const BUILD_STAGE_LIBRARY: BuildStageItem[] = [
   {
-    code: '5',
+    code: 5,
     order: '01',
     label: '切块执行',
     description: '按照当前策略链路生成原始 chunk'
   },
   {
-    code: '6',
+    code: 6,
     order: '02',
     label: '切块后处理',
     description: '清洗空块并整理最终可入库片段'
@@ -750,7 +767,7 @@ const BUILD_STAGE_LIBRARY = [
 const BUILD_STAGE_CODE_SET = new Set(BUILD_STAGE_LIBRARY.map((item) => item.code))
 const OPERATOR_ID = '10001'
 
-const uploadForm = reactive<UploadDocumentReq & { file: File | null }>({
+const uploadForm = reactive<UploadDocumentReq>({
   documentName: '',
   knowledgeScopeCode: '',
   knowledgeScopeName: '',
@@ -758,7 +775,7 @@ const uploadForm = reactive<UploadDocumentReq & { file: File | null }>({
   documentTags: '',
   file: null
 })
-const fileInputRef = ref(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const listLoading = ref(false)
 const planLoading = ref(false)
@@ -766,32 +783,32 @@ const confirmLoading = ref(false)
 const buildLoading = ref(false)
 const logLoading = ref(false)
 const chunkLoading = ref(false)
-const planPollTimer = ref(null)
-const buildPollTimer = ref(null)
+const planPollTimer = ref<number | undefined>(undefined)
+const buildPollTimer = ref<number | undefined>(undefined)
 const keyword = ref('')
-const documents = ref<DocumentInfo[]>([])
+const documents = ref<DocumentDetailResp[]>([])
 const selectedDocumentId = ref<string>('')
 const strategyPlan = ref<QueryStrategyPlanResp | null>(null)
-const selectedParentStrategyTypes = ref<string[]>([])
-const selectedChildStrategyTypes = ref<string[]>([])
+const selectedParentStrategyTypes = ref<number[]>([])
+const selectedChildStrategyTypes = ref<number[]>([])
 const adjustNote = ref('')
 const taskLogs = ref<TaskLog[]>([])
 const taskLogSnapshot = ref<QueryTaskLogsResp | null>(null)
 const buildTaskSnapshot = ref<QueryTaskLogsResp | null>(null)
 const chunkQuery = ref<QueryDocumentChunksResp | null>(null)
 const logDrawerOpen = ref(false)
-const buildTrackerRef = ref(null)
+const buildTrackerRef = ref<HTMLDivElement | null>(null)
 const pageNotice = reactive({
   type: 'info',
   message: ''
 })
 
 const selectedDocument = computed(() => {
-  return documents.value.find((item) => normalizeCode(item.documentId) === normalizeCode(selectedDocumentId.value)) || null
+  return documents.value.find((item) => item.documentId === selectedDocumentId.value) || null
 })
 
-const selectedParentStrategyPreview = computed(() => buildStrategyPreview(selectedParentStrategyTypes.value, strategyLibrary))
-const selectedChildStrategyPreview = computed(() => buildStrategyPreview(selectedChildStrategyTypes.value, strategyLibrary))
+const selectedParentStrategyPreview = computed<StrategyPreviewItem[]>(() => buildStrategyPreview(selectedParentStrategyTypes.value, strategyLibrary))
+const selectedChildStrategyPreview = computed<StrategyPreviewItem[]>(() => buildStrategyPreview(selectedChildStrategyTypes.value, strategyLibrary))
 const selectedParentStrategyRows = computed(() => buildSequenceRows(selectedParentStrategyPreview.value))
 const selectedChildStrategyRows = computed(() => buildSequenceRows(selectedChildStrategyPreview.value))
 const confirmedParentStrategyTypes = computed(() => extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary))
@@ -799,7 +816,7 @@ const confirmedChildStrategyTypes = computed(() => extractPipelineStrategyTypes(
 
 const isBuildPolling = computed(() => buildPollTimer.value != null)
 const hasSelectedStrategy = computed(() => selectedParentStrategyPreview.value.length > 0 && selectedChildStrategyPreview.value.length > 0)
-const hasConfirmedStrategy = computed(() => Boolean(selectedDocument.value?.currentPlanId) && hasCode(selectedDocument.value?.strategyStatus, 3))
+const hasConfirmedStrategy = computed(() => Boolean(selectedDocument.value?.currentPlanId) && selectedDocument.value?.strategyStatus === 3)
 const hasUnconfirmedStrategyChanges = computed(() => {
   return buildStrategySignature(selectedParentStrategyTypes.value, strategyLibrary) !== buildStrategySignature(confirmedParentStrategyTypes.value, strategyLibrary)
     || buildStrategySignature(selectedChildStrategyTypes.value, strategyLibrary) !== buildStrategySignature(confirmedChildStrategyTypes.value, strategyLibrary)
@@ -807,22 +824,22 @@ const hasUnconfirmedStrategyChanges = computed(() => {
 })
 
 const hasBuildTaskSnapshot = computed(() => {
-  return hasCode(buildTaskSnapshot.value?.taskType, 2)
+  return buildTaskSnapshot.value?.taskType === 2
 })
 
 const activeBuildTaskId = computed(() => {
-  if (hasCode(selectedDocument.value?.latestTaskType, 2)) {
+  if (selectedDocument.value?.latestTaskType === 2) {
     return selectedDocument.value?.latestTaskId || ''
   }
   return selectedDocument.value?.lastIndexTaskId || ''
 })
 const hasBuildInFlightStatus = computed(() => {
-  const taskStatus = normalizeCode(buildTaskSnapshot.value?.taskStatus)
+  const taskStatus = buildTaskSnapshot.value?.taskStatus
   return buildLoading.value
-    || taskStatus === '1'
-    || taskStatus === '2'
-    || hasCode(selectedDocument.value?.indexStatus, 2)
-    || (hasCode(selectedDocument.value?.latestTaskType, 2) && ['1', '2'].includes(normalizeCode(selectedDocument.value?.latestTaskStatus)))
+    || taskStatus === 1
+    || taskStatus === 2
+    || selectedDocument.value?.indexStatus === 2
+    || (selectedDocument.value?.latestTaskType === 2 && ![1, 2].includes(selectedDocument.value?.latestTaskStatus || 0))
 })
 const showBuildBlockingOverlay = computed(() => hasBuildInFlightStatus.value)
 
@@ -841,7 +858,7 @@ const activeBuildStageLabel = computed(() => {
   if (hasBuildInFlightStatus.value) {
     return buildTaskSnapshot.value?.currentStageName || BUILD_STAGE_LIBRARY[0]?.label
   }
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(selectedDocument.value?.indexStatus, 3)) {
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || selectedDocument.value?.indexStatus === 3) {
     return BUILD_STAGE_LIBRARY[BUILD_STAGE_LIBRARY.length - 1]?.label || '入库完成'
   }
   return ''
@@ -885,11 +902,11 @@ const buildStepState = computed(() => {
 })
 
 const strategySystemStages = computed(() => {
-  const parseStatus = normalizeCode(selectedDocument.value?.parseStatus)
-  const parseFailed = parseStatus === '4'
-  const parseReady = parseStatus === '3'
-  const parentReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'parent')?.steps?.length)
-  const childReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'child')?.steps?.length)
+  const parseStatus = selectedDocument.value?.parseStatus
+  const parseFailed = parseStatus === 4
+  const parseReady = parseStatus === 3
+  const parentReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'parent').length)
+  const childReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'child').length)
   const confirmed = hasConfirmedStrategy.value
 
   return [
@@ -953,7 +970,7 @@ const buildStepBadge = computed(() => {
   if (hasUnconfirmedStrategyChanges.value) {
     return '待重新确认'
   }
-  return hasCode(selectedDocument.value?.indexStatus, 3) ? '可再次执行' : '已解锁'
+  return selectedDocument.value?.indexStatus === 3 ? '可再次执行' : '已解锁'
 })
 
 const confirmStepDescription = computed(() => {
@@ -985,7 +1002,7 @@ const buildStepDescription = computed(() => {
   if (hasUnconfirmedStrategyChanges.value) {
     return '当前有未确认的双流水线调整，请先重新确认方案，再执行索引构建。'
   }
-  if (hasCode(selectedDocument.value?.indexStatus, 3)) {
+  if (selectedDocument.value?.parseStatus === 3 || selectedDocument.value?.indexStatus === 3) {
     return '最近一次构建已经完成；如果方案没变，这里也支持你再次发起构建。'
   }
   return '确认完成后可直接点击，构建进度会显示在下方，无需再往上查找。'
@@ -1025,11 +1042,11 @@ const buildTrackerTitle = computed(() => {
     return ''
   }
 
-  if (hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 4)) {
+  if (hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 4) {
     return `最近一次构建在「${buildTaskSnapshot.value?.currentStageName || '未知阶段'}」失败`
   }
 
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(selectedDocument.value?.indexStatus, 3)) {
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || selectedDocument.value?.indexStatus === 3) {
     return '最近一次索引构建已完成'
   }
 
@@ -1041,38 +1058,38 @@ const buildTrackerDescription = computed(() => {
     return ''
   }
 
-  if (hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 4)) {
+  if (hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 4) {
     return buildTaskSnapshot.value?.errorMsg || '请展开右侧时间线查看失败阶段和具体报错。'
   }
 
-  if ((hasBuildTaskSnapshot.value && hasCode(buildTaskSnapshot.value?.taskStatus, 3)) || hasCode(selectedDocument.value?.indexStatus, 3)) {
-    return '即使任务执行很快，这里也会保留完整阶段轨迹，方便复盘和教学演示。'
+  if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || selectedDocument.value?.indexStatus === 3) {
+    return '即使任务执行很快，这里也会保留完整阶段轨迹，方便复盘。'
   }
 
   return '系统正在自动轮询任务状态，阶段完成后会保留已完成轨迹，不会一闪而过。'
 })
 
-const buildStageItems = computed(() => {
-  const taskStatus = normalizeCode(buildTaskSnapshot.value?.taskStatus)
-  const currentStage = normalizeCode(buildTaskSnapshot.value?.currentStage)
+const buildStageItems = computed<BuildStageStatusItem[]>(() => {
+  const taskStatus = buildTaskSnapshot.value?.taskStatus
+  const currentStage = buildTaskSnapshot.value?.currentStage
   const activeStage = currentStage || (hasBuildInFlightStatus.value ? BUILD_STAGE_LIBRARY[0]?.code || '' : '')
-  const logs = Array.isArray(buildTaskSnapshot.value?.logs) ? buildTaskSnapshot.value.logs : []
+  const logs = buildTaskSnapshot.value?.logs || []
 
   const completedStages = new Set()
   const failedStages = new Set()
   const touchedStages = new Set()
 
   logs.forEach((log) => {
-    const stageCode = normalizeCode(log.stageType)
+    const stageCode = log.stageType
     if (!BUILD_STAGE_CODE_SET.has(stageCode)) {
       return
     }
 
     touchedStages.add(stageCode)
-    if (hasCode(log.eventType, 2)) {
+    if (log.eventType === 2) {
       completedStages.add(stageCode)
     }
-    if (hasCode(log.eventType, 3)) {
+    if (log.eventType === 3) {
       failedStages.add(stageCode)
     }
   })
@@ -1083,16 +1100,16 @@ const buildStageItems = computed(() => {
     let status = 'pending'
     let statusLabel = '等待执行'
 
-    if (failedStages.has(stage.code) || (taskStatus === '4' && activeStage === stage.code)) {
+    if (failedStages.has(stage.code) || (taskStatus === 4 && activeStage === stage.code)) {
       status = 'failed'
       statusLabel = '执行失败'
-    } else if (taskStatus === '3') {
+    } else if (taskStatus === 3) {
       status = 'completed'
       statusLabel = '已完成'
-    } else if ((taskStatus === '1' || taskStatus === '2' || (hasBuildInFlightStatus.value && !currentStage)) && activeStage === stage.code) {
+    } else if ((taskStatus === 1 || taskStatus === 2 || (hasBuildInFlightStatus.value && !currentStage)) && activeStage === stage.code) {
       status = 'current'
       statusLabel = '当前阶段'
-    } else if (completedStages.has(stage.code) || ((taskStatus === '1' || taskStatus === '2') && currentIndex > index)) {
+    } else if (completedStages.has(stage.code) || ((taskStatus === 1 || taskStatus === 2) && currentIndex > index)) {
       status = 'completed'
       statusLabel = '已完成'
     } else if (touchedStages.has(stage.code)) {
@@ -1109,7 +1126,7 @@ const buildStageItems = computed(() => {
   })
 })
 
-const buildStageRows = computed(() => {
+const buildStageRows = computed<SequenceRow<BuildStageStatusItem>[]>(() => {
   return buildSequenceRows(buildStageItems.value)
 })
 
@@ -1128,10 +1145,10 @@ const buildOverlayDescription = computed(() => {
 })
 
 const chunkRecords = computed(() => {
-  return Array.isArray(chunkQuery.value?.records) ? chunkQuery.value.records : []
+  return chunkQuery.value?.records
 })
 
-function showNotice(message, type = 'info') {
+function showNotice(message: string, type = 'info') {
   pageNotice.type = type
   pageNotice.message = message
 }
@@ -1140,9 +1157,10 @@ function clearNotice() {
   pageNotice.message = ''
 }
 
-function handleFileChange(event) {
-  uploadForm.file = event.target.files?.[0] || null
-}
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  uploadForm.file = target.files?.[0] ?? null;
+};
 
 function clearSelectedFile() {
   uploadForm.file = null
@@ -1156,7 +1174,7 @@ function clearSelectedFile() {
   }
 }
 
-async function loadDocuments(preferredDocumentId?: string | number) {
+async function loadDocuments(preferredDocumentId?: string) {
   listLoading.value = true
 
   try {
@@ -1168,7 +1186,7 @@ async function loadDocuments(preferredDocumentId?: string | number) {
     const res = await documentApi.queryDocumentPage(params)
     documents.value = Array.isArray(res.data?.records) ? res.data.records : []
 
-    const targetId = resolveValidDocumentId(preferredDocumentId) || resolveValidDocumentId(selectedDocumentId.value) || ''
+    const targetId = resolveValidDocumentId(preferredDocumentId || '') || resolveValidDocumentId(selectedDocumentId.value) || ''
     selectedDocumentId.value = targetId ? String(targetId) : ''
   } catch (error) {
     console.error('加载文档列表失败', error)
@@ -1179,7 +1197,7 @@ async function loadDocuments(preferredDocumentId?: string | number) {
 }
 
 async function loadSelectedDocumentDetail() {
-  const effectiveDocumentId = Number(resolveValidDocumentId(selectedDocumentId.value))
+  const effectiveDocumentId = resolveValidDocumentId(selectedDocumentId.value)
   if (!effectiveDocumentId) {
     strategyPlan.value = null
     selectedParentStrategyTypes.value = []
@@ -1191,7 +1209,7 @@ async function loadSelectedDocumentDetail() {
     return
   }
 
-  if (normalizeCode(selectedDocumentId.value) !== normalizeCode(effectiveDocumentId)) {
+  if (selectedDocumentId.value !== effectiveDocumentId) {
     selectedDocumentId.value = String(effectiveDocumentId)
     return
   }
@@ -1200,8 +1218,7 @@ async function loadSelectedDocumentDetail() {
   clearNotice()
 
   try {
-    const params: QueryStrategyPlanReq = { documentId: effectiveDocumentId }
-    const res = await documentApi.queryStrategyPlan(params)
+    const res = await documentApi.queryStrategyPlan({documentId: effectiveDocumentId})
     strategyPlan.value = res.data || null
     selectedParentStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary)
     selectedChildStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'child', strategyLibrary)
@@ -1240,12 +1257,13 @@ async function submitUpload() {
 
   try {
     const data: UploadDocumentReq = {
-      documentName: uploadForm.documentName.trim() || undefined,
-      operatorId: Number(OPERATOR_ID),
-      knowledgeScopeCode: uploadForm.knowledgeScopeCode.trim() || undefined,
-      knowledgeScopeName: uploadForm.knowledgeScopeName.trim() || undefined,
-      businessCategory: uploadForm.businessCategory.trim() || undefined,
-      documentTags: uploadForm.documentTags.trim() || undefined
+      documentName: uploadForm.documentName?.trim(),
+      operatorId: OPERATOR_ID,
+      knowledgeScopeCode: uploadForm.knowledgeScopeCode?.trim(),
+      knowledgeScopeName: uploadForm.knowledgeScopeName?.trim(),
+      businessCategory: uploadForm.businessCategory?.trim(),
+      documentTags: uploadForm.documentTags?.trim(),
+      file: uploadForm.file,
     }
     const res = await documentApi.uploadFile(uploadForm.file, data)
     const result = res.data as UploadDocumentResp
@@ -1281,10 +1299,10 @@ async function submitConfirmStrategy() {
 
   try {
     const params: ConfirmStrategyReq = {
-      documentId: Number(selectedDocumentId.value),
+      documentId: selectedDocumentId.value,
       basePlanId: strategyPlan.value.plan.planId,
       adjustNote: adjustNote.value.trim() || undefined,
-      operatorId: Number(OPERATOR_ID),
+      operatorId: OPERATOR_ID,
       parentSteps: buildPipelineStepPayload(selectedParentStrategyTypes.value, strategyLibrary),
       childSteps: buildPipelineStepPayload(selectedChildStrategyTypes.value, strategyLibrary)
     }
@@ -1323,9 +1341,9 @@ async function submitBuildIndex() {
 
   try {
     const params: BuildIndexReq = {
-      documentId: Number(selectedDocumentId.value),
+      documentId: selectedDocumentId.value,
       planId: selectedDocument.value.currentPlanId,
-      operatorId: Number(OPERATOR_ID)
+      operatorId: OPERATOR_ID
     }
     const res = await documentApi.buildIndex(params)
     const result = res.data as BuildIndexResp
@@ -1379,7 +1397,7 @@ async function loadBuildTaskLogs() {
 
   try {
     const params: QueryTaskLogsReq = {
-      taskId: Number(buildTaskId),
+      taskId: buildTaskId,
       pageNo: 1,
       pageSize: 30
     }
@@ -1392,7 +1410,7 @@ async function loadBuildTaskLogs() {
 }
 
 async function loadDocumentChunks() {
-  const documentId = Number(resolveValidDocumentId(selectedDocumentId.value))
+  const documentId = resolveValidDocumentId(selectedDocumentId.value)
   if (!documentId) {
     chunkQuery.value = null
     return
@@ -1416,12 +1434,12 @@ async function loadDocumentChunks() {
   }
 }
 
-function getSelectedStrategyTypes(pipelineKey) {
+function getSelectedStrategyTypes(pipelineKey: string) {
   return pipelineKey === 'parent' ? selectedParentStrategyTypes.value : selectedChildStrategyTypes.value
 }
 
-function setSelectedStrategyTypes(pipelineKey, nextList) {
-  const normalizedList = normalizeStrategyTypeList(nextList, strategyLibrary)
+function setSelectedStrategyTypes(pipelineKey: string, types: number[]) {
+  const normalizedList = normalizeStrategyTypeList(types, strategyLibrary)
   if (pipelineKey === 'parent') {
     selectedParentStrategyTypes.value = normalizedList
     return
@@ -1429,39 +1447,34 @@ function setSelectedStrategyTypes(pipelineKey, nextList) {
   selectedChildStrategyTypes.value = normalizedList
 }
 
-function getSelectedStrategyPreview(pipelineKey) {
+function getSelectedStrategyPreview(pipelineKey: string) {
   return pipelineKey === 'parent' ? selectedParentStrategyPreview.value : selectedChildStrategyPreview.value
 }
 
-function getSelectedStrategyRows(pipelineKey) {
+function getSelectedStrategyRows(pipelineKey: string) {
   return pipelineKey === 'parent' ? selectedParentStrategyRows.value : selectedChildStrategyRows.value
 }
 
-function toggleStrategy(type, pipelineKey) {
+function toggleStrategy(type: number, pipelineKey: string) {
   if (hasBuildInFlightStatus.value) {
-    return
-  }
-  const normalizedType = normalizeCode(type)
-  if (!normalizedType) {
     return
   }
 
   const currentTypes = getSelectedStrategyTypes(pipelineKey)
-  if (currentTypes.includes(normalizedType)) {
-    setSelectedStrategyTypes(pipelineKey, currentTypes.filter((item) => item !== normalizedType))
+  if (currentTypes.includes(type)) {
+    setSelectedStrategyTypes(pipelineKey, currentTypes.filter((item) => item !== type))
     return
   }
 
-  setSelectedStrategyTypes(pipelineKey, [...currentTypes, normalizedType])
+  setSelectedStrategyTypes(pipelineKey, [...currentTypes, type])
 }
 
-function moveStrategy(type, direction, pipelineKey) {
+function moveStrategy(type: number, direction: number, pipelineKey: string) {
   if (hasBuildInFlightStatus.value) {
     return
   }
-  const sourceType = normalizeCode(type)
   const orderedTypes = normalizeStrategyTypeList(getSelectedStrategyTypes(pipelineKey), strategyLibrary)
-  const sourceIndex = orderedTypes.indexOf(sourceType)
+  const sourceIndex = orderedTypes.indexOf(type)
   if (sourceIndex < 0) {
     return
   }
@@ -1472,17 +1485,17 @@ function moveStrategy(type, direction, pipelineKey) {
   }
 
   const nextList = [...orderedTypes]
-  ;[nextList[sourceIndex], nextList[targetIndex]] = [nextList[targetIndex], nextList[sourceIndex]]
+  const temp = nextList[sourceIndex]
+  nextList[sourceIndex] = nextList[targetIndex] || 0
+  nextList[targetIndex] = temp || 0
   setSelectedStrategyTypes(pipelineKey, nextList)
 }
 
-function buildSequenceRows(items) {
-  const sourceList = Array.isArray(items) ? items : []
-  const rows = []
-  for (let index = 0; index < sourceList.length; index += 2) {
-    const pair = sourceList.slice(index, index + 2)
-    const rowIndex = rows.length
-    const direction = rowIndex % 2 === 0 ? 'ltr' : 'rtl'
+function buildSequenceRows<T extends StrategyPreviewItem | BuildStageStatusItem>(items: T[]): SequenceRow<T>[] {
+  const rows: SequenceRow<T>[] = []
+  for (let index = 0; index < items.length; index += 2) {
+    const pair = items.slice(index, index + 2)
+    const direction: 'ltr' | 'rtl' = index % 2 === 0 ? 'ltr' : 'rtl'
     const leftItem = direction === 'ltr' ? pair[0] || null : pair[1] || null
     const rightItem = direction === 'ltr' ? pair[1] || null : pair[0] || null
 
@@ -1496,13 +1509,13 @@ function buildSequenceRows(items) {
   return rows
 }
 
-function resolveValidDocumentId(candidateId) {
+function resolveValidDocumentId(candidateId: string): string {
   if (!candidateId) {
     return ''
   }
 
-  const matched = documents.value.find((item) => normalizeCode(item.documentId) === normalizeCode(candidateId))
-  return matched?.documentId ? String(matched.documentId) : ''
+  const matched = documents.value.find((item) => item.documentId === candidateId)
+  return matched?.documentId || ''
 }
 
 function focusBuildTracker() {
@@ -1514,7 +1527,7 @@ function focusBuildTracker() {
   })
 }
 
-function startPlanPolling(documentId: number) {
+function startPlanPolling(documentId: string) {
   if (planPollTimer.value) {
     window.clearInterval(planPollTimer.value)
   }
@@ -1523,24 +1536,24 @@ function startPlanPolling(documentId: number) {
   planPollTimer.value = window.setInterval(async () => {
     pollCount += 1
     try {
-      const params: QueryStrategyPlanReq = { documentId }
+      const params: QueryStrategyPlanReq = {documentId}
       const res = await documentApi.queryStrategyPlan(params)
       const result = res.data as QueryStrategyPlanResp
-      if (normalizeCode(selectedDocumentId.value) === normalizeCode(documentId)) {
+      if (selectedDocumentId.value === documentId) {
         strategyPlan.value = result || null
         selectedParentStrategyTypes.value = extractPipelineStrategyTypes(result?.plan, 'parent', strategyLibrary)
         selectedChildStrategyTypes.value = extractPipelineStrategyTypes(result?.plan, 'child', strategyLibrary)
       }
 
       await loadDocuments(documentId)
-      if (result?.planReady || normalizeCode(result?.parseStatus) === '4' || pollCount >= 8) {
+      if (result?.planReady || result?.parseStatus === 4 || pollCount >= 8) {
         window.clearInterval(planPollTimer.value)
-        planPollTimer.value = null
+        planPollTimer.value = undefined
       }
     } catch (error) {
       console.error('轮询策略结果失败', error)
       window.clearInterval(planPollTimer.value)
-      planPollTimer.value = null
+      planPollTimer.value = undefined
     }
   }, 2500)
 }
@@ -1548,11 +1561,11 @@ function startPlanPolling(documentId: number) {
 function clearBuildPolling() {
   if (buildPollTimer.value) {
     window.clearInterval(buildPollTimer.value)
-    buildPollTimer.value = null
+    buildPollTimer.value = undefined
   }
 }
 
-function startBuildPolling(documentId) {
+function startBuildPolling(documentId: string) {
   clearBuildPolling()
 
   let pollCount = 0
@@ -1560,13 +1573,13 @@ function startBuildPolling(documentId) {
     pollCount += 1
     try {
       await loadDocuments(documentId)
-      if (normalizeCode(selectedDocumentId.value) === normalizeCode(documentId)) {
+      if (selectedDocumentId.value === documentId) {
         await loadSelectedDocumentDetail()
       }
 
-      const currentItem = documents.value.find((item) => normalizeCode(item.documentId) === normalizeCode(documentId))
-      const indexDone = currentItem && normalizeCode(currentItem.indexStatus) !== '2'
-      const taskDone = currentItem && !['1', '2'].includes(normalizeCode(currentItem.latestTaskStatus))
+      const currentItem = documents.value.find((item) => item.documentId === documentId)
+      const indexDone = currentItem && currentItem.indexStatus !== 2
+      const taskDone = currentItem && ![1, 2].includes(currentItem.latestTaskStatus)
 
       if (indexDone && taskDone) {
         clearBuildPolling()
@@ -1623,8 +1636,8 @@ watch(selectedDocument, (value) => {
     return
   }
 
-  const latestTaskBuilding = hasCode(value.latestTaskType, 2) && ['1', '2'].includes(normalizeCode(value.latestTaskStatus))
-  const building = hasCode(value.indexStatus, 2) || latestTaskBuilding
+  const latestTaskBuilding = value.latestTaskType === 2 && ![1, 2].includes(value.latestTaskStatus)
+  const building = value.indexStatus === 2 || latestTaskBuilding
   if (building && !buildPollTimer.value) {
     startBuildPolling(value.documentId)
     return
@@ -1642,7 +1655,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (planPollTimer.value) {
     window.clearInterval(planPollTimer.value)
-    planPollTimer.value = null
+    planPollTimer.value = undefined
   }
   clearBuildPolling()
 })
@@ -1715,7 +1728,7 @@ onBeforeUnmount(() => {
 }
 
 .section-headline.section-headline-major h4 {
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 34px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -1740,7 +1753,7 @@ onBeforeUnmount(() => {
 }
 
 .section-headline.pipeline-headline h4 {
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -2201,17 +2214,17 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-.strategy-lane-titlebox,
-.strategy-adjust-titlebox {
+.strategy-lane-title-box,
+.strategy-adjust-title-box {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.strategy-lane-titlebox h5,
-.strategy-adjust-titlebox h5 {
+.strategy-lane-title-box h5,
+.strategy-adjust-title-box h5 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -2219,12 +2232,12 @@ onBeforeUnmount(() => {
 }
 
 .strategy-lane-parent .strategy-lane-kicker,
-.strategy-lane-parent .strategy-lane-titlebox h5 {
+.strategy-lane-parent .strategy-lane-title-box h5 {
   color: #2557d6;
 }
 
 .strategy-lane-child .strategy-lane-kicker,
-.strategy-lane-child .strategy-lane-titlebox h5 {
+.strategy-lane-child .strategy-lane-title-box h5 {
   color: #0d7c7c;
 }
 
@@ -2333,17 +2346,17 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-.strategy-lane-titlebox,
-.strategy-adjust-titlebox {
+.strategy-lane-title-box,
+.strategy-adjust-title-box {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.strategy-lane-titlebox h5,
-.strategy-adjust-titlebox h5 {
+.strategy-lane-title-box h5,
+.strategy-adjust-title-box h5 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -2351,12 +2364,12 @@ onBeforeUnmount(() => {
 }
 
 .strategy-lane-parent .strategy-lane-kicker,
-.strategy-lane-parent .strategy-lane-titlebox h5 {
+.strategy-lane-parent .strategy-lane-title-box h5 {
   color: #2557d6;
 }
 
 .strategy-lane-child .strategy-lane-kicker,
-.strategy-lane-child .strategy-lane-titlebox h5 {
+.strategy-lane-child .strategy-lane-title-box h5 {
   color: #0d7c7c;
 }
 
@@ -2555,7 +2568,7 @@ onBeforeUnmount(() => {
 }
 
 .selected-flow-label {
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 24px !important;
   font-weight: 900;
   letter-spacing: -0.03em !important;
@@ -2848,8 +2861,7 @@ onBeforeUnmount(() => {
 }
 
 .preview-box .preview-box-title {
-  font-weight: 800;
-  font-family: var(--font-display);
+  font-family: var(--font-display), serif;
   font-size: 22px !important;
   font-weight: 900;
   letter-spacing: -0.03em;

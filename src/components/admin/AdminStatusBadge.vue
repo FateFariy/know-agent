@@ -6,8 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { normalizeCode } from '@/utils/format.ts'
+import {computed} from 'vue'
 
 const props = defineProps({
   label: {
@@ -19,34 +18,34 @@ const props = defineProps({
     default: 'default'
   },
   code: {
-    type: [String, Number],
-    default: ''
+    type: Number,
+    default: 0
   }
 })
-const STATUS_MAP = {
+const STATUS_MAP:Record<string, Record<number, string>> = {
   parse: {
     3: 'status-success',
     2: 'status-processing',
     4: 'status-danger',
-    default: 'status-waiting'
+    0: 'status-waiting'
   },
   strategy: {
     3: 'status-success',
     2: 'status-processing',
-    default: 'status-waiting'
+    0: 'status-waiting'
   },
   index: {
     3: 'status-success',
     2: 'status-processing',
     4: 'status-danger',
-    default: 'status-waiting'
+    0: 'status-waiting'
   },
   task: {
     3: 'status-success',
     1: 'status-processing',
     2: 'status-processing',
     4: 'status-danger',
-    default: 'status-default'
+    0: 'status-default'
   }
 }
 const badgeClass = computed(() => {
@@ -54,9 +53,8 @@ const badgeClass = computed(() => {
   // 无对应type直接返回默认样式
   if (!targetMap) return 'status-default'
 
-  const code = normalizeCode(props.code)
   // 匹配状态码，无匹配取该类型默认
-  return targetMap[code] ?? targetMap.default
+  return targetMap[props.code] ?? targetMap[0]
 })
 </script>
 

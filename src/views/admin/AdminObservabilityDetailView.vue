@@ -3,13 +3,13 @@
     <div class="detail-toolbar">
       <RouterLink :to="{ name: 'AdminObservabilitySession', params: { conversationId } }"
                   class="back-link">
-        <ArrowLeftIcon class="tool-icon" />
+        <ArrowLeftIcon class="tool-icon"/>
         返回会话轮次列表
       </RouterLink>
 
       <div class="toolbar-actions">
-        <button class="ghost-button" type="button" :disabled="loadingPage" @click="loadPage()">
-          <ArrowPathIcon class="tool-icon" />
+        <button :disabled="loadingPage" class="ghost-button" type="button" @click="loadPage()">
+          <ArrowPathIcon class="tool-icon"/>
           {{ loadingPage ? '刷新中...' : '刷新这一轮详情' }}
         </button>
       </div>
@@ -28,7 +28,7 @@
         </div>
 
         <div class="stat-badges">
-          <span class="stat-badge" :class="`badge-${turnStatusTone(activeExchange.turnStatus)}`">
+          <span :class="`badge-${turnStatusTone(activeExchange.turnStatus)}`" class="stat-badge">
             {{ formatTurnStatusLabel(activeExchange.turnStatus) }}
           </span>
           <span class="stat-badge mode-badge">{{ formatChatMode(activeSession?.chatMode) }}</span>
@@ -51,7 +51,8 @@
           <div class="meta-pair">
             <dt>总耗时</dt>
             <dd>
-              {{ activeExchange.totalResponseTimeMs ? `${activeExchange.totalResponseTimeMs} ms` : '无'
+              {{
+                activeExchange.totalResponseTimeMs ? `${activeExchange.totalResponseTimeMs} ms` : '无'
               }}
             </dd>
           </div>
@@ -81,18 +82,18 @@
         </div>
 
         <div v-else class="timeline-list">
-          <article v-for="(trace, index) in stageTraces" :key="trace.id" class="timeline-item"
-                   :class="{ active: String(trace.id) === selectedTraceId }">
+          <article v-for="(trace, index) in stageTraces" :key="trace.id" :class="{ active: String(trace.id) === selectedTraceId }"
+                   class="timeline-item">
             <div class="timeline-indicator">
-              <span class="timeline-dot" :class="`dot-${stageStateTone(trace.stageState)}`"></span>
+              <span :class="`dot-${stageStateTone(trace.stageState)}`" class="timeline-dot"></span>
               <span v-if="index < stageTraces.length - 1" class="timeline-line"></span>
             </div>
 
-            <button type="button" class="timeline-content" @click="openTraceDetail(trace.id)">
+            <button class="timeline-content" type="button" @click="openTraceDetail(trace.id)">
               <div class="timeline-header">
                 <div class="timeline-title">
                   <strong>{{ trace.stageName }}</strong>
-                  <span class="timeline-badge" :class="`badge-${stageStateTone(trace.stageState)}`">
+                  <span :class="`badge-${stageStateTone(trace.stageState)}`" class="timeline-badge">
                     {{ formatStageStateLabel(trace.stageState) }}
                   </span>
                 </div>
@@ -102,7 +103,7 @@
               <p class="timeline-summary">{{ trace.summaryText || '当前阶段已记录。' }}</p>
 
               <div class="timeline-bar">
-                <div class="timeline-bar-fill" :style="{ width: traceBarWidth(trace) }"></div>
+                <div :style="{ width: traceBarWidth(trace) }" class="timeline-bar-fill"></div>
               </div>
 
               <div class="timeline-meta">
@@ -133,8 +134,8 @@
               </div>
               <div v-if="stage.chips?.length" class="summary-chips">
                 <span v-for="item in stage.chips" :key="`${stage.key}-${item.label}-${item.value}`"
-                      class="summary-chip"
-                      :class="`chip-${item.tone || 'neutral'}`">
+                      :class="`chip-${item.tone || 'neutral'}`"
+                      class="summary-chip">
                   {{ item.label }}：{{ item.value }}
                 </span>
               </div>
@@ -178,32 +179,40 @@
           <article v-for="exec in channelExecutions" :key="exec.id" class="channel-card">
             <div class="channel-card-header">
               <strong>{{ formatChannelType(exec.channelType) }}</strong>
-              <span class="stat-badge"
-                    :class="`badge-${exec.executionState === 1 ? 'completed' : 'failed'}`">
+              <span :class="`badge-${exec.executionState === 1 ? 'completed' : 'failed'}`"
+                    class="stat-badge">
                 {{ formatExecutionState(exec.executionState) }}
               </span>
             </div>
-            <p v-if="exec.subQuestion" class="channel-sub-question">子问题 {{ exec.subQuestionIndex
+            <p v-if="exec.subQuestion" class="channel-sub-question">子问题 {{
+                exec.subQuestionIndex
               }}：{{
-                truncate(exec.subQuestion, 60) }}</p>
+                truncate(exec.subQuestion, 60)
+              }}</p>
             <div class="channel-metrics">
               <div class="metric-item"><span class="metric-label">召回数</span><span
                 class="metric-value">{{
-                  exec.recalledCount }}</span></div>
+                  exec.recalledCount
+                }}</span></div>
               <div class="metric-item"><span class="metric-label">闸门后</span><span
                 class="metric-value">{{
-                  exec.acceptedCount }}</span></div>
+                  exec.acceptedCount
+                }}</span></div>
               <div class="metric-item"><span class="metric-label">最终选入</span><span
                 class="metric-value metric-highlight">{{ exec.finalSelectedCount }}</span></div>
               <div class="metric-item"><span class="metric-label">耗时</span><span
-                class="metric-value">{{ exec.durationMs
-                ? `${exec.durationMs} ms` : '-' }}</span></div>
+                class="metric-value">{{
+                  exec.durationMs
+                    ? `${exec.durationMs} ms` : '-'
+                }}</span></div>
               <div class="metric-item"><span class="metric-label">平均分</span><span
                 class="metric-value">{{
-                  formatScore(exec.avgScore) }}</span></div>
+                  formatScore(exec.avgScore)
+                }}</span></div>
               <div class="metric-item"><span class="metric-label">分数区间</span><span
                 class="metric-value">{{
-                  formatScore(exec.minScore) }} ~ {{ formatScore(exec.maxScore) }}</span></div>
+                  formatScore(exec.minScore)
+                }} ~ {{ formatScore(exec.maxScore) }}</span></div>
             </div>
             <div v-if="exec.errorMessage" class="channel-error">{{ exec.errorMessage }}</div>
           </article>
@@ -250,7 +259,8 @@
                     <div v-if="result.sectionPath" class="chunk-section">{{ result.sectionPath }}
                     </div>
                     <div v-if="result.chunkTextPreview" class="chunk-preview-text">{{
-                        truncate(result.chunkTextPreview, 120) }}
+                        truncate(result.chunkTextPreview, 120)
+                      }}
                     </div>
                   </td>
                   <td>{{ formatScore(result.originalScore) }}</td>
@@ -285,19 +295,22 @@
           </div>
           <div class="budget-item">
             <span class="budget-label">单子问题预算</span>
-            <span class="budget-value">{{ evidenceBudgetSnapshot.perSubQuestionBudget || 0
+            <span class="budget-value">{{
+                evidenceBudgetSnapshot.perSubQuestionBudget || 0
               }} 字符</span>
           </div>
           <div class="budget-item">
             <span class="budget-label">已纳入</span>
             <span
-              class="budget-value metric-highlight">{{ evidenceBudgetSnapshot.renderedReferenceCount || 0
+              class="budget-value metric-highlight">{{
+                evidenceBudgetSnapshot.renderedReferenceCount || 0
               }}
               条</span>
           </div>
           <div class="budget-item">
             <span class="budget-label">已省略</span>
-            <span class="budget-value">{{ evidenceBudgetSnapshot.omittedReferenceCount || 0
+            <span class="budget-value">{{
+                evidenceBudgetSnapshot.omittedReferenceCount || 0
               }} 条</span>
           </div>
         </div>
@@ -307,7 +320,8 @@
           <ul class="evidence-list">
             <li v-for="(detail, idx) in evidenceBudgetSnapshot.renderedReferenceDetails"
                 :key="`rendered-${idx}`">{{
-                detail }}
+                detail
+              }}
             </li>
           </ul>
         </div>
@@ -317,7 +331,8 @@
           <ul class="evidence-list">
             <li v-for="(detail, idx) in evidenceBudgetSnapshot.omittedReferenceDetails"
                 :key="`omitted-${idx}`">{{
-                detail }}
+                detail
+              }}
             </li>
           </ul>
         </div>
@@ -331,10 +346,10 @@
         <p class="section-desc">查看最终喂给模型的完整 Prompt。</p>
 
         <div class="prompt-tabs">
-          <button type="button" class="prompt-tab" :class="{ active: activePromptTab === 'system' }"
+          <button :class="{ active: activePromptTab === 'system' }" class="prompt-tab" type="button"
                   @click="activePromptTab = 'system'">System Prompt
           </button>
-          <button type="button" class="prompt-tab" :class="{ active: activePromptTab === 'user' }"
+          <button :class="{ active: activePromptTab === 'user' }" class="prompt-tab" type="button"
                   @click="activePromptTab = 'user'">User Prompt
           </button>
         </div>
@@ -352,7 +367,8 @@
             <div>
               <span class="section-kicker">Trace Detail</span>
               <h3>{{ overlayInspector.title }}</h3>
-              <p class="section-desc">{{ overlayInspector.summary || '这个阶段已经执行完成，下面是它记录下来的结构化细节。'
+              <p class="section-desc">{{
+                  overlayInspector.summary || '这个阶段已经执行完成，下面是它记录下来的结构化细节。'
                 }}</p>
             </div>
             <button class="panel-close" type="button" @click="closeTraceDetail">关闭</button>
@@ -362,7 +378,8 @@
             <span>状态：{{ formatStageStateLabel(overlayInspector.stageState) }}</span>
             <span>开始：{{ overlayInspector.startTime }}</span>
             <span>结束：{{ overlayInspector.endTime }}</span>
-            <span>耗时：{{ overlayInspector.durationMs ? `${overlayInspector.durationMs} ms` : '无'
+            <span>耗时：{{
+                overlayInspector.durationMs ? `${overlayInspector.durationMs} ms` : '无'
               }}</span>
           </div>
 
@@ -434,20 +451,21 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, ref, watch, watchEffect } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { ArrowLeftIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
-import { chatApi } from '@/api/chat'
+<script lang="ts" setup>
+import {computed, ref, watch, watchEffect} from 'vue'
+import {RouterLink, useRoute} from 'vue-router'
+import {ArrowLeftIcon, ArrowPathIcon} from '@heroicons/vue/24/outline'
+import {chatApi} from '@/api/chat'
 import type {
   ChannelExecutionResp,
   ConversationExchange,
   ConversationExchangeDetailResp,
   ConversationSessionResp,
   ConversationTraceStage,
-  RetrievalResultResp, Snapshot
+  RetrievalResultResp,
+  Snapshot
 } from '@/types'
-import type { ExchangeStage, StageInspector } from '@/utils/observabilityHelpers'
+import type {ExchangeStage, StageInspector} from '@/utils/observabilityHelpers'
 import {
   buildExchangeStages,
   buildExchangeStatusNarrative,
@@ -562,7 +580,7 @@ async function loadPage(): Promise<void> {
   pageError.value = ''
   try {
     const [sessionRes, exchangeDetailRes] = await Promise.all([
-      chatApi.getSessionDetail({ conversationId: conversationId.value }),
+      chatApi.getSessionDetail({conversationId: conversationId.value}),
       chatApi.getExchangeDetail({
         conversationId: conversationId.value,
         exchangeId: exchangeId.value
@@ -658,7 +676,7 @@ watch([conversationId, exchangeId], () => {
   overlayInspector.value = null
   selectedTraceId.value = ''
   loadPage()
-}, { immediate: true })
+}, {immediate: true})
 
 watchEffect(() => {
   if (typeof window === 'undefined') {
@@ -741,7 +759,7 @@ watchEffect(() => {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
   margin-bottom: 4px;
 }
 
@@ -1254,7 +1272,7 @@ watchEffect(() => {
   white-space: pre-wrap;
   line-height: 1.65;
   font-size: 13px;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
   word-break: break-all;
 }
 

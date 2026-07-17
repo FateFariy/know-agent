@@ -81,8 +81,10 @@
               <p>{{ item.originalFileName }}</p>
             </div>
             <div class="recent-item-meta">
-              <AdminStatusBadge :label="item.parseStatusName" :code="item.parseStatus" type="parse" />
-              <AdminStatusBadge :label="item.indexStatusName" :code="item.indexStatus" type="index" />
+              <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
+                                type="parse"/>
+              <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
+                                type="index"/>
             </div>
           </article>
         </div>
@@ -91,13 +93,13 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { documentApi } from '@/api/document'
+<script lang="ts" setup>
+import {onMounted, reactive, ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {documentApi} from '@/api/document'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import { formatCount } from '@/utils/format.ts'
-import type { DocumentDetailResp } from '@/types'
+import {formatCount} from '@/utils/format.ts'
+import type {DocumentDetailResp} from '@/types'
 
 const router = useRouter()
 const loading = ref(false)
@@ -113,7 +115,7 @@ async function loadDashboard() {
   loading.value = true
 
   try {
-    const { data } = await documentApi.queryDocumentPage({
+    const {data} = await documentApi.queryDocumentPage({
       pageNo: 1,
       pageSize: 50,
       keyword: ''

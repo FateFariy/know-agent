@@ -2,7 +2,7 @@
   <section class="observability-session">
     <div class="detail-toolbar">
       <RouterLink :to="{ name: 'AdminObservabilityList' }" class="back-link">
-        <ArrowLeftIcon class="tool-icon" />
+        <ArrowLeftIcon class="tool-icon"/>
         返回会话列表
       </RouterLink>
 
@@ -11,13 +11,14 @@
           <span class="live-dot"></span>
           {{ pollingSession ? '实时轮询中' : '会话运行中' }}
         </span>
-        <button class="ghost-button" type="button" :disabled="loadingSession" @click="loadSession()">
-          <ArrowPathIcon class="tool-icon" />
+        <button :disabled="loadingSession" class="ghost-button" type="button"
+                @click="loadSession()">
+          <ArrowPathIcon class="tool-icon"/>
           {{ loadingSession ? '刷新中...' : '刷新会话详情' }}
         </button>
-        <button class="primary-button" type="button" :disabled="!activeSession || rebuildingSummary"
-          @click="rebuildSummary">
-          <SparklesIcon class="tool-icon" />
+        <button :disabled="!activeSession || rebuildingSummary" class="primary-button" type="button"
+                @click="rebuildSummary">
+          <SparklesIcon class="tool-icon"/>
           {{ rebuildingSummary ? '正在重建摘要...' : '重建长期摘要' }}
         </button>
       </div>
@@ -40,9 +41,10 @@
 
         <div class="stat-badges">
           <span class="stat-badge mode-badge">{{ formatChatMode(activeSession.chatMode) }}</span>
-          <span v-if="activeSession.running" class="stat-badge running-badge">当前会话仍在执行</span>
-          <span v-else-if="activeSession.latestTurnStatus" class="stat-badge"
-            :class="`badge-${turnStatusTone(activeSession.latestTurnStatus)}`">
+          <span v-if="activeSession.running"
+                class="stat-badge running-badge">当前会话仍在执行</span>
+          <span v-else-if="activeSession.latestTurnStatus" :class="`badge-${turnStatusTone(activeSession.latestTurnStatus)}`"
+                class="stat-badge">
             最近一轮{{ formatStageStateLabel(activeSession.latestTurnStatus) }}
           </span>
           <span class="stat-badge neutral-badge">会话ID {{ activeSession.conversationId }}</span>
@@ -82,12 +84,15 @@
             长期摘要快照
           </h4>
           <div class="memory-chips">
-            <span class="memory-chip">covered {{ activeSession.memorySummary?.coveredExchangeCount ?? 0
-            }}</span>
-            <span class="memory-chip">version {{ activeSession.memorySummary?.summaryVersion ?? 0
-            }}</span>
-            <span class="memory-chip">compress {{ activeSession.memorySummary?.compressionCount ?? 0
-            }}</span>
+            <span class="memory-chip">covered {{
+                activeSession.memorySummary?.coveredExchangeCount ?? 0
+              }}</span>
+            <span class="memory-chip">version {{
+                activeSession.memorySummary?.summaryVersion ?? 0
+              }}</span>
+            <span class="memory-chip">compress {{
+                activeSession.memorySummary?.compressionCount ?? 0
+              }}</span>
           </div>
           <pre class="code-block">{{ activeSession.memorySummary?.summaryText || '无' }}</pre>
         </div>
@@ -109,18 +114,19 @@
         </div>
 
         <div v-else class="rounds-list">
-          <article v-for="(exchange, index) in assistantExchanges" :key="exchange.exchangeId" class="round-item"
-            :class="`status-${turnStatusTone(exchange.turnStatus)}`">
+          <article v-for="(exchange, index) in assistantExchanges" :key="exchange.exchangeId"
+                   :class="`status-${turnStatusTone(exchange.turnStatus)}`"
+                   class="round-item">
             <div class="round-indicator">
               <span class="round-dot"></span>
               <span v-if="index < assistantExchanges.length - 1" class="round-line"></span>
             </div>
 
-            <RouterLink class="round-content" :to="exchangeTarget(exchange)">
+            <RouterLink :to="exchangeTarget(exchange)" class="round-content">
               <div class="round-header">
                 <div class="round-badges">
                   <span class="round-seq">第 {{ index + 1 }} 轮</span>
-                  <span class="round-badge" :class="`badge-${turnStatusTone(exchange.turnStatus)}`">
+                  <span :class="`badge-${turnStatusTone(exchange.turnStatus)}`" class="round-badge">
                     {{ formatStageStateLabel(exchange.turnStatus) }}
                   </span>
                   <span v-if="exchange.debugTrace?.executionMode" class="round-badge mode-badge">
@@ -139,8 +145,9 @@
               </div>
 
               <div class="round-meta">
-                <span>耗时 {{ exchange.totalResponseTimeMs ? `${exchange.totalResponseTimeMs} ms` : '无'
-                }}</span>
+                <span>耗时 {{
+                    exchange.totalResponseTimeMs ? `${exchange.totalResponseTimeMs} ms` : '无'
+                  }}</span>
                 <span>引用 {{ exchange.references?.length || 0 }}</span>
                 <span>推荐 {{ exchange.recommendations?.length || 0 }}</span>
                 <span>Token {{ exchangeTokenCount(exchange) }}</span>
@@ -156,20 +163,22 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { ArrowLeftIcon, ArrowPathIcon, SparklesIcon } from '@heroicons/vue/24/outline'
-import { chatApi } from '@/api/chat'
-import type { ConversationExchange, ConversationSessionResp } from '@/types'
+<script lang="ts" setup>
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {RouterLink, useRoute} from 'vue-router'
+import {ArrowLeftIcon, ArrowPathIcon, SparklesIcon} from '@heroicons/vue/24/outline'
+import {chatApi} from '@/api/chat'
+import type {ConversationExchange, ConversationSessionResp} from '@/types'
 import {
   formatChatMode,
-  formatExecutionMode, formatStageStateLabel,
+  formatExecutionMode,
+  formatStageStateLabel,
   listAssistantExchanges,
   normalizeError,
   sessionPreview,
   sessionTitle,
-  truncate, turnStatusTone
+  truncate,
+  turnStatusTone
 } from '@/utils/observabilityHelpers'
 
 const route = useRoute()
@@ -235,7 +244,7 @@ async function loadSession(options: LoadSessionOptions = {}): Promise<void> {
   pageError.value = ''
 
   try {
-    const { data } = await chatApi.getSessionDetail({ conversationId: conversationId.value })
+    const {data} = await chatApi.getSessionDetail({conversationId: conversationId.value})
     activeSession.value = data || null
   } catch (error) {
     activeSession.value = null
@@ -254,7 +263,7 @@ function schedulePolling(): void {
     return
   }
   pollTimer = window.setTimeout(() => {
-    loadSession({ silent: true })
+    loadSession({silent: true})
   }, POLL_INTERVAL_MS)
 }
 
@@ -267,7 +276,7 @@ async function rebuildSummary(): Promise<void> {
   pageError.value = ''
 
   try {
-    const { data } = await chatApi.rebuildSummary({ conversationId: conversationId.value })
+    const {data} = await chatApi.rebuildSummary({conversationId: conversationId.value})
     if (activeSession.value?.conversationId === conversationId.value) {
       activeSession.value = {
         ...activeSession.value,
@@ -306,7 +315,7 @@ function exchangeCost(exchange: ConversationExchange): string {
 watch(conversationId, () => {
   activeSession.value = null
   loadSession()
-}, { immediate: true })
+}, {immediate: true})
 
 onMounted(() => {
   schedulePolling()
@@ -419,7 +428,7 @@ onUnmounted(() => {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-family: 'Fira Code', var(--font-sans),serif;
+  font-family: 'Fira Code', var(--font-sans), serif;
   margin-bottom: 4px;
 }
 
@@ -497,7 +506,7 @@ onUnmounted(() => {
 
 .stat-value {
   color: var(--color-text-strong);
-  font-family: 'Fira Code', var(--font-sans),serif;
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 /* ── Context Section ── */
@@ -572,7 +581,7 @@ onUnmounted(() => {
   color: var(--color-muted-strong);
   font-size: 11px;
   font-weight: 600;
-  font-family: 'Fira Code', var(--font-sans),serif;
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 .code-block {
@@ -584,7 +593,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
   line-height: 1.65;
   font-size: 13px;
-  font-family: 'Fira Code', var(--font-sans),serif;
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 .memory-empty {
@@ -688,7 +697,7 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-strong);
-  font-family: 'Fira Code', var(--font-sans),serif;
+  font-family: 'Fira Code', var(--font-sans), serif;
 }
 
 .round-badge {

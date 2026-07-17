@@ -11,37 +11,37 @@
         <div class="upload-grid">
           <label class="field">
             <span>文档名称</span>
-            <input v-model="uploadForm.documentName" type="text"
-                   placeholder="不填则使用原始文件名" />
+            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" type="text"
-                   placeholder="例如 operation_rule" />
+            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" type="text"
-                   placeholder="例如 运营规则" />
+            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" type="text"
-                   placeholder="例如 手册 / 规则 / 介绍" />
+            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" type="text"
-                   placeholder="多个标签用英文逗号分隔" />
+            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
+                   type="text"/>
           </label>
 
           <label class="field">
             <span>选择文件</span>
-            <input ref="fileInputRef" type="file" class="file-input" @change="handleFileChange" />
+            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange"/>
           </label>
         </div>
 
@@ -53,7 +53,7 @@
 
           <div class="upload-actions">
             <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
-            <button class="primary-button" type="button" :disabled="uploading || !uploadForm.file"
+            <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button"
                     @click="submitUpload">
               {{ uploading ? '上传中...' : '上传并解析' }}
             </button>
@@ -74,7 +74,7 @@
       </article>
     </div>
 
-    <div v-if="pageNotice.message" class="page-notice" :class="`page-notice-${pageNotice.type}`">
+    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
       {{ pageNotice.message }}
     </div>
 
@@ -86,9 +86,9 @@
         </div>
 
         <div class="list-actions">
-          <input v-model="keyword" class="search-input" type="text"
-                 placeholder="搜索文档名称或原始文件名"
-                 @keydown.enter="submitSearch" />
+          <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名"
+                 type="text"
+                 @keydown.enter="submitSearch"/>
           <button class="ghost-button" type="button" @click="submitSearch">搜索</button>
         </div>
       </div>
@@ -151,24 +151,24 @@
                 <strong>{{ formatDateTime(item.updateTime) }}</strong>
               </td>
               <td class="document-cell">
-                <AdminStatusBadge :label="item.parseStatusName" :code="item.parseStatus"
-                                  type="parse" />
+                <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
+                                  type="parse"/>
               </td>
               <td class="document-cell">
-                <AdminStatusBadge :label="item.strategyStatusName" :code="item.strategyStatus"
-                                  type="strategy" />
+                <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName"
+                                  type="strategy"/>
               </td>
               <td class="document-cell">
-                <AdminStatusBadge :label="item.indexStatusName" :code="item.indexStatus"
-                                  type="index" />
+                <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
+                                  type="index"/>
               </td>
               <td class="document-cell document-cell-action">
                 <div class="document-action-group">
                   <button class="detail-link" type="button"
                           @click="openDocumentDetail(item.documentId)">查询详情
                   </button>
-                  <button class="danger-link" type="button" :disabled="!canDeleteDocument(item)"
-                          :title="buildDeleteTitle(item)" @click="deleteDocument(item)">
+                  <button :disabled="!canDeleteDocument(item)" :title="buildDeleteTitle(item)" class="danger-link"
+                          type="button" @click="deleteDocument(item)">
                     {{ deletingDocumentId === item.documentId ? '删除中...' : '删除' }}
                   </button>
                 </div>
@@ -180,7 +180,7 @@
       </div>
 
       <div v-if="documents.length" class="pagination-bar">
-        <button class="ghost-button" type="button" :disabled="currentPage <= 1 || listLoading"
+        <button :disabled="currentPage <= 1 || listLoading" class="ghost-button" type="button"
                 @click="changePage(currentPage - 1)">
           上一页
         </button>
@@ -188,8 +188,8 @@
           <strong>第 {{ currentPage }} / {{ totalPages }} 页</strong>
           <span>共 {{ total }} 条文档</span>
         </div>
-        <button class="ghost-button" type="button"
-                :disabled="currentPage >= totalPages || listLoading"
+        <button :disabled="currentPage >= totalPages || listLoading" class="ghost-button"
+                type="button"
                 @click="changePage(currentPage + 1)">
           下一页
         </button>
@@ -198,10 +198,10 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { documentApi } from '@/api/document'
+<script lang="ts" setup>
+import {computed, onMounted, reactive, ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {documentApi} from '@/api/document'
 import type {
   DeleteDocumentReq,
   DocumentDetailResp,
@@ -209,7 +209,7 @@ import type {
   UploadDocumentReq
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import { formatDateTime, formatFileSize } from '@/utils/format.ts'
+import {formatDateTime, formatFileSize} from '@/utils/format.ts'
 
 const router = useRouter()
 const OPERATOR_ID = '10001'
@@ -232,7 +232,7 @@ const currentPage = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
 const total = ref(0)
 const deletingDocumentId = ref('')
-const pageNotice = reactive({ type: 'info', message: '' })
+const pageNotice = reactive({type: 'info', message: ''})
 
 const totalPages = computed(() => {
   return Math.max(1, Math.ceil((total.value || 0) / pageSize.value))
@@ -280,7 +280,7 @@ async function loadDocuments(page: number = currentPage.value): Promise<void> {
       pageSize: pageSize.value,
       keyword: keyword.value.trim()
     }
-    const { data } = await documentApi.queryDocumentPage(params)
+    const {data} = await documentApi.queryDocumentPage(params)
 
     documents.value = data?.records || []
     currentPage.value = data?.pageNo || page
@@ -356,7 +356,7 @@ async function submitUpload(): Promise<void> {
       documentTags: uploadForm.documentTags?.trim() || undefined,
       file: uploadForm.file
     }
-    const { data } = await documentApi.uploadFile(uploadForm.file, documentReq)
+    const {data} = await documentApi.uploadFile(uploadForm.file, documentReq)
     clearSelectedFile()
     showNotice(`文档已上传，任务 ${data?.taskId} 已进入解析与策略推荐队列。`, 'success')
     await loadDocuments(1)

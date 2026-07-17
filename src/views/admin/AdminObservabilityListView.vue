@@ -6,13 +6,12 @@
           <span class="header-kicker">Conversation Observatory</span>
           <h2>先选会话，再进入整页观测详情</h2>
           <p>
-            列表页只负责定位问题会话，详情页再按单轮执行阶段展开。这样不会把大量轨迹信息压缩在同一块区域里，
-            也更适合教学演示和排障复盘。
+            列表页仅用于定位问题会话，详情页按单轮执行阶段分层展示数据，便于故障复盘。
           </p>
         </div>
 
         <div class="header-actions">
-          <button class="primary-button" type="button" :disabled="loadingSessions"
+          <button :disabled="loadingSessions" class="primary-button" type="button"
                   @click="loadSessions()">
             {{ loadingSessions ? '正在刷新...' : '刷新会话列表' }}
           </button>
@@ -20,8 +19,8 @@
       </div>
 
       <div class="stat-badges">
-        <span v-for="item in summaryStats" :key="item.label" class="stat-badge"
-              :title="item.description">
+        <span v-for="item in summaryStats" :key="item.label" :title="item.description"
+              class="stat-badge">
           <span class="stat-label">{{ item.label }}</span>
           <strong class="stat-value">{{ item.value }}</strong>
         </span>
@@ -31,8 +30,8 @@
     <section class="filter-bar">
       <label class="filter-field search-field">
         <span>搜索会话</span>
-        <input v-model.trim="keyword" type="text" placeholder="按会话ID、文档名、问题或回答筛选"
-               @keydown.enter.prevent="applyFilters" />
+        <input v-model.trim="keyword" placeholder="按会话ID、文档名、问题或回答筛选" type="text"
+               @keydown.enter.prevent="applyFilters"/>
       </label>
 
       <label class="filter-field">
@@ -57,11 +56,11 @@
       </label>
 
       <div class="filter-actions">
-        <button class="ghost-button" type="button" :disabled="loadingSessions"
+        <button :disabled="loadingSessions" class="ghost-button" type="button"
                 @click="resetFilters">
           重置筛选
         </button>
-        <button class="primary-button inline-primary" type="button" :disabled="loadingSessions"
+        <button :disabled="loadingSessions" class="primary-button inline-primary" type="button"
                 @click="applyFilters">
           应用筛选
         </button>
@@ -75,15 +74,15 @@
     </div>
 
     <div v-else class="session-list">
-      <article v-for="session in sessions" :key="session.conversationId" class="session-item"
-               :class="`status-${sessionTone(session)}`">
+      <article v-for="session in sessions" :key="session.conversationId" :class="`status-${sessionTone(session)}`"
+               class="session-item">
         <RouterLink :to="detailTarget(session)" class="session-link">
           <div class="session-top">
             <div class="session-chips">
               <span class="chip mode-chip">{{ formatChatMode(session.chatMode) }}</span>
               <span v-if="session.running" class="chip running-chip">实时执行中</span>
-              <span v-else-if="session.latestTurnStatus" class="chip"
-                    :class="`chip-${turnStatusTone(session.latestTurnStatus)}`">
+              <span v-else-if="session.latestTurnStatus" :class="`chip-${turnStatusTone(session.latestTurnStatus)}`"
+                    class="chip">
                 {{ formatTurnStatusLabel(session.latestTurnStatus) }}
               </span>
             </div>
@@ -132,16 +131,16 @@
         </label>
 
         <div class="page-buttons">
-          <button class="page-btn" type="button" :disabled="!canPrev" @click="goPrevPage">上一页
+          <button :disabled="!canPrev" class="page-btn" type="button" @click="goPrevPage">上一页
           </button>
           <button v-for="(item, index) in paginationItems" :key="`page-${item}-${index}`"
-                  class="page-btn"
-                  :class="{ active: item === pageNo, gap: item === '...' }" type="button"
-                  :disabled="item === '...'"
+                  :class="{ active: item === pageNo, gap: item === '...' }"
+                  :disabled="item === '...'" class="page-btn"
+                  type="button"
                   @click="typeof item === 'string' && item !== '...' ? goPage(item) : null">
             {{ item }}
           </button>
-          <button class="page-btn" type="button" :disabled="!canNext" @click="goNextPage">下一页
+          <button :disabled="!canNext" class="page-btn" type="button" @click="goNextPage">下一页
           </button>
         </div>
       </div>
@@ -149,10 +148,10 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import { chatApi } from '@/api/chat'
+<script lang="ts" setup>
+import {computed, onMounted, ref} from 'vue'
+import {RouterLink} from 'vue-router'
+import {chatApi} from '@/api/chat'
 import type {
   ConversationSessionListReq,
   ConversationSessionListResp,
@@ -160,12 +159,14 @@ import type {
 } from '@/types'
 import {
   formatChatMode,
-  formatTime, formatTurnStatusLabel,
+  formatTime,
+  formatTurnStatusLabel,
   normalizeError,
   sessionMessageCount,
   sessionPreview,
   sessionTitle,
-  truncate, turnStatusTone
+  truncate,
+  turnStatusTone
 } from '@/utils/observabilityHelpers'
 
 const sessions = ref<ConversationSessionResp[]>([])
@@ -231,7 +232,7 @@ const summaryStats = computed<SummaryStat[]>(() => {
 const paginationItems = computed<(string | number)[]>(() => {
   const current = pageNo.value
   if (total.value <= 7) {
-    return Array.from({ length: total.value }, (_, index) => String(index + 1))
+    return Array.from({length: total.value}, (_, index) => String(index + 1))
   }
   if (current <= 4) {
     return [1, 2, 3, 4, 5, '...', total.value]

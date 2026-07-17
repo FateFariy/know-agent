@@ -1,6 +1,6 @@
 <template>
   <section class="admin-shell">
-    <aside class="admin-sidebar" :class="{ 'admin-sidebar-open': sidebarOpen }">
+    <aside :class="{ 'admin-sidebar-open': sidebarOpen }" class="admin-sidebar">
       <div class="sidebar-brand">
         <div class="brand-mark">SA</div>
         <strong class="brand-name">Super Agent</strong>
@@ -8,9 +8,9 @@
 
       <nav class="sidebar-nav">
         <span class="nav-group-label">主要功能</span>
-        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="nav-item"
-          :class="{ active: isNavItemActive(item.to) }" @click="sidebarOpen = false">
-          <component :is="item.icon" class="nav-icon" />
+        <RouterLink v-for="item in navItems" :key="item.to" :class="{ active: isNavItemActive(item.to) }" :to="item.to"
+                    class="nav-item" @click="sidebarOpen = false">
+          <component :is="item.icon" class="nav-icon"/>
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
@@ -34,7 +34,7 @@
       <header class="admin-header">
         <div class="header-left">
           <button class="menu-button mobile-only" type="button" @click="sidebarOpen = true">
-            <Bars3Icon class="nav-icon" />
+            <Bars3Icon class="nav-icon"/>
           </button>
           <h2 class="page-title">{{ pageTitle }}</h2>
           <nav class="breadcrumb">
@@ -45,7 +45,7 @@
         </div>
 
         <div class="header-actions">
-          <RouterLink to="/chat" class="back-link">返回聊天</RouterLink>
+          <RouterLink class="back-link" to="/chat">返回聊天</RouterLink>
           <span class="header-divider"></span>
           <div class="header-user">
             <span>{{ username }}</span>
@@ -55,15 +55,15 @@
       </header>
 
       <main class="admin-content">
-        <RouterView />
+        <RouterView/>
       </main>
     </div>
   </section>
 </template>
 
-<script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+<script lang="ts" setup>
+import {computed, ref} from 'vue'
+import {RouterLink, RouterView, useRoute} from 'vue-router'
 import {
   Bars3Icon,
   ClipboardDocumentListIcon,
@@ -77,11 +77,11 @@ const route = useRoute()
 const sidebarOpen = ref(false)
 
 const navItems = [
-  { to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon },
-  { to: '/admin/documents', label: '文档接入', icon: ClipboardDocumentListIcon },
-  { to: '/admin/knowledge-route', label: '知识路由', icon: ShareIcon },
-  { to: '/admin/knowledge-route/traces', label: '路由追踪', icon: EyeIcon },
-  { to: '/admin/observability', label: '对话观测', icon: CommandLineIcon }
+  {to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon},
+  {to: '/admin/documents', label: '文档接入', icon: ClipboardDocumentListIcon},
+  {to: '/admin/knowledge-route', label: '知识路由', icon: ShareIcon},
+  {to: '/admin/knowledge-route/traces', label: '路由追踪', icon: EyeIcon},
+  {to: '/admin/observability', label: '对话观测', icon: CommandLineIcon}
 ]
 
 const pageTitle = computed(() => route.meta?.title || '管理后台')
