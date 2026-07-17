@@ -187,7 +187,7 @@ type ConversationSessionResp struct {
 	LatestUserMessage      string                         `json:"latestUserMessage"`      // 最新用户提问
 	LatestAssistantMessage string                         `json:"latestAssistantMessage"` // 模型最新回复
 	LatestExchangeId       string                         `json:"latestExchangeId"`       // 最新一轮交互ID
-	LatestTurnStatus       string                         `json:"latestTurnStatus"`       // 本轮交互状态
+	LatestTurnStatus       int                            `json:"latestTurnStatus"`       // 本轮交互状态
 	LatestTurnErrorMessage string                         `json:"latestTurnErrorMessage"` // 本轮交互错误信息
 	ChatMode               string                         `json:"chatMode"`               // 对话查询模式
 	SelectedDocumentId     string                         `json:"selectedDocumentId"`     // 选中文档ID
@@ -222,7 +222,7 @@ type ConversationTraceStage struct {
 	StageLevel    int    `json:"stageLevel"`    // 阶段层级
 	ParentStageId string `json:"parentStageId"` // 父阶段ID
 	ExecutionMode string `json:"executionMode"` // 执行模式
-	StageState    string `json:"stageState"`    // 阶段状态
+	StageState    int    `json:"stageState"`    // 阶段状态
 	StartTime     string `json:"startTime"`     // 开始时间
 	EndTime       string `json:"endTime"`       // 结束时间
 	DurationMs    int64  `json:"durationMs"`    // 持续时间毫秒
@@ -270,6 +270,8 @@ type RetrievalResultResp struct {
 	IsElevated       int     `json:"isElevated"`       // 是否升级
 	IsSelected       int     `json:"isSelected"`       // 是否选中
 	SelectionReason  string  `json:"selectionReason"`  // 选中原因
+	DocumentId       string  `json:"documentId"`       // 文档ID
+	DocumentName     string  `json:"documentName"`     // 文档名称
 	ChunkId          string  `json:"chunkId"`          // 分块ID
 	ChunkNo          int     `json:"chunkNo"`          // 分块序号
 	ParentBlockId    string  `json:"parentBlockId"`    // 父块ID

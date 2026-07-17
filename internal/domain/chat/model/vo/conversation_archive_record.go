@@ -22,7 +22,7 @@ type ConversationArchiveRecord struct {
 	LatestUserMessage      string                    // 最新用户提问
 	LatestAssistantMessage string                    // 模型最新回复
 	LatestExchangeId       int64                     // 最新一轮交互ID
-	LatestTurnStatus       string                    // 本轮交互状态
+	LatestTurnStatus       int                       // 本轮交互状态
 	LatestTurnErrorMessage string                    // 本轮交互错误信息
 	MemorySummary          *entity.ChatMemorySummary // 会话记忆摘要
 }
@@ -46,6 +46,6 @@ func (c *ConversationArchiveRecord) FillSummaryFields() {
 
 	lastExchange := c.Exchanges[len(c.Exchanges)-1]
 	c.LatestExchangeId = lastExchange.ID
-	c.LatestTurnStatus = ChatTurnStatusName(lastExchange.TurnStatus)
+	c.LatestTurnStatus = lastExchange.TurnStatus
 	c.LatestTurnErrorMessage = lastExchange.ErrorMessage
 }

@@ -291,7 +291,7 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.C
 		chatConversationTraceStage.StageLevel = (*source).StageLevel
 		chatConversationTraceStage.ParentStageId = Int64ToString((*source).ParentStageId)
 		chatConversationTraceStage.ExecutionMode = (*source).ExecutionMode
-		chatConversationTraceStage.StageState = ToChatQueryModeName((*source).StageState)
+		chatConversationTraceStage.StageState = (*source).StageState
 		chatConversationTraceStage.StartTime = TimeToString((*source).StartTime)
 		chatConversationTraceStage.EndTime = TimeToString((*source).EndTime)
 		chatConversationTraceStage.DurationMs = (*source).DurationMs
@@ -371,6 +371,8 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalRe
 		chatRetrievalResultResp.IsElevated = (*source).IsElevated
 		chatRetrievalResultResp.IsSelected = (*source).IsSelected
 		chatRetrievalResultResp.SelectionReason = (*source).SelectionReason
+		chatRetrievalResultResp.DocumentId = Int64ToString((*source).DocumentId)
+		chatRetrievalResultResp.DocumentName = (*source).DocumentName
 		chatRetrievalResultResp.ChunkId = Int64ToString((*source).ChunkId)
 		chatRetrievalResultResp.ChunkNo = (*source).ChunkNo
 		chatRetrievalResultResp.ParentBlockId = Int64ToString((*source).ParentBlockId)
