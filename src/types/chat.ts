@@ -181,6 +181,24 @@ export interface ChatDebugTrace {
   ragSystemPrompt: string;
   ragUserPrompt: string;
   noEvidenceReply: string;
+  intentResolution?: IntentResolution;
+  retrievalAnchorRootTopic?: string;
+  retrievalAnchorRootSectionTitle?: string;
+  retrievalAnchorTargetSectionHint?: string;
+  retrievalAnchorItemText?: string;
+  retrievalAnchorResolvedQuestion?: string;
+  retrievalAnchorApplied?: boolean;
+}
+
+export interface IntentResolution {
+  relationType?: string;
+  retrievalMode?: string;
+  informationNeed?: string;
+  rationale?: string;
+  softSectionHints?: string[];
+  queryContextHints?: string[];
+  answerShape?: string;
+  confidence?: number;
 }
 
 /** 对话交换单轮交互 */
@@ -343,30 +361,57 @@ export interface ChannelExecutionResp {
 }
 
 export interface Snapshot {
-  recommendationCount?: number;
-  recommendations?: string[];
-  finalStatus?: string;
-  referenceCount?: number;
-  answerLength?: number;
-  errorMessage?: string;
-  clarificationReply?: string;
-  clarificationReason?: string;
-  clarificationOptions?: string[];
-  targetSection?: string;
-  parentSection?: string;
-  childCount?: number;
-  previousSibling?: string;
-  nextSibling?: string;
-  answer?: string;
-  targetItemIndex?: string,
-  notes?: string[],
-  matchedItemCount?: number;
+  // MEMORY 阶段
+  compressionApplied?: boolean;
+  coveredExchangeId?: string | number;
+  coveredExchangeCount?: number;
+  compressionCount?: number;
+  longTermSummary?: string;
+  recentTranscript?: string;
+  recentQuestionTranscript?: string;
+
+  // INTENT 阶段
+  originalQuestion?: string;
+  relationType?: string;
+  resolvedTopic?: string;
+  resolvedFacet?: string;
+  informationNeed?: string;
+  answerShape?: string;
+  retrievalMode?: string;
+  retrievalQuery?: string;
+  confidence?: number;
+  rationale?: string;
+  previousAnchorDescription?: string | number;
+  retrievalSubQuestions?: string[];
+  softSectionHints?: string[];
+  queryContextHints?: string[];
+
+  // REWRITE 阶段
+  rewriteQuestion?: string;
+  historyContext?: string;
+  rewriteOverrideEnabled?: boolean;
+  rewriteTemperature?: number;
+  rewriteTopP?: number;
+  rewriteThinking?: boolean | string;
+  subQuestions?: (SubQuestion | string)[];
+
+  // ROUTE 阶段
+  executionMode?: string;
   retrievalQuestion?: string;
+  rootTopic?: string;
+  rootSectionCode?: string;
+  rootSectionTitle?: string;
+  targetSectionHint?: string;
+  anchorApplied?: boolean;
+
+  // RAG_RETRIEVE 阶段
+  referenceCount?: number;
+  subQuestionCount?: number;
   usedChannels?: string[];
   retrievalNotes?: string[];
-  subQuestionCount?: number;
-  subQuestions?: (SubQuestion | string)[];
   references?: Reference[];
+
+  // EVIDENCE_BUDGET 阶段
   totalBudget?: number;
   perSubQuestionBudget?: number;
   renderedReferenceCount?: number;
@@ -375,34 +420,22 @@ export interface Snapshot {
   omittedReferenceDetails?: string[];
   systemPrompt?: string;
   userPrompt?: string;
+
+  // ANSWER_GENERATE 阶段
   firstResponseTimeMs?: number;
-  chatMode?: string;
-  executionMode?: string;
-  requiresRealTimeSearch?: boolean;
-  requiresCurrentDateAnchoring?: boolean;
-  confidence?: number;
-  routeStatus?: string;
-  candidateDocumentCount?: number;
-  confidentTopDocument?: boolean;
-  topDocumentId?: string;
-  topDocumentName?: string;
-  targetSectionHint?: string;
-  navigationSummary?: string;
-  compressionApplied?: boolean;
-  coveredExchangeId?: string;
-  coveredExchangeCount?: number;
-  compressionCount?: number;
-  longTermSummary?: string;
-  recentTranscript?: string;
-  recentQuestionTranscript?: string;
-  originalQuestion?: string;
-  historyContext?: string;
-  rewriteQuestion?: string;
-  rawModelOutput?: string;
-  rewriteOverrideEnabled?: boolean;
-  rewriteTemperature?: number;
-  rewriteTopP?: number;
-  rewriteThinking?: boolean;
+  answerLength?: number;
+
+  // REACT_AGENT 阶段
+  usedTools?: string[];
+
+  // RECOMMENDATION 阶段
+  recommendationCount?: number;
+  recommendations?: string[];
+
+  // FINALIZE 阶段
+  finalStatus?: string;
+  reason?: string;
+  errorMessage?: string;
 }
 
 export interface SubQuestion {
@@ -430,3 +463,4 @@ export interface Reference {
   sectionPath: string;
   channel: string;
 }
+

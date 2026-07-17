@@ -419,7 +419,7 @@ onUnmounted(() => {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
   margin-bottom: 4px;
 }
 
@@ -497,7 +497,7 @@ onUnmounted(() => {
 
 .stat-value {
   color: var(--color-text-strong);
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
 }
 
 /* ── Context Section ── */
@@ -572,7 +572,7 @@ onUnmounted(() => {
   color: var(--color-muted-strong);
   font-size: 11px;
   font-weight: 600;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
 }
 
 .code-block {
@@ -584,7 +584,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
   line-height: 1.65;
   font-size: 13px;
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
 }
 
 .memory-empty {
@@ -688,7 +688,7 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-strong);
-  font-family: 'Fira Code', var(--font-sans);
+  font-family: 'Fira Code', var(--font-sans),serif;
 }
 
 .round-badge {
