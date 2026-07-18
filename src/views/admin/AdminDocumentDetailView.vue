@@ -1641,7 +1641,7 @@ const buildTrackerDescription = computed<string>(() => {
     return buildTaskSnapshot.value?.errorMsg || '请展开右侧时间线查看失败阶段和具体报错。'
   }
   if ((hasBuildTaskSnapshot.value && buildTaskSnapshot.value?.taskStatus === 3) || documentDetail.value?.indexStatus === 3) {
-    return '即使任务执行很快，这里也会保留完整阶段轨迹，方便复盘和教学演示。'
+    return '即使任务执行很快，这里也会保留完整阶段轨迹，方便复盘。'
   }
   return '系统正在自动轮询任务状态，阶段完成后会保留已完成轨迹，不会一闪而过。'
 })

@@ -96,23 +96,26 @@ function isNavItemActive(targetPath: string) {
 </script>
 
 <style scoped>
+/* ── 外壳：仅主内容参与布局，侧边栏 fixed 独立于文档流 ── */
 .admin-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  display: block;
 }
 
-/* ── Sidebar: 白底 + 右侧border ── */
+/* ── Sidebar: 固定在视口左侧，不随主内容滚动 ── */
 .admin-sidebar {
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
   height: 100vh;
+  width: 220px;
   display: flex;
   flex-direction: column;
   padding: 0;
   background: #fff;
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
+  z-index: 20;
 }
 
 .sidebar-brand {
@@ -271,6 +274,7 @@ function isNavItemActive(targetPath: string) {
 
 /* ── 主区域 ── */
 .admin-main {
+  margin-left: 220px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -394,20 +398,11 @@ function isNavItemActive(targetPath: string) {
 }
 
 @media (max-width: 1040px) {
-  .admin-shell {
-    grid-template-columns: 1fr;
-  }
-
   .admin-sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 240px;
-    z-index: 10;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md);
+    width: 240px;
   }
 
   .admin-sidebar.admin-sidebar-open {
@@ -424,6 +419,10 @@ function isNavItemActive(targetPath: string) {
 
   .mobile-only {
     display: inline-flex;
+  }
+
+  .admin-main {
+    margin-left: 0;
   }
 
   .page-title {

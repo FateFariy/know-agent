@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { documentApi } from '@/api/document'
-import type { DocumentInfo, DocumentChunk, DocumentProfile, UploadFile, UploadDocumentReq } from '@/types'
+import type { DocumentDetailResp, DocumentChunkItem, DocumentProfileResp, UploadDocumentReq } from '@/types'
 
 export const useDocumentStore = defineStore('document', () => {
-  const documents = ref<DocumentInfo[]>([])
-  const currentDocument = ref<DocumentInfo | null>(null)
-  const chunks = ref<DocumentChunk[]>([])
-  const profile = ref<DocumentProfile | null>(null)
-  const uploadFiles = ref<UploadFile[]>([])
+  const documents = ref<DocumentDetailResp[]>([])
+  const currentDocument = ref<DocumentDetailResp | null>(null)
+  const chunks = ref<DocumentChunkItem[]>([])
+  const profile = ref<DocumentProfileResp | null>(null)
+  const uploadFiles = ref<UploadDocumentReq[]>([])
   const total = ref(0)
   const pageNo = ref(1)
   const pageSize = ref(10)
@@ -65,8 +65,8 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
-  function removeUploadFile(fileName: string) {
-    uploadFiles.value = uploadFiles.value.filter((f) => f.fileName !== fileName)
+  function removeUploadFile(documentName: string) {
+    uploadFiles.value = uploadFiles.value.filter((f) => f.documentName !== documentName)
   }
 
   return {
