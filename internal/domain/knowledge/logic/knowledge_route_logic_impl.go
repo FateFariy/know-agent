@@ -300,7 +300,7 @@ func (s *KnowledgeRouteLogicImpl) deriveScopesFromDocuments(ctx context.Context,
 		if finalScore <= 0 && len(q.QueryEmbedding) == 0 {
 			continue
 		}
-		if existing := best[scopeCode]; existing.Score < finalScore {
+		if existing, ok := best[scopeCode]; !ok || existing.Score < finalScore {
 			best[scopeCode] = &vo.ScopeRouteCandidate{
 				ScopeCode: scopeCode,
 				ScopeName: scopeName,
@@ -394,7 +394,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 			if _, preferred := preferredScopes[scopeCode]; preferred {
 				finalScore += 6
 			}
-			if existing := best[topic]; existing.Score < finalScore {
+			if existing, ok := best[topic]; !ok || existing.Score < finalScore {
 				best[topic] = &vo.TopicRouteCandidate{
 					TopicCode: normalizeCode(topic),
 					TopicName: topic,

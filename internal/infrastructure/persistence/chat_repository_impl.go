@@ -111,7 +111,7 @@ func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversati
 
 // SelectExchangeById 根据ID查询对话记录
 func (r *ChatRepositoryImpl) SelectExchangeById(ctx context.Context, exchangeId int64) (*entity.ChatExchange, error) {
-	var exchange *entity.ChatExchange
+	exchange := &entity.ChatExchange{}
 	err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
 		Where("id = ?", exchangeId).
 		First(exchange).Error
@@ -135,7 +135,7 @@ func (r *ChatRepositoryImpl) UpdateDialogueByConversationId(ctx context.Context,
 
 // UpsertDialogue 创建或更新会话
 func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entity.ChatDialogue) error {
-	var chatDialogue *model.ChatDialogue
+	chatDialogue := &model.ChatDialogue{}
 	err := r.dbWithContext(ctx).
 		Where("conversation_id = ?", dialogue.ConversationId).
 		Order("id DESC").
@@ -248,7 +248,7 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 
 // SelectMemorySummary 查询会话记忆摘要
 func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
-	var summary *entity.ChatMemorySummary
+	summary := &entity.ChatMemorySummary{}
 	err := r.dbWithContext(ctx).Model(&model.ChatMemorySummary{}).
 		Where("conversation_id = ?", conversationId).
 		Order("id DESC").

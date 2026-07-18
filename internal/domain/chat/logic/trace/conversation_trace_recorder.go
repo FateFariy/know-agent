@@ -43,6 +43,7 @@ func (t *ConversationTraceRecorder) StartStage(ctx context.Context, trace *vo.Co
 		StageLevel:     1,
 		ExecutionMode:  executionMode,
 		StageState:     vo.ConversationTraceStageStateRunning,
+		StartTime:      utils.Pointer(time.Now()),
 		SummaryText:    utils.Pointer(summaryText),
 		SnapshotJson:   utils.Pointer(t.snapshot(snapshot)),
 	}
@@ -81,7 +82,7 @@ func (t *ConversationTraceRecorder) updateStage(ctx context.Context, stageHandle
 		DurationMs:   time.Since(stageHandle.StartTime).Milliseconds(),
 		ErrorMessage: utils.Pointer(errMsg),
 		SnapshotJson: utils.Pointer(t.snapshot(snapshot)),
-		EndTime:      time.Now(),
+		EndTime:      utils.Pointer(time.Now()),
 	}
 	if err := t.repo.UpdateStageById(ctx, stage); err != nil {
 		logx.Alert(fmt.Sprintf("更新阶段信息失败: conversationId=%s err=%v", stageHandle.ConversationId, err))

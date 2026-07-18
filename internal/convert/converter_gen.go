@@ -127,8 +127,8 @@ func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model
 		modelChatExchangeTraceStage.ParentStageId = (*source).ParentStageId
 		modelChatExchangeTraceStage.ExecutionMode = (*source).ExecutionMode
 		modelChatExchangeTraceStage.StageState = (*source).StageState
-		modelChatExchangeTraceStage.StartTime = timeTimeToTimeTime((*source).StartTime)
-		modelChatExchangeTraceStage.EndTime = timeTimeToTimeTime((*source).EndTime)
+		modelChatExchangeTraceStage.StartTime = (*source).StartTime
+		modelChatExchangeTraceStage.EndTime = (*source).EndTime
 		modelChatExchangeTraceStage.DurationMs = (*source).DurationMs
 		modelChatExchangeTraceStage.SummaryText = (*source).SummaryText
 		modelChatExchangeTraceStage.ErrorMessage = (*source).ErrorMessage
@@ -292,8 +292,8 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.C
 		chatConversationTraceStage.ParentStageId = Int64ToString((*source).ParentStageId)
 		chatConversationTraceStage.ExecutionMode = (*source).ExecutionMode
 		chatConversationTraceStage.StageState = (*source).StageState
-		chatConversationTraceStage.StartTime = TimeToString((*source).StartTime)
-		chatConversationTraceStage.EndTime = TimeToString((*source).EndTime)
+		chatConversationTraceStage.StartTime = pTimeTimeToString((*source).StartTime)
+		chatConversationTraceStage.EndTime = pTimeTimeToString((*source).EndTime)
 		chatConversationTraceStage.DurationMs = (*source).DurationMs
 		if (*source).SummaryText != nil {
 			chatConversationTraceStage.SummaryText = *(*source).SummaryText
@@ -322,6 +322,13 @@ func pEntityConversationSummaryToPChatSummaryPayload(source *entity.Conversation
 		pChatSummaryPayload = &chatSummaryPayload
 	}
 	return pChatSummaryPayload
+}
+func pTimeTimeToString(source *time.Time) string {
+	var xstring string
+	if source != nil {
+		xstring = TimeToString((*source))
+	}
+	return xstring
 }
 func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution
@@ -880,8 +887,8 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 		documentQueryTaskLogsResp.TaskStatusName = (*source).TaskStatusName
 		documentQueryTaskLogsResp.CurrentStage = (*source).CurrentStage
 		documentQueryTaskLogsResp.CurrentStageName = (*source).CurrentStageName
-		documentQueryTaskLogsResp.StartTime = pTimeTimeToString((*source).StartTime)
-		documentQueryTaskLogsResp.FinishTime = pTimeTimeToString((*source).FinishTime)
+		documentQueryTaskLogsResp.StartTime = pTimeTimeToString2((*source).StartTime)
+		documentQueryTaskLogsResp.FinishTime = pTimeTimeToString2((*source).FinishTime)
 		documentQueryTaskLogsResp.CostMillis = (*source).CostMillis
 		if (*source).ErrorCode != nil {
 			documentQueryTaskLogsResp.ErrorCode = *(*source).ErrorCode
@@ -1041,7 +1048,7 @@ func pEntityDocumentTaskLogToPDocumentTaskLog(source *entity1.DocumentTaskLog) *
 	}
 	return pDocumentTaskLog
 }
-func pTimeTimeToString(source *time.Time) string {
+func pTimeTimeToString2(source *time.Time) string {
 	var xstring string
 	if source != nil {
 		xstring = TimeToString((*source))
