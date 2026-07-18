@@ -373,64 +373,25 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const handlers: StreamHandlers = {
-      onMeta: (payload) => {
-        if (streamingMessageId.value !== assistantId) return
-        const nextId = payload.conversationId || currentSessionId.value
-        if (nextId) {
-          const existing = sessions.value.find((s) => s.id === nextId)
-          const lastTime = new Date().toISOString()
-          currentSessionId.value = nextId
-          isCreatingNew.value = false
-          if (!existing) {
-            sessions.value = [
-              {
-                id: nextId,
-                title: trimmed.slice(0, 24) || '新对话',
-                lastTime,
-                latestUserMessage: trimmed,
-                running: true
-              },
-              ...sessions.value
-            ]
-          } else {
-            sessions.value = sessions.value.map((s) =>
-              s.id === nextId ? { ...s, lastTime, running: true, latestUserMessage: trimmed } : s
-            )
-          }
-        }
-        // 同步 exchangeId（后续 cancel 也要这个 id 反馈给后端）
-        const exId = payload.exchangeId
-        if (exId != null) {
-          const exIdStr = String(exId)
-          messages.value = messages.value.map((m) =>
-            m.id === assistantId ? { ...m, exchangeId: exIdStr } : m
-          )
-        }
-      },
       onText: (payload) => {
-        if (!payload || typeof payload !== 'object') return
-        appendStreamContent(payload.delta || '')
+        appendStreamContent(payload.content)
       },
       onThinking: (payload) => {
-        if (!payload || typeof payload !== 'object') return
-        appendThinkingContent(payload.delta || '')
+        appendThinkingContent(payload.content)
       },
       onStatus: (payload) => {
-        if (!payload || typeof payload !== 'object') return
-        setStage(payload.stage || 'pending')
+        setStage(payload.stage)
       },
       onReference: (payload) => {
-        if (!payload || typeof payload !== 'object') return
-        appendReferences(payload.items || [])
+        appendReferences(payload.items)
       },
       onRecommend: (payload) => {
-        if (!payload || typeof payload !== 'object') return
-        setRecommendations(payload.items || [])
+        setRecommendations(payload.items)
       },
       onFinish: (payload) => {
         if (streamingMessageId.value !== assistantId) return
         const duration = computeThinkingDuration(thinkingStartAt.value)
-        const finalId = payload?.messageId ? String(payload.messageId) : assistantId
+        const finalId = payload.messageId ? String(payload.messageId) : assistantId
         messages.value = messages.value.map((m) => {
           if (m.id !== assistantId) return m
           return {
@@ -445,16 +406,21 @@ export const useChatStore = defineStore('chat', () => {
         if (cid) {
           const lastTime = new Date().toISOString()
           const existing = sessions.value.find((s) => s.id === cid)
-          const nextTitle = payload?.title || existing?.title || '新对话'
+          const nextTitle = payload.title || existing?.title || '新对话'
           sessions.value = sessions.value.map((s) =>
             s.id === cid ? { ...s, title: nextTitle, lastTime, running: false } : s
           )
         }
+        isStreaming.value = false
+        thinkingStartAt.value = null
+        streamAbort.value = null
+        streamingMessageId.value = null
+        cancelRequested.value = false
       },
       onCancel: (payload) => {
         if (streamingMessageId.value !== assistantId) return
         const duration = computeThinkingDuration(thinkingStartAt.value)
-        const finalId = payload?.messageId ? String(payload.messageId) : assistantId
+        const finalId = payload.messageId ? String(payload.messageId) : assistantId
         messages.value = messages.value.map((m) => {
           if (m.id !== assistantId) return m
           const suffix = m.content.includes('（已停止生成）') ? '' : '\n\n（已停止生成）'
@@ -467,6 +433,11 @@ export const useChatStore = defineStore('chat', () => {
             thinkingDuration: m.thinkingDuration ?? duration
           }
         })
+        isStreaming.value = false
+        thinkingStartAt.value = null
+        streamAbort.value = null
+        streamingMessageId.value = null
+        cancelRequested.value = false
       },
       onError: (error) => {
         // 后端连通失败或 SSE 解析异常时，给用户可见提示，并清掉流式占位。
@@ -489,6 +460,27 @@ export const useChatStore = defineStore('chat', () => {
           cancelRequested.value = false
         }
         ElMessage.error(`对话请求失败：${error?.message || '未知错误'}`)
+      },
+      onClose: () => {
+        if (streamingMessageId.value !== assistantId) return
+        const duration = computeThinkingDuration(thinkingStartAt.value)
+        messages.value = messages.value.map((m) => {
+          if (m.id !== assistantId) return m
+          if (m.status !== 'streaming') return m
+          return { ...m, status: 'done', isThinking: false, thinkingDuration: m.thinkingDuration ?? duration }
+        })
+        const cid = currentSessionId.value
+        if (cid) {
+          const lastTime = new Date().toISOString()
+          sessions.value = sessions.value.map((s) =>
+            s.id === cid ? { ...s, lastTime, running: false } : s
+          )
+        }
+        isStreaming.value = false
+        thinkingStartAt.value = null
+        streamAbort.value = null
+        streamingMessageId.value = null
+        cancelRequested.value = false
       }
     }
 

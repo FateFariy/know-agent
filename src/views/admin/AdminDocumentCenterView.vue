@@ -23,11 +23,9 @@
 
           <div class="build-overlay-stage-list">
             <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`"
-                     :class="`build-overlay-stage-${stage.status}`"
-                     class="build-overlay-stage">
+              :class="`build-overlay-stage-${stage.status}`" class="build-overlay-stage">
               <span class="build-overlay-stage-icon">
-                <span v-if="stage.status === 'current'" aria-hidden="true"
-                      class="stage-spinner"></span>
+                <span v-if="stage.status === 'current'" aria-hidden="true" class="stage-spinner"></span>
                 <span v-else>{{ stage.order }}</span>
               </span>
               <div class="build-overlay-stage-copy">
@@ -55,7 +53,7 @@
             </p>
           </div>
           <button class="icon-button" type="button" @click="closeLogDrawer">
-            <XMarkIcon class="drawer-icon"/>
+            <XMarkIcon class="drawer-icon" />
           </button>
         </div>
 
@@ -63,13 +61,12 @@
           <div class="summary-chip">
             <span>当前状态</span>
             <AdminStatusBadge :code="selectedDocument?.latestTaskStatus"
-                              :label="selectedDocument?.latestTaskStatusName || '暂无状态'" type="task"/>
+              :label="selectedDocument?.latestTaskStatusName || '暂无状态'" type="task" />
           </div>
           <div class="summary-chip">
             <span>索引状态</span>
-            <AdminStatusBadge :code="selectedDocument?.indexStatus"
-                              :label="selectedDocument?.indexStatusName || '暂无状态'"
-                              type="index"/>
+            <AdminStatusBadge :code="selectedDocument?.indexStatus" :label="selectedDocument?.indexStatusName || '暂无状态'"
+              type="index" />
           </div>
         </div>
 
@@ -104,36 +101,32 @@
         <div class="upload-grid">
           <label class="field">
             <span>文档名称</span>
-            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名"
-                   type="text"/>
+            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名" type="text" />
           </label>
 
           <label class="field">
             <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
-                   type="text"/>
+            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule" type="text" />
           </label>
 
           <label class="field">
             <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则" type="text"/>
+            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则" type="text" />
           </label>
 
           <label class="field">
             <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
-                   type="text"/>
+            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍" type="text" />
           </label>
 
           <label class="field">
             <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
-                   type="text"/>
+            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔" type="text" />
           </label>
 
           <label class="field">
             <span>选择文件</span>
-            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange"/>
+            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange" />
           </label>
         </div>
 
@@ -144,8 +137,7 @@
 
         <div class="upload-actions">
           <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
-          <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button"
-                  @click="submitUpload">
+          <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button" @click="submitUpload">
             {{ uploading ? '上传中...' : '上传并解析' }}
           </button>
         </div>
@@ -181,17 +173,16 @@
           </div>
 
           <div class="list-actions">
-            <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名"
-                   type="text"
-                   @keydown.enter="loadDocuments()"/>
+            <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名" type="text"
+              @keydown.enter="loadDocuments()" />
             <button class="ghost-button" type="button" @click="loadDocuments()">搜索</button>
           </div>
         </div>
 
         <div class="document-list">
-          <button v-for="item in documents" :key="item.documentId" :class="{ active: selectedDocumentId === item.documentId }"
-                  class="document-row" type="button"
-                  @click="selectDocument(item.documentId)">
+          <button v-for="item in documents" :key="item.documentId"
+            :class="{ active: selectedDocumentId === item.documentId }" class="document-row" type="button"
+            @click="selectDocument(item.documentId)">
             <div class="document-row-main">
               <div class="document-row-title">
                 <strong>{{ item.documentName }}</strong>
@@ -204,12 +195,9 @@
               </div>
             </div>
             <div class="document-row-status">
-              <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
-                                type="parse"/>
-              <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName"
-                                type="strategy"/>
-              <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
-                                type="index"/>
+              <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName" type="parse" />
+              <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName" type="strategy" />
+              <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName" type="index" />
             </div>
           </button>
 
@@ -217,8 +205,7 @@
             还没有文档，先上传一份资料开始体验。
           </div>
           <div v-if="listLoading" class="empty-block">正在加载文档列表...</div>
-          <div v-if="!listLoading && documents.length && !selectedDocument"
-               class="list-selection-hint">
+          <div v-if="!listLoading && documents.length && !selectedDocument" class="list-selection-hint">
             点击任意文档，查看解析详情、策略方案、构建轨迹和 Chunk 列表。
           </div>
         </div>
@@ -234,15 +221,12 @@
             </div>
 
             <div class="detail-statuses">
-              <AdminStatusBadge :code="selectedDocument.parseStatus"
-                                :label="selectedDocument.parseStatusName"
-                                type="parse"/>
-              <AdminStatusBadge :code="selectedDocument.strategyStatus"
-                                :label="selectedDocument.strategyStatusName"
-                                type="strategy"/>
-              <AdminStatusBadge :code="selectedDocument.indexStatus"
-                                :label="selectedDocument.indexStatusName"
-                                type="index"/>
+              <AdminStatusBadge :code="selectedDocument.parseStatus" :label="selectedDocument.parseStatusName"
+                type="parse" />
+              <AdminStatusBadge :code="selectedDocument.strategyStatus" :label="selectedDocument.strategyStatusName"
+                type="strategy" />
+              <AdminStatusBadge :code="selectedDocument.indexStatus" :label="selectedDocument.indexStatusName"
+                type="index" />
             </div>
           </div>
 
@@ -269,12 +253,11 @@
           </div>
 
           <div class="detail-secondary-actions">
-            <button :disabled="planLoading" class="ghost-button" type="button"
-                    @click="loadSelectedDocumentDetail">
+            <button :disabled="planLoading" class="ghost-button" type="button" @click="loadSelectedDocumentDetail">
               {{ planLoading ? '刷新中...' : '刷新详情' }}
             </button>
             <button :disabled="!selectedDocument.latestTaskId" class="ghost-button" type="button"
-                    @click="openLogDrawer">
+              @click="openLogDrawer">
               查看任务时间线
             </button>
           </div>
@@ -292,7 +275,7 @@
 
             <div v-if="strategySystemStages.length" class="strategy-status-bar">
               <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
-                       :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
+                :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
                 <div class="strategy-status-index">{{ item.order }}</div>
                 <div class="strategy-status-copy">
                   <strong>{{ item.label }}</strong>
@@ -317,10 +300,8 @@
                 </div>
 
                 <div class="strategy-flow-stack">
-                  <section v-for="pipeline in strategyPipelineLibrary"
-                           :key="`recommended-${pipeline.key}`"
-                           :class="`strategy-lane-${pipeline.key}`"
-                           class="strategy-lane strategy-lane-recommended">
+                  <section v-for="pipeline in strategyPipelineLibrary" :key="`recommended-${pipeline.key}`"
+                    :class="`strategy-lane-${pipeline.key}`" class="strategy-lane strategy-lane-recommended">
                     <div class="strategy-lane-header">
                       <div class="strategy-lane-title-box">
                         <p class="strategy-lane-kicker">
@@ -334,10 +315,8 @@
                     </div>
 
                     <div v-if="resolveStrategySteps(strategyPlan?.plan, pipeline.key).length"
-                         :class="`timeline-list-${pipeline.key}`"
-                         class="timeline-list">
-                      <template
-                        v-for="(step, index) in resolveStrategySteps(strategyPlan?.plan, pipeline.key)"
+                      :class="`timeline-list-${pipeline.key}`" class="timeline-list">
+                      <template v-for="(step, index) in resolveStrategySteps(strategyPlan?.plan, pipeline.key)"
                         :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}`">
                         <article class="timeline-item">
                           <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}
@@ -347,11 +326,9 @@
                             <p>{{ step.recommendReason || step.strategyRoleName }}</p>
                           </div>
                         </article>
-                        <div
-                          v-if="index < resolveStrategySteps(strategyPlan?.plan, pipeline.key).length - 1"
-                          :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`"
-                          class="flow-arrow">
-                          <ArrowDownIcon class="flow-arrow-icon"/>
+                        <div v-if="index < resolveStrategySteps(strategyPlan?.plan, pipeline.key).length - 1"
+                          :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`" class="flow-arrow">
+                          <ArrowDownIcon class="flow-arrow-icon" />
                         </div>
                       </template>
                     </div>
@@ -372,10 +349,8 @@
                   </div>
 
                   <div class="strategy-flow-stack strategy-flow-stack-edit">
-                    <section v-for="pipeline in strategyPipelineLibrary"
-                             :key="`editor-${pipeline.key}`"
-                             :class="`strategy-lane-${pipeline.key}`"
-                             class="strategy-lane strategy-lane-edit">
+                    <section v-for="pipeline in strategyPipelineLibrary" :key="`editor-${pipeline.key}`"
+                      :class="`strategy-lane-${pipeline.key}`" class="strategy-lane strategy-lane-edit">
                       <div class="strategy-lane-header">
                         <div class="strategy-lane-title-box">
                           <p class="strategy-lane-kicker">
@@ -388,15 +363,13 @@
                         <p class="strategy-lane-description">{{ pipeline.description }}</p>
                       </div>
 
-                      <div :class="`selected-flow-board-${pipeline.key}`"
-                           class="selected-flow-board">
-                        <span :class="`selected-flow-label-${pipeline.key}`"
-                              class="selected-flow-label">当前配置</span>
+                      <div :class="`selected-flow-board-${pipeline.key}`" class="selected-flow-board">
+                        <span :class="`selected-flow-label-${pipeline.key}`" class="selected-flow-label">当前配置</span>
 
                         <div v-if="getSelectedStrategyPreview(pipeline.key).length"
-                             class="sequence-board selected-flow-sequence">
+                          class="sequence-board selected-flow-sequence">
                           <template v-for="(row, rowIndex) in getSelectedStrategyRows(pipeline.key)"
-                                    :key="`strategy-row-${pipeline.key}-${rowIndex}`">
+                            :key="`strategy-row-${pipeline.key}-${rowIndex}`">
                             <div class="sequence-row">
                               <article v-if="row.leftItem" class="selected-flow-card sequence-card">
                                 <div class="selected-flow-order">{{ row.leftItem.order }}</div>
@@ -405,45 +378,42 @@
                                   <span>{{ row.leftItem.description }}</span>
                                 </div>
                                 <div class="selected-flow-actions">
-                                  <button :disabled="row.leftItem.index === 0" class="flow-action-button"
-                                          type="button"
-                                          @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
+                                  <button :disabled="row.leftItem.index === 0" class="flow-action-button" type="button"
+                                    @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
                                     上移
                                   </button>
-                                  <button :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" class="flow-action-button"
-                                          type="button"
-                                          @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
+                                  <button
+                                    :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                    class="flow-action-button" type="button"
+                                    @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
                                     下移
                                   </button>
                                 </div>
                               </article>
                               <div v-else class="sequence-card-placeholder"></div>
 
-                              <div v-if="row.leftItem && row.rightItem"
-                                   class="sequence-inline-arrow">{{
-                                  row.direction
+                              <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">{{
+                                row.direction
                                   === 'rtl' ? '←' : '→'
-                                }}
+                              }}
                               </div>
-                              <div v-else
-                                   class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
+                              <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
-                              <article v-if="row.rightItem"
-                                       class="selected-flow-card sequence-card">
+                              <article v-if="row.rightItem" class="selected-flow-card sequence-card">
                                 <div class="selected-flow-order">{{ row.rightItem.order }}</div>
                                 <div class="selected-flow-content">
                                   <strong>{{ row.rightItem.label }}</strong>
                                   <span>{{ row.rightItem.description }}</span>
                                 </div>
                                 <div class="selected-flow-actions">
-                                  <button :disabled="row.rightItem.index === 0" class="flow-action-button"
-                                          type="button"
-                                          @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
+                                  <button :disabled="row.rightItem.index === 0" class="flow-action-button" type="button"
+                                    @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
                                     上移
                                   </button>
-                                  <button :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1" class="flow-action-button"
-                                          type="button"
-                                          @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
+                                  <button
+                                    :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                    class="flow-action-button" type="button"
+                                    @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
                                     下移
                                   </button>
                                 </div>
@@ -452,8 +422,7 @@
                             </div>
 
                             <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
-                                 :class="`sequence-down-row-${row.downColumn}`"
-                                 class="sequence-down-row">
+                              :class="`sequence-down-row-${row.downColumn}`" class="sequence-down-row">
                               <span class="sequence-down-arrow">↓</span>
                             </div>
                           </template>
@@ -465,20 +434,16 @@
                       </div>
 
                       <div :class="`strategy-picker-${pipeline.key}`" class="strategy-picker">
-                        <button v-for="item in strategyLibrary"
-                                :key="`${pipeline.key}-${item.type}`"
-                                :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
-                                class="strategy-chip"
-                                type="button"
-                                @click="toggleStrategy(item.type, pipeline.key)">
+                        <button v-for="item in strategyLibrary" :key="`${pipeline.key}-${item.type}`"
+                          :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
+                          class="strategy-chip" type="button" @click="toggleStrategy(item.type, pipeline.key)">
                           <div class="strategy-chip-top">
                             <span class="strategy-chip-state">{{
-                                getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' : '点击添加'
+                              getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' : '点击添加'
                               }}
                             </span>
-                            <CheckCircleIcon
-                              v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
-                              class="strategy-chip-check"/>
+                            <CheckCircleIcon v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
+                              class="strategy-chip-check" />
                           </div>
                           <strong>{{ item.label }}</strong>
                           <span>{{ item.description }}</span>
@@ -486,19 +451,15 @@
                       </div>
 
                       <div :class="`preview-box-${pipeline.key}`" class="preview-box">
-                        <span :class="`preview-box-title-${pipeline.key}`"
-                              class="preview-box-title">
+                        <span :class="`preview-box-title-${pipeline.key}`" class="preview-box-title">
                           {{ pipeline.label }}最终提交顺序
                         </span>
-                        <div v-if="getSelectedStrategyPreview(pipeline.key).length"
-                             class="preview-flow">
-                          <template
-                            v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
+                        <div v-if="getSelectedStrategyPreview(pipeline.key).length" class="preview-flow">
+                          <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
                             :key="`preview-${pipeline.key}-${item.type}`">
                             <span class="preview-tag">{{ item.label }}</span>
-                            <ArrowRightIcon
-                              v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
-                              class="preview-arrow"/>
+                            <ArrowRightIcon v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
+                              class="preview-arrow" />
                           </template>
                         </div>
                         <p v-else class="preview-empty">
@@ -510,8 +471,7 @@
               </div>
 
               <div class="confirm-actions">
-                <input v-model="adjustNote" class="adjust-input" placeholder="补充说明，例如：增加大模型智能切块用于复杂段落"
-                       type="text"/>
+                <input v-model="adjustNote" class="adjust-input" placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" type="text" />
                 <div class="strategy-submit-actions">
                   <article :class="`action-stage-${confirmStepState}`" class="action-stage-card">
                     <div class="action-stage-head">
@@ -521,7 +481,7 @@
                     <strong>先确认策略方案</strong>
                     <p>{{ confirmStepDescription }}</p>
                     <button :disabled="!canConfirmStrategyAction" class="action-button action-button-confirm"
-                            type="button" @click="submitConfirmStrategy">
+                      type="button" @click="submitConfirmStrategy">
                       {{ confirmButtonLabel }}
                     </button>
                   </article>
@@ -533,17 +493,15 @@
                     </div>
                     <strong>再执行构建索引</strong>
                     <p>{{ buildStepDescription }}</p>
-                    <button :disabled="!canBuildIndexAction" class="action-button action-button-build"
-                            type="button"
-                            @click="submitBuildIndex">
+                    <button :disabled="!canBuildIndexAction" class="action-button action-button-build" type="button"
+                      @click="submitBuildIndex">
                       {{ buildButtonLabel }}
                     </button>
                   </article>
                 </div>
               </div>
 
-              <div v-if="showBuildTracker" ref="buildTrackerRef"
-                   class="build-progress-card build-progress-card-inline">
+              <div v-if="showBuildTracker" ref="buildTrackerRef" class="build-progress-card build-progress-card-inline">
                 <div class="build-progress-header">
                   <div>
                     <p class="section-eyebrow">Index Build Tracker</p>
@@ -556,14 +514,13 @@
                 </div>
 
                 <div class="sequence-board build-stage-board">
-                  <template v-for="(row, rowIndex) in buildStageRows"
-                            :key="`build-row-${rowIndex}`">
+                  <template v-for="(row, rowIndex) in buildStageRows" :key="`build-row-${rowIndex}`">
                     <div class="sequence-row">
                       <article v-if="row.leftItem" :class="`stage-${row.leftItem.status}`"
-                               class="stage-card sequence-card">
+                        class="stage-card sequence-card">
                         <div class="stage-order">
                           <span v-if="row.leftItem.status === 'current'" aria-hidden="true"
-                                class="stage-spinner"></span>
+                            class="stage-spinner"></span>
                           <span v-else>{{ row.leftItem.order }}</span>
                         </div>
                         <div class="stage-body">
@@ -580,10 +537,10 @@
                       <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
 
                       <article v-if="row.rightItem" :class="`stage-${row.rightItem.status}`"
-                               class="stage-card sequence-card">
+                        class="stage-card sequence-card">
                         <div class="stage-order">
                           <span v-if="row.rightItem.status === 'current'" aria-hidden="true"
-                                class="stage-spinner"></span>
+                            class="stage-spinner"></span>
                           <span v-else>{{ row.rightItem.order }}</span>
                         </div>
                         <div class="stage-body">
@@ -596,7 +553,7 @@
                     </div>
 
                     <div v-if="rowIndex < buildStageRows.length - 1" :class="`sequence-down-row-${row.downColumn}`"
-                         class="sequence-down-row">
+                      class="sequence-down-row">
                       <span class="sequence-down-arrow">↓</span>
                     </div>
                   </template>
@@ -605,9 +562,9 @@
                 <div class="tracker-footer">
                   <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
                   <span>状态 {{
-                      buildTaskSnapshot?.taskStatusName || (selectedDocument.indexStatus === 3 ? '成功' :
-                        '未知')
-                    }}</span>
+                    buildTaskSnapshot?.taskStatusName || (selectedDocument.indexStatus === 3 ? '成功' :
+                      '未知')
+                  }}</span>
                   <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
                 </div>
               </div>
@@ -618,7 +575,7 @@
             <div class="section-headline section-headline-major section-headline-chunk">
               <h4>解析后的 Chunk 列表</h4>
               <span v-if="chunkQuery?.taskId">任务 {{
-                  chunkQuery.taskId
+                chunkQuery.taskId
                 }} · {{ chunkQuery.total || 0 }} 条</span>
               <span v-else>当前还没有可展示的 chunk</span>
             </div>
@@ -682,9 +639,9 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
-import {ArrowDownIcon, ArrowRightIcon, CheckCircleIcon, XMarkIcon} from '@heroicons/vue/24/outline'
-import {documentApi} from '@/api/document'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ArrowDownIcon, ArrowRightIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { documentApi } from '@/api/document'
 import type {
   BuildIndexReq,
   BuildIndexResp,
@@ -702,7 +659,7 @@ import type {
   UploadDocumentResp
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import {formatCount, formatDateTime, formatFileSize,} from '@/utils/format.ts'
+import { formatCount, formatDateTime, formatFileSize, } from '@/utils/format.ts'
 import {
   buildPipelineStepPayload,
   buildStrategyPreview,
@@ -841,7 +798,21 @@ const hasBuildInFlightStatus = computed(() => {
     || selectedDocument.value?.indexStatus === 2
     || (selectedDocument.value?.latestTaskType === 2 && ![1, 2].includes(selectedDocument.value?.latestTaskStatus || 0))
 })
-const showBuildBlockingOverlay = computed(() => hasBuildInFlightStatus.value)
+// 仅在已确认策略、且真正进入 4 个索引构建阶段时视为「执行中」；
+// 任务还停留在"内容解析"等前置阶段时不展示蒙层。
+const isBuildExecutionStage = computed(() => {
+  const currentStage = buildTaskSnapshot.value?.currentStage
+  return currentStage != null && BUILD_STAGE_CODE_SET.has(currentStage)
+})
+const showBuildBlockingOverlay = computed(() => {
+  if (!hasBuildInFlightStatus.value) return false
+  // 启动阶段：buildLoading 为 true 但任务快照还没回来 → 显示"正在发起索引构建任务"
+  if (buildLoading.value && !hasBuildTaskSnapshot.value) {
+    return true
+  }
+  // 已创建任务但还在前置阶段（如"内容解析"）→ 不展示蒙层
+  return isBuildExecutionStage.value
+})
 
 const showBuildTracker = computed(() => {
   if (!selectedDocument.value) {
@@ -1218,7 +1189,7 @@ async function loadSelectedDocumentDetail() {
   clearNotice()
 
   try {
-    const res = await documentApi.queryStrategyPlan({documentId: effectiveDocumentId})
+    const res = await documentApi.queryStrategyPlan({ documentId: effectiveDocumentId })
     strategyPlan.value = res.data || null
     selectedParentStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'parent', strategyLibrary)
     selectedChildStrategyTypes.value = extractPipelineStrategyTypes(strategyPlan.value?.plan, 'child', strategyLibrary)
@@ -1536,7 +1507,7 @@ function startPlanPolling(documentId: string) {
   planPollTimer.value = window.setInterval(async () => {
     pollCount += 1
     try {
-      const params: QueryStrategyPlanReq = {documentId}
+      const params: QueryStrategyPlanReq = { documentId }
       const res = await documentApi.queryStrategyPlan(params)
       const result = res.data as QueryStrategyPlanResp
       if (selectedDocumentId.value === documentId) {
@@ -1692,7 +1663,7 @@ onBeforeUnmount(() => {
 
 .panel-title,
 .list-toolbar,
-.panel-title > div,
+.panel-title>div,
 .detail-header,
 .detail-statuses,
 .build-progress-header,
@@ -1728,7 +1699,7 @@ onBeforeUnmount(() => {
 }
 
 .section-headline.section-headline-major h4 {
-  font-family: var(--font-display),serif;
+  font-family: var(--font-display), serif;
   font-size: 34px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -1753,7 +1724,7 @@ onBeforeUnmount(() => {
 }
 
 .section-headline.pipeline-headline h4 {
-  font-family: var(--font-display),serif;
+  font-family: var(--font-display), serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -1957,7 +1928,7 @@ onBeforeUnmount(() => {
   border-color: rgba(13, 124, 124, 0.42);
   background: linear-gradient(135deg, rgba(13, 124, 124, 0.14), rgba(23, 48, 79, 0.08));
   box-shadow: 0 18px 34px rgba(13, 124, 124, 0.14),
-  inset 0 0 0 1px rgba(13, 124, 124, 0.16);
+    inset 0 0 0 1px rgba(13, 124, 124, 0.16);
 }
 
 .document-row.active::before {
@@ -2189,7 +2160,7 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 
-.strategy-lane + .strategy-lane {
+.strategy-lane+.strategy-lane {
   padding-top: 24px;
   border-top: 1px dashed rgba(23, 48, 79, 0.1);
 }
@@ -2224,7 +2195,7 @@ onBeforeUnmount(() => {
 .strategy-lane-title-box h5,
 .strategy-adjust-title-box h5 {
   margin: 0;
-  font-family: var(--font-display),serif;
+  font-family: var(--font-display), serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -2272,7 +2243,7 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 
-.strategy-lane-edit + .strategy-lane-edit {
+.strategy-lane-edit+.strategy-lane-edit {
   border-top: none;
 }
 
@@ -2333,7 +2304,7 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 
-.strategy-lane + .strategy-lane {
+.strategy-lane+.strategy-lane {
   padding-top: 24px;
   border-top: 1px dashed rgba(23, 48, 79, 0.1);
 }
@@ -2356,7 +2327,7 @@ onBeforeUnmount(() => {
 .strategy-lane-title-box h5,
 .strategy-adjust-title-box h5 {
   margin: 0;
-  font-family: var(--font-display),serif;
+  font-family: var(--font-display), serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -2568,7 +2539,7 @@ onBeforeUnmount(() => {
 }
 
 .selected-flow-label {
-  font-family: var(--font-display),serif;
+  font-family: var(--font-display), serif;
   font-size: 24px !important;
   font-weight: 900;
   letter-spacing: -0.03em !important;
@@ -3192,7 +3163,7 @@ onBeforeUnmount(() => {
   color: #17304f;
 }
 
-.stage-order > span {
+.stage-order>span {
   display: inline-flex;
   align-items: center;
   justify-content: center;

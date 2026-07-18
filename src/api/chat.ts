@@ -17,37 +17,71 @@ import type {
   SearchReference,
 } from '@/types'
 
-/** SSE 流式回调：后端约定事件类型 meta / text / thinking / status / reference / recommend / finish / cancel。 */
-export interface StreamHandlers {
-  onMeta?: (payload: { conversationId?: string; taskId?: string; exchangeId?: string | number }) => void
-  /** 普通文本增量（与 onMessage 同义，保留 onMessage 用于旧后端协议） */
-  onText?: (payload: { delta: string }) => void
-  onMessage?: (payload: { delta: string }) => void
-  /** 思考阶段增量：前端要把它实时拼到消息的 thinking 字段。 */
-  onThinking?: (payload: { delta: string }) => void
-  /** 阶段状态：例如"检索文档中…"，可用于在 UI 提示。 */
-  onStatus?: (payload: { stage: string; message?: string }) => void
-  /** 引用来源（支持多次累加） */
-  onReference?: (payload: { items: SearchReference[] }) => void
-  /** 推荐问题：渲染为按钮，点击可发送。 */
-  onRecommend?: (payload: { items: string[] }) => void
-  onFinish?: (payload: { messageId?: string; title?: string }) => void
-  onCancel?: (payload: { messageId?: string; title?: string }) => void
-  onError?: (error: Error) => void
+/** 后端约定的流式事件类型，对应 streamEvent.type 字段。 */
+export type StreamEventType =
+  | 'text'
+  | 'thinking'
+  | 'status'
+  | 'reference'
+  | 'recommend'
+  | 'finish'
+  | 'cancel'
+  | 'error'
+
+/** 已知事件类型集合（用于类型守卫 / 兜底校验）。 */
+const STREAM_EVENT_TYPES: ReadonlySet<StreamEventType> = new Set<StreamEventType>([
+  'text',
+  'thinking',
+  'status',
+  'reference',
+  'recommend',
+  'finish',
+  'cancel',
+  'error'
+])
+
+/** 单条流式事件（对应后端 streamEvent 结构体序列化结果）。
+ * 后端只通过两种线上格式下发：
+ *  1) SSE 标准：`event: <type>\ndata: <此 JSON>\n\n`
+ *  2) 裸 JSON：直接以 `{...}` 形式发送
+ * 解析后归一化为本结构派发到 handlers，不再区分新老协议字段。
+ */
+export interface StreamEvent {
+  type: StreamEventType
+  /** 不同事件下语义不同：
+   *  - text / thinking / status / finish / cancel / error：string
+   *  - reference：SearchReference[]
+   *  - recommend：string[]
+   */
+  content?: string | SearchReference[] | string[]
+  timestamp?: string
+  conversationId?: string
+  exchangeId?: string
+  count?: number
+  /** status 事件专用：阶段标识。 */
+  stage?: string
+  /** finish / cancel 事件专用：对话标题。 */
+  title?: string
 }
 
+/** SSE 帧的解析中间结构（私有，parseSseFrame 内部使用）。 */
 interface SseEvent {
-  event: string
+  event?: string
   data: string
 }
 
-interface StreamEnvet {
-  type: string
-  content: any
-  timestamp: string
-  conversationId: string
-  exchangeId: number
-  count: number
+/** 派发到业务层的标准化 payload。已统一字段命名，不再做新老协议兼容。 */
+export interface StreamHandlers {
+  onText?: (payload: { content: string }) => void
+  onThinking?: (payload: { content: string }) => void
+  onStatus?: (payload: { stage: string; content?: string }) => void
+  onReference?: (payload: { items: SearchReference[]; count?: number }) => void
+  onRecommend?: (payload: { items: string[]; count?: number }) => void
+  onFinish?: (payload: { messageId?: string; title?: string }) => void
+  onCancel?: (payload: { messageId?: string; title?: string }) => void
+  onError?: (error: Error) => void
+  /** SSE 连接已关闭（非用户主动 stop），用于后端没发 finish/cancel 就关流的兜底。 */
+  onClose?: () => void
 }
 
 export const chatApi = {
@@ -92,14 +126,18 @@ export const chatApi = {
           const { value, done } = await reader.read()
           if (done) break
           buffer += decoder.decode(value, { stream: true })
-          // 持续从 buffer 中提取事件,支持 SSE(\n\n) 与裸 JSON({...}) 两种格式
+          // 持续从 buffer 中提取事件，支持 SSE(\n\n) 与裸 JSON({...}) 两种格式
           while (true) {
             const boundary = findEventBoundary(buffer)
             if (!boundary) break
             const rawEvent = buffer.slice(0, boundary.end)
             buffer = buffer.slice(boundary.end)
-            parseSseEvent(rawEvent, handlers)
+            parseStreamFrame(rawEvent, handlers)
           }
+        }
+        // 流被后端正常关闭（done: true），且不是用户主动 stop 时通知上层收尾。
+        if (!stopped) {
+          handlers.onClose?.()
         }
       })
       .catch((error) => {
@@ -153,112 +191,118 @@ export const chatApi = {
   },
 }
 
-/** 解析一段 SSE 原始块并派发到对应 handler。模块作用域私有工具。
- * 支持两种输入格式：
- * 1) SSE 标准格式：`event: xxx\ndata: {...}\n\n`（后端老协议）
- * 2) 裸 JSON 格式：单行/多行 JSON 对象，后端 streamEvent 结构体直接序列化的形式
+/** 把一段原始块解析为标准 StreamEvent 并派发到对应 handler。模块作用域私有工具。
+ *  - 以 `{` 开头：视为裸 JSON（streamEvent 直接序列化）；
+ *  - 否则：按 SSE 标准格式解析 event / data 行后 JSON.parse data。
  */
-function parseSseEvent(rawBlock: string, handlers: StreamHandlers) {
+function parseStreamFrame(rawBlock: string, handlers: StreamHandlers): void {
   const trimmed = rawBlock.trim()
   if (!trimmed) return
 
-  // 路径 1：整块是裸 JSON（以 { 开头），后端 streamEvent 直接序列化的形式
   if (trimmed.startsWith('{')) {
-    let payload: StreamEnvet
-    payload = JSON.parse(trimmed)
-    dispatchPayload(payload, handlers)
+    // 路径 1：裸 JSON
+    const event = parseJsonAsStreamEvent(trimmed)
+    if (event) dispatchStreamEvent(event, handlers)
     return
   }
 
-  // 路径 2：SSE 标准格式，逐行解析 event / data 字段
-  const lines = rawBlock.split('\n')
-  const event: SseEvent = { event: 'message', data: '' }
-  let sawStructuredLine = false
-  for (const line of lines) {
-    if (!line) continue
-    if (line.startsWith('event:')) {
-      event.event = line.slice(6).trim()
-      sawStructuredLine = true
-    } else if (line.startsWith('data:')) {
-      event.data += line.slice(5).trim()
-      sawStructuredLine = true
-    } else if (line.startsWith(':')) {
-      // 注释行，忽略
-      sawStructuredLine = true
-    } else if (line.startsWith('{')) {
-      // 容错：某些实现会把 data 后的 JSON 写在新行，合并到 data 字段
-      event.data += (event.data ? '\n' : '') + line
-      sawStructuredLine = true
-    }
+  // 路径 2：SSE 标准格式
+  const frame = parseSseFrame(trimmed)
+  if (!frame) return
+  const event = parseJsonAsStreamEvent(frame.data)
+  if (event) {
+    dispatchStreamEvent(event, handlers)
+  } else if (frame.event) {
+    // 容错：data 不是合法 JSON 时，回退到 event 行作为类型，data 作为文本 content
+    dispatchStreamEvent({ type: frame.event as StreamEventType, content: frame.data }, handlers)
   }
-  if (!event.data) return
-  if (!sawStructuredLine) {
-    // 整块是纯文本，当作一个无类型的 fallback
-    dispatchPayload({ raw: event.data }, handlers)
-    return
-  }
-  let payload: any
-  try {
-    payload = JSON.parse(event.data)
-  } catch {
-    payload = { raw: event.data }
-  }
-  dispatchPayload(payload, handlers)
 }
 
-/** 根据 payload.type 派发到对应 handler。模块作用域私有工具。 */
-function dispatchPayload(payload: any, handlers: StreamHandlers) {
-  // 兼容两种后端实现：SSE event 字段 OR payload.type 字段
-  const type = (payload?.type || '').toString().toLowerCase()
-  // 字段兼容：content 优先（后端新协议），fallback 到 delta（旧协议）
-  const delta = payload?.content ?? payload?.delta ?? ''
-  // 后端 reference / recommend 事件把数组放在 content 字段，旧协议用 items
-  const rawItems = Array.isArray(payload?.items)
-    ? payload.items
-    : Array.isArray(payload?.content)
-      ? payload.content
-      : []
-  switch (type) {
-    case 'meta':
-      handlers.onMeta?.(payload)
-      break
+/** 解析 SSE 帧的 event / data 行。
+ *  规范：连续多行 data: 用 `\n` 拼接；event: 取首个；`:` 开头为注释。
+ *  返回 null 表示该块没有任何 data 可解析。
+ */
+function parseSseFrame(block: string): SseEvent | null {
+  let event: string | undefined
+  const dataLines: string[] = []
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) {
+      event = line.slice(6).trim()
+    } else if (line.startsWith('data:')) {
+      // 规范：去掉 data: 后第一个前导空格（若有）
+      dataLines.push(line.startsWith('data: ') ? line.slice(6) : line.slice(5))
+    } else if (line.startsWith(':')) {
+      // 注释行，忽略
+    } else if (line.startsWith('{')) {
+      // 容错：data 行换行后丢前缀（多行 JSON）
+      dataLines.push(line)
+    }
+    // 其他行忽略
+  }
+  if (dataLines.length === 0) return null
+  return { event, data: dataLines.join('\n') }
+}
+
+function parseJsonAsStreamEvent(text: string): StreamEvent | null {
+  try {
+    const value: StreamEvent = JSON.parse(text)
+    return isStreamEvent(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function isStreamEvent(value: unknown): value is StreamEvent {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return typeof v.type === 'string' && STREAM_EVENT_TYPES.has(v.type as StreamEventType)
+}
+
+/** 把单个标准 StreamEvent 派发到对应 handler。模块作用域私有工具。 */
+function dispatchStreamEvent(event: StreamEvent, handlers: StreamHandlers): void {
+  switch (event.type) {
     case 'text':
-    case 'message':
-    case 'response':
-      handlers.onText?.({ delta })
+      handlers.onText?.({ content: readString(event.content) })
       break
     case 'thinking':
-    case 'think':
-      handlers.onThinking?.({ delta })
+      handlers.onThinking?.({ content: readString(event.content) })
       break
     case 'status':
       handlers.onStatus?.({
-        stage: payload?.stage ?? 'pending',
-        message: delta || payload?.message
+        stage: event.stage || 'pending',
+        content: readString(event.content)
       })
       break
     case 'reference':
-      handlers.onReference?.({ items: rawItems })
+      handlers.onReference?.({
+        items: readArray<SearchReference>(event.content),
+        count: event.count
+      })
       break
     case 'recommend':
-      handlers.onRecommend?.({ items: rawItems.filter((x: any) => typeof x === 'string') })
+      handlers.onRecommend?.({
+        items: readArray(event.content).filter((x): x is string => typeof x === 'string'),
+        count: event.count
+      })
       break
     case 'finish':
-    case 'done':
-      handlers.onFinish?.(payload)
+      handlers.onFinish?.({ messageId: event.exchangeId, title: event.title })
       break
     case 'cancel':
-      handlers.onCancel?.(payload)
+      handlers.onCancel?.({ messageId: event.exchangeId, title: event.title })
       break
     case 'error':
-      // 后端 error 事件：作为可读消息上抛，业务层可在 onText 或 onError 中处理
-      handlers.onText?.({ delta: delta || payload?.message || '生成出错' })
-      handlers.onError?.(new Error(delta || payload?.message || '生成出错'))
-      break
-    default:
-      // 未知事件忽略
+      handlers.onError?.(new Error(readString(event.content) || '生成出错'))
       break
   }
+}
+
+function readString(content: StreamEvent['content']): string {
+  return typeof content === 'string' ? content : ''
+}
+
+function readArray<T>(content: StreamEvent['content']): T[] {
+  return Array.isArray(content) ? (content as T[]) : []
 }
 
 /** 在 buffer 中寻找下一个事件结束位置。
