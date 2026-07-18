@@ -42,6 +42,7 @@ watch(
     if (!sessionsReady.value) return
 
     if (sessionId.value) {
+      if (store.isCreatingNew) return
       if (!sessionExists.value && !store.isCreatingNew) {
         await store.createSession().catch(() => null)
         router.replace('/chat').catch(() => null)

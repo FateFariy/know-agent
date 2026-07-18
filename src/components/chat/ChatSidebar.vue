@@ -170,7 +170,7 @@ watch(userMenuOpen, (open) => {
         </el-icon>
       </div>
       <div>
-        <p class="chat-sidebar__title">Ragent AI 智能体</p>
+        <p class="chat-sidebar__title">KonwRag</p>
         <p class="chat-sidebar__subtitle">Powered by AI</p>
       </div>
     </div>

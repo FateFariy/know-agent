@@ -2,8 +2,8 @@
   <section class="admin-shell">
     <aside :class="{ 'admin-sidebar-open': sidebarOpen }" class="admin-sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">KA</div>
-        <strong class="brand-name">Know Agent</strong>
+        <div class="brand-mark">KR</div>
+        <strong class="brand-name">KnowRag</strong>
       </div>
 
       <nav class="sidebar-nav">

@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <div class="welcome-screen__presets">
+      <!-- <div class="welcome-screen__presets">
         <div class="welcome-screen__divider">
           <span class="welcome-screen__divider-line"/>
           <span class="welcome-screen__divider-text">试试这些开场</span>
@@ -270,7 +270,7 @@ onBeforeUnmount(() => {
             </div>
           </button>
         </div>
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
+  height: 870px;
   padding: 64px 16px;
   overflow: hidden;
 }

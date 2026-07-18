@@ -402,6 +402,7 @@ export const useChatStore = defineStore('chat', () => {
             thinkingDuration: m.thinkingDuration ?? duration
           }
         })
+        streamingMessageId.value = finalId
         const cid = currentSessionId.value
         if (cid) {
           const lastTime = new Date().toISOString()
@@ -411,11 +412,6 @@ export const useChatStore = defineStore('chat', () => {
             s.id === cid ? { ...s, title: nextTitle, lastTime, running: false } : s
           )
         }
-        isStreaming.value = false
-        thinkingStartAt.value = null
-        streamAbort.value = null
-        streamingMessageId.value = null
-        cancelRequested.value = false
       },
       onCancel: (payload) => {
         if (streamingMessageId.value !== assistantId) return
@@ -462,10 +458,11 @@ export const useChatStore = defineStore('chat', () => {
         ElMessage.error(`对话请求失败：${error?.message || '未知错误'}`)
       },
       onClose: () => {
-        if (streamingMessageId.value !== assistantId) return
+        if (!streamingMessageId.value) return
         const duration = computeThinkingDuration(thinkingStartAt.value)
+        const targetId = streamingMessageId.value
         messages.value = messages.value.map((m) => {
-          if (m.id !== assistantId) return m
+          if (m.id !== targetId) return m
           if (m.status !== 'streaming') return m
           return { ...m, status: 'done', isThinking: false, thinkingDuration: m.thinkingDuration ?? duration }
         })
