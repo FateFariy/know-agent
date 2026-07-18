@@ -1,0 +1,276 @@
+{
+  "collection_name": "document_chunk_collection",
+  "description": "文档分块向量集合，稠密FloatVector + 稀疏SparseFloatVector",
+  "fields": [
+    {
+      "name": "id",
+      "data_type": 21,
+      "description": "分块主键ID",
+      "is_primary_key": true,
+      "max_length": 64
+    },
+    {
+      "name": "document_id",
+      "data_type": 5,
+      "description": "文档ID",
+      "is_primary_key": false,
+      "indexes": [
+        {
+          "index_name": "idx_document_id",
+          "index_type": "STL_SORT",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "STL_SORT"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "task_id",
+      "data_type": 5,
+      "description": "任务ID",
+      "is_primary_key": false,
+      "indexes": [
+        {
+          "index_name": "idx_task_id",
+          "index_type": "STL_SORT",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "STL_SORT"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "plan_id",
+      "data_type": 5,
+      "description": "计划ID",
+      "is_primary_key": false
+    },
+    {
+      "name": "parent_block_id",
+      "data_type": 5,
+      "description": "父块ID",
+      "is_primary_key": false
+    },
+    {
+      "name": "chunk_no",
+      "data_type": 4,
+      "description": "块序号",
+      "is_primary_key": false
+    },
+    {
+      "name": "source_type",
+      "data_type": 4,
+      "description": "来源类型编码",
+      "is_primary_key": false
+    },
+    {
+      "name": "section_path",
+      "data_type": 21,
+      "description": "章节层级路径",
+      "is_primary_key": false,
+      "max_length": 2048
+    },
+    {
+      "name": "structure_node_id",
+      "data_type": 5,
+      "description": "结构节点ID",
+      "is_primary_key": false
+    },
+    {
+      "name": "structure_node_type",
+      "data_type": 4,
+      "description": "结构节点类型编码",
+      "is_primary_key": false
+    },
+    {
+      "name": "canonical_path",
+      "data_type": 21,
+      "description": "文档规范唯一路径",
+      "is_primary_key": false,
+      "max_length": 2048
+    },
+    {
+      "name": "item_index",
+      "data_type": 4,
+      "description": "条目索引",
+      "is_primary_key": false
+    },
+    {
+      "name": "char_count",
+      "data_type": 4,
+      "description": "分块字符总数",
+      "is_primary_key": false
+    },
+    {
+      "name": "token_count",
+      "data_type": 4,
+      "description": "分块token数量",
+      "is_primary_key": false
+    },
+    {
+      "name": "embedding_model",
+      "data_type": 21,
+      "description": "稠密Embedding模型名称",
+      "is_primary_key": false,
+      "max_length": 128
+    },
+    {
+      "name": "create_time",
+      "data_type": 26,
+      "description": "创建时间，支持时区、时间区间比较",
+      "is_primary_key": false,
+      "indexes": [
+        {
+          "index_name": "idx_create_time",
+          "index_type": "STL_SORT",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "STL_SORT"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "update_time",
+      "data_type": 26,
+      "description": "更新时间，支持时区、时间区间比较",
+      "is_primary_key": false,
+      "indexes": [
+        {
+          "index_name": "idx_update_time",
+          "index_type": "STL_SORT",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "STL_SORT"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "status",
+      "data_type": 2,
+      "description": "分块向量状态 0=正常",
+      "is_primary_key": false
+    },
+    {
+      "name": "vector",
+      "data_type": 101,
+      "description": "稠密语义Embedding向量，维度按需修改",
+      "is_primary_key": false,
+      "dim": 1024,
+      "indexes": [
+        {
+          "index_name": "dense_vector_index",
+          "index_type": "HNSW",
+          "metric_type": "COSINE",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "HNSW"
+            },
+            {
+              "key": "metric_type",
+              "value": "COSINE"
+            },
+            {
+              "key": "M",
+              "value": "16"
+            },
+            {
+              "key": "efConstruction",
+              "value": "200"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sparse_vector",
+      "data_type": 104,
+      "description": "稀疏词向量（SPLADE/BM25），存储{词id:权重}",
+      "is_primary_key": false,
+      "indexes": [
+        {
+          "index_name": "sparse_vector_index",
+          "index_type": "SPARSE_INVERTED_INDEX",
+          "metric_type": "BM25",
+          "indexParameterPairs": [
+            {
+              "key": "index_type",
+              "value": "SPARSE_INVERTED_INDEX"
+            },
+            {
+              "key": "metric_type",
+              "value": "BM25"
+            },
+            {
+              "key": "mmap.enabled",
+              "value": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "content",
+      "data_type": 21,
+      "description": "分块原始文本",
+      "is_primary_key": false,
+      "is_partition_key": false,
+      "nullable": false,
+      "max_length": 65535,
+      "enable_analyzer": true,
+      "analyzer_params": {
+        "type": "chinese"
+      },
+      "enable_match": false
+    }
+  ],
+  "functions": [
+    {
+      "name": "bm25",
+      "description": "基于块文本计算稀疏向量",
+      "type": 1,
+      "input_field_names": [
+        "content"
+      ],
+      "output_field_names": [
+        "sparse_vector"
+      ],
+      "params": {}
+    }
+  ],
+  "consistency_level": "Bounded",
+  "shards_num": 1,
+  "enableDynamicField": false
+}

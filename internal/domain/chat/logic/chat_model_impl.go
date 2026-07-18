@@ -253,8 +253,14 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 func resolveTokenUsage(resp any) *schema.TokenUsage {
 	switch expr := resp.(type) {
 	case *schema.AgenticMessage:
+		if expr == nil || expr.ResponseMeta == nil {
+			return nil
+		}
 		return expr.ResponseMeta.TokenUsage
 	case *schema.Message:
+		if expr == nil || expr.ResponseMeta == nil {
+			return nil
+		}
 		return expr.ResponseMeta.Usage
 	}
 	return nil

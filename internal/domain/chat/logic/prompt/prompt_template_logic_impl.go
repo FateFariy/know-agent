@@ -5,25 +5,20 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
-	"github.com/valyala/fasttemplate"
-
-	"github.com/swiftbit/know-agent/common/utils"
+	"text/template"
 )
 
-//go:embed templates/*.st
+//go:embed templates/*.tmpl
 var templateFS embed.FS
 
 const (
 	templateDir    = "templates/"
-	templateSuffix = ".st"
-	startDelimiter = "<"
-	endDelimiter   = ">"
+	templateSuffix = ".tmpl"
 )
 
 // TemplateLogicImpl Prompt模板渲染服务实现
 type TemplateLogicImpl struct {
-	cache sync.Map
+	cache sync.Map // key: templatePath, value: *template.Template
 }
 
 // NewPromptTemplateLogicImpl 创建Prompt模板服务实例
@@ -35,43 +30,40 @@ func NewPromptTemplateLogicImpl() *TemplateLogicImpl {
 func (s *TemplateLogicImpl) Render(templateName string, variables map[string]any) (string, error) {
 	templatePath := normalizeTemplatePath(templateName)
 
-	// 从缓存中获取或加载模板
-	templateContent, err := s.loadTemplate(templatePath)
+	tmpl, err := s.loadTemplate(templatePath)
 	if err != nil {
 		return "", err
 	}
 
-	// 创建模板渲染器
-	tmpl := fasttemplate.New(templateContent, startDelimiter, endDelimiter)
-
-	w := &strings.Builder{}
-	// 渲染模板
-	if _, err = tmpl.Execute(w, normalizeVariables(variables)); err != nil {
-		return "", err
+	// 执行渲染（text/template 通过反射自动处理 int/bool/string 等类型）
+	var buf strings.Builder
+	if err = tmpl.Execute(&buf, normalizeVariables(variables)); err != nil {
+		return "", fmt.Errorf("prompt模板渲染失败: %s, err=%w", templatePath, err)
 	}
-
-	return w.String(), nil
+	return buf.String(), nil
 }
 
-// loadTemplate 加载模板内容
-func (s *TemplateLogicImpl) loadTemplate(templatePath string) (string, error) {
-	// 尝试从缓存获取
+// loadTemplate 加载（并缓存）已解析的模板
+func (s *TemplateLogicImpl) loadTemplate(templatePath string) (*template.Template, error) {
 	if cached, ok := s.cache.Load(templatePath); ok {
-		if content, ok := cached.(string); ok {
-			return content, nil
+		if tmpl, ok := cached.(*template.Template); ok {
+			return tmpl, nil
 		}
 	}
 
-	// 从embed FS读取模板文件
 	content, err := templateFS.ReadFile(templatePath)
 	if err != nil {
-		return "", fmt.Errorf("prompt模板不存在: %s", templatePath)
+		return nil, fmt.Errorf("prompt模板不存在: %s", templatePath)
 	}
 
-	// 缓存模板内容
-	s.cache.Store(templatePath, string(content))
+	// 解析模板；Option("missingkey=zero") 让缺失字段渲染为零值而非报错
+	tmpl, err := template.New(templatePath).Option("missingkey=zero").Parse(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("prompt模板解析失败: %s, err=%w", templatePath, err)
+	}
 
-	return string(content), nil
+	actual, _ := s.cache.LoadOrStore(templatePath, tmpl)
+	return actual.(*template.Template), nil
 }
 
 // normalizeTemplatePath 规范化模板路径
@@ -87,12 +79,12 @@ func normalizeTemplatePath(templateName string) string {
 		normalized = normalized[1:]
 	}
 
-	// 确保以templateDir开头
+	// 确保以 templateDir 开头
 	if !strings.HasPrefix(normalized, templateDir) {
 		normalized = templateDir + normalized
 	}
 
-	// 确保以templateSuffix结尾
+	// 确保以 templateSuffix 结尾
 	if !strings.HasSuffix(normalized, templateSuffix) {
 		normalized = normalized + templateSuffix
 	}
@@ -102,15 +94,13 @@ func normalizeTemplatePath(templateName string) string {
 
 // normalizeVariables 规范化变量
 func normalizeVariables(variables map[string]any) map[string]any {
-	normalized := make(map[string]any)
-
-	if len(variables) == 0 {
-		return normalized
-	}
-
+	normalized := make(map[string]any, len(variables))
 	for key, value := range variables {
-		normalized[key] = utils.Ternary(value == nil, "", value)
+		if value == nil {
+			normalized[key] = ""
+			continue
+		}
+		normalized[key] = value
 	}
-
 	return normalized
 }

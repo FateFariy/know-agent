@@ -20,6 +20,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	cadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	dadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
@@ -71,15 +72,14 @@ func (m *MilvusVector) Vectorize(ctx context.Context, chunks []*entity.DocumentC
 
 // DeleteVectorByDocumentId 根据文档ID删除向量
 func (m *MilvusVector) DeleteVectorByDocumentId(ctx context.Context, documentId int64) error {
-	expr := fmt.Sprintf("metadata['documentId'] == %d", documentId)
+	expr := fmt.Sprintf("document_id == %d", documentId)
 	_, err := m.client.Delete(ctx, milvusclient.NewDeleteOption(m.collection).WithExpr(expr))
 	return err
 }
 
 // SearchByVector 根据向量搜索
 func (m *MilvusVector) SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
-	// todo 过滤条件
-	filterExpr := ""
+	filterExpr := m.buildFilterExpr(query)
 	retrievedDocs, err := m.retriever.Retrieve(ctx, query.RetrievalQuery, retriever.WithTopK(query.TopK), retrievermilvus.WithFilter(filterExpr))
 	if err != nil {
 		return nil, err
@@ -98,6 +98,94 @@ func (m *MilvusVector) markSuccess(chunks []*entity.DocumentChunk) {
 	}
 }
 
+// buildFilterExpr 构建 Milvus 过滤表达式
+//
+// 表达式结构：
+//
+//	document_id in [..] AND task_id in [..]
+//	    [ AND (section_path like "%h1%" or ...) ]       ← sectionPathHints
+//	    [ AND structure_node_id in [..] ]               ← structureNodeIdHints
+//	    [ AND (canonical_path like "%h1%" or ...) ]     ← canonicalPathHints
+//	    [ AND item_index in [..] ]                      ← itemIndexHints
+func (m *MilvusVector) buildFilterExpr(query *vo.DocumentRetrieve) string {
+	var sb strings.Builder
+	sb.WriteString("document_id in ")
+	sb.WriteString(utils.Join(query.DocumentIds, "[", "]", ", "))
+	sb.WriteString(" AND task_id in ")
+	sb.WriteString(utils.Join(query.TaskIds, "[", "]", ", "))
+
+	if query.Filters == nil {
+		return sb.String()
+	}
+
+	// sectionPathHints（多个 hint 之间用 OR 拼接，模糊匹配 section_path）
+	if clause := m.buildSectionFilter(query.Filters.SectionPathHints); clause != "" {
+		sb.WriteString(clause)
+	}
+	// structureNodeIdHints / canonicalPathHints / itemIndexHints
+	if clause := m.buildStructureFilter(query.Filters); clause != "" {
+		sb.WriteString(clause)
+	}
+
+	return sb.String()
+}
+
+// buildSectionFilter 拼接 section_path hints 对应的过滤片段
+//
+// 返回形如 ` AND (section_path like "%h1%" OR section_path like "%h2%")`；无 hint 时返回空串。
+func (m *MilvusVector) buildSectionFilter(hints []string) string {
+	if len(hints) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(" AND (")
+	for i, hint := range hints {
+		if i > 0 {
+			sb.WriteString(" OR ")
+		}
+		sb.WriteString(`section_path like "%`)
+		sb.WriteString(strings.ToLower(hint))
+		sb.WriteString(`%"`)
+	}
+	sb.WriteString(")")
+	return sb.String()
+}
+
+// buildStructureFilter 拼接 structure_node_id / canonical_path / item_index hints 对应的过滤片段
+//
+// 返回形如 ` AND structure_node_id in [..] AND (...) AND item_index in [..]`；所有 hint 都为空时返回空串。
+func (m *MilvusVector) buildStructureFilter(filters *vo.DocumentRetrieveFilters) string {
+	if filters == nil {
+		return ""
+	}
+	var sb strings.Builder
+
+	if len(filters.StructureNodeIdHints) > 0 {
+		sb.WriteString(" AND structure_node_id in ")
+		sb.WriteString(utils.Join(filters.StructureNodeIdHints, "[", "]", ", "))
+	}
+
+	if len(filters.CanonicalPathHints) > 0 {
+		sb.WriteString(" AND (")
+		for i, hint := range filters.CanonicalPathHints {
+			if i > 0 {
+				sb.WriteString(" OR ")
+			}
+			sb.WriteString(`canonical_path like "%`)
+			sb.WriteString(strings.ToLower(hint))
+			sb.WriteString(`%"`)
+		}
+		sb.WriteString(")")
+	}
+
+	if len(filters.ItemIndexHints) > 0 {
+		sb.WriteString(" AND item_index in ")
+		sb.WriteString(utils.Join(filters.ItemIndexHints, "[", "]", ", "))
+	}
+
+	return sb.String()
+}
+
 // toDocument 转换为文档
 func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Document {
 	result := make([]*schema.Document, 0, len(chunks))
@@ -107,23 +195,23 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 				ID:      strconv.FormatInt(chunk.ID, 10),
 				Content: chunk.ChunkText,
 				MetaData: map[string]any{
-					"documentId":        chunk.DocumentId,
-					"taskId":            chunk.TaskId,
-					"planId":            chunk.PlanId,
-					"parentBlockId":     chunk.ParentBlockId,
-					"chunkNo":           chunk.ChunkNo,
-					"sourceType":        chunk.SourceType,
-					"sectionPath":       chunk.SectionPath,
-					"structureNodeId":   chunk.StructureNodeId,
-					"structureNodeType": chunk.StructureNodeType,
-					"canonicalPath":     chunk.CanonicalPath,
-					"itemIndex":         chunk.ItemIndex,
-					"charCount":         chunk.CharCount,
-					"tokenCount":        chunk.TokenCount,
-					"embeddingModel":    m.model,
-					"createTime":        time.Now().Format(time.DateTime),
-					"updateTime":        time.Now().Format(time.DateTime),
-					"status":            1,
+					vo.MetaDocumentID:        chunk.DocumentId,
+					vo.MetaTaskID:            chunk.TaskId,
+					vo.MetaPlanID:            chunk.PlanId,
+					vo.MetaParentBlockID:     chunk.ParentBlockId,
+					vo.MetaChunkNo:           int32(chunk.ChunkNo),
+					vo.MetaSourceType:        int32(chunk.SourceType),
+					vo.MetaSectionPath:       chunk.SectionPath,
+					vo.MetaStructureNodeID:   chunk.StructureNodeId,
+					vo.MetaStructureNodeType: int32(chunk.StructureNodeType),
+					vo.MetaCanonicalPath:     chunk.CanonicalPath,
+					vo.MetaItemIndex:         int32(chunk.ItemIndex),
+					"charCount":              int32(chunk.CharCount),
+					"tokenCount":             int32(chunk.TokenCount),
+					"embeddingModel":         m.model,
+					"createTime":             time.Now(),
+					"updateTime":             time.Now(),
+					"status":                 int8(0),
 				},
 			})
 		}
@@ -158,7 +246,7 @@ func (m *MilvusVector) convertToDocumentChunks(retrievedDocs []*schema.Document)
 
 // 创建索引器
 func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) indexer.Indexer {
-	vecIndexer, err := indexmilvus.NewIndexer(ctx, &indexmilvus.IndexerConfig{
+	indexerConfig := &indexmilvus.IndexerConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
 		},
@@ -168,8 +256,11 @@ func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.E
 			MetricType:   indexmilvus.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType)),
 			IndexBuilder: indexmilvus.NewHNSWIndexBuilder().WithM(16).WithEfConstruction(200),
 		},
+		Sparse:    &indexmilvus.SparseVectorConfig{},
 		Embedding: emb,
-	})
+	}
+	indexerConfig.DocumentConverter = DocumentConverter(indexerConfig.Vector, indexerConfig.Sparse)
+	vecIndexer, err := indexmilvus.NewIndexer(ctx, indexerConfig)
 	if err != nil {
 		panic(err)
 	}

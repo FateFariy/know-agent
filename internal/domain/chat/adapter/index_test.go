@@ -18,7 +18,7 @@ func TestIndex(t *testing.T) {
 	// 获取环境变量
 	addr := "10.104.1.173:19530"
 	arkApiKey := ""
-	arkModel := "doubao-embedding-vision-251215"
+	arkModel := ""
 
 	ctx := context.Background()
 

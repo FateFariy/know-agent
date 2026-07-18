@@ -390,7 +390,6 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 				c.finishWithFailure(ctx, convCtx, err)
 				return
 			}
-			return
 		}
 	}
 }
@@ -509,6 +508,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 
 // emitModelChunk 发出模型输出块（text 事件），并更新首响应时间
 func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) error {
+	logx.Errorf("模型输出块, conversationId=%s, exchangeId=%d, chunk=%s", convCtx.ConversationId, convCtx.ExchangeId, chunk)
 	convCtx.WriteAnswerBuffer(chunk)
 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
 	textEvent := c.eventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId)

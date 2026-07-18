@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 )
 
@@ -87,4 +88,18 @@ func ParseChineseNumber(text string) int {
 
 	// 单个中文数字
 	return digitMap[runeStr[0]]
+}
+
+// Join 连接字符串
+func Join[T any](values []T, prefix, suffix, sep string) string {
+	var sb strings.Builder
+	sb.WriteString(prefix)
+	for i, id := range values {
+		if i > 0 {
+			sb.WriteString(sep)
+		}
+		sb.WriteString(convertor.ToString(id))
+	}
+	sb.WriteString(suffix)
+	return sb.String()
 }

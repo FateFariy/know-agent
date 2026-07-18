@@ -12,6 +12,7 @@ const (
 	MetaDocumentID          = "documentId"
 	MetaDocumentName        = "documentName"
 	MetaTaskID              = "taskId"
+	MetaPlanID              = "planId"
 	MetaParentBlockID       = "parentBlockId"
 	MetaParentBlockNo       = "parentBlockNo"
 	MetaChunkID             = "chunkId"

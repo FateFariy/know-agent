@@ -219,7 +219,7 @@ CREATE TABLE `document_parent_block` (
   `structure_node_type` INT NOT NULL DEFAULT 0 COMMENT '结构节点类型',
   `canonical_path` VARCHAR(255) COMMENT '规范路径',
   `item_index` INT NOT NULL DEFAULT 0 COMMENT '项目索引',
-  `parent_text` VARCHAR(255) COMMENT '父节点文本',
+  `parent_text` TEXT COMMENT '父节点文本',
   `char_count` INT NOT NULL DEFAULT 0 COMMENT '字符数',
   `token_count` INT NOT NULL DEFAULT 0 COMMENT '令牌数',
   `child_count` INT NOT NULL DEFAULT 0 COMMENT '子节点数',

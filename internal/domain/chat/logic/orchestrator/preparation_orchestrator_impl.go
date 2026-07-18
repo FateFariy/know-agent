@@ -370,8 +370,10 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 	snapshot := map[string]any{
 		"executionMode":     navigationDecision.ExecutionModeName,
 		"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
-		"targetItemIndex":   navigationDecision.ItemAnchor.ItemIndex,
 		"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
+	}
+	if navigationDecision.ItemAnchor != nil {
+		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
 	}
 	if err = o.tracer.CompleteStage(ctx, stage, "执行路由完成。", snapshot); err != nil {
 		return err

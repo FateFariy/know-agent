@@ -64,9 +64,9 @@ func (r *RedisMutexLock) getMutex(name string) (*redsync.Mutex, bool) {
 
 // getOrStoreMutex 获取或存储分布式锁
 func (r *RedisMutexLock) getOrStoreMutex(name string) *redsync.Mutex {
-	expiry := redsync.WithExpiry(10 * time.Second)
+	expiry := redsync.WithExpiry(30 * time.Second)
 	mutex := r.redSync.NewMutex(name, expiry)
-	if value, ok := r.mutexMap.LoadOrStore(name, mutex); !ok {
+	if value, ok := r.mutexMap.LoadOrStore(name, mutex); ok {
 		mutex, ok = value.(*redsync.Mutex)
 	}
 	return mutex

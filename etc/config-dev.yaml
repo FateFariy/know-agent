@@ -3,9 +3,9 @@ Http:
   Host: 0.0.0.0
   Port: 8080
   Mode: dev
-  Middlewares:
-    Recover: false
-    Timeout: false
+#  Middlewares:
+#    Recover: false
+#    Timeout: false
 
 Auth:
   AccessSecret: your-access-secret-key
@@ -72,7 +72,7 @@ Chunk:
 
 Milvus:
   Addr: 10.104.1.173:19530
-  Collection:
+  Collection: document_chunk_collection
   MetricType: COSINE
 
 Chat:
@@ -139,8 +139,8 @@ Chat:
 
 ChatModel:
   Ark:
-    Model: deepseek-v3-2-251201
-    BaseURL: https://ark.cn-beijing.volces.com/api/v3/responses
+    Model: doubao-seed-2-0-mini-260428
+    BaseURL: https://ark.cn-beijing.volces.com/api/v3
     ApiKey: REPLACE_YOUR_ARK_KEY
     Temperature: 0.1
     MaxTokens: 1024

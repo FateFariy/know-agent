@@ -644,6 +644,7 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 	// 构建"通过闸门"的文档 ID 集合（按渠道名分组）—— filteredResults 即通过闸门的结果集
 	gatePassedSet := make(map[string]map[string]int)
 	for _, fr := range filteredResults {
+		gatePassedSet[fr.ChannelName] = make(map[string]int)
 		for _, doc := range fr.Documents {
 			// 按渠道名建立文档 ID → 1 的映射（存在即表示通过）
 			gatePassedSet[fr.ChannelName][doc.ID] = 1
