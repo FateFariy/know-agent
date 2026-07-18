@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { chatApi } from '@/api/chat'
+import { ElMessage } from 'element-plus'
+import { chatApi, type StreamHandlers } from '@/api/chat'
+import type { SearchReference } from '@/types/chat'
 import type {
   ChatReq,
   ConversationExchange,
@@ -37,20 +39,13 @@ export interface ChatMessage {
   status: 'streaming' | 'done' | 'cancelled' | 'error'
   createdAt?: string
   exchangeId?: string
+  /** 当前阶段：'thinking' | 'retrieving' | 'generating' | 'done' | 'error' ... */
+  stage?: string
+  /** 检索引用：每次 reference 事件都会累加 */
+  references?: SearchReference[]
+  /** 后端推荐问题：finish 后出现 */
+  recommendations?: string[]
 }
-
-interface StreamHandlers {
-  onMeta?: (payload: { conversationId: string; taskId: string }) => void
-  onMessage?: (payload: { delta: string }) => void
-  onThinking?: (payload: { delta: string }) => void
-  onFinish?: (payload: { messageId?: string; title?: string }) => void
-  onCancel?: (payload: { messageId?: string; title?: string }) => void
-  onError?: (error: Error) => void
-}
-
-const baseURL = (import.meta.env.MODE === 'production')
-  ? '/api/v1/'
-  : 'http://localhost:8080'
 
 function computeThinkingDuration(startAt?: number | null) {
   if (!startAt) return undefined
@@ -245,12 +240,91 @@ export const useChatStore = defineStore('chat', () => {
     })
   }
 
+  /** 累加 reference；同名文档去重。 */
+  function appendReferences(items: SearchReference[]) {
+    if (!items?.length) return
+    messages.value = messages.value.map((m) => {
+      if (m.id !== streamingMessageId.value) return m
+      if (m.status === 'cancelled' || m.status === 'error') return m
+      const seen = new Set((m.references || []).map((r) => r.documentId ?? r.url ?? r.title))
+      const next = [...(m.references || [])]
+      for (const r of items) {
+        const key = r.documentId ?? r.url ?? r.title
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        next.push(r)
+      }
+      return { ...m, references: next }
+    })
+  }
+
+  /** 覆盖式更新推荐问题（finish 时一次性下发）。 */
+  function setRecommendations(items: string[]) {
+    if (!items?.length) return
+    messages.value = messages.value.map((m) => {
+      if (m.id !== streamingMessageId.value) return m
+      if (m.status === 'cancelled' || m.status === 'error') return m
+      return { ...m, recommendations: items }
+    })
+  }
+
+  /** 更新当前阶段。 */
+  function setStage(stage: string) {
+    messages.value = messages.value.map((m) => {
+      if (m.id !== streamingMessageId.value) return m
+      return { ...m, stage }
+    })
+  }
+
   function cancelGeneration() {
     if (!isStreaming.value) return
+    const targetId = streamingMessageId.value
+    const cid = currentSessionId.value
     cancelRequested.value = true
+
+    // 1) 中止前端 SSE 连接
     if (streamAbort.value) {
-      streamAbort.value()
+      try {
+        streamAbort.value()
+      } catch {
+        // ignore
+      }
     }
+
+    // 2) 通知后端真正停止生成（拿到 conversationId 时才调）
+    if (cid) {
+      chatApi.stopConversation({ conversationId: cid }).catch(() => null)
+    }
+
+    // 3) 本地立即把占位消息标记为 cancelled，清理流式状态
+    //    后端稍后即便发来 cancel/finish 事件，下面的 onCancel/onFinish 也会因
+    //    streamingMessageId 已置空 + status==='cancelled' 的双重判断而成为 no-op。
+    if (targetId) {
+      const duration = computeThinkingDuration(thinkingStartAt.value)
+      messages.value = messages.value.map((m) => {
+        if (m.id !== targetId) return m
+        if (m.status === 'cancelled' || m.status === 'error') return m
+        const suffix = m.content.includes('（已停止生成）') ? '' : '\n\n（已停止生成）'
+        return {
+          ...m,
+          content: m.content + suffix,
+          status: 'cancelled',
+          isThinking: false,
+          thinkingDuration: m.thinkingDuration ?? duration
+        }
+      })
+      if (cid) {
+        const lastTime = new Date().toISOString()
+        sessions.value = sessions.value.map((s) =>
+          s.id === cid ? { ...s, lastTime, running: false } : s
+        )
+      }
+    }
+    isStreaming.value = false
+    thinkingStartAt.value = null
+    streamAbort.value = null
+    streamingMessageId.value = null
+    cancelRequested.value = false
   }
 
   /**
@@ -302,35 +376,56 @@ export const useChatStore = defineStore('chat', () => {
       onMeta: (payload) => {
         if (streamingMessageId.value !== assistantId) return
         const nextId = payload.conversationId || currentSessionId.value
-        if (!nextId) return
-        const existing = sessions.value.find((s) => s.id === nextId)
-        const lastTime = new Date().toISOString()
-        currentSessionId.value = nextId
-        isCreatingNew.value = false
-        if (!existing) {
-          sessions.value = [
-            {
-              id: nextId,
-              title: trimmed.slice(0, 24) || '新对话',
-              lastTime,
-              latestUserMessage: trimmed,
-              running: true
-            },
-            ...sessions.value
-          ]
-        } else {
-          sessions.value = sessions.value.map((s) =>
-            s.id === nextId ? { ...s, lastTime, running: true, latestUserMessage: trimmed } : s
+        if (nextId) {
+          const existing = sessions.value.find((s) => s.id === nextId)
+          const lastTime = new Date().toISOString()
+          currentSessionId.value = nextId
+          isCreatingNew.value = false
+          if (!existing) {
+            sessions.value = [
+              {
+                id: nextId,
+                title: trimmed.slice(0, 24) || '新对话',
+                lastTime,
+                latestUserMessage: trimmed,
+                running: true
+              },
+              ...sessions.value
+            ]
+          } else {
+            sessions.value = sessions.value.map((s) =>
+              s.id === nextId ? { ...s, lastTime, running: true, latestUserMessage: trimmed } : s
+            )
+          }
+        }
+        // 同步 exchangeId（后续 cancel 也要这个 id 反馈给后端）
+        const exId = payload.exchangeId
+        if (exId != null) {
+          const exIdStr = String(exId)
+          messages.value = messages.value.map((m) =>
+            m.id === assistantId ? { ...m, exchangeId: exIdStr } : m
           )
         }
       },
-      onMessage: (payload) => {
+      onText: (payload) => {
         if (!payload || typeof payload !== 'object') return
         appendStreamContent(payload.delta || '')
       },
       onThinking: (payload) => {
         if (!payload || typeof payload !== 'object') return
         appendThinkingContent(payload.delta || '')
+      },
+      onStatus: (payload) => {
+        if (!payload || typeof payload !== 'object') return
+        setStage(payload.stage || 'pending')
+      },
+      onReference: (payload) => {
+        if (!payload || typeof payload !== 'object') return
+        appendReferences(payload.items || [])
+      },
+      onRecommend: (payload) => {
+        if (!payload || typeof payload !== 'object') return
+        setRecommendations(payload.items || [])
       },
       onFinish: (payload) => {
         if (streamingMessageId.value !== assistantId) return
@@ -372,17 +467,39 @@ export const useChatStore = defineStore('chat', () => {
             thinkingDuration: m.thinkingDuration ?? duration
           }
         })
+      },
+      onError: (error) => {
+        // 后端连通失败或 SSE 解析异常时，给用户可见提示，并清掉流式占位。
+        console.error('[chat] stream error', error)
+        if (streamingMessageId.value === assistantId) {
+          const duration = computeThinkingDuration(thinkingStartAt.value)
+          messages.value = messages.value.map((m) => {
+            if (m.id !== assistantId) return m
+            return {
+              ...m,
+              status: 'error',
+              isThinking: false,
+              thinkingDuration: m.thinkingDuration ?? duration
+            }
+          })
+          isStreaming.value = false
+          thinkingStartAt.value = null
+          streamAbort.value = null
+          streamingMessageId.value = null
+          cancelRequested.value = false
+        }
+        ElMessage.error(`对话请求失败：${error?.message || '未知错误'}`)
       }
     }
 
     try {
-      const stop = await startStream(req, handlers)
+      // 流式连接的所有错误（包括初始化失败）都由 handlers.onError 通知，
+      // 此处只负责把 stop 闭包交给 streamAbort 供 cancelGeneration 使用。
+      const { stop } = chatApi.streamChat(req, handlers)
       streamAbort.value = stop
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        handlers.onError?.(error as Error)
-      }
-    } finally {
+      // 兜底：理论上 streamChat 不会同步 throw；若出现异常仍清理状态。
+      console.error('[chat] streamChat failed', error)
       if (streamingMessageId.value === assistantId) {
         isStreaming.value = false
         thinkingStartAt.value = null
@@ -409,7 +526,6 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
-    // state
     sessions,
     currentSessionId,
     messages,
@@ -420,7 +536,6 @@ export const useChatStore = defineStore('chat', () => {
     isCreatingNew,
     deepThinkingEnabled,
     showWelcome,
-    // actions
     fetchSessions,
     createSession,
     selectSession,
@@ -431,116 +546,3 @@ export const useChatStore = defineStore('chat', () => {
     submitFeedback
   }
 })
-
-/**
- * 通过 fetch + ReadableStream 解析 text/event-stream。
- * 支持事件类型：meta / message / think / finish / cancel / done。
- * 返回一个 stop 闭包用于外部主动中断。
- */
-async function startStream(req: ChatReq, handlers: StreamHandlers): Promise<() => void> {
-  const controller = new AbortController()
-  let stopped = false
-
-  const stop = () => {
-    if (stopped) return
-    stopped = true
-    try {
-      controller.abort()
-    } catch {
-      // ignore
-    }
-  }
-
-  const url = `${baseURL}chat/stream`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream'
-    },
-    body: JSON.stringify(req),
-    signal: controller.signal
-  })
-
-  if (!response.ok || !response.body) {
-    throw new Error(`流式连接失败 (${response.status})`)
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder('utf-8')
-  let buffer = ''
-
-  // 异步消费流，不 await 整个流，方便外部 stop() 后立即打断 UI。
-  ;(async () => {
-    try {
-      while (!stopped) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let boundary = buffer.indexOf('\n\n')
-        while (boundary >= 0) {
-          const rawEvent = buffer.slice(0, boundary)
-          buffer = buffer.slice(boundary + 2)
-          parseSseEvent(rawEvent, handlers)
-          boundary = buffer.indexOf('\n\n')
-        }
-      }
-    } catch (error) {
-      if (!stopped) {
-        handlers.onError?.(error as Error)
-      }
-    }
-  })()
-
-  return stop
-}
-
-interface SseEvent {
-  event: string
-  data: string
-}
-
-function parseSseEvent(rawBlock: string, handlers: StreamHandlers) {
-  const lines = rawBlock.split('\n')
-  const event: SseEvent = { event: 'message', data: '' }
-  for (const line of lines) {
-    if (!line) continue
-    if (line.startsWith('event:')) {
-      event.event = line.slice(6).trim()
-    } else if (line.startsWith('data:')) {
-      event.data += line.slice(5).trim()
-    } else if (line.startsWith(':')) {
-      // 注释行，忽略
-    }
-  }
-  if (!event.data) return
-  let payload: any
-  try {
-    payload = JSON.parse(event.data)
-  } catch {
-    payload = { raw: event.data }
-  }
-  switch (event.event) {
-    case 'meta':
-      handlers.onMeta?.(payload)
-      break
-    case 'message':
-    case 'response':
-      handlers.onMessage?.({ delta: payload?.delta ?? payload?.content ?? '' })
-      break
-    case 'think':
-    case 'thinking':
-      handlers.onThinking?.({ delta: payload?.delta ?? payload?.content ?? '' })
-      break
-    case 'finish':
-    case 'done':
-      handlers.onFinish?.(payload)
-      break
-    case 'cancel':
-      handlers.onCancel?.(payload)
-      break
-    default:
-      // 未知事件忽略
-      break
-  }
-}

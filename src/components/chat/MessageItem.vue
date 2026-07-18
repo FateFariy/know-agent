@@ -2,13 +2,16 @@
 /**
  * MessageItem：单条消息渲染。
  * - 用户消息：右对齐气泡；
- * - 助手消息：左侧展示，深度思考折叠面板 + Markdown 正文 + 反馈按钮。
+ * - 助手消息：左侧展示，深度思考折叠面板 + 流式正文(thinking / text) + 引用 + 推荐问题 + 反馈按钮。
+ * - 流式阶段：thinking 阶段在 assistant-body 顶部实时显示思考内容(text + 光标)；
+ *             text 阶段切到 MarkdownRenderer；
+ *             未到任何事件时显示 ai-wait dots 占位。
  */
 import {computed, ref} from 'vue'
-import {ArrowDown} from '@element-plus/icons-vue'
+import {ArrowDown, Document, Loading, Promotion} from '@element-plus/icons-vue'
 import FeedbackButtons from './FeedbackButtons.vue'
 import MarkdownRenderer from './MarkdownRenderer.vue'
-import ThinkingIndicator from './ThinkingIndicator.vue'
+import {useChatStore} from '@/stores/chat'
 import type {ChatMessage} from '@/stores/chat'
 
 const props = defineProps<{
@@ -16,14 +19,19 @@ const props = defineProps<{
   isLast?: boolean
 }>()
 
+const store = useChatStore()
 const thinkingExpanded = ref(false)
 const isUser = computed(() => props.message.role === 'user')
 const isThinking = computed(() => Boolean(props.message.isThinking))
+const isStreaming = computed(() => props.message.status === 'streaming')
 const hasThinking = computed(() => Boolean(props.message.thinking && props.message.thinking.trim().length > 0))
 const hasContent = computed(() => props.message.content.trim().length > 0)
-const isWaiting = computed(() => props.message.status === 'streaming' && !isThinking.value && !hasContent.value)
+// 仅当 streaming 且既没收到 thinking 也没收到 text 时，才显示 dots 占位
+const isWaiting = computed(() => isStreaming.value && !isThinking.value && !hasContent.value)
 const isError = computed(() => props.message.status === 'error')
 const isCancelled = computed(() => props.message.status === 'cancelled')
+const hasReferences = computed(() => Boolean(props.message.references?.length))
+const hasRecommendations = computed(() => Boolean(props.message.recommendations?.length))
 const thinkingDuration = computed(() => props.message.thinkingDuration ? `${props.message.thinkingDuration}秒` : '')
 const showFeedback = computed(() =>
   props.message.role === 'assistant' &&
@@ -31,6 +39,12 @@ const showFeedback = computed(() =>
   Boolean(props.message.id) &&
   !props.message.id.startsWith('assistant-')
 )
+
+/** 点击推荐问题：直接发送 */
+function handleRecommend(question: string) {
+  if (store.isStreaming) return
+  store.sendMessage(question)
+}
 </script>
 
 <template>
@@ -42,13 +56,8 @@ const showFeedback = computed(() =>
 
   <div v-else class="message-item message-item--assistant">
     <div class="assistant-stack">
-      <ThinkingIndicator
-        v-if="isThinking"
-        :content="message.thinking"
-        :duration="message.thinkingDuration"
-      />
-
-      <div v-else-if="hasThinking" class="thinking-panel">
+      <!-- 折叠面板：仅在 streaming 结束后展示，作为历史查看入口 -->
+      <div v-if="!isThinking && hasThinking" class="thinking-panel">
         <button
           :aria-expanded="thinkingExpanded"
           class="thinking-panel__header"
@@ -80,14 +89,73 @@ const showFeedback = computed(() =>
       </div>
 
       <div class="assistant-body">
-        <div v-if="isWaiting" aria-label="思考中" class="ai-wait">
+        <!-- 思考中：流式 thinking 预览（实时显示 message.thinking + 闪烁光标） -->
+        <div v-if="isThinking" class="stream-preview stream-preview--thinking">
+          <div class="stream-preview__header">
+            <el-icon class="stream-preview__spinner"><Loading/></el-icon>
+            <span class="stream-preview__label">正在思考…</span>
+            <span v-if="thinkingDuration" class="stream-preview__duration">{{ thinkingDuration }}</span>
+          </div>
+          <p class="stream-preview__content">
+            {{ message.thinking || '' }}<span class="stream-preview__cursor"/>
+          </p>
+        </div>
+
+        <!-- 等待首个事件：dots 占位 -->
+        <div v-else-if="isWaiting" aria-label="思考中" class="ai-wait">
           <span class="ai-wait__dot"/>
           <span class="ai-wait__dot"/>
           <span class="ai-wait__dot"/>
         </div>
-        <MarkdownRenderer v-if="hasContent" :content="message.content"/>
+
+        <!-- 正式回答：Markdown 流式 -->
+        <MarkdownRenderer v-else-if="hasContent" :content="message.content"/>
         <p v-if="isError" class="message-notice message-notice--error">生成已中断。</p>
         <p v-else-if="isCancelled" class="message-notice message-notice--cancelled">（已停止生成）</p>
+
+        <!-- 引用来源 -->
+        <div v-if="hasReferences" class="references">
+          <div class="references__header">
+            <el-icon class="references__icon"><Document /></el-icon>
+            <span>参考来源（{{ message.references!.length }}）</span>
+          </div>
+          <ul class="references__list">
+            <li
+              v-for="(ref, idx) in message.references"
+              :key="(ref.documentId ?? ref.url ?? ref.title ?? '') + '-' + idx"
+              class="references__item"
+            >
+              <span class="references__index">[{{ idx + 1 }}]</span>
+              <a
+                v-if="ref.url"
+                :href="ref.url"
+                class="references__title"
+                rel="noopener"
+                target="_blank"
+              >{{ ref.title || ref.documentName || ref.url }}</a>
+              <span v-else class="references__title">{{ ref.title || ref.documentName || '参考文档' }}</span>
+              <span v-if="ref.score != null" class="references__score">相似度 {{ (ref.score * 100).toFixed(0) }}%</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 推荐问题（按钮列表，点击直接发送） -->
+        <div v-if="hasRecommendations" class="recommend">
+          <div class="recommend__header">
+            <el-icon class="recommend__icon"><Promotion /></el-icon>
+            <span>推荐问题</span>
+          </div>
+          <div class="recommend__list">
+            <button
+              v-for="(q, idx) in message.recommendations"
+              :key="idx"
+              class="recommend__btn"
+              type="button"
+              @click="handleRecommend(q)"
+            >{{ q }}</button>
+          </div>
+        </div>
+
         <FeedbackButtons
           v-if="showFeedback"
           :always-visible="Boolean(isLast)"
@@ -252,6 +320,69 @@ const showFeedback = computed(() =>
   }
 }
 
+/* 流式 thinking 预览：直接铺在 assistant-body 顶部，与正文同位置实时更新 */
+.stream-preview {
+  border: 1px solid #bfdbfe;
+  background: #f0f7ff;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.stream-preview__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  margin-bottom: 8px;
+}
+
+.stream-preview__spinner {
+  font-size: 14px;
+  animation: stream-spin 1s linear infinite;
+}
+
+@keyframes stream-spin {
+  to { transform: rotate(360deg); }
+}
+
+.stream-preview__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stream-preview__duration {
+  font-size: 11px;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stream-preview__content {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1e40af;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stream-preview__cursor {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 2px;
+  background: #3b82f6;
+  vertical-align: -2px;
+  animation: stream-blink 1s infinite;
+}
+
+@keyframes stream-blink {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
 .message-notice {
   font-size: 12px;
   margin: 0;
@@ -263,5 +394,120 @@ const showFeedback = computed(() =>
 
 .message-notice--cancelled {
   color: #999999;
+}
+
+.references {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.references__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.references__icon {
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.references__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.references__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.references__index {
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.references__title {
+  color: #2563eb;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.references__title:hover {
+  text-decoration: underline;
+}
+
+.references__score {
+  font-size: 11px;
+  color: #94a3b8;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.recommend {
+  margin-top: 8px;
+}
+
+.recommend__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.recommend__icon {
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.recommend__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recommend__btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  max-width: 100%;
+}
+
+.recommend__btn:hover {
+  border-color: #3b82f6;
+  color: #2563eb;
+  background: #eff6ff;
 }
 </style>
