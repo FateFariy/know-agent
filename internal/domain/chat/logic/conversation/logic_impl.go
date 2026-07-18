@@ -450,8 +450,8 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 			}
 			// 执行续期逻辑
 			if err := c.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
-				Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d",
-					convCtx.ConversationId, convCtx.ExchangeId)
+				Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d, err=%v",
+					convCtx.ConversationId, convCtx.ExchangeId, err)
 				c.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
 				return
 			}
@@ -595,6 +595,9 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
 	}
+
+	// 发送 finish 事件
+	_ = support.SafeEmitNext(convCtx.Channel, c.eventBuilder.Finish(convCtx.ConversationId, convCtx.ExchangeId))
 
 	// defer 中刷新会话摘要 + 执行清理
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行

@@ -88,6 +88,11 @@ func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []strin
 	return b.build(payload)
 }
 
+// Finish 构建完成事件
+func (b *StreamEventBuilder) Finish(conversationId string, exchangeId int64) string {
+	return b.build(b.event("finish", nil, conversationId, exchangeId))
+}
+
 // event 构建事件载荷
 func (b *StreamEventBuilder) event(eventType string, content any, conversationId string, exchangeId int64) *streamEvent {
 	payload := &streamEvent{
