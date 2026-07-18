@@ -310,7 +310,8 @@ func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, pla
 
 // UpdateStepExecuteStatus 根据方案/策略ID更新步骤执行状态
 func (d *DocumentRepositoryImpl) UpdateStepExecuteStatus(ctx context.Context, planId int64, status int) error {
-	return d.dbWithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Update("execute_status", status).Error
+	step := &model.DocumentStrategyStep{PlanId: planId, ExecuteStatus: status}
+	return d.dbWithContext(ctx).Where("plan_id = ?", planId).Updates(step).Error
 }
 
 // ========== 块相关 ==========

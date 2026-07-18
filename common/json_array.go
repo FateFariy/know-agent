@@ -9,7 +9,7 @@ import (
 type JSONArray []any
 
 // Value 实现 driver.Valuer 接口
-func (j *JSONArray) Value() (driver.Value, error) {
+func (j JSONArray) Value() (driver.Value, error) {
 	if j == nil {
 		return nil, nil
 	}
@@ -17,16 +17,15 @@ func (j *JSONArray) Value() (driver.Value, error) {
 }
 
 // Scan 实现 sql.Scanner 接口
-func (j *JSONArray) Scan(value any) error {
+func (j JSONArray) Scan(value any) error {
 	if value == nil {
-		*j = nil
 		return nil
 	}
 	bytes, ok := value.([]byte)
 	if !ok {
 		return nil
 	}
-	return json.Unmarshal(bytes, j)
+	return json.Unmarshal(bytes, &j)
 }
 
 func JSONArrayTo[T any](src JSONArray, parseFunc func(any) T) []T {

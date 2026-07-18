@@ -60,9 +60,7 @@ func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity
 
 // UpdateExchangeById 更新对话记录
 func (r *ChatRepositoryImpl) UpdateExchangeById(ctx context.Context, exchange *entity.ChatExchange) error {
-	return r.dbWithContext(ctx).Model(&model.ChatExchange{}).
-		Where("id = ?", exchange.ID).
-		Updates(convert.ToChatExchangeModel(exchange)).Error
+	return r.dbWithContext(ctx).Where("id = ?", exchange.ID).Updates(convert.ToChatExchangeModel(exchange)).Error
 }
 
 // ListExchanges 列出对话的所有交换记录
@@ -128,9 +126,7 @@ func (r *ChatRepositoryImpl) SelectExchangeById(ctx context.Context, exchangeId 
 
 // UpdateDialogueByConversationId 根据对话ID更新对话记录
 func (r *ChatRepositoryImpl) UpdateDialogueByConversationId(ctx context.Context, dialogue *entity.ChatDialogue) error {
-	return r.dbWithContext(ctx).Model(&model.ChatDialogue{}).
-		Where("conversation_id = ?", dialogue.ConversationId).
-		Updates(convert.ToChatDialogueModel(dialogue)).Error
+	return r.dbWithContext(ctx).Where("conversation_id = ?", dialogue.ConversationId).Updates(convert.ToChatDialogueModel(dialogue)).Error
 }
 
 // UpsertDialogue 创建或更新会话
@@ -157,15 +153,13 @@ func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entit
 		chatDialogue.SelectedDocumentName != dialogue.SelectedDocumentName
 
 	if needUpdate {
-		updates := map[string]interface{}{
-			"session_status":         dialogue.SessionStatus,
-			"chat_mode":              dialogue.ChatMode,
-			"selected_document_id":   dialogue.SelectedDocumentId,
-			"selected_document_name": dialogue.SelectedDocumentName,
+		updates := &model.ChatDialogue{
+			SessionStatus:        dialogue.SessionStatus,
+			ChatMode:             dialogue.ChatMode,
+			SelectedDocumentId:   dialogue.SelectedDocumentId,
+			SelectedDocumentName: dialogue.SelectedDocumentName,
 		}
-		return r.dbWithContext(ctx).Model(&model.ChatDialogue{}).
-			Where("id = ?", chatDialogue.ID).
-			Updates(updates).Error
+		return r.dbWithContext(ctx).Where("id = ?", chatDialogue.ID).Updates(updates).Error
 	}
 	return nil
 }
@@ -288,9 +282,7 @@ func (r *ChatRepositoryImpl) InsertStage(ctx context.Context, stage *entity.Chat
 
 // UpdateStageById 更新阶段记录
 func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, stage *entity.ChatExchangeTraceStage) error {
-	return r.dbWithContext(ctx).Model(&model.ChatExchangeTraceStage{}).
-		Where("id = ?", stage.ID).
-		Updates(stage).Error
+	return r.dbWithContext(ctx).Where("id = ?", stage.ID).Updates(convert.ToChatExchangeTraceStageModel(stage)).Error
 }
 
 // SelectStages 查询阶段记录
