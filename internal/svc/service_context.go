@@ -13,6 +13,7 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/google/wire"
+	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
@@ -36,6 +37,7 @@ type ServiceContext struct {
 	Emb            embedding.Embedder
 	ChatModel      model.BaseModel[*schema.AgenticMessage]
 	ParserRegistry *parse.Registry
+	Milvus         *milvusclient.Client
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {
@@ -49,6 +51,7 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		RedSync:   NewRedSync(redisClient),
 		Emb:       NewArkEmbedding(c),
 		ChatModel: NewArkChatModel(c),
+		Milvus:    NewMilvusClient(c),
 	}
 }
 
@@ -61,6 +64,7 @@ func NewMinioClient(c *config.Config) *minio.Client {
 		Creds:  credentials.NewStaticV4(accessKeyID, accessKey, ""),
 		Secure: c.Minio.UseSSL,
 	})
+
 	if err != nil {
 		panic(err)
 	}
@@ -104,4 +108,14 @@ func NewArkChatModel(c *config.Config) *agenticark.Model {
 		panic(err)
 	}
 	return chatModel
+}
+
+func NewMilvusClient(c *config.Config) *milvusclient.Client {
+	client, err := milvusclient.New(context.TODO(), &milvusclient.ClientConfig{
+		Address: c.Milvus.Addr,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return client
 }

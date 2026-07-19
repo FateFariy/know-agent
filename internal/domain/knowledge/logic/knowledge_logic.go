@@ -62,7 +62,7 @@ package logic
 // 		return nil, err
 // 	}
 //
-// 	documents, err := s.port.SearchByVector(ctx, retrieve.RetrievalQuery, retrieve.DocumentIds, retrieve.TaskIds, resolveTopK(retrieve.TopK), retrieve.Filters)
+// 	documents, err := s.port.Search(ctx, retrieve.RetrievalQuery, retrieve.DocumentIds, retrieve.TaskIds, resolveTopK(retrieve.TopK), retrieve.Filters)
 // 	if err != nil {
 // 		logx.Errorf("VectorSearch failed: query=%s, err=%v", retrieve.RetrievalQuery, err)
 // 		return nil, err
@@ -88,7 +88,7 @@ package logic
 //
 // 	documents, err := s.port.SearchByKeyword(ctx, retrieve.RetrievalQuery, retrieve.DocumentIds, retrieve.TaskIds, resolveTopK(retrieve.TopK), retrieve.Filters)
 // 	if err != nil {
-// 		logx.Errorf("KeywordRetriever failed: query=%s, err=%v", retrieve.RetrievalQuery, err)
+// 		logx.Errorf("KeywordIndexer failed: query=%s, err=%v", retrieve.RetrievalQuery, err)
 // 		return nil, err
 // 	}
 //

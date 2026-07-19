@@ -3,7 +3,7 @@ package vo
 type RetrievalChannel = string
 
 const (
-	RetrievalChannelVector  = "vector"  // 向量检索
+	RetrievalChannelVector  = "indexer" // 向量检索
 	RetrievalChannelKeyword = "keyword" // 关键词检索
 	RetrievalChannelRerank  = "rerank"  // 重排序
 	RetrievalChannelHybrid  = "hybrid"  // 混合检索

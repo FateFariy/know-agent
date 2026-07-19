@@ -20,14 +20,9 @@ type DistributedLock interface {
 	Extend(ctx context.Context, name string) error
 }
 
-type VectorRetriever interface {
-	// SearchByVector 基于 Milvus 向量数据库进行相似度检索
-	SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
-}
-
-type KeywordRetriever interface {
-	// SearchByKeyword 基于关键词索引进行检索
-	SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
+type Retriever interface {
+	// Search 检索
+	Search(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
 
 // CheckPointStore 检查点存储器

@@ -415,11 +415,11 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 	}
 
 	// 批量向量化
-	if err = d.port.Vectorize(ctx, childChunks); err != nil {
+	if err = d.port.BuildVectors(ctx, childChunks); err != nil {
 		panic(err)
 	}
 	// 批量关键词索引
-	if err = d.port.IndexChunks(ctx, childChunks); err != nil {
+	if err = d.port.BuildIndexes(ctx, childChunks); err != nil {
 		panic(err)
 	}
 	// 回写向量状态
@@ -571,8 +571,8 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 	parentBlocks := make([]*entity.DocumentParentBlock, 0, len(candidates))
 	chunks := make([]*entity.DocumentChunk, 0)
 
-	// 全局子块编号：从 1 开始，遇到有效子块时递增并写入 ChunkNo
-	globalChunkNo := 1
+	// 全局子块编号：从 0 开始，遇到有效子块时递增并写入 ChunkNo
+	globalChunkNo := 0
 	for parentIdx, candidate := range candidates {
 		parentBlock := &entity.DocumentParentBlock{
 			ID:                utils.GetSnowflakeNextID(),

@@ -1,4 +1,4 @@
-package vector
+package indexer
 
 import (
 	"context"
@@ -69,10 +69,10 @@ func DocumentConverter(vector *milvus2.VectorConfig, _ *milvus2.SparseVectorConf
 				sourceVec = doc.DenseVector()
 			}
 
-			// Dense vector is required when vectorField is set (dense-only or hybrid mode).
+			// Dense indexer is required when vectorField is set (dense-only or hybrid mode).
 			if denseVectorField != "" {
 				if len(sourceVec) == 0 {
-					return nil, fmt.Errorf("vector data missing for document %d (id: %s)", idx, doc.ID)
+					return nil, fmt.Errorf("indexer data missing for document %d (id: %s)", idx, doc.ID)
 				}
 				vec := make([]float32, len(sourceVec))
 				for i, v := range sourceVec {

@@ -14,13 +14,13 @@ import (
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	vectorDB adapter.VectorRetriever
+	vectorDB adapter.Retriever
 }
 
 var _ rag.RetrievalChannel = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
-func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, vectorDB adapter.VectorRetriever) *VectorRetrievalChannel {
+func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, vectorDB adapter.Retriever) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
 		vectorDB: vectorDB,
 	}
@@ -43,7 +43,7 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, query *vo.Documen
 		return nil, fmt.Errorf("invaild value")
 	}
 
-	docs, err := c.vectorDB.SearchByVector(ctx, query)
+	docs, err := c.vectorDB.Search(ctx, query)
 	if err != nil {
 		logx.Errorf("向量检索失败: question='%s', error=%v", query.Question, err)
 		return nil, err

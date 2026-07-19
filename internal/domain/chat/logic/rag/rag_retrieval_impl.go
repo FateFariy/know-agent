@@ -204,8 +204,9 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 	// 为每个通道启动一个 goroutine 并行执行检索
 	for _, ch := range channels {
 		go func(ch RetrievalChannel) {
-			// 组装文档检索对象（传入子问题、执行计划、向量 topK）
-			documentRetrieve := vo.NewDocumentRetrieve(subQuestion, plan, e.vectorTopK)
+			// 组装文档检索对象（传入子问题、执行计划、opK）
+			topK := utils.Ternary(ch.ChannelName() == "indexer", e.vectorTopK, e.candidateTopK)
+			documentRetrieve := vo.NewDocumentRetrieve(subQuestion, plan, topK)
 			// 调用 retrieveChannel（实际执行：加载文档元数据 → 调用通道检索 → 回填知识库信息）
 			result, err := e.retrieveChannel(timeoutCtx, ch, documentRetrieve)
 			if err != nil {

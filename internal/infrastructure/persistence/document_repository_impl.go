@@ -22,14 +22,14 @@ import (
 
 type DocumentRepositoryImpl struct {
 	rdb     *redis.Client
-	vdb     adapter.VectorRetriever
+	vdb     adapter.VectorIndexer
 	storage adapter.Storage
 	*transactionManager
 }
 
 var _ adapter.DocumentRepository = (*DocumentRepositoryImpl)(nil)
 
-func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorRetriever) *DocumentRepositoryImpl {
+func NewDocumentRepository(svcCtx *svc.ServiceContext, storage adapter.Storage, vdb adapter.VectorIndexer) *DocumentRepositoryImpl {
 	return &DocumentRepositoryImpl{
 		transactionManager: &transactionManager{db: svcCtx.Db},
 		rdb:                svcCtx.Rdb,
@@ -54,7 +54,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 		}
 
 		// 删除向量索引
-		if err = d.vdb.DeleteVectorByDocumentId(ctx, documentId); err != nil {
+		if err = d.vdb.DeleteByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
 

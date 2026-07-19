@@ -10,16 +10,16 @@ import (
 type DocumentPort struct {
 	Storage
 	MessageProducer
-	VectorRetriever
-	KeywordRetriever
+	VectorIndexer
+	KeywordIndexer
 }
 
-func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorRetriever, keywordSearch KeywordRetriever) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorIndexer, keywordSearch KeywordIndexer) *DocumentPort {
 	return &DocumentPort{
-		Storage:          storage,
-		MessageProducer:  messageProducer,
-		VectorRetriever:  vectorDB,
-		KeywordRetriever: keywordSearch,
+		Storage:         storage,
+		MessageProducer: messageProducer,
+		VectorIndexer:   vectorDB,
+		KeywordIndexer:  keywordSearch,
 	}
 }
 
@@ -44,18 +44,10 @@ type MessageProducer interface {
 	Send(ctx context.Context, topic, key string, message any) error
 }
 
-type VectorRetriever interface {
-	// Vectorize 向量化块
-	Vectorize(ctx context.Context, chunks []*entity.DocumentChunk) error
+type Indexer interface {
+	// BuildIndex 构建索引
+	BuildIndex(ctx context.Context, chunks []*entity.DocumentChunk) error
 
-	// DeleteVectorByDocumentId 根据文档ID删除向量
-	DeleteVectorByDocumentId(ctx context.Context, documentId int64) error
-}
-
-type KeywordRetriever interface {
-	// IndexChunks 索引块
-	IndexChunks(ctx context.Context, chunks []*entity.DocumentChunk) error
-
-	// DeleteIndexByDocumentId 根据文档ID删除索引
-	DeleteIndexByDocumentId(ctx context.Context, documentId int64) error
+	// DeleteByDocumentId 根据文档ID删除
+	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
