@@ -11,7 +11,7 @@ var (
 	ErrStrategyPlanNotFound     = common.NewBizError(20006, "策略方案不存在：%d")
 	ErrStrategyStepEmpty        = common.NewBizError(20007, "当前没有可执行的策略步骤")
 	ErrIndexTaskRunning         = common.NewBizError(20008, "当前文档已有索引任务正在执行")
-	ErrKafkaSendFailed          = common.NewBizError(20009, "异步任务投递失败：%s")
+	ErrMQSendFailed             = common.NewBizError(20009, "异步任务投递失败：%s")
 	ErrDocumentParseFailed      = common.NewBizError(20010, "文件解析失败：%s")
 	ErrDocumentStorageFailed    = common.NewBizError(20011, "文件存储失败：%s")
 	ErrDocumentVectorFailed     = common.NewBizError(20012, "向量化处理失败：%s")

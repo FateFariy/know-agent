@@ -14,15 +14,15 @@ import (
 
 // KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
-	keywordDB adapter.KeywordRetriever
+	retriever adapter.KeywordRetriever
 }
 
 var _ rag.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, keywordDB adapter.KeywordRetriever) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever adapter.KeywordRetriever) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
-		keywordDB: keywordDB,
+		retriever: retriever,
 	}
 }
 
@@ -42,7 +42,7 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.Docume
 		return nil, fmt.Errorf("invaild value")
 	}
 
-	docs, err := c.keywordDB.SearchByKeyword(ctx, query)
+	docs, err := c.retriever.SearchByKeyword(ctx, query)
 	if err != nil {
 		logx.Errorf("关键词检索失败: question='%s', error=%v", query.Question, err)
 		return nil, err

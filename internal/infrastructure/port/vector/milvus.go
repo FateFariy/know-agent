@@ -1,4 +1,4 @@
-package indexer
+package vector
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	indexmilvus "github.com/cloudwego/eino-ext/components/indexer/milvus2"
 	retrievermilvus "github.com/cloudwego/eino-ext/components/retriever/milvus2"
 	"github.com/cloudwego/eino-ext/components/retriever/milvus2/search_mode"
-	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
@@ -17,34 +16,24 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	cadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	dadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// MilvusVector 向量检索实现（dense HNSW）
-//
-// 共享逻辑（client 管理、过滤表达式、metadata 转换）下沉到 milvus.Base，
-// 本结构体只保留向量索引写入与 dense 检索相关的差异逻辑。
+// MilvusVector 关键词检索实现（sparse BM25）
 type MilvusVector struct {
 	*milvus.Base
 	indexer indexer.Indexer
 	model   string
 }
 
-var _ dadapter.Indexer = (*MilvusVector)(nil)
-var _ cadapter.Retriever = (*MilvusVector)(nil)
-
 func NewMilvusVector(svcCtx *svc.ServiceContext) *MilvusVector {
-	ctx := context.Background()
-	retriever := newRetriever(svcCtx, ctx, svcCtx.Emb)
 	return &MilvusVector{
-		Base:    milvus.NewBase(svcCtx, retriever),
-		indexer: newIndexer(svcCtx, ctx, svcCtx.Emb),
+		Base:    milvus.NewBase(svcCtx, newRetriever(svcCtx)),
+		indexer: newIndexer(svcCtx),
 		model:   svcCtx.Config.Embedding.Model,
 	}
 }
@@ -64,8 +53,7 @@ func (m *MilvusVector) BuildVectors(ctx context.Context, chunks []*entity.Docume
 	return nil
 }
 
-// SearchByVector 根据向量搜索
-func (m *MilvusVector) Search(ctx context.Context, query *cvo.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
+func (m *MilvusVector) SearchByVector(ctx context.Context, query *cvo.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
 	return m.Search(ctx, query)
 }
 
@@ -115,7 +103,7 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 }
 
 // 创建索引器
-func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) indexer.Indexer {
+func newIndexer(svcCtx *svc.ServiceContext) indexer.Indexer {
 	indexerConfig := &indexmilvus.IndexerConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
@@ -127,10 +115,10 @@ func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.E
 			IndexBuilder: indexmilvus.NewHNSWIndexBuilder().WithM(16).WithEfConstruction(200),
 		},
 		Sparse:    &indexmilvus.SparseVectorConfig{},
-		Embedding: emb,
+		Embedding: svcCtx.Emb,
 	}
 	indexerConfig.DocumentConverter = DocumentConverter(indexerConfig.Vector, indexerConfig.Sparse)
-	vecIndexer, err := indexmilvus.NewIndexer(ctx, indexerConfig)
+	vecIndexer, err := indexmilvus.NewIndexer(context.Background(), indexerConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -138,16 +126,16 @@ func newIndexer(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.E
 }
 
 // 创建向量检索器
-func newRetriever(svcCtx *svc.ServiceContext, ctx context.Context, emb embedding.Embedder) retriever.Retriever {
+func newRetriever(svcCtx *svc.ServiceContext) retriever.Retriever {
 	metricType := retrievermilvus.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType))
-	vecRetriever, err := retrievermilvus.NewRetriever(ctx, &retrievermilvus.RetrieverConfig{
+	vecRetriever, err := retrievermilvus.NewRetriever(context.Background(), &retrievermilvus.RetrieverConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
 		},
 		Collection: svcCtx.Config.Milvus.Collection,
 		TopK:       10,
 		SearchMode: search_mode.NewApproximate(metricType),
-		Embedding:  emb,
+		Embedding:  svcCtx.Emb,
 	})
 	if err != nil {
 		panic(err)

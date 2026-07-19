@@ -14,12 +14,12 @@ type DocumentPort struct {
 	KeywordIndexer
 }
 
-func NewDocumentPort(storage Storage, messageProducer MessageProducer, vectorDB VectorIndexer, keywordSearch KeywordIndexer) *DocumentPort {
+func NewDocumentPort(storage Storage, messageProducer MessageProducer, vector VectorIndexer, keyword KeywordIndexer) *DocumentPort {
 	return &DocumentPort{
 		Storage:         storage,
 		MessageProducer: messageProducer,
-		VectorIndexer:   vectorDB,
-		KeywordIndexer:  keywordSearch,
+		VectorIndexer:   vector,
+		KeywordIndexer:  keyword,
 	}
 }
 
@@ -44,9 +44,16 @@ type MessageProducer interface {
 	Send(ctx context.Context, topic, key string, message any) error
 }
 
-type Indexer interface {
-	// BuildIndex 构建索引
-	BuildIndex(ctx context.Context, chunks []*entity.DocumentChunk) error
+type KeywordIndexer interface {
+	// BuildIndexes 构建索引
+	BuildIndexes(ctx context.Context, chunks []*entity.DocumentChunk) error
+
+	// DeleteByDocumentId 根据文档ID删除
+	DeleteByDocumentId(ctx context.Context, documentId int64) error
+}
+type VectorIndexer interface {
+	// BuildVectors 构建索引
+	BuildVectors(ctx context.Context, chunks []*entity.DocumentChunk) error
 
 	// DeleteByDocumentId 根据文档ID删除
 	DeleteByDocumentId(ctx context.Context, documentId int64) error

@@ -20,9 +20,14 @@ type DistributedLock interface {
 	Extend(ctx context.Context, name string) error
 }
 
-type Retriever interface {
-	// Search 检索
-	Search(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
+type KeywordRetriever interface {
+	// SearchByKeyword  按关键词检索
+	SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
+}
+
+type VectorRetriever interface {
+	// SearchByVector 按向量检索
+	SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
 
 // CheckPointStore 检查点存储器

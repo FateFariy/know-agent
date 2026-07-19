@@ -8,9 +8,7 @@ import (
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
-	cadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	dadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -21,9 +19,6 @@ type MilvusKeyword struct {
 	*milvus.Base
 }
 
-var _ dadapter.KeywordIndexer = (*MilvusKeyword)(nil)
-var _ cadapter.KeywordRetriever = (*MilvusKeyword)(nil)
-
 func NewMilvusKeyword(svcCtx *svc.ServiceContext) *MilvusKeyword {
 	ctx := context.Background()
 	return &MilvusKeyword{
@@ -31,13 +26,12 @@ func NewMilvusKeyword(svcCtx *svc.ServiceContext) *MilvusKeyword {
 	}
 }
 
-// BuildIndexes 批量索引分片（文档域）。分片文本已写入 document_chunk，此处仅标记可检索状态
 func (m *MilvusKeyword) BuildIndexes(ctx context.Context, chunks []*entity.DocumentChunk) error {
+	// todo 向量、关键字均使用Milus，暂时不用实现
 	return nil
 }
 
-// SearchByKeyword 基于关键词进行检索
-func (m *MilvusKeyword) SearchByKeyword(ctx context.Context, query *cvo.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
+func (m *MilvusKeyword) SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	return m.Search(ctx, query)
 }
 
