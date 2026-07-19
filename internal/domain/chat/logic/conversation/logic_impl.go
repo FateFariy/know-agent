@@ -534,7 +534,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
+		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
 
@@ -602,7 +602,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
+		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
 
@@ -689,7 +689,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(ctx, convCtx.ConversationId)
+		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(ctx, convCtx)
 	}()
 
@@ -796,9 +796,9 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 // cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
 func (c *LogicImpl) cleanup(ctx context.Context, convCtx *vo.ConversationContext) {
 	support.SafeEmitComplete(convCtx.Channel)
-	convCtx.ReleaseResources()
 	c.unlockConversationLock(ctx, convCtx.LeaseKey)
 	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
+	convCtx.ReleaseResources()
 }
 
 // unlockConversationLock 释放会话运行锁

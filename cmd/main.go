@@ -9,7 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/config"
 )
 
-var configFile = flag.String("f", "etc/config-dev.yaml", "the config file")
+var configFile = flag.String("f", "etc/config-prod.yaml", "the config file")
 
 func main() {
 	flag.Parse()

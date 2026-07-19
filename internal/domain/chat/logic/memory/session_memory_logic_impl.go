@@ -26,9 +26,9 @@ func (s *SessionMemoryLogicImpl) LoadMemoryContext(ctx context.Context, conversa
 }
 
 // RefreshConversationSummaryAsync 异步刷新会话摘要
-func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(ctx context.Context, conversationId string) {
+func (s *SessionMemoryLogicImpl) RefreshConversationSummaryAsync(conversationId string) {
 	if summaryStrategy, ok := s.memoryStrategy.(*strategy.SummaryCompressionStrategy); ok {
-		summaryStrategy.RefreshConversationSummaryAsync(ctx, conversationId)
+		summaryStrategy.RefreshConversationSummaryAsync(conversationId)
 	}
 }
 

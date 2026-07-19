@@ -111,7 +111,7 @@ func (s *SummaryCompressionStrategy) GetStrategyType() string {
 }
 
 // RefreshConversationSummaryAsync 异步刷新会话摘要
-func (s *SummaryCompressionStrategy) RefreshConversationSummaryAsync(ctx context.Context, conversationId string) {
+func (s *SummaryCompressionStrategy) RefreshConversationSummaryAsync(conversationId string) {
 	if strutil.IsBlank(conversationId) {
 		return
 	}
@@ -119,9 +119,12 @@ func (s *SummaryCompressionStrategy) RefreshConversationSummaryAsync(ctx context
 		return
 	}
 
-	// todo 待完善（使用协程池）
 	go func() {
 		defer s.refreshingConversationIds.Delete(conversationId)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		defer cancel()
+
 		summaryState, _ := s.repo.SelectMemorySummary(ctx, conversationId)
 
 		_, err := s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, nil)

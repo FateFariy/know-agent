@@ -43,7 +43,7 @@ type SessionMemoryLogic interface {
 	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
 
 	// RefreshConversationSummaryAsync 异步刷新会话摘要
-	RefreshConversationSummaryAsync(ctx context.Context, conversationId string)
+	RefreshConversationSummaryAsync(conversationId string)
 
 	// GetConversationSummary 获取会话摘要
 	GetConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)

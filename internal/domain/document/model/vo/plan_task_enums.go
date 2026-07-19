@@ -91,11 +91,11 @@ func TaskEventTypeName(et TaskEventType) string {
 type TaskStatus = int
 
 const (
-	TaskStatusNew TaskStatus = iota + 1
-	TaskStatusRunning
-	TaskStatusCompleted
-	TaskStatusFailed
-	TaskStatusSuccess // 成功
+	TaskStatusNew       TaskStatus = iota + 1 // 新建
+	TaskStatusRunning                         // 运行中
+	TaskStatusCompleted                       // 完成
+	TaskStatusFailed                          // 失败
+	TaskStatusSuccess                         // 成功
 )
 
 func TaskStatusName(ts TaskStatus) string {
