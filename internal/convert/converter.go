@@ -2,7 +2,6 @@ package convert
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -145,7 +144,6 @@ func ToChatQueryModeName(code int) string {
 func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 	var debugTrace cvo.ChatDebugTrace
 	if err := json.Unmarshal([]byte(debugTraceJson), &debugTrace); err != nil {
-		fmt.Println(err)
 		return nil
 	}
 	return &chat.ChatDebugTrace{
@@ -156,7 +154,7 @@ func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 		RewriteSubQuestions:           debugTrace.RewriteSubQuestions,
 		RetrievalQuestion:             debugTrace.RetrievalQuestion,
 		AgentQuestion:                 debugTrace.AgentQuestion,
-		NavigationDecision:            debugTrace.NavigationDecision,
+		NavigationDecision:            ToChatDocumentNavigationDecision(debugTrace.NavigationDecision),
 		HistorySummary:                debugTrace.HistorySummary,
 		LongTermSummary:               debugTrace.LongTermSummary,
 		RecentHistoryTranscript:       debugTrace.RecentHistoryTranscript,
@@ -175,12 +173,137 @@ func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 		SelectedTaskId:                debugTrace.SelectedTaskId,
 		RetrievalNotes:                debugTrace.RetrievalNotes,
 		UsedChannels:                  debugTrace.UsedChannels,
-		ToolTraces:                    debugTrace.ToolTraces,
-		ModelUsageTraces:              debugTrace.ModelUsageTraces,
-		LimitStats:                    debugTrace.LimitStats,
+		ToolTraces:                    ToChatToolTraces(debugTrace.ToolTraces),
+		ModelUsageTraces:              ToChatModelUsageTraces(debugTrace.ModelUsageTraces),
+		LimitStats:                    ToChatLimitStats(debugTrace.LimitStats),
 		RagSystemPrompt:               debugTrace.RagSystemPrompt,
 		RagUserPrompt:                 debugTrace.RagUserPrompt,
 		NoEvidenceReply:               debugTrace.NoEvidenceReply,
+	}
+}
+
+// ToChatDocumentNavigationDecision 将领域层 DocumentNavigationDecision 转换为 API 层
+func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat.DocumentNavigationDecision {
+	if src == nil {
+		return nil
+	}
+
+	mode := src.ExecutionModeName
+	if mode == "" && src.ExecutionMode != nil {
+		mode = src.ExecutionMode.Name()
+	}
+	return &chat.DocumentNavigationDecision{
+		NavigationAction:  src.NavigationAction,
+		ExecutionMode:     mode,
+		StructureAnchor:   ToChatStructureAnchor(src.StructureAnchor),
+		ItemAnchor:        ToChatItemAnchor(src.ItemAnchor),
+		RetrievalPlan:     ToChatRetrievalQuestionPlan(src.RetrievalPlan),
+		SummaryText:       src.SummaryText,
+		QueryContextHints: append([]string(nil), src.QueryContextHints...),
+		SoftSectionHints:  append([]string(nil), src.SoftSectionHints...),
+	}
+}
+
+// ToChatStructureAnchor 将领域层结构锚点转换为 API 层结构锚点
+func ToChatStructureAnchor(src *cvo.ConversationStructureAnchor) *chat.ConversationStructureAnchor {
+	if src == nil {
+		return nil
+	}
+	return &chat.ConversationStructureAnchor{
+		RootSectionCode:   src.RootSectionCode,
+		RootSectionTitle:  src.RootSectionTitle,
+		TargetSectionHint: src.TargetSectionHint,
+		StructureNodeId:   src.StructureNodeId,
+		CanonicalPath:     src.CanonicalPath,
+		ScopeMode:         src.ScopeMode,
+	}
+}
+
+func ToChatItemAnchor(src *cvo.ConversationItemAnchor) *chat.ConversationItemAnchor {
+	if src == nil {
+		return nil
+	}
+	return &chat.ConversationItemAnchor{
+		ItemIndex:       src.ItemIndex,
+		ItemText:        src.ItemText,
+		StructureNodeId: src.StructureNodeId,
+		CanonicalPath:   src.CanonicalPath,
+	}
+}
+
+func ToChatRetrievalQuestionPlan(src *cvo.RetrievalQuestionPlan) *chat.RetrievalQuestionPlan {
+	if src == nil {
+		return nil
+	}
+	return &chat.RetrievalQuestionPlan{
+		RetrievalQuestion: src.RetrievalQuestion,
+		SubQuestions:      append([]string(nil), src.SubQuestions...),
+	}
+}
+
+func ToChatToolTraces(src []*cvo.ChatToolTrace) []*chat.ChatToolTrace {
+	if src == nil {
+		return nil
+	}
+	result := make([]*chat.ChatToolTrace, len(src))
+	for i, t := range src {
+		if t == nil {
+			result[i] = nil
+			continue
+		}
+		result[i] = &chat.ChatToolTrace{
+			ToolName:       t.ToolName,
+			Status:         t.Status,
+			InputSummary:   t.InputSummary,
+			EffectiveInput: t.EffectiveInput,
+			OutputSummary:  t.OutputSummary,
+			ErrorMessage:   t.ErrorMessage,
+			ReferenceCount: t.ReferenceCount,
+			Topic:          t.Topic,
+			DurationMs:     t.DurationMs,
+		}
+	}
+	return result
+}
+
+func ToChatModelUsageTraces(src []*cvo.ChatModelUsageTrace) []*chat.ChatModelUsageTrace {
+	if src == nil {
+		return nil
+	}
+	result := make([]*chat.ChatModelUsageTrace, len(src))
+	for i, t := range src {
+		if t == nil {
+			result[i] = nil
+			continue
+		}
+		result[i] = &chat.ChatModelUsageTrace{
+			StageName:        t.StageName,
+			Provider:         t.Provider,
+			Model:            t.Model,
+			PromptTokens:     t.PromptTokens,
+			CompletionTokens: t.CompletionTokens,
+			TotalTokens:      t.TotalTokens,
+			EstimatedCost:    t.EstimatedCost,
+			DurationMs:       t.DurationMs,
+			Status:           t.Status,
+		}
+	}
+	return result
+}
+
+func ToChatLimitStats(src *cvo.ChatLimitStats) *chat.ChatLimitStats {
+	if src == nil {
+		return nil
+	}
+	return &chat.ChatLimitStats{
+		ModelCallsUsed:        src.ModelCallsUsed,
+		ModelCallsRunLimit:    src.ModelCallsRunLimit,
+		ModelCallsThreadLimit: src.ModelCallsThreadLimit,
+		ToolCallsUsed:         src.ToolCallsUsed,
+		ToolCallsRunLimit:     src.ToolCallsRunLimit,
+		ToolCallsThreadLimit:  src.ToolCallsThreadLimit,
+		LimitTriggered:        src.LimitTriggered,
+		LimitReason:           src.LimitReason,
 	}
 }
 
