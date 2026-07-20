@@ -53,8 +53,8 @@ func DocumentConverter(vector *milvus2.VectorConfig, _ *milvus2.SparseVectorConf
 			sectionPaths = append(sectionPaths, doc.MetaData[vo.MetaSectionPath].(string))
 			structureNodeIds = append(structureNodeIds, doc.MetaData[vo.MetaStructureNodeID].(int64))
 			structureNodeTypes = append(structureNodeTypes, doc.MetaData[vo.MetaStructureNodeType].(int32))
-			canonicalPaths = append(canonicalPaths, doc.MetaData["canonicalPath"].(string))
-			itemIndices = append(itemIndices, doc.MetaData["itemIndex"].(int32))
+			canonicalPaths = append(canonicalPaths, doc.MetaData[vo.MetaCanonicalPath].(string))
+			itemIndices = append(itemIndices, doc.MetaData[vo.MetaItemIndex].(int32))
 			charCounts = append(charCounts, doc.MetaData["charCount"].(int32))
 			tokenCounts = append(tokenCounts, doc.MetaData["tokenCount"].(int32))
 			embeddingModels = append(embeddingModels, doc.MetaData["embeddingModel"].(string))
@@ -69,10 +69,10 @@ func DocumentConverter(vector *milvus2.VectorConfig, _ *milvus2.SparseVectorConf
 				sourceVec = doc.DenseVector()
 			}
 
-			// Dense indexer is required when vectorField is set (dense-only or hybrid mode).
+			// Dense vector is required when vectorField is set (dense-only or hybrid mode).
 			if denseVectorField != "" {
 				if len(sourceVec) == 0 {
-					return nil, fmt.Errorf("indexer data missing for document %d (id: %s)", idx, doc.ID)
+					return nil, fmt.Errorf("vector data missing for document %d (id: %s)", idx, doc.ID)
 				}
 				vec := make([]float32, len(sourceVec))
 				for i, v := range sourceVec {

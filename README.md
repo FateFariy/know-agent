@@ -15,6 +15,7 @@
 ## 目录
 
 - [项目概述](#项目概述)
+- [项目亮点](#项目亮点)
 - [核心功能](#核心功能)
 - [技术架构](#技术架构)
 - [项目结构](#项目结构)
@@ -22,7 +23,6 @@
 - [核心流程与执行模式](#核心流程与执行模式)
 - [数据库与基础设施](#数据库与基础设施)
 - [可观测与追踪](#可观测与追踪)
-- [项目亮点](#项目亮点)
 
 ---
 
@@ -43,22 +43,37 @@
 
 ---
 
+## 项目亮点
+
+1. **DDD + Wire 的清晰架构**：领域 / 基础设施 / 触发器严格分层，Provider 按域聚合，二次开发不污染核心。
+2. **多策略分块自适应**：`Recursive / Semantic / Structure / LLM` 四种分块可按文档特征自动推荐，并支持人工微调。
+3. **可执行多种 Executor**：`GraphOnly / GraphThenEvidence / Clarification / ReActAgent` 覆盖从纯结构查询到复杂推理的全谱场景。
+4. **混合检索 + RRF + Rerank**：向量召回 + 关键词召回统一打分，支持重排，可配置多种阈值（最低相似度、关键词相对分下限等）。
+5. **结构化长期记忆**：`SummaryPayload` 含目标/事实/偏好/已解决/待办/检索提示六类，长会话仍能保持低成本高质量。
+6. **完整可观测**：每一轮对话产出 `DebugTrace` + `StageTrace` + `ChannelExecution` + `RetrievalResult`，可逐阶段回放。
+7. **异步流水线**：RocketMQ 解析/索引解耦，主链路响应毫秒级，错误可重试。
+8. **可插拔基础设施**：Milvus / MinIO / MQ / LLM 全部在 `internal/infrastructure/port/` 内替换实现，迁移成本低。
+9. **火山方舟深度集成**：Chat / Embedding / Rerank 同厂商，鉴权与限流策略一致。
+10. **多模式路由**：`document / open_chat / auto_document` 三种模式，覆盖"严格基于文档 / 自由对话 / 自动判断"。
+
+---
+
 ## 核心功能
 
-### 1. 文档管理（`/api/document`）
+### 1. 文档管理
 - 文档上传、解析、查询、删除
 - 结构化骨架识别（章/节/小节/列表/表格/代码块/引用/附录）
 - 文档画像（`DocumentProfile`）自动生成
 - 异步分块策略推荐（人工可调整）
 - 向量索引构建
 
-### 2. 知识管理（`/api/knowledge`）
+### 2. 知识管理
 - 知识范围（Scope）树形管理
 - 知识主题（Topic）与文档的多对多关联
 - 文档画像与主题路由
 - 路由追踪（`KnowledgeRouteTrace`）
 
-### 3. 智能问答（`/api/chat`）
+### 3. 智能问答
 - 流式聊天（SSE）
 - 多模式：`document` / `open_chat` / `auto_document`
 - 查询改写（Query Rewrite + Sub-Question）
@@ -95,16 +110,16 @@
 
 ```
                 ┌────────────────────────────────────────┐
-                │            HTTP / SSE Client          │
+                │            HTTP / SSE Client           │
                 └──────────────────┬─────────────────────┘
                                    │
                 ┌──────────────────▼─────────────────────┐
-                │   go-zero REST API Layer (api/*)      │
-                │  - chat    - document    - knowledge  │
+                │   go-zero REST API Layer (api/*)       │
+                │  - chat    - document    - knowledge   │
                 └──────────────────┬─────────────────────┘
                                    │
                 ┌──────────────────▼─────────────────────┐
-                │  Trigger Handler（HTTP/MQ 入口）         │
+                │  Trigger Handler（HTTP/MQ 入口）        │
                 │  - chat_service   - document_service   │
                 │  - knowledge_service                   │
                 └──────────────────┬─────────────────────┘
@@ -113,10 +128,10 @@
                 │       Domain Logic (DDD)               │
                 │  ┌────────────┬────────────┬──────────┐│
                 │  │  Chat      │ Document   │ Knowledge││
-                │  │  • 改写     │ • 解析     │ • 路由   ││
-                │  │  • 检索     │ • 分块     │ • 主题   ││
-                │  │  • 记忆     │ • 索引     │ • 画像   ││
-                │  │  • 生成     │ • 策略     │          ││
+                │  │  • 改写     │ • 解析     │ • 路由    ││
+                │  │  • 检索     │ • 分块     │ • 主题    ││
+                │  │  • 记忆     │ • 索引     │ • 画像    ││
+                │  │  • 生成     │ • 策略     │           ││
                 │  └────────────┴────────────┴──────────┘│
                 └──────────────────┬─────────────────────┘
                                    │
@@ -186,7 +201,7 @@ know-agent/
 │   ├── infrastructure/            #   - 基础设施适配
 │   │   ├── model/                 #     - ORM 模型
 │   │   ├── persistence/           #     - MySQL 仓储
-│   │   └── port/                  #     - 外部端口（Milvus/MinIO/MQ/LLM）
+│   │   └── port/                  #     - 外部端口（Milvus/MinIO/MQ）
 │   ├── server/                    #   - HTTP 服务
 │   ├── svc/                       #   - 服务上下文
 │   └── trigger/                   #   - 触发器（消费者）
@@ -258,7 +273,6 @@ know-agent/
 ### 异步处理
 - `trigger/consumer/parse_document.go`：消费解析任务 → 抽取结构 → 写 MinIO → 落库
 - `trigger/consumer/build_index.go`：消费索引任务 → 选分块策略 → Embedding → 写 Milvus
-
 ---
 
 ## 数据库与基础设施
@@ -284,7 +298,6 @@ know-agent/
 - `agent-document/`
   - `rag/document/`：原始文档
   - `rag/parsed-text/`：解析后纯文本
-
 ---
 
 ## 可观测与追踪
@@ -304,20 +317,5 @@ know-agent/
   - 每条召回的原始分、RRF 分、Rerank 分、门控、选中原因
 
 可通过 `/chat/exchange/detail` 一键拉取单轮全部调试信息，便于排查"为什么答非所问"。
-
----
-
-## 项目亮点
-
-1. **DDD + Wire 的清晰架构**：领域 / 基础设施 / 触发器严格分层，Provider 按域聚合，二次开发不污染核心。
-2. **多策略分块自适应**：`Recursive / Semantic / Structure / LLM` 四种分块可按文档特征自动推荐，并支持人工微调。
-3. **可执行多种 Executor**：`GraphOnly / GraphThenEvidence / Clarification / ReActAgent` 覆盖从纯结构查询到复杂推理的全谱场景。
-4. **混合检索 + RRF + Rerank**：向量召回 + 关键词召回统一打分，支持重排，可配置多种阈值（最低相似度、关键词相对分下限等）。
-5. **结构化长期记忆**：`SummaryPayload` 含目标/事实/偏好/已解决/待办/检索提示六类，长会话仍能保持低成本高质量。
-6. **完整可观测**：每一轮对话产出 `DebugTrace` + `StageTrace` + `ChannelExecution` + `RetrievalResult`，可逐阶段回放。
-7. **异步流水线**：RocketMQ 解析/索引解耦，主链路响应毫秒级，错误可重试。
-8. **可插拔基础设施**：Milvus / MinIO / MQ / LLM 全部在 `internal/infrastructure/port/` 内替换实现，迁移成本低。
-9. **火山方舟深度集成**：Chat / Embedding / Rerank 同厂商，鉴权与限流策略一致。
-10. **多模式路由**：`document / open_chat / auto_document` 三种模式，覆盖"严格基于文档 / 自由对话 / 自动判断"。
 
 ---

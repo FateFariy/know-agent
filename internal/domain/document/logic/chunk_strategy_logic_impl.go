@@ -269,6 +269,8 @@ func (s *ChunkStrategyLogicImpl) BuildParentBlocks(ctx context.Context, document
 				Text:              trim,
 				SourceType:        parentSeed.SourceType,
 				ChildChunks:       finalChildren,
+				CanonicalPath:     parentSeed.CanonicalPath,
+				ItemIndex:         parentSeed.ItemIndex,
 			}
 
 			parentBlockList = append(parentBlockList, parentBlock)

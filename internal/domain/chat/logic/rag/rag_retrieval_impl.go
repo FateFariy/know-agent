@@ -133,20 +133,20 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 				return
 			}
 
-			rerankedCandidates := e.applyRerank(ctx, ragCtx, parentSearchDocs, subQuestion)
+			rerankedDocs := e.applyRerank(ctx, ragCtx, parentSearchDocs, subQuestion)
 
-			finalTopK := min(e.finalTopK, len(rerankedCandidates))
-			finalDocuments := rerankedCandidates[:finalTopK]
+			finalTopK := min(e.finalTopK, len(rerankedDocs))
+			finalDocs := rerankedDocs[:finalTopK]
 
 			ragCtx.AddRetrievalNotef("子问题%d检索完成：%s，final=%d",
-				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocuments))
+				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocs))
 
 			// 记录观测数据
 			if trace != nil {
 				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, start, rawChannelResults, filteredResults, channelTraces); err != nil {
 					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
-				if err = e.recordRetrievalResultObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, finalDocuments); err != nil {
+				if err = e.recordRetrievalResultObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, fusedDocs, rerankedDocs, finalDocs); err != nil {
 					Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 			}
@@ -154,11 +154,11 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			resultChan <- &vo.SubQuestionEvidence{
 				SubQuestionIndex:       subQuestionIndex,
 				SubQuestion:            subQuestion,
-				Documents:              finalDocuments,
+				Documents:              finalDocs,
 				ChannelTraces:          channelTraces,
 				FusedCandidateCount:    len(fusedDocs),
 				ParentCandidateCount:   len(parentSearchDocs),
-				RerankedCandidateCount: len(rerankedCandidates),
+				RerankedCandidateCount: len(rerankedDocs),
 			}
 		}(i+1, sq)
 	}
@@ -205,7 +205,7 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 	for _, ch := range channels {
 		go func(ch RetrievalChannel) {
 			// 组装文档检索对象（传入子问题、执行计划、opK）
-			topK := utils.Ternary(ch.ChannelName() == "indexer", e.vectorTopK, e.candidateTopK)
+			topK := utils.Ternary(ch.ChannelName() == "vector", e.vectorTopK, e.candidateTopK)
 			documentRetrieve := vo.NewDocumentRetrieve(subQuestion, plan, topK)
 			// 调用 retrieveChannel（实际执行：加载文档元数据 → 调用通道检索 → 回填知识库信息）
 			result, err := e.retrieveChannel(timeoutCtx, ch, documentRetrieve)
@@ -424,7 +424,6 @@ func (e *RetrievalImpl) fuseByRRF(channelResults []*vo.RetrievalChannelResult) [
 		Limit(e.candidateTopK).
 		ForEach(func(holder *candidateHolder) {
 			// 填充文档元数据（分数、通道来源）
-			holder.document.Score = holder.score
 			holder.document.RRFScore = holder.score
 			holder.document.Channel = utils.Ternary(len(holder.channels) > 1, vo.RetrievalChannelHybrid, maputil.Keys(holder.channels)[0])
 			result = append(result, holder.document)
@@ -614,7 +613,7 @@ func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo
 // 执行流程：
 //  1. 空结果快速返回
 //  2. 构建最终文档 ID → FinalRank 的映射（保留原始传入顺序，从 1 起编号）
-//  3. 按 RRFScore 降序排序 finalDocuments，再构建 RrfRank 映射（RRF 融合后的排名）
+//  3. 按 RRFScore 降序排序 fusedDocs，再构建 RrfRank 映射（RRF 融合后的排名）
 //  4. 构建"通过闸门"的文档 ID 集合（以渠道名分组）
 //  5. 遍历所有渠道的所有原始文档：
 //     - 填充会话/子问题/渠道/排名等基础信息
@@ -622,24 +621,26 @@ func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo
 //     - 判定是否被最终选中；未选中则按渠道类型格式化原因
 //  6. 调用 repo 批量写入数据库
 func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, trace *vo.ConversationTrace, subQuestionIndex int, subQuestion string,
-	rawResults, filteredResults []*vo.RetrievalChannelResult, finalDocuments []*vo.DocumentChunk) error {
+	rawResults, filteredResults []*vo.RetrievalChannelResult, fusedDocs, rerankedDocs, finalDocs []*vo.DocumentChunk) error {
 	if len(rawResults) == 0 {
 		return nil
 	}
 
-	// 基于传入的 finalDocuments 顺序构建 FinalRank 映射（保留调用方的选择顺序，从 1 起编号）
-	finalRankMap := make(map[string]int)
-	for i, doc := range finalDocuments {
-		finalRankMap[doc.ID] = i + 1
+	// 基于传入的 finalDocs 顺序构建 FinalRank 映射（保留调用方的选择顺序，从 1 起编号）
+	finalRankMap := make(map[int64]int)
+	for i, doc := range finalDocs {
+		finalRankMap[doc.ParentBlockId] = i + 1
 	}
 
-	// 按 RRFScore 降序排序 finalDocuments，再构建 RrfRank 映射（RRF 融合后的排名）
-	sort.Slice(finalDocuments, func(i, j int) bool {
-		return finalDocuments[i].RRFScore > finalDocuments[j].RRFScore
+	// 按 RRFScore 降序排序 fusedDocs，再构建 RrfRank 映射（RRF 融合后的排名）
+	sort.Slice(fusedDocs, func(i, j int) bool {
+		return fusedDocs[i].RRFScore > fusedDocs[j].RRFScore
 	})
-	rrkRankMap := make(map[string]int)
-	for i, doc := range finalDocuments {
-		rrkRankMap[doc.ID] = i + 1
+	rrfRankMap := make(map[string]int)
+	rrdScoreMap := make(map[string]float64)
+	for i, doc := range fusedDocs {
+		rrfRankMap[doc.ID] = i + 1
+		rrdScoreMap[doc.ID] = doc.RRFScore
 	}
 
 	// 构建"通过闸门"的文档 ID 集合（按渠道名分组）—— filteredResults 即通过闸门的结果集
@@ -666,7 +667,8 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 				SubQuestion:      subQuestion,
 				ChannelType:      channelName,
 				ChannelRank:      i + 1,
-				RrfRank:          rrkRankMap[doc.ID],
+				RrfRank:          rrfRankMap[doc.ID],
+				RrfScore:         rrdScoreMap[doc.ID],
 				GatePassed:       gatePassedSet[channelName][doc.ID],
 			}
 
@@ -674,12 +676,7 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 			view.SetDocumentInfo(doc)
 
 			// 判定是否被选入最终 Prompt；否则写入原因
-			if rank, ok := finalRankMap[doc.ID]; ok {
-				// 已选入最终 Prompt：设置 IsSelected=1 与 FinalRank
-				view.IsSelected = 1
-				view.FinalRank = rank
-				view.SelectionReason = "已选入最终 Prompt"
-			} else if view.GatePassed == 0 {
+			if view.GatePassed == 0 {
 				// 未通过闸门：按渠道类型格式化原因
 				if vo.RetrievalChannelVector == channelName {
 					view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
@@ -690,6 +687,11 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 				} else {
 					view.SelectionReason = fmt.Sprintf("闸门过滤：分数 %.4f", view.OriginalScore)
 				}
+			} else if rank, ok := finalRankMap[doc.ParentBlockId]; ok {
+				// 已选入最终 Prompt：设置 IsSelected=1 与 FinalRank
+				view.IsSelected = 1
+				view.FinalRank = rank
+				view.SelectionReason = "已选入最终 Prompt"
 			} else {
 				// 通过了闸门但因超出 finalTopK 限制而未被选中
 				view.SelectionReason = fmt.Sprintf("超出 finalTopK 限制（topK=%d）", e.finalTopK)

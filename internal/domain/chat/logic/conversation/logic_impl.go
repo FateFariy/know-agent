@@ -95,7 +95,7 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
-				c.unlockConversationLock(ctx, leaseKey)
+				c.unlockConversationLock(leaseKey)
 				logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
 					cmd.ConversationId, cmd.Question, err)
 				stream = c.rejectStream(err.Error(), cmd.ConversationId, 0)
@@ -535,7 +535,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	defer func() {
 		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(ctx, convCtx)
+		c.cleanup(convCtx)
 	}()
 
 	// todo 中断 ReactAgent
@@ -603,7 +603,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	defer func() {
 		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(ctx, convCtx)
+		c.cleanup(convCtx)
 	}()
 
 	// 从 convCtx 中取出当前答案与去重后的引用列表（供后续发送事件与落库使用）
@@ -690,7 +690,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	defer func() {
 		_ = recover()
 		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(ctx, convCtx)
+		c.cleanup(convCtx)
 	}()
 
 	// 启动 finalize 追踪阶段（失败时忽略 tracer 错误，不影响主流程）
@@ -782,7 +782,10 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 			return err
 		}
 		// 将对应会话的状态重置为 Idle（释放"运行中"标记）
-		dialogue := &entity.ChatDialogue{SessionStatus: vo.ChatSessionStatusIdle}
+		dialogue := &entity.ChatDialogue{
+			ConversationId: exchange.ConversationId,
+			SessionStatus:  vo.ChatSessionStatusIdle,
+		}
 		return c.repo.UpdateDialogueByConversationId(txCtx, dialogue)
 	}
 	if err := c.repo.Do(ctx, completeFn); err != nil {
@@ -794,15 +797,17 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 }
 
 // cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
-func (c *LogicImpl) cleanup(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *LogicImpl) cleanup(convCtx *vo.ConversationContext) {
 	support.SafeEmitComplete(convCtx.Channel)
-	c.unlockConversationLock(ctx, convCtx.LeaseKey)
+	c.unlockConversationLock(convCtx.LeaseKey)
 	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
 	convCtx.ReleaseResources()
 }
 
 // unlockConversationLock 释放会话运行锁
-func (c *LogicImpl) unlockConversationLock(ctx context.Context, leaseKey string) {
+func (c *LogicImpl) unlockConversationLock(leaseKey string) {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelFunc()
 	err := c.distributedLock.Unlock(ctx, leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
