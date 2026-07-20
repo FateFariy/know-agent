@@ -258,6 +258,28 @@ function isStreamEvent(value: unknown): value is StreamEvent {
   return typeof v.type === 'string' && STREAM_EVENT_TYPES.has(v.type as StreamEventType)
 }
 
+const CHANNEL_LOCALIZATION: Record<string, string> = {
+  keyword: '关键词检索',
+  vector: '向量检索',
+  rerank: '重排精排',
+  hybrid: '融合结果',
+  'web-search': '网页搜索'
+}
+
+const SOURCE_TYPE_LOCALIZATION: Record<string, string> = {
+  document: '文档',
+  web: '网页',
+  knowledge: '知识库'
+}
+
+function localizeReference(item: SearchReference): SearchReference {
+  return {
+    ...item,
+    channel: CHANNEL_LOCALIZATION[item.channel] || item.channel,
+    sourceType: SOURCE_TYPE_LOCALIZATION[item.sourceType] || item.sourceType
+  }
+}
+
 /** 把单个标准 StreamEvent 派发到对应 handler。模块作用域私有工具。 */
 function dispatchStreamEvent(event: StreamEvent, handlers: StreamHandlers): void {
   switch (event.type) {
@@ -275,7 +297,7 @@ function dispatchStreamEvent(event: StreamEvent, handlers: StreamHandlers): void
       break
     case 'reference':
       handlers.onReference?.({
-        items: readArray<SearchReference>(event.content),
+        items: readArray<SearchReference>(event.content).map(localizeReference),
         count: event.count
       })
       break

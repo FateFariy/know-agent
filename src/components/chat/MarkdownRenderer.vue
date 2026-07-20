@@ -5,7 +5,7 @@
  * - 多行 code 走带语言标签的代码块 + 复制按钮。
  * 复刻 React MarkdownRenderer 的视觉与交互。
  */
-import {computed, nextTick, ref, watch} from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
@@ -17,7 +17,7 @@ import sql from 'highlight.js/lib/languages/sql'
 import typescript from 'highlight.js/lib/languages/typescript'
 import xml from 'highlight.js/lib/languages/xml'
 import yaml from 'highlight.js/lib/languages/yaml'
-import {ElMessage} from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 // markdown-it 子模块类型不能从默认导出直接拿，这里从实例上推导。
 type MdToken = ReturnType<MarkdownIt['parse']>[number]
@@ -27,6 +27,10 @@ type MdRenderRule = (tokens: MdToken[], idx: number, options: MdOptions, env: un
 
 const props = defineProps<{
   content: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'reference-click', index: number): void
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -43,7 +47,7 @@ hljs.registerLanguage('xml', xml)
 hljs.registerLanguage('yaml', yaml)
 
 const md: MarkdownIt = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   breaks: true,
   highlight: (str: string, lang: string) => {
@@ -78,12 +82,16 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
 
 const renderedHtml = computed(() => {
   if (!props.content) return ''
-  // 替换 ```lang 代码块占位：markdown-it 内部已经处理。这里只确保安全。
-  return md.render(props.content)
+  const html = md.render(props.content)
+  return html.replace(/\[(\d+)\](?!\()/g, '<span class="md-reference-btn" data-index="$1">$&</span>')
 })
 
+function handleReferenceClick(index: number) {
+  emit('reference-click', index)
+}
+
 function handleImageError(idx: number) {
-  imageErrors.value = {...imageErrors.value, [idx]: true}
+  imageErrors.value = { ...imageErrors.value, [idx]: true }
 }
 
 async function highlightAll() {
@@ -111,7 +119,7 @@ watch(
   () => {
     highlightAll()
   },
-  {immediate: false}
+  { immediate: false }
 )
 
 // 自定义代码块渲染：增加复制按钮与语言标签。
@@ -147,8 +155,24 @@ async function enrichCodeBlocks() {
     block.parentNode?.insertBefore(wrapper, block)
     wrapper.appendChild(header)
     wrapper.appendChild(block)
-    ;(block as HTMLElement).dataset.enriched = '1'
+      ; (block as HTMLElement).dataset.enriched = '1'
   })
+}
+
+function handleContainerClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  const btn = target.closest('.md-reference-btn') as HTMLElement | null
+  if (btn) {
+    const index = parseInt(btn.dataset.index || '0', 10)
+    handleReferenceClick(index)
+  } else {
+    const textContent = target.textContent || ''
+    const match = textContent.match(/\[(\d+)\]/)
+    if (match) {
+      const index = parseInt(match[1] || '0', 10)
+      handleReferenceClick(index)
+    }
+  }
 }
 
 watch(
@@ -156,14 +180,14 @@ watch(
   () => {
     enrichCodeBlocks()
   },
-  {immediate: true}
+  { immediate: true }
 )
 </script>
 
 <template>
-  <div ref="containerRef" class="markdown-body">
+  <div ref="containerRef" class="markdown-body" @click="handleContainerClick">
     <!-- eslint-disable-next-line vue/no-v-html -->
-    <div v-html="renderedHtml"/>
+    <div v-html="renderedHtml" />
     <!-- 图片兜底：markdown-it 解析出的 <img> 节点附加错误处理。这里仅提供一段提示文本提示。 -->
     <span class="markdown-body__hidden">{{ imageErrors }}</span>
   </div>
@@ -333,6 +357,34 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.markdown-body :deep(.md-reference-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.markdown-body :deep(.md-reference-btn:hover) {
+  background: #bae6fd;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 2px rgba(3, 105, 161, 0.2);
+}
+
+.markdown-body :deep(.md-reference-btn:active) {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .markdown-body__hidden {

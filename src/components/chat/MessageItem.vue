@@ -7,12 +7,14 @@
  *             text 阶段切到 MarkdownRenderer；
  *             未到任何事件时显示 ai-wait dots 占位。
  */
-import {computed, ref} from 'vue'
-import {ArrowDown, Document, Loading, Promotion} from '@element-plus/icons-vue'
+import { computed, ref } from 'vue'
+import { ArrowDown, Document, Loading, Promotion } from '@element-plus/icons-vue'
+import { ElDrawer } from 'element-plus'
 import FeedbackButtons from './FeedbackButtons.vue'
 import MarkdownRenderer from './MarkdownRenderer.vue'
-import {useChatStore} from '@/stores/chat'
-import type {ChatMessage} from '@/stores/chat'
+import { useChatStore } from '@/stores/chat'
+import type { ChatMessage } from '@/stores/chat'
+import type { SearchReference } from '@/types'
 
 const props = defineProps<{
   message: ChatMessage
@@ -21,6 +23,8 @@ const props = defineProps<{
 
 const store = useChatStore()
 const thinkingExpanded = ref(false)
+const drawerVisible = ref(false)
+const selectedReference = ref<SearchReference | null>(null)
 const isUser = computed(() => props.message.role === 'user')
 const isThinking = computed(() => Boolean(props.message.isThinking))
 const isStreaming = computed(() => props.message.status === 'streaming')
@@ -45,6 +49,19 @@ function handleRecommend(question: string) {
   if (store.isStreaming) return
   store.sendMessage(question)
 }
+
+function handleReferenceClick(index: number) {
+  const refItem = props.message.references?.[index - 1]
+  if (refItem) {
+    selectedReference.value = refItem
+    drawerVisible.value = true
+  }
+}
+
+function closeDrawer() {
+  drawerVisible.value = false
+  selectedReference.value = null
+}
 </script>
 
 <template>
@@ -58,29 +75,27 @@ function handleRecommend(question: string) {
     <div class="assistant-stack">
       <!-- 折叠面板：仅在 streaming 结束后展示，作为历史查看入口 -->
       <div v-if="!isThinking && hasThinking" class="thinking-panel">
-        <button
-          :aria-expanded="thinkingExpanded"
-          class="thinking-panel__header"
-          type="button"
-          @click="thinkingExpanded = !thinkingExpanded"
-        >
+        <button :aria-expanded="thinkingExpanded" class="thinking-panel__header" type="button"
+          @click="thinkingExpanded = !thinkingExpanded">
           <span class="thinking-panel__icon">
             <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                 stroke-width="2" viewBox="0 0 24 24" width="16"><path
-              d="M9 6a3 3 0 0 1 3-3v0a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3"/><path
-              d="M9 18a3 3 0 0 0 3 3v0a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3"/><path d="M3 12h3"/><path
-              d="M18 12h3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/><path
-              d="M5.6 18.4l2.1-2.1"/><path d="M16.3 7.7l2.1-2.1"/></svg>
+              stroke-width="2" viewBox="0 0 24 24" width="16">
+              <path d="M9 6a3 3 0 0 1 3-3v0a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3" />
+              <path d="M9 18a3 3 0 0 0 3 3v0a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3" />
+              <path d="M3 12h3" />
+              <path d="M18 12h3" />
+              <path d="M5.6 5.6l2.1 2.1" />
+              <path d="M16.3 16.3l2.1 2.1" />
+              <path d="M5.6 18.4l2.1-2.1" />
+              <path d="M16.3 7.7l2.1-2.1" />
+            </svg>
           </span>
           <span class="thinking-panel__title">深度思考</span>
           <span v-if="thinkingDuration" class="thinking-panel__duration">{{
-              thinkingDuration
-            }}</span>
-          <el-icon
-            :class="{ 'thinking-panel__caret--open': thinkingExpanded }"
-            class="thinking-panel__caret"
-          >
-            <ArrowDown/>
+            thinkingDuration
+          }}</span>
+          <el-icon :class="{ 'thinking-panel__caret--open': thinkingExpanded }" class="thinking-panel__caret">
+            <ArrowDown />
           </el-icon>
         </button>
         <div v-if="thinkingExpanded" class="thinking-panel__body">
@@ -92,47 +107,43 @@ function handleRecommend(question: string) {
         <!-- 思考中：流式 thinking 预览（实时显示 message.thinking + 闪烁光标） -->
         <div v-if="isThinking" class="stream-preview stream-preview--thinking">
           <div class="stream-preview__header">
-            <el-icon class="stream-preview__spinner"><Loading/></el-icon>
+            <el-icon class="stream-preview__spinner">
+              <Loading />
+            </el-icon>
             <span class="stream-preview__label">正在思考…</span>
             <span v-if="thinkingDuration" class="stream-preview__duration">{{ thinkingDuration }}</span>
           </div>
           <p class="stream-preview__content">
-            {{ message.thinking || '' }}<span class="stream-preview__cursor"/>
+            {{ message.thinking || '' }}<span class="stream-preview__cursor" />
           </p>
         </div>
 
         <!-- 等待首个事件：dots 占位 -->
         <div v-else-if="isWaiting" aria-label="思考中" class="ai-wait">
-          <span class="ai-wait__dot"/>
-          <span class="ai-wait__dot"/>
-          <span class="ai-wait__dot"/>
+          <span class="ai-wait__dot" />
+          <span class="ai-wait__dot" />
+          <span class="ai-wait__dot" />
         </div>
 
         <!-- 正式回答：Markdown 流式 -->
-        <MarkdownRenderer v-else-if="hasContent" :content="message.content"/>
+        <MarkdownRenderer v-else-if="hasContent" :content="message.content" @reference-click="handleReferenceClick" />
         <p v-if="isError" class="message-notice message-notice--error">生成已中断。</p>
         <p v-else-if="isCancelled" class="message-notice message-notice--cancelled">（已停止生成）</p>
 
         <!-- 引用来源 -->
         <div v-if="hasReferences" class="references">
           <div class="references__header">
-            <el-icon class="references__icon"><Document /></el-icon>
+            <el-icon class="references__icon">
+              <Document />
+            </el-icon>
             <span>参考来源（{{ message.references!.length }}）</span>
           </div>
           <ul class="references__list">
-            <li
-              v-for="(ref, idx) in message.references"
-              :key="(ref.documentId ?? ref.url ?? ref.title ?? '') + '-' + idx"
-              class="references__item"
-            >
+            <li v-for="(ref, idx) in message.references"
+              :key="(ref.documentId ?? ref.url ?? ref.title ?? '') + '-' + idx" class="references__item">
               <span class="references__index">[{{ idx + 1 }}]</span>
-              <a
-                v-if="ref.url"
-                :href="ref.url"
-                class="references__title"
-                rel="noopener"
-                target="_blank"
-              >{{ ref.title || ref.documentName || ref.url }}</a>
+              <a v-if="ref.url" :href="ref.url" class="references__title" rel="noopener" target="_blank">{{ ref.title ||
+                ref.documentName || ref.url }}</a>
               <span v-else class="references__title">{{ ref.title || ref.documentName || '参考文档' }}</span>
               <span v-if="ref.score != null" class="references__score">相似度 {{ (ref.score * 100).toFixed(0) }}%</span>
             </li>
@@ -142,30 +153,57 @@ function handleRecommend(question: string) {
         <!-- 推荐问题（按钮列表，点击直接发送） -->
         <div v-if="hasRecommendations" class="recommend">
           <div class="recommend__header">
-            <el-icon class="recommend__icon"><Promotion /></el-icon>
+            <el-icon class="recommend__icon">
+              <Promotion />
+            </el-icon>
             <span>推荐问题</span>
           </div>
           <div class="recommend__list">
-            <button
-              v-for="(q, idx) in message.recommendations"
-              :key="idx"
-              class="recommend__btn"
-              type="button"
-              @click="handleRecommend(q)"
-            >{{ q }}</button>
+            <button v-for="(q, idx) in message.recommendations" :key="idx" class="recommend__btn" type="button"
+              @click="handleRecommend(q)">{{ q }}</button>
           </div>
         </div>
 
-        <FeedbackButtons
-          v-if="showFeedback"
-          :always-visible="Boolean(isLast)"
-          :content="message.content"
-          :feedback="message.feedback ?? null"
-          :message-id="message.id"
-        />
+        <FeedbackButtons v-if="showFeedback" :always-visible="Boolean(isLast)" :content="message.content"
+          :feedback="message.feedback ?? null" :message-id="message.id" />
       </div>
     </div>
   </div>
+
+  <ElDrawer v-model="drawerVisible" title="引用详情" direction="rtl" size="480px" :before-close="closeDrawer"
+    class="reference-drawer">
+    <div v-if="selectedReference" class="reference-detail">
+      <div class="reference-detail__header">
+        <h3 class="reference-detail__title">{{ selectedReference.title || selectedReference.documentName || '参考文档' }}
+        </h3>
+        <span v-if="selectedReference.score != null" class="reference-detail__score">相似度 {{ (selectedReference.score *
+          100).toFixed(0) }}%</span>
+      </div>
+      <div v-if="selectedReference.sectionPath" class="reference-detail__section">
+        <span class="reference-detail__label">章节路径</span>
+        <span class="reference-detail__value">{{ selectedReference.sectionPath }}</span>
+      </div>
+      <div v-if="selectedReference.documentName" class="reference-detail__section">
+        <span class="reference-detail__label">文档名称</span>
+        <span class="reference-detail__value">{{ selectedReference.documentName }}</span>
+      </div>
+      <div v-if="selectedReference.sourceType" class="reference-detail__section">
+        <span class="reference-detail__label">来源类型</span>
+        <span class="reference-detail__value">{{ selectedReference.sourceType }}</span>
+      </div>
+      <div v-if="selectedReference.channel" class="reference-detail__section">
+        <span class="reference-detail__label">检索通道</span>
+        <span class="reference-detail__value">{{ selectedReference.channel }}</span>
+      </div>
+      <div v-if="selectedReference.snippet" class="reference-detail__snippet">
+        <span class="reference-detail__label">引用片段</span>
+        <p class="reference-detail__text">{{ selectedReference.snippet }}</p>
+      </div>
+      <div v-if="selectedReference.url" class="reference-detail__link">
+        <a :href="selectedReference.url" target="_blank" rel="noopener">查看原文</a>
+      </div>
+    </div>
+  </ElDrawer>
 </template>
 
 <style scoped>
@@ -310,10 +348,14 @@ function handleRecommend(question: string) {
 }
 
 @keyframes wait-bounce {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0.6);
     opacity: 0.5;
   }
+
   40% {
     transform: scale(1);
     opacity: 1;
@@ -342,7 +384,9 @@ function handleRecommend(question: string) {
 }
 
 @keyframes stream-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stream-preview__label {
@@ -379,8 +423,15 @@ function handleRecommend(question: string) {
 }
 
 @keyframes stream-blink {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .message-notice {
@@ -509,5 +560,96 @@ a.references__title:hover {
   border-color: #3b82f6;
   color: #2563eb;
   background: #eff6ff;
+}
+
+.reference-detail {
+  padding: 8px 0;
+}
+
+.reference-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.reference-detail__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.4;
+  margin: 0;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.reference-detail__score {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f0fdf4;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.reference-detail__section {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.reference-detail__label {
+  width: 80px;
+  font-size: 13px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.reference-detail__value {
+  font-size: 14px;
+  color: #334155;
+  flex: 1;
+}
+
+.reference-detail__snippet {
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.reference-detail__snippet .reference-detail__label {
+  display: block;
+  margin-bottom: 8px;
+  width: auto;
+}
+
+.reference-detail__text {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reference-detail__link {
+  margin-top: 12px;
+}
+
+.reference-detail__link a {
+  display: inline-flex;
+  align-items: center;
+  color: #2563eb;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.reference-detail__link a:hover {
+  text-decoration: underline;
 }
 </style>

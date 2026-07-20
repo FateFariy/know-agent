@@ -75,7 +75,8 @@ function mapExchangeToMessages(exchange: ConversationExchange): ChatMessage[] {
     feedback: null,
     status: exchange.turnStatus === -1 ? 'error' : 'done',
     createdAt,
-    exchangeId: exchange.exchangeId
+    exchangeId: exchange.exchangeId,
+    references: exchange.references
   }
   return [userMessage, assistantMessage]
 }
