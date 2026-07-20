@@ -1263,7 +1263,7 @@ const strategySystemStages = computed<Array<{
 }>>(() => {
   const parseStatus = documentDetail.value?.parseStatus
   const parseFailed = parseStatus === 4
-  const parseReady = parseStatus === 3
+  const parseReady = parseStatus === 2
   const parentReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'parent').length)
   const childReady = Boolean(resolveStrategySteps(strategyPlan.value?.plan, 'child').length)
   const confirmed = hasConfirmedStrategy.value
@@ -1410,10 +1410,10 @@ const workflowCurrentPhase = computed<{
       description: documentDetail.value?.parseErrorMsg || '请先排查解析异常，再继续后续推荐与构建流程。'
     }
   }
-  if (documentDetail.value?.parseStatus !== 3) {
+  if (documentDetail.value?.parseStatus === 1) {
     return {
       tone: 'neutral',
-      shortLabel: '待解析',
+      shortLabel: '解析中',
       title: '等待文档解析',
       description: '文档刚进入处理流程，当前先等待解析完成并生成可用文本。'
     }
@@ -1473,7 +1473,7 @@ const workflowNextAction = computed<{ title: string, description: string }>(() =
       description: '建议先检查解析错误和最近任务日志，解决异常后再继续后续流程。'
     }
   }
-  if (documentDetail.value?.parseStatus !== 3) {
+  if (documentDetail.value?.parseStatus === 1) {
     return {
       title: '等待解析完成',
       description: '当前还不需要人工操作，解析完成后刷新页面查看策略推荐结果。'

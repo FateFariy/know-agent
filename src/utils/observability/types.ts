@@ -80,7 +80,7 @@ export interface StageInspectorTable {
 export interface StageInspector {
   title: string
   summary: string
-  stageState: number | string
+  stageState: number
   startTime: string
   endTime: string
   durationMs: number | undefined

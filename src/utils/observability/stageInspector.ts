@@ -399,7 +399,7 @@ export function buildUsageStageInspector(exchange: ConversationExchange | null):
   return {
     title: '模型使用与限制',
     summary: '这一轮里每一次模型调用都按阶段分组列在下面，便于排查到底哪个阶段最耗 token 和成本。',
-    stageState: limitStats?.limitTriggered ? 'WARNING' : 'COMPLETED',
+    stageState: limitStats?.limitTriggered ? 3 : 2,
     startTime: exchange.createTime,
     endTime: exchange.updateTime || '',
     durationMs: exchange.totalResponseTimeMs,

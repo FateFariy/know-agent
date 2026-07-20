@@ -358,7 +358,7 @@ function exchangeLinkLabel(session: ConversationSessionResp): string {
   if (session.running) {
     return '直达当前轮次'
   }
-  if (session.latestTurnStatus === 2 || session.latestTurnStatus === 3) {
+  if (session.latestTurnStatus === 3) {
     return '直达异常轮次'
   }
   return '直达最近轮次'
