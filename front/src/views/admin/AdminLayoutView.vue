@@ -1,0 +1,442 @@
+<template>
+  <section class="admin-shell">
+    <aside :class="{ 'admin-sidebar-open': sidebarOpen }" class="admin-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">KR</div>
+        <strong class="brand-name">KnowRag</strong>
+      </div>
+
+      <nav class="sidebar-nav">
+        <span class="nav-group-label">主要功能</span>
+        <RouterLink v-for="item in navItems" :key="item.to" :class="{ active: isNavItemActive(item.to) }" :to="item.to"
+                    class="nav-item" @click="sidebarOpen = false">
+          <component :is="item.icon" class="nav-icon"/>
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user-card">
+          <div class="sidebar-user-info">
+            <div class="sidebar-avatar">{{ username.slice(0, 1).toUpperCase() }}</div>
+            <div>
+              <strong>{{ username }}</strong>
+              <span class="user-role">管理员</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div v-if="sidebarOpen" class="sidebar-mask" @click="sidebarOpen = false"></div>
+
+    <div class="admin-main">
+      <header class="admin-header">
+        <div class="header-left">
+          <button class="menu-button mobile-only" type="button" @click="sidebarOpen = true">
+            <Bars3Icon class="nav-icon"/>
+          </button>
+          <h2 class="page-title">{{ pageTitle }}</h2>
+          <nav class="breadcrumb">
+            <RouterLink to="/admin/dashboard">首页</RouterLink>
+            <span class="breadcrumb-sep">/</span>
+            <span>{{ pageTitle }}</span>
+          </nav>
+        </div>
+
+        <div class="header-actions">
+          <RouterLink class="back-link" to="/chat">返回聊天</RouterLink>
+          <span class="header-divider"></span>
+          <div class="header-user">
+            <span>{{ username }}</span>
+            <div class="header-avatar">{{ username.slice(0, 1).toUpperCase() }}</div>
+          </div>
+        </div>
+      </header>
+
+      <main class="admin-content">
+        <RouterView/>
+      </main>
+    </div>
+  </section>
+</template>
+
+<script lang="ts" setup>
+import {computed, ref} from 'vue'
+import {RouterLink, RouterView, useRoute} from 'vue-router'
+import {
+  Bars3Icon,
+  ClipboardDocumentListIcon,
+  CommandLineIcon,
+  EyeIcon,
+  HomeModernIcon,
+  ShareIcon
+} from '@heroicons/vue/24/outline'
+
+const route = useRoute()
+const sidebarOpen = ref(false)
+
+const navItems = [
+  {to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon},
+  {to: '/admin/documents', label: '文档接入', icon: ClipboardDocumentListIcon},
+  {to: '/admin/knowledge-route', label: '知识路由', icon: ShareIcon},
+  {to: '/admin/knowledge-route/traces', label: '路由追踪', icon: EyeIcon},
+  {to: '/admin/observability', label: '对话观测', icon: CommandLineIcon}
+]
+
+const pageTitle = computed(() => route.meta?.title || '管理后台')
+const username = 'admin'
+
+function isNavItemActive(targetPath: string) {
+  if (!targetPath) {
+    return false
+  }
+  return route.path === targetPath
+}
+</script>
+
+<style scoped>
+/* ── 外壳：仅主内容参与布局，侧边栏 fixed 独立于文档流 ── */
+.admin-shell {
+  min-height: 100vh;
+  display: block;
+}
+
+/* ── Sidebar: 固定在视口左侧，不随主内容滚动 ── */
+.admin-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: #fff;
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 16px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.brand-name {
+  font-size: 15px;
+  color: var(--color-text-strong);
+}
+
+/* ── 导航 ── */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  flex: 1;
+}
+
+.nav-group-label {
+  font-size: 11px;
+  color: var(--color-muted);
+  padding: 12px 8px 6px;
+  font-weight: 500;
+}
+
+.nav-item {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted-strong);
+  font-size: 14px;
+  transition: background 0.15s ease, color 0.15s ease;
+  position: relative;
+}
+
+.nav-item:hover {
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+}
+
+.nav-item.active {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-weight: 500;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--color-primary);
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* ── Sidebar 底部用户 ── */
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.admin-icp {
+  margin-top: 10px;
+  --icp-footer-font-size: 11px;
+}
+
+.sidebar-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.sidebar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  flex: none;
+}
+
+.sidebar-user-info strong {
+  display: block;
+  font-size: 13px;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.user-role {
+  display: block;
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-top: 1px;
+}
+
+.logout-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  flex: none;
+}
+
+.logout-btn:hover {
+  color: var(--color-danger);
+  background: rgba(179, 76, 47, 0.08);
+}
+
+/* ── 主区域 ── */
+.admin-main {
+  margin-left: 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  height: 52px;
+  background: #fff;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.breadcrumb a {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--color-primary);
+}
+
+.breadcrumb-sep {
+  color: var(--color-border-strong);
+}
+
+.breadcrumb span:last-child {
+  color: var(--color-muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.back-link {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.header-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.header-avatar {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.admin-content {
+  padding: 20px 24px;
+}
+
+.menu-button {
+  border: 1px solid var(--color-border);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: #fff;
+}
+
+.mobile-only,
+.sidebar-mask {
+  display: none;
+}
+
+@media (max-width: 1040px) {
+  .admin-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-md);
+    width: 240px;
+  }
+
+  .admin-sidebar.admin-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 9;
+  }
+
+  .mobile-only {
+    display: inline-flex;
+  }
+
+  .admin-main {
+    margin-left: 0;
+  }
+
+  .page-title {
+    display: none;
+  }
+
+  .admin-content {
+    padding: 16px;
+  }
+}
+
+@media (min-width: 1041px) {
+  .breadcrumb {
+    display: none;
+  }
+}
+</style>
