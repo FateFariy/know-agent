@@ -36,9 +36,11 @@ export const STAGE_STATE_TONES: Record<number, string> = {
 }
 
 export const EXECUTION_MODE_LABELS: Record<ExecutionModeType, string> = {
-  RAG_CHAT: '文档检索问答',
-  REACT_AGENT: 'Agent 自主执行',
-  CLARIFICATION: '路由澄清'
+  graph_only: '结构图直答',
+  graph_then_evidence: '结构图定位后取证据',
+  retrieval: '检索问答',
+  react_agent: '开放式 ReAct Agent ',
+  clarification: '路由澄清',
 }
 
 export const RELATION_TYPE_LABELS: Record<RelationType, string> = {
