@@ -317,7 +317,7 @@ function openDocumentDetail(documentId: string): void {
 }
 
 function hasRunningDocumentTask(item: DocumentDetailResp): boolean {
-  return item?.latestTaskStatus === 1 || item?.latestTaskStatus === 2 || item?.parseStatus === 2 || item?.indexStatus === 2
+  return item?.latestTaskStatus === 1 || item?.latestTaskStatus === 2 || item?.parseStatus === 1 || item?.indexStatus === 2
 }
 
 function canDeleteDocument(item: DocumentDetailResp): boolean {

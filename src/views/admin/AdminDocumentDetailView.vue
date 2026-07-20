@@ -1195,7 +1195,9 @@ const hasBuildInFlightStatus = computed<boolean>(() => {
     || documentDetail.value?.indexStatus === 2
     || (documentDetail.value?.latestTaskType === 2 && [1, 2].includes(documentDetail.value?.latestTaskStatus))
 })
-const showBuildBlockingOverlay = computed<boolean>(() => hasBuildInFlightStatus.value)
+const showBuildBlockingOverlay = computed<boolean>(() => {
+  return (buildTaskSnapshot.value?.currentStage || 0) <= 4 && hasBuildInFlightStatus.value
+})
 
 const showBuildTracker = computed<boolean>(() => {
   return Boolean(activeBuildTaskId.value) || hasBuildTaskSnapshot.value
