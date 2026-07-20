@@ -29,7 +29,7 @@ type ChatDebugTrace struct {
 	CurrentDateText                 string                                `json:"currentDateText"`                 // 当前日期文本
 	RequiresRealTimeSearch          bool                                  `json:"requiresRealTimeSearch"`          // 需要实时搜索
 	RequiresCurrentDateAnchoring    bool                                  `json:"requiresCurrentDateAnchoring"`    // 需要当前日期锚定
-	RetrievalSubQuestions           []string                              `json:"subQuestions"`                    // 检索子问题列表（别名：subQuestions）
+	SubQuestions                    []string                              `json:"subQuestions"`                    // 检索子问题列表（别名：subQuestions）
 	SelectedDocumentId              int64                                 `json:"selectedDocumentId"`              // 选中的文档ID
 	SelectedTaskId                  int64                                 `json:"selectedTaskId"`                  // 选中的任务ID
 	RetrievalNotes                  []string                              `json:"retrievalNoteList"`               // 检索备注列表
@@ -126,7 +126,7 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace.RequiresCurrentDateAnchoring = execPlan.RequiresCurrentDateAnchoring
 
 	// 检索子问题
-	trace.RetrievalSubQuestions = append(trace.RetrievalSubQuestions, execPlan.RetrievalSubQuestions...)
+	trace.SubQuestions = append(trace.SubQuestions, execPlan.RetrievalSubQuestions...)
 	trace.SelectedDocumentId = execPlan.SelectedDocumentId
 	trace.SelectedTaskId = execPlan.SelectedTaskId
 

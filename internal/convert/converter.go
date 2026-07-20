@@ -2,10 +2,12 @@ package convert
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/chat"
@@ -141,11 +143,45 @@ func ToChatQueryModeName(code int) string {
 }
 
 func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
-	var debugTrace chat.ChatDebugTrace
+	var debugTrace cvo.ChatDebugTrace
 	if err := json.Unmarshal([]byte(debugTraceJson), &debugTrace); err != nil {
+		fmt.Println(err)
 		return nil
 	}
-	return &debugTrace
+	return &chat.ChatDebugTrace{
+		ExecutionMode:                 debugTrace.ExecutionMode,
+		ChatMode:                      cvo.ChatQueryModeName(debugTrace.ChatMode),
+		OriginalQuestion:              debugTrace.OriginalQuestion,
+		RewriteQuestion:               debugTrace.RewriteQuestion,
+		RewriteSubQuestions:           debugTrace.RewriteSubQuestions,
+		RetrievalQuestion:             debugTrace.RetrievalQuestion,
+		AgentQuestion:                 debugTrace.AgentQuestion,
+		NavigationDecision:            debugTrace.NavigationDecision,
+		HistorySummary:                debugTrace.HistorySummary,
+		LongTermSummary:               debugTrace.LongTermSummary,
+		RecentHistoryTranscript:       debugTrace.RecentHistoryTranscript,
+		AnswerRecentTranscript:        debugTrace.RecentQuestionTranscript,
+		AnswerHistoryContext:          debugTrace.QuestionHistoryContext,
+		AnswerHistoryFollowUpQuestion: debugTrace.QuestionHistoryFollowUpQuestion,
+		HistoryCompressionApplied:     debugTrace.HistoryCompressionApplied,
+		HistoryCoveredExchangeId:      debugTrace.HistoryCoveredExchangeId,
+		HistoryCoveredExchangeCount:   debugTrace.HistoryCoveredExchangeCount,
+		HistoryCompressionCount:       debugTrace.HistoryCompressionCount,
+		CurrentDateText:               debugTrace.CurrentDateText,
+		RequiresFreshSearch:           debugTrace.RequiresRealTimeSearch,
+		RequiresCurrentDateAnchoring:  debugTrace.RequiresCurrentDateAnchoring,
+		SubQuestions:                  debugTrace.SubQuestions,
+		SelectedDocumentId:            debugTrace.SelectedDocumentId,
+		SelectedTaskId:                debugTrace.SelectedTaskId,
+		RetrievalNotes:                debugTrace.RetrievalNotes,
+		UsedChannels:                  debugTrace.UsedChannels,
+		ToolTraces:                    debugTrace.ToolTraces,
+		ModelUsageTraces:              debugTrace.ModelUsageTraces,
+		LimitStats:                    debugTrace.LimitStats,
+		RagSystemPrompt:               debugTrace.RagSystemPrompt,
+		RagUserPrompt:                 debugTrace.RagUserPrompt,
+		NoEvidenceReply:               debugTrace.NoEvidenceReply,
+	}
 }
 
 func JsonArrayToStringSlice(src common.JSONArray) []string {
@@ -160,7 +196,32 @@ func StringToStringSlice(src string) []string {
 
 func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReference {
 	return common.JSONArrayTo(src, func(item any) *chat.SearchReference {
-		return item.(*chat.SearchReference)
+		refMap := item.(map[string]any)
+		return &chat.SearchReference{
+			ReferenceId:        refMap["referenceId"].(string),
+			SourceType:         refMap["sourceType"].(string),
+			Title:              refMap["title"].(string),
+			Url:                refMap["url"].(string),
+			Snippet:            refMap["snippet"].(string),
+			DocumentId:         convertor.ToString(refMap["documentId"]),
+			DocumentName:       refMap["documentName"].(string),
+			ChunkId:            convertor.ToString(refMap["chunkId"]),
+			ParentBlockId:      convertor.ToString(refMap["parentBlockId"]),
+			ParentBlockNo:      int(refMap["parentBlockNo"].(float64)),
+			ChunkNo:            int(refMap["chunkNo"].(float64)),
+			SectionPath:        refMap["sectionPath"].(string),
+			StructureNodeId:    convertor.ToString(refMap["structureNodeId"]),
+			StructureNodeType:  int(refMap["structureNodeType"].(float64)),
+			CanonicalPath:      refMap["canonicalPath"].(string),
+			ItemIndex:          int(refMap["itemIndex"].(float64)),
+			Score:              refMap["score"].(float64),
+			SubQuestionIndex:   int(refMap["subQuestionIndex"].(float64)),
+			SubQuestion:        refMap["subQuestion"].(string),
+			Channel:            refMap["channel"].(string),
+			ToolName:           refMap["toolName"].(string),
+			KnowledgeScopeCode: refMap["knowledgeScopeCode"].(string),
+			KnowledgeScopeName: refMap["knowledgeScopeName"].(string),
+		}
 	})
 }
 

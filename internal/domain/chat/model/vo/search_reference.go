@@ -11,29 +11,29 @@ import (
 )
 
 type SearchReference struct {
-	ReferenceId        string  // 参考ID
-	SourceType         string  // 来源类型
-	Title              string  // 标题
-	Url                string  // URL地址
-	Snippet            string  // 摘要
-	DocumentId         int64   // 文档ID
-	DocumentName       string  // 文档名称
-	ChunkId            int64   // 块ID
-	ParentBlockId      int64   // 父块ID
-	ParentBlockNo      int     // 父块序号
-	ChunkNo            int     // 块序号
-	SectionPath        string  // 节点路径
-	StructureNodeId    int64   // 结构节点ID
-	StructureNodeType  int     // 结构节点类型
-	CanonicalPath      string  // 规范路径
-	ItemIndex          int     // 项索引
-	Score              float64 // 分数
-	SubQuestionIndex   int     // 子问题索引
-	SubQuestion        string  // 子问题内容
-	Channel            string  // 渠道名称
-	ToolName           string  // 工具名称
-	KnowledgeScopeCode string  // 知识范围代码
-	KnowledgeScopeName string  // 知识范围名称
+	ReferenceId        string  `json:"referenceId,omitempty"`        // 参考ID
+	SourceType         string  `json:"sourceType,omitempty"`         // 来源类型
+	Title              string  `json:"title,omitempty"`              // 标题
+	Url                string  `json:"url,omitempty"`                // URL地址
+	Snippet            string  `json:"snippet,omitempty"`            // 摘要
+	DocumentId         int64   `json:"documentId,omitempty"`         // 文档ID
+	DocumentName       string  `json:"documentName,omitempty"`       // 文档名称
+	ChunkId            int64   `json:"chunkId,omitempty"`            // 块ID
+	ParentBlockId      int64   `json:"parentBlockId,omitempty"`      // 父块ID
+	ParentBlockNo      int     `json:"parentBlockNo,omitempty"`      // 父块序号
+	ChunkNo            int     `json:"chunkNo,omitempty"`            // 块序号
+	SectionPath        string  `json:"sectionPath,omitempty"`        // 节点路径
+	StructureNodeId    int64   `json:"structureNodeId,omitempty"`    // 结构节点ID
+	StructureNodeType  int     `json:"structureNodeType,omitempty"`  // 结构节点类型
+	CanonicalPath      string  `json:"canonicalPath,omitempty"`      // 规范路径
+	ItemIndex          int     `json:"itemIndex,omitempty"`          // 项索引
+	Score              float64 `json:"score,omitempty"`              // 分数
+	SubQuestionIndex   int     `json:"subQuestionIndex,omitempty"`   // 子问题索引
+	SubQuestion        string  `json:"subQuestion,omitempty"`        // 子问题内容
+	Channel            string  `json:"channel,omitempty"`            // 渠道名称
+	ToolName           string  `json:"toolName,omitempty"`           // 工具名称
+	KnowledgeScopeCode string  `json:"knowledgeScopeCode,omitempty"` // 知识范围代码
+	KnowledgeScopeName string  `json:"knowledgeScopeName,omitempty"` // 知识范围名称
 }
 
 func NewSearchReference(chunk *DocumentChunk, subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {

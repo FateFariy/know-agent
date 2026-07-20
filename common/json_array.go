@@ -17,7 +17,7 @@ func (j JSONArray) Value() (driver.Value, error) {
 }
 
 // Scan 实现 sql.Scanner 接口
-func (j JSONArray) Scan(value any) error {
+func (j *JSONArray) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -25,7 +25,7 @@ func (j JSONArray) Scan(value any) error {
 	if !ok {
 		return nil
 	}
-	return json.Unmarshal(bytes, &j)
+	return json.Unmarshal(bytes, j)
 }
 
 func JSONArrayTo[T any](src JSONArray, parseFunc func(any) T) []T {
@@ -34,8 +34,8 @@ func JSONArrayTo[T any](src JSONArray, parseFunc func(any) T) []T {
 	}
 
 	var result = make([]T, len(src))
-	for _, item := range src {
-		result = append(result, parseFunc(item))
+	for i, item := range src {
+		result[i] = parseFunc(item)
 	}
 	return result
 }

@@ -111,7 +111,7 @@ type ConversationExchange struct {
 	Recommendations     []string           `json:"recommendations"`     // 推荐问题列表
 	UsedTools           []string           `json:"usedTools"`           // 使用工具列表
 	DebugTrace          *ChatDebugTrace    `json:"debugTrace"`          // 调试轨迹
-	TurnStatus          int                `json:"status"`              // 对话状态
+	TurnStatus          int                `json:"turnStatus"`          // 对话状态
 	ErrorMessage        string             `json:"errorMessage"`        // 错误信息
 	FirstResponseTimeMs int64              `json:"firstResponseTimeMs"` // 首次响应时间毫秒
 	TotalResponseTimeMs int64              `json:"totalResponseTimeMs"` // 总响应时间毫秒
