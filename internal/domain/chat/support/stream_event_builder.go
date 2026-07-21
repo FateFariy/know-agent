@@ -24,65 +24,35 @@ type streamEvent struct {
 type StreamEventBuilder struct {
 }
 
-// Text 生成文本类型事件
-func (b *StreamEventBuilder) Text(content string) string {
-	return b.TextWithMetadata(content, "", 0)
-}
-
-// TextWithMetadata 生成带元数据的文本类型事件
-func (b *StreamEventBuilder) TextWithMetadata(content string, conversationId string, exchangeId int64) string {
+// Text 构建文本类型事件
+func (b *StreamEventBuilder) Text(content string, conversationId string, exchangeId int64) string {
 	return b.build(b.event("text", content, conversationId, exchangeId))
 }
 
-// Thinking 生成思考类型事件
-func (b *StreamEventBuilder) Thinking(content string) string {
-	return b.ThinkingWithMetadata(content, "", 0)
-}
-
-// ThinkingWithMetadata 生成带元数据的思考类型事件
-func (b *StreamEventBuilder) ThinkingWithMetadata(content string, conversationId string, exchangeId int64) string {
+// Thinking 构建思考类型事件
+func (b *StreamEventBuilder) Thinking(content string, conversationId string, exchangeId int64) string {
 	return b.build(b.event("thinking", content, conversationId, exchangeId))
 }
 
-// Status 生成状态类型事件
-func (b *StreamEventBuilder) Status(content string) string {
-	return b.StatusWithMetadata(content, "", 0)
-}
-
-// StatusWithMetadata 生成带元数据的状态类型事件
-func (b *StreamEventBuilder) StatusWithMetadata(content string, conversationId string, exchangeId int64) string {
+// Status 构建状态类型事件
+func (b *StreamEventBuilder) Status(content string, conversationId string, exchangeId int64) string {
 	return b.build(b.event("status", content, conversationId, exchangeId))
 }
 
-// Error 生成错误类型事件
-func (b *StreamEventBuilder) Error(content string) string {
-	return b.ErrorWithMetadata(content, "", 0)
-}
-
-// ErrorWithMetadata 生成带元数据的错误类型事件
-func (b *StreamEventBuilder) ErrorWithMetadata(content string, conversationId string, exchangeId int64) string {
+// Error 构建错误类型事件
+func (b *StreamEventBuilder) Error(content string, conversationId string, exchangeId int64) string {
 	return b.build(b.event("error", content, conversationId, exchangeId))
 }
 
-// References 生成引用类型事件
-func (b *StreamEventBuilder) References(references []*vo.SearchReference) string {
-	return b.ReferencesWithMetadata(references, "", 0)
-}
-
-// ReferencesWithMetadata 生成带元数据的引用类型事件
-func (b *StreamEventBuilder) ReferencesWithMetadata(references []*vo.SearchReference, conversationId string, exchangeId int64) string {
+// References 构建引用类型事件
+func (b *StreamEventBuilder) References(references []*vo.SearchReference, conversationId string, exchangeId int64) string {
 	payload := b.event("reference", references, conversationId, exchangeId)
 	payload.Count = utils.Pointer(len(references))
 	return b.build(payload)
 }
 
-// Recommendations 生成推荐类型事件
-func (b *StreamEventBuilder) Recommendations(recommendations []string) string {
-	return b.RecommendationsWithMetadata(recommendations, "", 0)
-}
-
-// RecommendationsWithMetadata 生成带元数据的推荐类型事件
-func (b *StreamEventBuilder) RecommendationsWithMetadata(recommendations []string, conversationId string, exchangeId int64) string {
+// Recommendations 构建推荐类型事件
+func (b *StreamEventBuilder) Recommendations(recommendations []string, conversationId string, exchangeId int64) string {
 	payload := b.event("recommend", recommendations, conversationId, exchangeId)
 	payload.Count = utils.Pointer(len(recommendations))
 	return b.build(payload)
@@ -95,14 +65,13 @@ func (b *StreamEventBuilder) Finish(conversationId string, exchangeId int64) str
 
 // event 构建事件载荷
 func (b *StreamEventBuilder) event(eventType string, content any, conversationId string, exchangeId int64) *streamEvent {
-	payload := &streamEvent{
-		Type:      eventType,
-		Content:   content,
-		Timestamp: time.Now().Format(time.DateTime),
+	return &streamEvent{
+		Type:           eventType,
+		Content:        content,
+		Timestamp:      time.Now().Format(time.DateTime),
+		ConversationId: strutil.Trim(conversationId),
+		ExchangeId:     exchangeId,
 	}
-	payload.ConversationId = strutil.Trim(conversationId)
-	payload.ExchangeId = exchangeId
-	return payload
 }
 
 // build 将载荷序列化为 JSON 字符串

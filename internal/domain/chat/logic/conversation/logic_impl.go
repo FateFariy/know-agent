@@ -405,7 +405,7 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) (<-chan string, error) {
 	return func(ctx context.Context) (<-chan string, error) {
 		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
-		thinkingEvent := c.eventBuilder.ThinkingWithMetadata("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
+		thinkingEvent := c.eventBuilder.Thinking("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
 			return nil, err
 		}
@@ -418,7 +418,7 @@ func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) 
 		convCtx.ExecutionPlan.Store(plan)
 
 		// 发送"上下文分析完成"的思考事件（前端调试/感知）
-		thinkingEvent = c.eventBuilder.ThinkingWithMetadata("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
+		thinkingEvent = c.eventBuilder.Thinking("上下文分析完成，已准备执行计划。", convCtx.ConversationId, convCtx.ExchangeId)
 		if err = support.SafeEmitNext(convCtx.Channel, thinkingEvent); err != nil {
 			return nil, err
 		}
@@ -510,7 +510,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) error {
 	convCtx.WriteAnswerBuffer(chunk)
 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
-	textEvent := c.eventBuilder.TextWithMetadata(chunk, convCtx.ConversationId, convCtx.ExchangeId)
+	textEvent := c.eventBuilder.Text(chunk, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, textEvent)
 }
 
@@ -549,7 +549,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 		convCtx.ExecutionModeName(), "正在收尾停止中的会话。", nil)
 
 	// 发送 status 事件
-	statusEvent := c.eventBuilder.StatusWithMetadata("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
+	statusEvent := c.eventBuilder.Status("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
 	if err := support.SafeEmitNext(convCtx.Channel, statusEvent); err != nil {
 		Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		responseMessage = "会话已停止，停止事件发送失败"
@@ -634,13 +634,13 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 
 	// 向客户端流补发引用事件 / 推荐事件，最后发送流 Complete 信号
 	if len(uniqueReferences) > 0 {
-		referencesEvent := c.eventBuilder.ReferencesWithMetadata(uniqueReferences, convCtx.ConversationId, convCtx.ExchangeId)
+		referencesEvent := c.eventBuilder.References(uniqueReferences, convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, referencesEvent); err != nil {
 			Warnf("发送引用事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
 	}
 	if len(recommendations) > 0 {
-		recommendationsEvent := c.eventBuilder.RecommendationsWithMetadata(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
+		recommendationsEvent := c.eventBuilder.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, recommendationsEvent); err != nil {
 			Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
@@ -699,7 +699,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 		convCtx.ExecutionModeName(), "正在收尾失败会话。", nil)
 
 	// 向失败事件 + 流 Complete 信号；发送失败仅告警
-	errorEvent := c.eventBuilder.ErrorWithMetadata(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)
+	errorEvent := c.eventBuilder.Error(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)
 	if err = support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
 		Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
@@ -834,7 +834,7 @@ func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *en
 func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
 	stream := make(chan string, 1)
 	defer close(stream)
-	stream <- c.eventBuilder.ErrorWithMetadata(message, conversationId, exchangeId)
+	stream <- c.eventBuilder.Error(message, conversationId, exchangeId)
 	return stream
 }
 

@@ -28,7 +28,7 @@ func publishThinking(convCtx *vo.ConversationContext, content string) error {
 		return nil
 	}
 	convCtx.AddThinkingSteps(content)
-	payload := builder.ThinkingWithMetadata(content, convCtx.ConversationId, convCtx.ExchangeId)
+	payload := builder.Thinking(content, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
 
@@ -37,7 +37,7 @@ func publishStatus(convCtx *vo.ConversationContext, content string) error {
 	if convCtx == nil || strutil.IsBlank(content) {
 		return nil
 	}
-	payload := builder.StatusWithMetadata(content, convCtx.ConversationId, convCtx.ExchangeId)
+	payload := builder.Status(content, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
 
@@ -47,7 +47,7 @@ func publishReferences(convCtx *vo.ConversationContext, refs []*vo.SearchReferen
 		return nil
 	}
 	convCtx.AddReferences(refs...)
-	payload := builder.ReferencesWithMetadata(refs, convCtx.ConversationId, convCtx.ExchangeId)
+	payload := builder.References(refs, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
 
@@ -56,7 +56,7 @@ func publishRecommendations(convCtx *vo.ConversationContext, recommendations []s
 	if convCtx == nil || len(recommendations) == 0 {
 		return nil
 	}
-	payload := builder.RecommendationsWithMetadata(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
+	payload := builder.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
 
@@ -66,6 +66,6 @@ func publishText(convCtx *vo.ConversationContext, content string) error {
 		return nil
 	}
 	convCtx.WriteAnswerBuffer(content)
-	payload := builder.TextWithMetadata(content, convCtx.ConversationId, convCtx.ExchangeId)
+	payload := builder.Text(content, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
