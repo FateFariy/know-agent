@@ -1,973 +1,3 @@
-<template>
-  <section class="document-detail-page">
-    <transition name="drawer-fade">
-      <div v-if="logDrawerOpen" class="drawer-overlay" @click="closeLogDrawer"></div>
-    </transition>
-    <transition name="drawer-fade">
-      <div v-if="chunkDetailDrawerOpen" class="drawer-overlay"
-           @click="closeChunkDetailDrawer"></div>
-    </transition>
-
-    <transition name="build-mask-fade">
-      <div v-if="showBuildBlockingOverlay" class="build-overlay">
-        <div class="build-overlay-card">
-          <div class="build-overlay-head">
-            <span aria-hidden="true" class="build-overlay-spinner"></span>
-            <div>
-              <h3>{{ buildOverlayTitle }}</h3>
-              <p class="build-overlay-text">{{ buildOverlayDescription }}</p>
-            </div>
-          </div>
-
-          <div class="build-overlay-task-meta">
-            <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '创建中' }}</span>
-            <span>当前阶段 {{ activeBuildStageLabel || '准备启动' }}</span>
-          </div>
-
-          <div class="build-overlay-stage-list">
-            <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`"
-                     :class="`build-overlay-stage-${stage.status}`" class="build-overlay-stage">
-              <span class="build-overlay-stage-icon">
-                <span v-if="stage.status === 'current'" aria-hidden="true"
-                      class="stage-spinner"></span>
-                <span v-else>{{ stage.order }}</span>
-              </span>
-              <div class="build-overlay-stage-copy">
-                <strong>{{ stage.label }}</strong>
-                <span>{{ stage.statusLabel }}</span>
-              </div>
-            </article>
-          </div>
-
-          <p class="build-overlay-tip">
-            执行期间页面已暂时锁定，避免重复发起构建或误改当前策略链路。</p>
-        </div>
-      </div>
-    </transition>
-
-    <transition name="drawer-slide">
-      <aside v-if="logDrawerOpen" class="log-drawer">
-        <div class="drawer-header">
-          <div>
-            <h3>任务执行详情</h3>
-            <p class="drawer-subtitle">
-              任务 {{ documentDetail?.latestTaskId || '-' }} ·
-              {{ documentDetail?.latestTaskTypeName || '暂无任务类型' }}
-            </p>
-          </div>
-          <button aria-label="关闭任务执行详情" class="icon-button" type="button"
-                  @click="closeLogDrawer">
-            <XMarkIcon class="drawer-icon"/>
-          </button>
-        </div>
-
-        <div class="drawer-summary">
-          <div class="summary-chip">
-            <span>当前状态</span>
-            <AdminStatusBadge :code="documentDetail?.latestTaskStatus"
-                              :label="documentDetail?.latestTaskStatusName || '暂无状态'"
-                              type="task"/>
-          </div>
-          <div class="summary-chip">
-            <span>索引状态</span>
-            <AdminStatusBadge :code="documentDetail?.indexStatus"
-                              :label="documentDetail?.indexStatusName || '暂无状态'"
-                              type="index"/>
-          </div>
-        </div>
-
-        <div v-if="logLoading" class="drawer-empty">正在加载任务日志...</div>
-        <div v-else-if="!taskLogs.length" class="drawer-empty">当前任务还没有日志记录。</div>
-
-        <div v-else class="drawer-timeline">
-          <article v-for="log in taskLogs" :key="log.id" class="drawer-log-item">
-            <div class="drawer-log-node"></div>
-            <div class="drawer-log-body">
-              <div class="drawer-log-head">
-                <strong>{{ log.stageTypeName }} · {{ log.eventTypeName }}</strong>
-                <span>{{ formatDateTime(log.createTime) }}</span>
-              </div>
-              <p>{{ log.content }}</p>
-              <pre v-if="log.detailJson" class="drawer-log-detail">{{ log.detailJson }}</pre>
-            </div>
-          </article>
-        </div>
-      </aside>
-    </transition>
-    <transition name="drawer-slide">
-      <aside v-if="chunkDetailDrawerOpen" class="log-drawer chunk-detail-drawer">
-        <div class="drawer-header">
-          <div>
-            <h3>Chunk 详情</h3>
-            <p class="drawer-subtitle">
-              <template v-if="chunkDetail?.chunk">
-                子块 C#{{ chunkDetail.chunk.chunkNo || '-' }} · 父块
-                P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}
-              </template>
-              <template v-else>
-                正在读取切块详情
-              </template>
-            </p>
-          </div>
-          <button aria-label="关闭 Chunk 详情" class="icon-button" type="button"
-                  @click="closeChunkDetailDrawer">
-            <XMarkIcon class="drawer-icon"/>
-          </button>
-        </div>
-
-        <div v-if="chunkDetailLoading" class="drawer-empty">正在加载 chunk 详情...</div>
-        <div v-else-if="!chunkDetail?.chunk" class="drawer-empty">当前没有可展示的 chunk 详情。</div>
-        <template v-else>
-          <div class="drawer-summary">
-            <div class="summary-chip summary-chip-child">
-              <span>当前子块</span>
-              <strong>C#{{ chunkDetail.chunk.chunkNo || '-' }}</strong>
-            </div>
-            <div class="summary-chip summary-chip-parent">
-              <span>所属父块</span>
-              <strong>P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}</strong>
-            </div>
-            <div class="summary-chip">
-              <span>同父子块</span>
-              <strong>{{
-                  chunkDetail.parentBlock?.childCount || chunkDetail.siblingChunks?.length || 0
-                }}</strong>
-            </div>
-          </div>
-
-          <section class="chunk-detail-section chunk-detail-section-current">
-            <div class="chunk-detail-head">
-              <div class="chunk-detail-title-group">
-                <span class="chunk-kind-badge chunk-kind-badge-child">Child Evidence</span>
-                <h4>当前子块 C#{{ chunkDetail?.chunk.chunkNo || '-' }}</h4>
-              </div>
-              <span>{{ buildChunkRelationText(chunkDetail?.chunk) }}</span>
-            </div>
-            <div class="chunk-detail-meta">
-              <span>章节：{{ chunkDetail?.chunk.sectionPath || '未识别章节' }}</span>
-              <span>字符：{{ formatCount(chunkDetail?.chunk.charCount) }}</span>
-              <span>Token：{{ formatCount(chunkDetail?.chunk.tokenCount) }}</span>
-            </div>
-            <pre class="chunk-detail-text">{{ chunkDetail?.chunk.chunkText || '' }}</pre>
-          </section>
-
-          <section v-if="chunkDetail.parentBlock" ref="parentBlockSectionRef"
-                   :class="{ 'chunk-detail-section-focused': chunkDetailFocusMode === 'parent' }"
-                   class="chunk-detail-section chunk-detail-section-parent">
-            <div class="chunk-detail-head">
-              <div class="chunk-detail-title-group">
-                <span class="chunk-kind-badge chunk-kind-badge-parent">Parent Context</span>
-                <h4>所属父块 P#{{ chunkDetail.parentBlock.parentBlockNo || '-' }}</h4>
-              </div>
-              <span>子块范围 C#{{
-                  chunkDetail.parentBlock.startChunkNo || '-'
-                }} - C#{{
-                  chunkDetail.parentBlock.endChunkNo
-                  || '-'
-                }}</span>
-            </div>
-            <div class="chunk-detail-meta">
-              <span>章节：{{ chunkDetail.parentBlock.sectionPath || '未识别章节' }}</span>
-              <span>字符：{{ formatCount(chunkDetail.parentBlock.charCount) }}</span>
-              <span>Token：{{ formatCount(chunkDetail.parentBlock.tokenCount) }}</span>
-            </div>
-            <pre class="chunk-detail-text parent-block-text">{{
-                chunkDetail.parentBlock.parentText
-              }}</pre>
-          </section>
-
-          <section
-            v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length"
-            class="chunk-detail-section">
-            <div class="chunk-detail-head">
-              <h4>同父子块关系</h4>
-              <span>点击可切换查看其他子块</span>
-            </div>
-            <div class="chunk-relation-legend">
-              <span>父块 P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}</span>
-              <span>当前命中子块 C#{{ chunkDetail.chunk.chunkNo || '-' }}</span>
-              <span>同父共 {{ chunkDetail.siblingChunks.length }} 个子块</span>
-            </div>
-            <p class="chunk-relation-note">
-              当前父块 P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }} 内包含
-              {{ formatChunkCodeList(chunkDetail.siblingChunks) }} 这些子块，当前命中的是
-              C#{{ chunkDetail.chunk.chunkNo || '-' }}。
-            </p>
-            <div class="chunk-relation-track">
-              <template v-for="(item, index) in chunkDetail.siblingChunks"
-                        :key="`track-${item.chunkId}`">
-                <button :class="{ active: isCurrentChunk(item) }" class="chunk-relation-node"
-                        type="button"
-                        @click="openChunkDetail(item.chunkId)">
-                  <strong>C#{{ item.chunkNo || '-' }}</strong>
-                  <span>{{ buildSiblingOrderLabel(index, chunkDetail.siblingChunks.length) }}</span>
-                </button>
-                <div v-if="index < chunkDetail.siblingChunks.length - 1"
-                     :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1] || null) }"
-                     class="chunk-relation-line">
-                </div>
-              </template>
-            </div>
-            <div class="sibling-chunk-list">
-              <button v-for="item in chunkDetail.siblingChunks" :key="`sibling-${item.chunkId}`"
-                      :class="{ active: item.chunkId === chunkDetail.chunk.chunkId }"
-                      class="sibling-chunk-card" type="button"
-                      @click="openChunkDetail(item.chunkId)">
-                <div class="sibling-chunk-head">
-                  <strong>子块 C#{{ item.chunkNo || '-' }}</strong>
-                  <span>{{ buildChunkRelationText(item) }}</span>
-                </div>
-                <span>{{ item.sectionPath || '未识别章节' }}</span>
-                <span>{{ item.chunkText }}</span>
-              </button>
-            </div>
-          </section>
-        </template>
-      </aside>
-    </transition>
-
-    <div class="page-top">
-      <div class="page-top-main">
-        <div class="page-top-breadcrumb">
-          <button class="ghost-button page-top-back" type="button" @click="goBack">
-            <ArrowLeftIcon class="back-icon"/>
-            返回文档列表
-          </button>
-          <span>文档接入</span>
-          <span>/</span>
-          <strong>文档工作台</strong>
-        </div>
-        <p class="page-top-caption">围绕单个文档完成策略确认、索引构建、验证 Chunk 结果与任务追踪。</p>
-      </div>
-      <div class="page-top-actions">
-        <button :disabled="loading" class="ghost-button" type="button" @click="loadAll">
-          {{ loading ? '刷新中...' : '刷新详情' }}
-        </button>
-      </div>
-    </div>
-
-    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
-      {{ pageNotice.message }}
-    </div>
-
-    <article v-if="documentDetail" class="panel-card detail-card">
-      <div class="detail-content">
-        <nav aria-label="文档工作台章节导航" class="workbench-nav">
-          <button v-for="item in workbenchSections" :key="`workbench-nav-${item.key}`"
-                  :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]"
-                  class="workbench-nav-item" type="button"
-                  @click="scrollToWorkbenchSection(item.key)">
-            <span class="workbench-nav-step">{{ item.step }}</span>
-            <span class="workbench-nav-copy">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.caption }}</span>
-            </span>
-            <em>{{ item.status }}</em>
-          </button>
-        </nav>
-
-        <section v-show="activeWorkbenchSection === 'overview'" ref="overviewSectionRef"
-                 class="detail-section workbench-section" data-workbench-section="overview">
-          <div class="workbench-section-head">
-            <div class="workbench-section-heading">
-              <span class="workbench-section-step-badge">Overview</span>
-              <h2>文档概览</h2>
-              <p>先确认文档状态、关键指标和当前工作焦点，再进入下方流程。</p>
-            </div>
-            <span class="workbench-section-pill">{{ workflowCurrentPhase.shortLabel }}</span>
-          </div>
-
-          <div class="overview-document-card">
-            <div class="overview-document-main">
-              <p class="overview-document-kicker">Current Document</p>
-              <h3>{{ documentDetail.documentName }}</h3>
-              <p v-if="showOriginalFileName" class="overview-document-subtitle">
-                {{ documentDetail.originalFileName }}
-              </p>
-            </div>
-            <div class="overview-document-side">
-              <div class="detail-statuses">
-                <AdminStatusBadge :code="documentDetail.parseStatus"
-                                  :label="documentDetail.parseStatusName"
-                                  type="parse"/>
-                <AdminStatusBadge :code="documentDetail.strategyStatus"
-                                  :label="documentDetail.strategyStatusName"
-                                  type="strategy"/>
-                <AdminStatusBadge :code="documentDetail.indexStatus"
-                                  :label="documentDetail.indexStatusName"
-                                  type="index"/>
-              </div>
-              <span class="overview-document-phase">{{ workflowCurrentPhase.title }}</span>
-            </div>
-          </div>
-
-          <div class="workspace-guidance-grid overview-guidance-grid">
-            <article :class="`workspace-guidance-card-${workflowCurrentPhase.tone}`"
-                     class="workspace-guidance-card">
-              <span class="workspace-guidance-kicker">当前阶段</span>
-              <strong>{{ workflowCurrentPhase.title }}</strong>
-              <p>{{ workflowCurrentPhase.description }}</p>
-            </article>
-            <article class="workspace-guidance-card workspace-guidance-card-next">
-              <span class="workspace-guidance-kicker">下一步建议</span>
-              <strong>{{ workflowNextAction.title }}</strong>
-              <p>{{ workflowNextAction.description }}</p>
-            </article>
-          </div>
-
-          <article class="workspace-subsection workspace-subsection-compact overview-routes-card">
-            <div class="workspace-subsection-header">
-              <div>
-                <p class="workspace-subsection-kicker">Quick Routes</p>
-                <h3>常用入口</h3>
-              </div>
-            </div>
-            <div class="overview-action-row">
-              <button class="ghost-button" type="button"
-                      @click="scrollToWorkbenchSection('strategy')">
-                查看策略配置
-              </button>
-              <button class="ghost-button" type="button"
-                      @click="scrollToWorkbenchSection('execution')">
-                前往确认与构建
-              </button>
-              <button class="ghost-button" type="button" @click="scrollToWorkbenchSection('chunk')">
-                检查 Chunk 结果
-              </button>
-            </div>
-          </article>
-        </section>
-
-        <section v-show="activeWorkbenchSection === 'strategy'" ref="strategySectionRef"
-                 class="detail-section workbench-section" data-workbench-section="strategy">
-          <div class="workbench-section-head">
-            <div class="workbench-section-heading">
-              <span class="workbench-section-step-badge">Step 1</span>
-              <h2>配置策略</h2>
-              <p>先阅读系统推荐，再分别调整父块和子块流水线，形成最终执行方案。</p>
-            </div>
-            <span class="workbench-section-pill">{{ strategySectionStatusText }}</span>
-          </div>
-
-          <div v-if="documentDetail.parseErrorMsg" class="inline-notice inline-notice-danger">
-            {{ documentDetail.parseErrorMsg }}
-          </div>
-
-          <div v-if="strategySystemStages.length" class="strategy-status-bar">
-            <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
-                     :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
-              <div class="strategy-status-index">{{ item.order }}</div>
-              <div class="strategy-status-copy">
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.description }}</span>
-              </div>
-            </article>
-          </div>
-
-          <div v-if="planLoading" class="empty-block compact-empty">正在读取策略详情...</div>
-          <div v-else-if="!strategyPlan?.planReady" class="empty-block compact-empty">
-            当前文档尚未生成策略方案，解析完成后可点击刷新查看。
-          </div>
-          <template v-else>
-            <div class="strategy-section-shell">
-              <div class="strategy-intro">
-                <p class="strategy-intro-kicker">Recommendation Summary</p>
-                <p class="strategy-intro-copy">
-                  {{
-                    strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。'
-                  }}
-                </p>
-              </div>
-
-              <div class="strategy-flow-stack">
-                <section v-for="pipeline in strategyPipelineLibrary"
-                         :key="`recommended-${pipeline.key}`"
-                         :class="`strategy-lane-${pipeline.key}`"
-                         class="strategy-lane strategy-lane-recommended">
-                  <div class="strategy-lane-header">
-                    <div class="strategy-lane-title-box">
-                      <p class="strategy-lane-kicker">
-                        {{
-                          pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                            'Retrieval Recall Pipeline'
-                        }}</p>
-                      <h5>{{ pipeline.label }}</h5>
-                    </div>
-                    <p class="strategy-lane-description">{{ pipeline.description }}</p>
-                  </div>
-
-                  <div v-if="resolveStrategySteps(strategyPlan.plan, pipeline.key)?.length"
-                       :class="`timeline-list-${pipeline.key}`" class="timeline-list">
-                    <template
-                      v-for="(step, index) in resolveStrategySteps(strategyPlan.plan, pipeline.key)"
-                      :key="`${strategyPlan?.plan?.planId}-${pipeline.key}-${step.stepNo}`">
-                      <article class="timeline-item">
-                        <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}</div>
-                        <div class="timeline-main">
-                          <strong>{{ step.strategyTypeName }}</strong>
-                          <p>{{ step.recommendReason || step.strategyRoleName }}</p>
-                        </div>
-                      </article>
-                      <div
-                        v-if="index < resolveStrategySteps(strategyPlan.plan, pipeline.key).length - 1"
-                        :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`"
-                        class="flow-arrow">
-                        <span aria-hidden="true" class="flow-arrow-icon">↓</span>
-                      </div>
-                    </template>
-                  </div>
-                  <div v-else class="empty-block compact-empty">
-                    当前方案还没有 {{ pipeline.label }} 配置。
-                  </div>
-                </section>
-              </div>
-
-              <div class="strategy-adjust-shell">
-                <div class="strategy-adjust-header">
-                  <div class="strategy-adjust-title-box">
-                    <p class="strategy-adjust-kicker">Adjustment Workspace</p>
-                    <h5>双流水线调整</h5>
-                  </div>
-                  <p class="strategy-adjust-description">分别配置父块回答流水线和子块召回流水线，并通过上移
-                    / 下移调整顺序。</p>
-                </div>
-
-                <div class="strategy-flow-stack strategy-flow-stack-edit">
-                  <section v-for="pipeline in strategyPipelineLibrary"
-                           :key="`editor-${pipeline.key}`"
-                           :class="`strategy-lane-${pipeline.key}`"
-                           class="strategy-lane strategy-lane-edit">
-                    <div class="strategy-lane-header">
-                      <div class="strategy-lane-title-box">
-                        <p class="strategy-lane-kicker">
-                          {{
-                            pipeline.key === 'parent' ? 'Answer Context Pipeline' :
-                              'Retrieval Recall Pipeline'
-                          }}</p>
-                        <h5>{{ pipeline.label }}</h5>
-                      </div>
-                      <p class="strategy-lane-description">{{ pipeline.description }}</p>
-                    </div>
-
-                    <div :class="`selected-flow-board-${pipeline.key}`" class="selected-flow-board">
-                      <span :class="`selected-flow-label-${pipeline.key}`"
-                            class="selected-flow-label">当前配置</span>
-
-                      <div v-if="getSelectedStrategyPreview(pipeline.key).length"
-                           class="sequence-board selected-flow-sequence">
-                        <template v-for="(row, rowIndex) in getSelectedStrategyRows(pipeline.key)"
-                                  :key="`strategy-row-${pipeline.key}-${rowIndex}`">
-                          <div class="sequence-row">
-                            <article v-if="row.leftItem" class="selected-flow-card sequence-card">
-                              <div class="selected-flow-order">{{ row.leftItem.order }}</div>
-                              <div class="selected-flow-content">
-                                <strong>{{ row.leftItem.label }}</strong>
-                                <span>{{ row.leftItem.description }}</span>
-                              </div>
-                              <div class="selected-flow-actions">
-                                <button :disabled="row.leftItem.index === 0"
-                                        class="flow-action-button" type="button"
-                                        @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
-                                  上移
-                                </button>
-                                <button
-                                  :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
-                                  class="flow-action-button" type="button"
-                                  @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
-                                  下移
-                                </button>
-                              </div>
-                            </article>
-                            <div v-else class="sequence-card-placeholder"></div>
-
-                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
-                              {{
-                                row.direction ===
-                                'rtl' ? '←' : '→'
-                              }}
-                            </div>
-                            <div v-else
-                                 class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
-
-                            <article v-if="row.rightItem" class="selected-flow-card sequence-card">
-                              <div class="selected-flow-order">{{ row.rightItem.order }}</div>
-                              <div class="selected-flow-content">
-                                <strong>{{ row.rightItem.label }}</strong>
-                                <span>{{ row.rightItem.description }}</span>
-                              </div>
-                              <div class="selected-flow-actions">
-                                <button :disabled="row.rightItem.index === 0"
-                                        class="flow-action-button" type="button"
-                                        @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
-                                  上移
-                                </button>
-                                <button
-                                  :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
-                                  class="flow-action-button" type="button"
-                                  @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
-                                  下移
-                                </button>
-                              </div>
-                            </article>
-                            <div v-else class="sequence-card-placeholder"></div>
-                          </div>
-
-                          <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
-                               :class="`sequence-down-row-${row.downColumn}`"
-                               class="sequence-down-row">
-                            <span class="sequence-down-arrow">↓</span>
-                          </div>
-                        </template>
-                      </div>
-
-                      <div v-else class="selected-flow-empty">
-                        {{ pipeline.label }}至少选择一个拆分策略，已选策略会在这里形成清晰的箭头处理链路。
-                      </div>
-                    </div>
-
-                    <div :class="`strategy-picker-${pipeline.key}`" class="strategy-picker">
-                      <button v-for="item in strategyLibrary" :key="`${pipeline.key}-${item.type}`"
-                              :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
-                              class="strategy-chip" type="button"
-                              @click="toggleStrategy(item.type, pipeline.key)">
-                        <div class="strategy-chip-top">
-                          <span class="strategy-chip-state">{{
-                              getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' :
-                                '点击添加'
-                            }}</span>
-                          <CheckCircleIcon
-                            v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
-                            class="strategy-chip-check"/>
-                        </div>
-                        <strong>{{ item.label }}</strong>
-                        <span>{{ item.description }}</span>
-                      </button>
-                    </div>
-
-                    <div :class="`preview-box-${pipeline.key}`" class="preview-box">
-                      <span :class="`preview-box-title-${pipeline.key}`" class="preview-box-title">{{
-                          pipeline.label
-                        }}最终提交顺序</span>
-                      <div v-if="getSelectedStrategyPreview(pipeline.key).length"
-                           class="preview-flow">
-                        <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
-                                  :key="`preview-${pipeline.key}-${item.type}`">
-                          <span class="preview-tag">{{ item.label }}</span>
-                          <ArrowRightIcon
-                            v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
-                            class="preview-arrow"/>
-                        </template>
-                      </div>
-                      <p v-else class="preview-empty">
-                        还没有选中策略，无法生成当前流水线的最终提交顺序。</p>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </div>
-
-          </template>
-        </section>
-
-        <section v-show="activeWorkbenchSection === 'execution'" ref="executionSectionRef"
-                 class="detail-section workbench-section" data-workbench-section="execution">
-          <div class="workbench-section-head">
-            <div class="workbench-section-heading">
-              <span class="workbench-section-step-badge">Step 2</span>
-              <h2>确认并构建</h2>
-              <p>先确认策略方案，再执行构建索引，并在同一处查看执行轨迹。</p>
-            </div>
-            <span class="workbench-section-pill">{{ executionSectionStatusText }}</span>
-          </div>
-
-          <div class="execution-summary-grid">
-            <article class="execution-summary-card">
-              <span>策略确认</span>
-              <strong>{{ confirmStepBadge }}</strong>
-              <p>{{ hasConfirmedStrategy ? '当前方案已进入确认流程。' : '还未完成最终确认。' }}</p>
-            </article>
-            <article class="execution-summary-card">
-              <span>构建执行</span>
-              <strong>{{ buildStepBadge }}</strong>
-              <p>{{
-                  hasBuildInFlightStatus ? '系统正在执行构建，请留意下方轨迹。' : '确认完成后即可发起构建。'
-                }}</p>
-            </article>
-            <article class="execution-summary-card">
-              <span>当前任务</span>
-              <strong>{{ activeBuildTaskId || documentDetail.latestTaskId || '-' }}</strong>
-              <p>{{ activeBuildStageLabel || '当前还没有正在执行的构建任务。' }}</p>
-            </article>
-          </div>
-
-          <div class="confirm-actions">
-            <input v-model="adjustNote" class="adjust-input"
-                   placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" type="text"/>
-            <div class="strategy-submit-actions">
-              <article :class="`action-stage-${confirmStepState}`" class="action-stage-card">
-                <div class="action-stage-head">
-                  <span class="action-stage-index">01</span>
-                  <span class="action-stage-badge">{{ confirmStepBadge }}</span>
-                </div>
-                <strong>先确认策略方案</strong>
-                <p>{{ confirmStepDescription }}</p>
-                <button :disabled="!canConfirmStrategyAction"
-                        class="action-button action-button-confirm" type="button"
-                        @click="submitConfirmStrategy">
-                  <span>{{ confirmButtonLabel }}</span>
-                  <CheckCircleIcon aria-hidden="true" class="action-button-icon"/>
-                </button>
-              </article>
-
-              <article :class="`action-stage-${buildStepState}`" class="action-stage-card">
-                <div class="action-stage-head">
-                  <span class="action-stage-index">02</span>
-                  <span class="action-stage-badge">{{ buildStepBadge }}</span>
-                </div>
-                <strong>再执行构建索引</strong>
-                <p>{{ buildStepDescription }}</p>
-                <button :disabled="!canBuildIndexAction" class="action-button action-button-build"
-                        type="button"
-                        @click="submitBuildIndex">
-                  <span>{{ buildButtonLabel }}</span>
-                  <ArrowRightIcon aria-hidden="true" class="action-button-icon"/>
-                </button>
-              </article>
-            </div>
-          </div>
-
-          <div v-if="showBuildTracker" ref="buildTrackerRef"
-               class="build-progress-card build-progress-card-inline">
-            <div class="build-progress-header">
-              <div>
-                <strong>{{ buildTrackerTitle }}</strong>
-                <p class="build-progress-text">{{ buildTrackerDescription }}</p>
-              </div>
-              <span :class="{ 'build-pulse-static': !isBuildPolling }" class="build-pulse">
-                {{ isBuildPolling ? '实时轮询中' : '轨迹已保留' }}
-              </span>
-            </div>
-
-            <div class="sequence-board build-stage-board">
-              <template v-for="(row, rowIndex) in buildStageRows" :key="`build-row-${rowIndex}`">
-                <div class="sequence-row">
-                  <article v-if="row.leftItem" :class="`stage-${row.leftItem.status}`"
-                           class="stage-card sequence-card">
-                    <div class="stage-order">
-                      <span v-if="row.leftItem.status === 'current'" aria-hidden="true"
-                            class="stage-spinner"></span>
-                      <span v-else>{{ row.leftItem.order }}</span>
-                    </div>
-                    <div class="stage-body">
-                      <strong>{{ row.leftItem.label }}</strong>
-                      <span>{{ row.leftItem.description }}</span>
-                      <em>{{ row.leftItem.statusLabel }}</em>
-                    </div>
-                  </article>
-                  <div v-else class="sequence-card-placeholder"></div>
-
-                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
-                    {{ row.direction === 'rtl' ? '←' : '→' }}
-                  </div>
-                  <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
-
-                  <article v-if="row.rightItem" :class="`stage-${row.rightItem.status}`"
-                           class="stage-card sequence-card">
-                    <div class="stage-order">
-                      <span v-if="row.rightItem.status === 'current'" aria-hidden="true"
-                            class="stage-spinner"></span>
-                      <span v-else>{{ row.rightItem.order }}</span>
-                    </div>
-                    <div class="stage-body">
-                      <strong>{{ row.rightItem.label }}</strong>
-                      <span>{{ row.rightItem.description }}</span>
-                      <em>{{ row.rightItem.statusLabel }}</em>
-                    </div>
-                  </article>
-                  <div v-else class="sequence-card-placeholder"></div>
-                </div>
-
-                <div v-if="rowIndex < buildStageRows.length - 1"
-                     :class="`sequence-down-row-${row.downColumn}`"
-                     class="sequence-down-row">
-                  <span class="sequence-down-arrow">↓</span>
-                </div>
-              </template>
-            </div>
-
-            <div class="tracker-footer">
-              <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
-              <span>状态 {{
-                  buildTaskSnapshot?.taskStatusName || (documentDetail?.indexStatus === 3 ? '成功' : '未知')
-                }}</span>
-              <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
-            </div>
-          </div>
-        </section>
-
-        <section v-show="activeWorkbenchSection === 'chunk'" ref="chunkSectionRef"
-                 class="detail-section workbench-section" data-workbench-section="chunk">
-          <div class="workbench-section-head">
-            <div class="workbench-section-heading">
-              <span class="workbench-section-step-badge">Step 3</span>
-              <h2>验证 Chunk 结果</h2>
-              <p>在这里检查父子分块结构、分页浏览内容，并抽样验证切块是否符合预期。</p>
-            </div>
-            <div class="chunk-section-actions">
-              <span class="workbench-section-pill">{{ chunkSectionStatusText }}</span>
-              <span v-if="chunkQuery?.taskId">任务 {{
-                  chunkQuery.taskId
-                }} · {{ chunkQuery.total || 0 }} 条</span>
-              <span v-else>当前还没有可展示的 chunk</span>
-              <div v-if="chunkRecords.length" class="chunk-view-switch">
-                <button :class="{ active: chunkDisplayMode === 'grouped' }"
-                        class="chunk-view-button" type="button"
-                        @click="chunkDisplayMode = 'grouped'">
-                  按父块分组
-                </button>
-                <button :class="{ active: chunkDisplayMode === 'flat' }" class="chunk-view-button"
-                        type="button"
-                        @click="chunkDisplayMode = 'flat'">
-                  平铺列表
-                </button>
-                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button"
-                        type="button"
-                        @click="setAllChunkGroupsCollapsed(false)">
-                  展开全部
-                </button>
-                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button"
-                        type="button"
-                        @click="setAllChunkGroupsCollapsed(true)">
-                  折叠全部
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="chunkLoading" class="empty-block compact-empty">正在加载 Chunk 列表...</div>
-          <div v-else-if="!chunkRecords.length" class="empty-block compact-empty">
-            当前文档还没有 Chunk 数据。请先完成索引构建，或等待构建任务继续执行。
-          </div>
-
-          <div v-else class="chunk-table-panel">
-            <div class="chunk-toolbar">
-              <article class="chunk-stat-card">
-                <span>父块数</span>
-                <strong>{{ formatCount(chunkParentCount) }}</strong>
-              </article>
-              <article class="chunk-stat-card">
-                <span>总片段</span>
-                <strong>{{ formatCount(chunkTotalCount) }}</strong>
-              </article>
-              <article class="chunk-stat-card">
-                <span>向量可用</span>
-                <strong>{{ formatCount(chunkVectorReadyCount) }}</strong>
-              </article>
-              <article class="chunk-stat-card">
-                <span>待处理</span>
-                <strong>{{ formatCount(chunkVectorPendingCount) }}</strong>
-              </article>
-              <article class="chunk-stat-card">
-                <span>平均 Token</span>
-                <strong>{{ formatCount(chunkAverageTokens) }}</strong>
-              </article>
-            </div>
-
-            <div v-if="chunkDisplayMode === 'grouped'" class="chunk-group-list">
-              <article v-for="group in chunkGroupedRecords"
-                       :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`"
-                       :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }"
-                       class="chunk-group-card">
-                <div class="chunk-group-head">
-                  <div class="chunk-group-head-main">
-                    <strong>父块 P#{{ group.parentBlockNo || '-' }}</strong>
-                    <p>{{ group.sectionPath || '未识别章节' }}</p>
-                  </div>
-                  <div class="chunk-group-head-side">
-                    <div class="chunk-group-head-actions">
-                      <button class="ghost-button chunk-group-detail-button" type="button"
-                              @click="openParentBlockDetail(group)">
-                        查看父块上下文
-                      </button>
-                      <button class="ghost-button chunk-group-toggle-button" type="button"
-                              @click="toggleChunkGroup(group.groupKey)">
-                        {{ isChunkGroupCollapsed(group.groupKey) ? '展开子块' : '折叠子块' }}
-                      </button>
-                    </div>
-                    <div class="chunk-group-meta">
-                      <span>子块 {{
-                          group.items.length
-                        }}/{{ group.parentChildCount || group.items.length }}</span>
-                      <span>子块范围 C#{{
-                          group.parentStartChunkNo || '-'
-                        }} - C#{{ group.parentEndChunkNo || '-' }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="!isChunkGroupCollapsed(group.groupKey)" class="chunk-group-track">
-                  <button v-for="item in group.items" :key="`group-track-${item.chunkId}`"
-                          class="chunk-group-node"
-                          type="button" @click="openChunkDetail(item.chunkId)">
-                    <strong>#{{ item.chunkNo || '-' }}</strong>
-                    <span>{{ formatCount(item.tokenCount) }} Token</span>
-                  </button>
-                </div>
-
-                <div v-if="!isChunkGroupCollapsed(group.groupKey)" class="chunk-group-table">
-                  <div class="chunk-table-head">
-                    <span>Chunk</span>
-                    <span>章节 / 标识</span>
-                    <span>来源 / 状态</span>
-                    <span>字符</span>
-                    <span>Token</span>
-                    <span>内容预览</span>
-                  </div>
-                  <article v-for="item in group.items" :key="`group-row-${item.chunkId}`"
-                           class="chunk-row chunk-row-clickable"
-                           @click="openChunkDetail(item.chunkId)">
-                    <div class="chunk-cell chunk-cell-index" data-label="Chunk">
-                      <strong>子块 C#{{ item.chunkNo }}</strong>
-                      <span>{{ item.chunkId }}</span>
-                      <span class="chunk-relation-hint">{{ buildChunkRelationText(item) }}</span>
-                    </div>
-                    <div class="chunk-cell chunk-cell-section" data-label="章节 / 标识">
-                      <strong>{{ item.sectionPath || '未识别章节' }}</strong>
-                      <span>父块 P#{{
-                          item.parentBlockNo || '-'
-                        }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
-                    </div>
-                    <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
-                      <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
-                      <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
-                        {{ item.vectorStatusName || '未知状态' }}
-                      </span>
-                    </div>
-                    <div class="chunk-cell" data-label="字符">
-                      <strong>{{ formatCount(item.charCount) }}</strong>
-                    </div>
-                    <div class="chunk-cell" data-label="Token">
-                      <strong>{{ formatCount(item.tokenCount) }}</strong>
-                    </div>
-                    <div class="chunk-cell chunk-cell-content" data-label="内容预览">
-                      <p class="chunk-body">{{ item.chunkText }}</p>
-                    </div>
-                  </article>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="chunk-table">
-              <div class="chunk-table-head">
-                <span>Chunk</span>
-                <span>章节 / 标识</span>
-                <span>来源 / 状态</span>
-                <span>字符</span>
-                <span>Token</span>
-                <span>内容预览</span>
-              </div>
-
-              <article v-for="item in chunkRecords" :key="item.chunkId"
-                       class="chunk-row chunk-row-clickable"
-                       @click="openChunkDetail(item.chunkId)">
-                <div class="chunk-cell chunk-cell-index" data-label="Chunk">
-                  <strong>子块 C#{{ item.chunkNo }}</strong>
-                  <span>{{ item.chunkId }}</span>
-                  <span class="chunk-relation-hint">{{ buildChunkRelationText(item) }}</span>
-                </div>
-                <div class="chunk-cell chunk-cell-section" data-label="章节 / 标识">
-                  <strong>{{ item.sectionPath || '未识别章节' }}</strong>
-                  <span>父块 P#{{ item.parentBlockNo || '-' }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
-                </div>
-                <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
-                  <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
-                  <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
-                    {{ item.vectorStatusName || '未知状态' }}
-                  </span>
-                </div>
-                <div class="chunk-cell" data-label="字符">
-                  <strong>{{ formatCount(item.charCount) }}</strong>
-                </div>
-                <div class="chunk-cell" data-label="Token">
-                  <strong>{{ formatCount(item.tokenCount) }}</strong>
-                </div>
-                <div class="chunk-cell chunk-cell-content" data-label="内容预览">
-                  <p class="chunk-body">{{ item.chunkText }}</p>
-                </div>
-              </article>
-            </div>
-
-            <div class="pagination-bar chunk-pagination-bar">
-              <button :disabled="chunkCurrentPage <= 1 || chunkLoading" class="ghost-button"
-                      type="button"
-                      @click="changeChunkPage(chunkCurrentPage - 1)">
-                上一页
-              </button>
-              <div class="pagination-status">
-                <label class="page-size-control">
-                  <span>每页显示</span>
-                  <select :disabled="chunkLoading" :value="chunkCurrentPageSize"
-                          class="page-size-select"
-                          @change="changeChunkPageSize(($event.currentTarget as HTMLSelectElement).value)">
-                    <option v-for="size in chunkPageSizeOptions" :key="`chunk-page-size-${size}`"
-                            :value="size">
-                      {{ size }} 条
-                    </option>
-                  </select>
-                </label>
-                <strong>第 {{ chunkCurrentPage }} / {{ chunkTotalPages }} 页</strong>
-                <span>共 {{ chunkTotalCount }} 条 Chunk，当前页 {{ chunkRecords.length }} 条</span>
-              </div>
-              <button :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading"
-                      class="ghost-button" type="button"
-                      @click="changeChunkPage(chunkCurrentPage + 1)">
-                下一页
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section v-show="activeWorkbenchSection === 'tasks'" ref="taskSectionRef"
-                 class="detail-section workbench-section" data-workbench-section="tasks">
-          <div class="workbench-section-head">
-            <div class="workbench-section-heading">
-              <span class="workbench-section-step-badge">Step 4</span>
-              <h2>查看任务记录</h2>
-              <p>通过最近任务摘要和完整时间线快速复盘当前文档的执行过程与异常信息。</p>
-            </div>
-            <div class="task-section-actions">
-              <span class="workbench-section-pill">{{ taskSectionStatusText }}</span>
-              <button :disabled="!documentDetail.latestTaskId" class="ghost-button" type="button"
-                      @click="openLogDrawer">
-                查看完整任务时间线
-              </button>
-            </div>
-          </div>
-
-          <div v-if="logLoading" class="empty-block compact-empty">正在加载任务日志...</div>
-          <div v-else-if="!taskLogs.length" class="empty-block compact-empty">
-            当前文档还没有可查看的任务日志。
-          </div>
-
-          <div v-else class="summary-log-list">
-            <article v-for="log in taskLogs.slice(0, 3)" :key="log.id" class="summary-log-item">
-              <div class="summary-log-head">
-                <strong>{{ log.stageTypeName }} · {{ log.eventTypeName }}</strong>
-                <span>{{ formatDateTime(log.createTime) }}</span>
-              </div>
-              <p>{{ log.content }}</p>
-            </article>
-          </div>
-        </section>
-      </div>
-    </article>
-
-    <div v-else class="empty-block">
-      正在加载文档详情...
-    </div>
-  </section>
-</template>
-
 <script lang="ts" setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
@@ -2222,6 +1252,976 @@ onBeforeUnmount(() => {
   clearBuildPolling()
 })
 </script>
+
+<template>
+  <section class="document-detail-page">
+    <transition name="drawer-fade">
+      <div v-if="logDrawerOpen" class="drawer-overlay" @click="closeLogDrawer"></div>
+    </transition>
+    <transition name="drawer-fade">
+      <div v-if="chunkDetailDrawerOpen" class="drawer-overlay"
+           @click="closeChunkDetailDrawer"></div>
+    </transition>
+
+    <transition name="build-mask-fade">
+      <div v-if="showBuildBlockingOverlay" class="build-overlay">
+        <div class="build-overlay-card">
+          <div class="build-overlay-head">
+            <span aria-hidden="true" class="build-overlay-spinner"></span>
+            <div>
+              <h3>{{ buildOverlayTitle }}</h3>
+              <p class="build-overlay-text">{{ buildOverlayDescription }}</p>
+            </div>
+          </div>
+
+          <div class="build-overlay-task-meta">
+            <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '创建中' }}</span>
+            <span>当前阶段 {{ activeBuildStageLabel || '准备启动' }}</span>
+          </div>
+
+          <div class="build-overlay-stage-list">
+            <article v-for="stage in buildStageItems" :key="`overlay-stage-${stage.code}`"
+                     :class="`build-overlay-stage-${stage.status}`" class="build-overlay-stage">
+              <span class="build-overlay-stage-icon">
+                <span v-if="stage.status === 'current'" aria-hidden="true"
+                      class="stage-spinner"></span>
+                <span v-else>{{ stage.order }}</span>
+              </span>
+              <div class="build-overlay-stage-copy">
+                <strong>{{ stage.label }}</strong>
+                <span>{{ stage.statusLabel }}</span>
+              </div>
+            </article>
+          </div>
+
+          <p class="build-overlay-tip">
+            执行期间页面已暂时锁定，避免重复发起构建或误改当前策略链路。</p>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="drawer-slide">
+      <aside v-if="logDrawerOpen" class="log-drawer">
+        <div class="drawer-header">
+          <div>
+            <h3>任务执行详情</h3>
+            <p class="drawer-subtitle">
+              任务 {{ documentDetail?.latestTaskId || '-' }} ·
+              {{ documentDetail?.latestTaskTypeName || '暂无任务类型' }}
+            </p>
+          </div>
+          <button aria-label="关闭任务执行详情" class="icon-button" type="button"
+                  @click="closeLogDrawer">
+            <XMarkIcon class="drawer-icon"/>
+          </button>
+        </div>
+
+        <div class="drawer-summary">
+          <div class="summary-chip">
+            <span>当前状态</span>
+            <AdminStatusBadge :code="documentDetail?.latestTaskStatus"
+                              :label="documentDetail?.latestTaskStatusName || '暂无状态'"
+                              type="task"/>
+          </div>
+          <div class="summary-chip">
+            <span>索引状态</span>
+            <AdminStatusBadge :code="documentDetail?.indexStatus"
+                              :label="documentDetail?.indexStatusName || '暂无状态'"
+                              type="index"/>
+          </div>
+        </div>
+
+        <div v-if="logLoading" class="drawer-empty">正在加载任务日志...</div>
+        <div v-else-if="!taskLogs.length" class="drawer-empty">当前任务还没有日志记录。</div>
+
+        <div v-else class="drawer-timeline">
+          <article v-for="log in taskLogs" :key="log.id" class="drawer-log-item">
+            <div class="drawer-log-node"></div>
+            <div class="drawer-log-body">
+              <div class="drawer-log-head">
+                <strong>{{ log.stageTypeName }} · {{ log.eventTypeName }}</strong>
+                <span>{{ formatDateTime(log.createTime) }}</span>
+              </div>
+              <p>{{ log.content }}</p>
+              <pre v-if="log.detailJson" class="drawer-log-detail">{{ log.detailJson }}</pre>
+            </div>
+          </article>
+        </div>
+      </aside>
+    </transition>
+    <transition name="drawer-slide">
+      <aside v-if="chunkDetailDrawerOpen" class="log-drawer chunk-detail-drawer">
+        <div class="drawer-header">
+          <div>
+            <h3>Chunk 详情</h3>
+            <p class="drawer-subtitle">
+              <template v-if="chunkDetail?.chunk">
+                子块 C#{{ chunkDetail.chunk.chunkNo || '-' }} · 父块
+                P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}
+              </template>
+              <template v-else>
+                正在读取切块详情
+              </template>
+            </p>
+          </div>
+          <button aria-label="关闭 Chunk 详情" class="icon-button" type="button"
+                  @click="closeChunkDetailDrawer">
+            <XMarkIcon class="drawer-icon"/>
+          </button>
+        </div>
+
+        <div v-if="chunkDetailLoading" class="drawer-empty">正在加载 chunk 详情...</div>
+        <div v-else-if="!chunkDetail?.chunk" class="drawer-empty">当前没有可展示的 chunk 详情。</div>
+        <template v-else>
+          <div class="drawer-summary">
+            <div class="summary-chip summary-chip-child">
+              <span>当前子块</span>
+              <strong>C#{{ chunkDetail.chunk.chunkNo || '-' }}</strong>
+            </div>
+            <div class="summary-chip summary-chip-parent">
+              <span>所属父块</span>
+              <strong>P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}</strong>
+            </div>
+            <div class="summary-chip">
+              <span>同父子块</span>
+              <strong>{{
+                  chunkDetail.parentBlock?.childCount || chunkDetail.siblingChunks?.length || 0
+                }}</strong>
+            </div>
+          </div>
+
+          <section class="chunk-detail-section chunk-detail-section-current">
+            <div class="chunk-detail-head">
+              <div class="chunk-detail-title-group">
+                <span class="chunk-kind-badge chunk-kind-badge-child">Child Evidence</span>
+                <h4>当前子块 C#{{ chunkDetail?.chunk.chunkNo || '-' }}</h4>
+              </div>
+              <span>{{ buildChunkRelationText(chunkDetail?.chunk) }}</span>
+            </div>
+            <div class="chunk-detail-meta">
+              <span>章节：{{ chunkDetail?.chunk.sectionPath || '未识别章节' }}</span>
+              <span>字符：{{ formatCount(chunkDetail?.chunk.charCount) }}</span>
+              <span>Token：{{ formatCount(chunkDetail?.chunk.tokenCount) }}</span>
+            </div>
+            <pre class="chunk-detail-text">{{ chunkDetail?.chunk.chunkText || '' }}</pre>
+          </section>
+
+          <section v-if="chunkDetail.parentBlock" ref="parentBlockSectionRef"
+                   :class="{ 'chunk-detail-section-focused': chunkDetailFocusMode === 'parent' }"
+                   class="chunk-detail-section chunk-detail-section-parent">
+            <div class="chunk-detail-head">
+              <div class="chunk-detail-title-group">
+                <span class="chunk-kind-badge chunk-kind-badge-parent">Parent Context</span>
+                <h4>所属父块 P#{{ chunkDetail.parentBlock.parentBlockNo || '-' }}</h4>
+              </div>
+              <span>子块范围 C#{{
+                  chunkDetail.parentBlock.startChunkNo || '-'
+                }} - C#{{
+                  chunkDetail.parentBlock.endChunkNo
+                  || '-'
+                }}</span>
+            </div>
+            <div class="chunk-detail-meta">
+              <span>章节：{{ chunkDetail.parentBlock.sectionPath || '未识别章节' }}</span>
+              <span>字符：{{ formatCount(chunkDetail.parentBlock.charCount) }}</span>
+              <span>Token：{{ formatCount(chunkDetail.parentBlock.tokenCount) }}</span>
+            </div>
+            <pre class="chunk-detail-text parent-block-text">{{
+                chunkDetail.parentBlock.parentText
+              }}</pre>
+          </section>
+
+          <section
+            v-if="Array.isArray(chunkDetail.siblingChunks) && chunkDetail.siblingChunks.length"
+            class="chunk-detail-section">
+            <div class="chunk-detail-head">
+              <h4>同父子块关系</h4>
+              <span>点击可切换查看其他子块</span>
+            </div>
+            <div class="chunk-relation-legend">
+              <span>父块 P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }}</span>
+              <span>当前命中子块 C#{{ chunkDetail.chunk.chunkNo || '-' }}</span>
+              <span>同父共 {{ chunkDetail.siblingChunks.length }} 个子块</span>
+            </div>
+            <p class="chunk-relation-note">
+              当前父块 P#{{ chunkDetail.parentBlock?.parentBlockNo || '-' }} 内包含
+              {{ formatChunkCodeList(chunkDetail.siblingChunks) }} 这些子块，当前命中的是
+              C#{{ chunkDetail.chunk.chunkNo || '-' }}。
+            </p>
+            <div class="chunk-relation-track">
+              <template v-for="(item, index) in chunkDetail.siblingChunks"
+                        :key="`track-${item.chunkId}`">
+                <button :class="{ active: isCurrentChunk(item) }" class="chunk-relation-node"
+                        type="button"
+                        @click="openChunkDetail(item.chunkId)">
+                  <strong>C#{{ item.chunkNo || '-' }}</strong>
+                  <span>{{ buildSiblingOrderLabel(index, chunkDetail.siblingChunks.length) }}</span>
+                </button>
+                <div v-if="index < chunkDetail.siblingChunks.length - 1"
+                     :class="{ active: isCurrentChunk(item) || isCurrentChunk(chunkDetail.siblingChunks[index + 1] || null) }"
+                     class="chunk-relation-line">
+                </div>
+              </template>
+            </div>
+            <div class="sibling-chunk-list">
+              <button v-for="item in chunkDetail.siblingChunks" :key="`sibling-${item.chunkId}`"
+                      :class="{ active: item.chunkId === chunkDetail.chunk.chunkId }"
+                      class="sibling-chunk-card" type="button"
+                      @click="openChunkDetail(item.chunkId)">
+                <div class="sibling-chunk-head">
+                  <strong>子块 C#{{ item.chunkNo || '-' }}</strong>
+                  <span>{{ buildChunkRelationText(item) }}</span>
+                </div>
+                <span>{{ item.sectionPath || '未识别章节' }}</span>
+                <span>{{ item.chunkText }}</span>
+              </button>
+            </div>
+          </section>
+        </template>
+      </aside>
+    </transition>
+
+    <div class="page-top">
+      <div class="page-top-main">
+        <div class="page-top-breadcrumb">
+          <button class="ghost-button page-top-back" type="button" @click="goBack">
+            <ArrowLeftIcon class="back-icon"/>
+            返回文档列表
+          </button>
+          <span>文档接入</span>
+          <span>/</span>
+          <strong>文档工作台</strong>
+        </div>
+        <p class="page-top-caption">围绕单个文档完成策略确认、索引构建、验证 Chunk 结果与任务追踪。</p>
+      </div>
+      <div class="page-top-actions">
+        <button :disabled="loading" class="ghost-button" type="button" @click="loadAll">
+          {{ loading ? '刷新中...' : '刷新详情' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
+      {{ pageNotice.message }}
+    </div>
+
+    <article v-if="documentDetail" class="panel-card detail-card">
+      <div class="detail-content">
+        <nav aria-label="文档工作台章节导航" class="workbench-nav">
+          <button v-for="item in workbenchSections" :key="`workbench-nav-${item.key}`"
+                  :class="[{ active: activeWorkbenchSection === item.key }, `workbench-nav-item-${item.key}`]"
+                  class="workbench-nav-item" type="button"
+                  @click="scrollToWorkbenchSection(item.key)">
+            <span class="workbench-nav-step">{{ item.step }}</span>
+            <span class="workbench-nav-copy">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.caption }}</span>
+            </span>
+            <em>{{ item.status }}</em>
+          </button>
+        </nav>
+
+        <section v-show="activeWorkbenchSection === 'overview'" ref="overviewSectionRef"
+                 class="detail-section workbench-section" data-workbench-section="overview">
+          <div class="workbench-section-head">
+            <div class="workbench-section-heading">
+              <span class="workbench-section-step-badge">Overview</span>
+              <h2>文档概览</h2>
+              <p>先确认文档状态、关键指标和当前工作焦点，再进入下方流程。</p>
+            </div>
+            <span class="workbench-section-pill">{{ workflowCurrentPhase.shortLabel }}</span>
+          </div>
+
+          <div class="overview-document-card">
+            <div class="overview-document-main">
+              <p class="overview-document-kicker">Current Document</p>
+              <h3>{{ documentDetail.documentName }}</h3>
+              <p v-if="showOriginalFileName" class="overview-document-subtitle">
+                {{ documentDetail.originalFileName }}
+              </p>
+            </div>
+            <div class="overview-document-side">
+              <div class="detail-statuses">
+                <AdminStatusBadge :code="documentDetail.parseStatus"
+                                  :label="documentDetail.parseStatusName"
+                                  type="parse"/>
+                <AdminStatusBadge :code="documentDetail.strategyStatus"
+                                  :label="documentDetail.strategyStatusName"
+                                  type="strategy"/>
+                <AdminStatusBadge :code="documentDetail.indexStatus"
+                                  :label="documentDetail.indexStatusName"
+                                  type="index"/>
+              </div>
+              <span class="overview-document-phase">{{ workflowCurrentPhase.title }}</span>
+            </div>
+          </div>
+
+          <div class="workspace-guidance-grid overview-guidance-grid">
+            <article :class="`workspace-guidance-card-${workflowCurrentPhase.tone}`"
+                     class="workspace-guidance-card">
+              <span class="workspace-guidance-kicker">当前阶段</span>
+              <strong>{{ workflowCurrentPhase.title }}</strong>
+              <p>{{ workflowCurrentPhase.description }}</p>
+            </article>
+            <article class="workspace-guidance-card workspace-guidance-card-next">
+              <span class="workspace-guidance-kicker">下一步建议</span>
+              <strong>{{ workflowNextAction.title }}</strong>
+              <p>{{ workflowNextAction.description }}</p>
+            </article>
+          </div>
+
+          <article class="workspace-subsection workspace-subsection-compact overview-routes-card">
+            <div class="workspace-subsection-header">
+              <div>
+                <p class="workspace-subsection-kicker">Quick Routes</p>
+                <h3>常用入口</h3>
+              </div>
+            </div>
+            <div class="overview-action-row">
+              <button class="ghost-button" type="button"
+                      @click="scrollToWorkbenchSection('strategy')">
+                查看策略配置
+              </button>
+              <button class="ghost-button" type="button"
+                      @click="scrollToWorkbenchSection('execution')">
+                前往确认与构建
+              </button>
+              <button class="ghost-button" type="button" @click="scrollToWorkbenchSection('chunk')">
+                检查 Chunk 结果
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section v-show="activeWorkbenchSection === 'strategy'" ref="strategySectionRef"
+                 class="detail-section workbench-section" data-workbench-section="strategy">
+          <div class="workbench-section-head">
+            <div class="workbench-section-heading">
+              <span class="workbench-section-step-badge">Step 1</span>
+              <h2>配置策略</h2>
+              <p>先阅读系统推荐，再分别调整父块和子块流水线，形成最终执行方案。</p>
+            </div>
+            <span class="workbench-section-pill">{{ strategySectionStatusText }}</span>
+          </div>
+
+          <div v-if="documentDetail.parseErrorMsg" class="inline-notice inline-notice-danger">
+            {{ documentDetail.parseErrorMsg }}
+          </div>
+
+          <div v-if="strategySystemStages.length" class="strategy-status-bar">
+            <article v-for="item in strategySystemStages" :key="`strategy-stage-${item.code}`"
+                     :class="`strategy-status-step-${item.status}`" class="strategy-status-step">
+              <div class="strategy-status-index">{{ item.order }}</div>
+              <div class="strategy-status-copy">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.description }}</span>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="planLoading" class="empty-block compact-empty">正在读取策略详情...</div>
+          <div v-else-if="!strategyPlan?.planReady" class="empty-block compact-empty">
+            当前文档尚未生成策略方案，解析完成后可点击刷新查看。
+          </div>
+          <template v-else>
+            <div class="strategy-section-shell">
+              <div class="strategy-intro">
+                <p class="strategy-intro-kicker">Recommendation Summary</p>
+                <p class="strategy-intro-copy">
+                  {{
+                    strategyPlan.plan?.recommendReason || '系统已生成推荐策略，可以根据业务需要再做补充。'
+                  }}
+                </p>
+              </div>
+
+              <div class="strategy-flow-stack">
+                <section v-for="pipeline in strategyPipelineLibrary"
+                         :key="`recommended-${pipeline.key}`"
+                         :class="`strategy-lane-${pipeline.key}`"
+                         class="strategy-lane strategy-lane-recommended">
+                  <div class="strategy-lane-header">
+                    <div class="strategy-lane-title-box">
+                      <p class="strategy-lane-kicker">
+                        {{
+                          pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                            'Retrieval Recall Pipeline'
+                        }}</p>
+                      <h5>{{ pipeline.label }}</h5>
+                    </div>
+                    <p class="strategy-lane-description">{{ pipeline.description }}</p>
+                  </div>
+
+                  <div v-if="resolveStrategySteps(strategyPlan.plan, pipeline.key)?.length"
+                       :class="`timeline-list-${pipeline.key}`" class="timeline-list">
+                    <template
+                      v-for="(step, index) in resolveStrategySteps(strategyPlan.plan, pipeline.key)"
+                      :key="`${strategyPlan?.plan?.planId}-${pipeline.key}-${step.stepNo}`">
+                      <article class="timeline-item">
+                        <div class="timeline-index">{{ String(step.stepNo).padStart(2, '0') }}</div>
+                        <div class="timeline-main">
+                          <strong>{{ step.strategyTypeName }}</strong>
+                          <p>{{ step.recommendReason || step.strategyRoleName }}</p>
+                        </div>
+                      </article>
+                      <div
+                        v-if="index < resolveStrategySteps(strategyPlan.plan, pipeline.key).length - 1"
+                        :key="`${strategyPlan.plan?.planId}-${pipeline.key}-${step.stepNo}-arrow`"
+                        class="flow-arrow">
+                        <span aria-hidden="true" class="flow-arrow-icon">↓</span>
+                      </div>
+                    </template>
+                  </div>
+                  <div v-else class="empty-block compact-empty">
+                    当前方案还没有 {{ pipeline.label }} 配置。
+                  </div>
+                </section>
+              </div>
+
+              <div class="strategy-adjust-shell">
+                <div class="strategy-adjust-header">
+                  <div class="strategy-adjust-title-box">
+                    <p class="strategy-adjust-kicker">Adjustment Workspace</p>
+                    <h5>双流水线调整</h5>
+                  </div>
+                  <p class="strategy-adjust-description">分别配置父块回答流水线和子块召回流水线，并通过上移
+                    / 下移调整顺序。</p>
+                </div>
+
+                <div class="strategy-flow-stack strategy-flow-stack-edit">
+                  <section v-for="pipeline in strategyPipelineLibrary"
+                           :key="`editor-${pipeline.key}`"
+                           :class="`strategy-lane-${pipeline.key}`"
+                           class="strategy-lane strategy-lane-edit">
+                    <div class="strategy-lane-header">
+                      <div class="strategy-lane-title-box">
+                        <p class="strategy-lane-kicker">
+                          {{
+                            pipeline.key === 'parent' ? 'Answer Context Pipeline' :
+                              'Retrieval Recall Pipeline'
+                          }}</p>
+                        <h5>{{ pipeline.label }}</h5>
+                      </div>
+                      <p class="strategy-lane-description">{{ pipeline.description }}</p>
+                    </div>
+
+                    <div :class="`selected-flow-board-${pipeline.key}`" class="selected-flow-board">
+                      <span :class="`selected-flow-label-${pipeline.key}`"
+                            class="selected-flow-label">当前配置</span>
+
+                      <div v-if="getSelectedStrategyPreview(pipeline.key).length"
+                           class="sequence-board selected-flow-sequence">
+                        <template v-for="(row, rowIndex) in getSelectedStrategyRows(pipeline.key)"
+                                  :key="`strategy-row-${pipeline.key}-${rowIndex}`">
+                          <div class="sequence-row">
+                            <article v-if="row.leftItem" class="selected-flow-card sequence-card">
+                              <div class="selected-flow-order">{{ row.leftItem.order }}</div>
+                              <div class="selected-flow-content">
+                                <strong>{{ row.leftItem.label }}</strong>
+                                <span>{{ row.leftItem.description }}</span>
+                              </div>
+                              <div class="selected-flow-actions">
+                                <button :disabled="row.leftItem.index === 0"
+                                        class="flow-action-button" type="button"
+                                        @click="moveStrategy(row.leftItem.type, -1, pipeline.key)">
+                                  上移
+                                </button>
+                                <button
+                                  :disabled="row.leftItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  class="flow-action-button" type="button"
+                                  @click="moveStrategy(row.leftItem.type, 1, pipeline.key)">
+                                  下移
+                                </button>
+                              </div>
+                            </article>
+                            <div v-else class="sequence-card-placeholder"></div>
+
+                            <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
+                              {{
+                                row.direction ===
+                                'rtl' ? '←' : '→'
+                              }}
+                            </div>
+                            <div v-else
+                                 class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
+
+                            <article v-if="row.rightItem" class="selected-flow-card sequence-card">
+                              <div class="selected-flow-order">{{ row.rightItem.order }}</div>
+                              <div class="selected-flow-content">
+                                <strong>{{ row.rightItem.label }}</strong>
+                                <span>{{ row.rightItem.description }}</span>
+                              </div>
+                              <div class="selected-flow-actions">
+                                <button :disabled="row.rightItem.index === 0"
+                                        class="flow-action-button" type="button"
+                                        @click="moveStrategy(row.rightItem.type, -1, pipeline.key)">
+                                  上移
+                                </button>
+                                <button
+                                  :disabled="row.rightItem.index === getSelectedStrategyPreview(pipeline.key).length - 1"
+                                  class="flow-action-button" type="button"
+                                  @click="moveStrategy(row.rightItem.type, 1, pipeline.key)">
+                                  下移
+                                </button>
+                              </div>
+                            </article>
+                            <div v-else class="sequence-card-placeholder"></div>
+                          </div>
+
+                          <div v-if="rowIndex < getSelectedStrategyRows(pipeline.key).length - 1"
+                               :class="`sequence-down-row-${row.downColumn}`"
+                               class="sequence-down-row">
+                            <span class="sequence-down-arrow">↓</span>
+                          </div>
+                        </template>
+                      </div>
+
+                      <div v-else class="selected-flow-empty">
+                        {{ pipeline.label }}至少选择一个拆分策略，已选策略会在这里形成清晰的箭头处理链路。
+                      </div>
+                    </div>
+
+                    <div :class="`strategy-picker-${pipeline.key}`" class="strategy-picker">
+                      <button v-for="item in strategyLibrary" :key="`${pipeline.key}-${item.type}`"
+                              :class="{ active: getSelectedStrategyTypes(pipeline.key).includes(item.type) }"
+                              class="strategy-chip" type="button"
+                              @click="toggleStrategy(item.type, pipeline.key)">
+                        <div class="strategy-chip-top">
+                          <span class="strategy-chip-state">{{
+                              getSelectedStrategyTypes(pipeline.key).includes(item.type) ? '已选中' :
+                                '点击添加'
+                            }}</span>
+                          <CheckCircleIcon
+                            v-if="getSelectedStrategyTypes(pipeline.key).includes(item.type)"
+                            class="strategy-chip-check"/>
+                        </div>
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.description }}</span>
+                      </button>
+                    </div>
+
+                    <div :class="`preview-box-${pipeline.key}`" class="preview-box">
+                      <span :class="`preview-box-title-${pipeline.key}`" class="preview-box-title">{{
+                          pipeline.label
+                        }}最终提交顺序</span>
+                      <div v-if="getSelectedStrategyPreview(pipeline.key).length"
+                           class="preview-flow">
+                        <template v-for="(item, index) in getSelectedStrategyPreview(pipeline.key)"
+                                  :key="`preview-${pipeline.key}-${item.type}`">
+                          <span class="preview-tag">{{ item.label }}</span>
+                          <ArrowRightIcon
+                            v-if="index < getSelectedStrategyPreview(pipeline.key).length - 1"
+                            class="preview-arrow"/>
+                        </template>
+                      </div>
+                      <p v-else class="preview-empty">
+                        还没有选中策略，无法生成当前流水线的最终提交顺序。</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+
+          </template>
+        </section>
+
+        <section v-show="activeWorkbenchSection === 'execution'" ref="executionSectionRef"
+                 class="detail-section workbench-section" data-workbench-section="execution">
+          <div class="workbench-section-head">
+            <div class="workbench-section-heading">
+              <span class="workbench-section-step-badge">Step 2</span>
+              <h2>确认并构建</h2>
+              <p>先确认策略方案，再执行构建索引，并在同一处查看执行轨迹。</p>
+            </div>
+            <span class="workbench-section-pill">{{ executionSectionStatusText }}</span>
+          </div>
+
+          <div class="execution-summary-grid">
+            <article class="execution-summary-card">
+              <span>策略确认</span>
+              <strong>{{ confirmStepBadge }}</strong>
+              <p>{{ hasConfirmedStrategy ? '当前方案已进入确认流程。' : '还未完成最终确认。' }}</p>
+            </article>
+            <article class="execution-summary-card">
+              <span>构建执行</span>
+              <strong>{{ buildStepBadge }}</strong>
+              <p>{{
+                  hasBuildInFlightStatus ? '系统正在执行构建，请留意下方轨迹。' : '确认完成后即可发起构建。'
+                }}</p>
+            </article>
+            <article class="execution-summary-card">
+              <span>当前任务</span>
+              <strong>{{ activeBuildTaskId || documentDetail.latestTaskId || '-' }}</strong>
+              <p>{{ activeBuildStageLabel || '当前还没有正在执行的构建任务。' }}</p>
+            </article>
+          </div>
+
+          <div class="confirm-actions">
+            <input v-model="adjustNote" class="adjust-input"
+                   placeholder="补充说明，例如：增加大模型智能切块用于复杂段落" type="text"/>
+            <div class="strategy-submit-actions">
+              <article :class="`action-stage-${confirmStepState}`" class="action-stage-card">
+                <div class="action-stage-head">
+                  <span class="action-stage-index">01</span>
+                  <span class="action-stage-badge">{{ confirmStepBadge }}</span>
+                </div>
+                <strong>先确认策略方案</strong>
+                <p>{{ confirmStepDescription }}</p>
+                <button :disabled="!canConfirmStrategyAction"
+                        class="action-button action-button-confirm" type="button"
+                        @click="submitConfirmStrategy">
+                  <span>{{ confirmButtonLabel }}</span>
+                  <CheckCircleIcon aria-hidden="true" class="action-button-icon"/>
+                </button>
+              </article>
+
+              <article :class="`action-stage-${buildStepState}`" class="action-stage-card">
+                <div class="action-stage-head">
+                  <span class="action-stage-index">02</span>
+                  <span class="action-stage-badge">{{ buildStepBadge }}</span>
+                </div>
+                <strong>再执行构建索引</strong>
+                <p>{{ buildStepDescription }}</p>
+                <button :disabled="!canBuildIndexAction" class="action-button action-button-build"
+                        type="button"
+                        @click="submitBuildIndex">
+                  <span>{{ buildButtonLabel }}</span>
+                  <ArrowRightIcon aria-hidden="true" class="action-button-icon"/>
+                </button>
+              </article>
+            </div>
+          </div>
+
+          <div v-if="showBuildTracker" ref="buildTrackerRef"
+               class="build-progress-card build-progress-card-inline">
+            <div class="build-progress-header">
+              <div>
+                <strong>{{ buildTrackerTitle }}</strong>
+                <p class="build-progress-text">{{ buildTrackerDescription }}</p>
+              </div>
+              <span :class="{ 'build-pulse-static': !isBuildPolling }" class="build-pulse">
+                {{ isBuildPolling ? '实时轮询中' : '轨迹已保留' }}
+              </span>
+            </div>
+
+            <div class="sequence-board build-stage-board">
+              <template v-for="(row, rowIndex) in buildStageRows" :key="`build-row-${rowIndex}`">
+                <div class="sequence-row">
+                  <article v-if="row.leftItem" :class="`stage-${row.leftItem.status}`"
+                           class="stage-card sequence-card">
+                    <div class="stage-order">
+                      <span v-if="row.leftItem.status === 'current'" aria-hidden="true"
+                            class="stage-spinner"></span>
+                      <span v-else>{{ row.leftItem.order }}</span>
+                    </div>
+                    <div class="stage-body">
+                      <strong>{{ row.leftItem.label }}</strong>
+                      <span>{{ row.leftItem.description }}</span>
+                      <em>{{ row.leftItem.statusLabel }}</em>
+                    </div>
+                  </article>
+                  <div v-else class="sequence-card-placeholder"></div>
+
+                  <div v-if="row.leftItem && row.rightItem" class="sequence-inline-arrow">
+                    {{ row.direction === 'rtl' ? '←' : '→' }}
+                  </div>
+                  <div v-else class="sequence-inline-arrow sequence-inline-arrow-empty"></div>
+
+                  <article v-if="row.rightItem" :class="`stage-${row.rightItem.status}`"
+                           class="stage-card sequence-card">
+                    <div class="stage-order">
+                      <span v-if="row.rightItem.status === 'current'" aria-hidden="true"
+                            class="stage-spinner"></span>
+                      <span v-else>{{ row.rightItem.order }}</span>
+                    </div>
+                    <div class="stage-body">
+                      <strong>{{ row.rightItem.label }}</strong>
+                      <span>{{ row.rightItem.description }}</span>
+                      <em>{{ row.rightItem.statusLabel }}</em>
+                    </div>
+                  </article>
+                  <div v-else class="sequence-card-placeholder"></div>
+                </div>
+
+                <div v-if="rowIndex < buildStageRows.length - 1"
+                     :class="`sequence-down-row-${row.downColumn}`"
+                     class="sequence-down-row">
+                  <span class="sequence-down-arrow">↓</span>
+                </div>
+              </template>
+            </div>
+
+            <div class="tracker-footer">
+              <span>任务 {{ buildTaskSnapshot?.taskId || activeBuildTaskId || '-' }}</span>
+              <span>状态 {{
+                  buildTaskSnapshot?.taskStatusName || (documentDetail?.indexStatus === 3 ? '成功' : '未知')
+                }}</span>
+              <span>耗时 {{ formatDuration(buildTaskSnapshot?.costMillis) }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section v-show="activeWorkbenchSection === 'chunk'" ref="chunkSectionRef"
+                 class="detail-section workbench-section" data-workbench-section="chunk">
+          <div class="workbench-section-head">
+            <div class="workbench-section-heading">
+              <span class="workbench-section-step-badge">Step 3</span>
+              <h2>验证 Chunk 结果</h2>
+              <p>在这里检查父子分块结构、分页浏览内容，并抽样验证切块是否符合预期。</p>
+            </div>
+            <div class="chunk-section-actions">
+              <span class="workbench-section-pill">{{ chunkSectionStatusText }}</span>
+              <span v-if="chunkQuery?.taskId">任务 {{
+                  chunkQuery.taskId
+                }} · {{ chunkQuery.total || 0 }} 条</span>
+              <span v-else>当前还没有可展示的 chunk</span>
+              <div v-if="chunkRecords.length" class="chunk-view-switch">
+                <button :class="{ active: chunkDisplayMode === 'grouped' }"
+                        class="chunk-view-button" type="button"
+                        @click="chunkDisplayMode = 'grouped'">
+                  按父块分组
+                </button>
+                <button :class="{ active: chunkDisplayMode === 'flat' }" class="chunk-view-button"
+                        type="button"
+                        @click="chunkDisplayMode = 'flat'">
+                  平铺列表
+                </button>
+                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button"
+                        type="button"
+                        @click="setAllChunkGroupsCollapsed(false)">
+                  展开全部
+                </button>
+                <button v-if="chunkDisplayMode === 'grouped'" class="chunk-view-button"
+                        type="button"
+                        @click="setAllChunkGroupsCollapsed(true)">
+                  折叠全部
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="chunkLoading" class="empty-block compact-empty">正在加载 Chunk 列表...</div>
+          <div v-else-if="!chunkRecords.length" class="empty-block compact-empty">
+            当前文档还没有 Chunk 数据。请先完成索引构建，或等待构建任务继续执行。
+          </div>
+
+          <div v-else class="chunk-table-panel">
+            <div class="chunk-toolbar">
+              <article class="chunk-stat-card">
+                <span>父块数</span>
+                <strong>{{ formatCount(chunkParentCount) }}</strong>
+              </article>
+              <article class="chunk-stat-card">
+                <span>总片段</span>
+                <strong>{{ formatCount(chunkTotalCount) }}</strong>
+              </article>
+              <article class="chunk-stat-card">
+                <span>向量可用</span>
+                <strong>{{ formatCount(chunkVectorReadyCount) }}</strong>
+              </article>
+              <article class="chunk-stat-card">
+                <span>待处理</span>
+                <strong>{{ formatCount(chunkVectorPendingCount) }}</strong>
+              </article>
+              <article class="chunk-stat-card">
+                <span>平均 Token</span>
+                <strong>{{ formatCount(chunkAverageTokens) }}</strong>
+              </article>
+            </div>
+
+            <div v-if="chunkDisplayMode === 'grouped'" class="chunk-group-list">
+              <article v-for="group in chunkGroupedRecords"
+                       :key="`parent-group-${group.parentBlockId || group.parentBlockNo}`"
+                       :class="{ collapsed: isChunkGroupCollapsed(group.groupKey) }"
+                       class="chunk-group-card">
+                <div class="chunk-group-head">
+                  <div class="chunk-group-head-main">
+                    <strong>父块 P#{{ group.parentBlockNo || '-' }}</strong>
+                    <p>{{ group.sectionPath || '未识别章节' }}</p>
+                  </div>
+                  <div class="chunk-group-head-side">
+                    <div class="chunk-group-head-actions">
+                      <button class="ghost-button chunk-group-detail-button" type="button"
+                              @click="openParentBlockDetail(group)">
+                        查看父块上下文
+                      </button>
+                      <button class="ghost-button chunk-group-toggle-button" type="button"
+                              @click="toggleChunkGroup(group.groupKey)">
+                        {{ isChunkGroupCollapsed(group.groupKey) ? '展开子块' : '折叠子块' }}
+                      </button>
+                    </div>
+                    <div class="chunk-group-meta">
+                      <span>子块 {{
+                          group.items.length
+                        }}/{{ group.parentChildCount || group.items.length }}</span>
+                      <span>子块范围 C#{{
+                          group.parentStartChunkNo || '-'
+                        }} - C#{{ group.parentEndChunkNo || '-' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="!isChunkGroupCollapsed(group.groupKey)" class="chunk-group-track">
+                  <button v-for="item in group.items" :key="`group-track-${item.chunkId}`"
+                          class="chunk-group-node"
+                          type="button" @click="openChunkDetail(item.chunkId)">
+                    <strong>#{{ item.chunkNo || '-' }}</strong>
+                    <span>{{ formatCount(item.tokenCount) }} Token</span>
+                  </button>
+                </div>
+
+                <div v-if="!isChunkGroupCollapsed(group.groupKey)" class="chunk-group-table">
+                  <div class="chunk-table-head">
+                    <span>Chunk</span>
+                    <span>章节 / 标识</span>
+                    <span>来源 / 状态</span>
+                    <span>字符</span>
+                    <span>Token</span>
+                    <span>内容预览</span>
+                  </div>
+                  <article v-for="item in group.items" :key="`group-row-${item.chunkId}`"
+                           class="chunk-row chunk-row-clickable"
+                           @click="openChunkDetail(item.chunkId)">
+                    <div class="chunk-cell chunk-cell-index" data-label="Chunk">
+                      <strong>子块 C#{{ item.chunkNo }}</strong>
+                      <span>{{ item.chunkId }}</span>
+                      <span class="chunk-relation-hint">{{ buildChunkRelationText(item) }}</span>
+                    </div>
+                    <div class="chunk-cell chunk-cell-section" data-label="章节 / 标识">
+                      <strong>{{ item.sectionPath || '未识别章节' }}</strong>
+                      <span>父块 P#{{
+                          item.parentBlockNo || '-'
+                        }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
+                    </div>
+                    <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
+                      <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
+                      <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
+                        {{ item.vectorStatusName || '未知状态' }}
+                      </span>
+                    </div>
+                    <div class="chunk-cell" data-label="字符">
+                      <strong>{{ formatCount(item.charCount) }}</strong>
+                    </div>
+                    <div class="chunk-cell" data-label="Token">
+                      <strong>{{ formatCount(item.tokenCount) }}</strong>
+                    </div>
+                    <div class="chunk-cell chunk-cell-content" data-label="内容预览">
+                      <p class="chunk-body">{{ item.chunkText }}</p>
+                    </div>
+                  </article>
+                </div>
+              </article>
+            </div>
+
+            <div v-else class="chunk-table">
+              <div class="chunk-table-head">
+                <span>Chunk</span>
+                <span>章节 / 标识</span>
+                <span>来源 / 状态</span>
+                <span>字符</span>
+                <span>Token</span>
+                <span>内容预览</span>
+              </div>
+
+              <article v-for="item in chunkRecords" :key="item.chunkId"
+                       class="chunk-row chunk-row-clickable"
+                       @click="openChunkDetail(item.chunkId)">
+                <div class="chunk-cell chunk-cell-index" data-label="Chunk">
+                  <strong>子块 C#{{ item.chunkNo }}</strong>
+                  <span>{{ item.chunkId }}</span>
+                  <span class="chunk-relation-hint">{{ buildChunkRelationText(item) }}</span>
+                </div>
+                <div class="chunk-cell chunk-cell-section" data-label="章节 / 标识">
+                  <strong>{{ item.sectionPath || '未识别章节' }}</strong>
+                  <span>父块 P#{{ item.parentBlockNo || '-' }} · 共 {{ item.parentChildCount || 0 }} 子块</span>
+                </div>
+                <div class="chunk-cell chunk-cell-status" data-label="来源 / 状态">
+                  <span class="chunk-chip">{{ item.sourceTypeName || '未知来源' }}</span>
+                  <span :class="`chunk-chip-${item.vectorStatus || '0'}`" class="chunk-chip">
+                    {{ item.vectorStatusName || '未知状态' }}
+                  </span>
+                </div>
+                <div class="chunk-cell" data-label="字符">
+                  <strong>{{ formatCount(item.charCount) }}</strong>
+                </div>
+                <div class="chunk-cell" data-label="Token">
+                  <strong>{{ formatCount(item.tokenCount) }}</strong>
+                </div>
+                <div class="chunk-cell chunk-cell-content" data-label="内容预览">
+                  <p class="chunk-body">{{ item.chunkText }}</p>
+                </div>
+              </article>
+            </div>
+
+            <div class="pagination-bar chunk-pagination-bar">
+              <button :disabled="chunkCurrentPage <= 1 || chunkLoading" class="ghost-button"
+                      type="button"
+                      @click="changeChunkPage(chunkCurrentPage - 1)">
+                上一页
+              </button>
+              <div class="pagination-status">
+                <label class="page-size-control">
+                  <span>每页显示</span>
+                  <select :disabled="chunkLoading" :value="chunkCurrentPageSize"
+                          class="page-size-select"
+                          @change="changeChunkPageSize(($event.currentTarget as HTMLSelectElement).value)">
+                    <option v-for="size in chunkPageSizeOptions" :key="`chunk-page-size-${size}`"
+                            :value="size">
+                      {{ size }} 条
+                    </option>
+                  </select>
+                </label>
+                <strong>第 {{ chunkCurrentPage }} / {{ chunkTotalPages }} 页</strong>
+                <span>共 {{ chunkTotalCount }} 条 Chunk，当前页 {{ chunkRecords.length }} 条</span>
+              </div>
+              <button :disabled="chunkCurrentPage >= chunkTotalPages || chunkLoading"
+                      class="ghost-button" type="button"
+                      @click="changeChunkPage(chunkCurrentPage + 1)">
+                下一页
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section v-show="activeWorkbenchSection === 'tasks'" ref="taskSectionRef"
+                 class="detail-section workbench-section" data-workbench-section="tasks">
+          <div class="workbench-section-head">
+            <div class="workbench-section-heading">
+              <span class="workbench-section-step-badge">Step 4</span>
+              <h2>查看任务记录</h2>
+              <p>通过最近任务摘要和完整时间线快速复盘当前文档的执行过程与异常信息。</p>
+            </div>
+            <div class="task-section-actions">
+              <span class="workbench-section-pill">{{ taskSectionStatusText }}</span>
+              <button :disabled="!documentDetail.latestTaskId" class="ghost-button" type="button"
+                      @click="openLogDrawer">
+                查看完整任务时间线
+              </button>
+            </div>
+          </div>
+
+          <div v-if="logLoading" class="empty-block compact-empty">正在加载任务日志...</div>
+          <div v-else-if="!taskLogs.length" class="empty-block compact-empty">
+            当前文档还没有可查看的任务日志。
+          </div>
+
+          <div v-else class="summary-log-list">
+            <article v-for="log in taskLogs.slice(0, 3)" :key="log.id" class="summary-log-item">
+              <div class="summary-log-head">
+                <strong>{{ log.stageTypeName }} · {{ log.eventTypeName }}</strong>
+                <span>{{ formatDateTime(log.createTime) }}</span>
+              </div>
+              <p>{{ log.content }}</p>
+            </article>
+          </div>
+        </section>
+      </div>
+    </article>
+
+    <div v-else class="empty-block">
+      正在加载文档详情...
+    </div>
+  </section>
+</template>
 
 <style scoped>
 .document-detail-page {

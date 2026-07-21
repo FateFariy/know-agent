@@ -37,8 +37,11 @@ function closeDrawer() {
 }
 
 const sessionId = computed(() => (route.params.sessionId as string | undefined) || null)
+// 会话存在性判断：store.sessions 尚未加载完成时不进行判断，避免刷新瞬间 sessions 仍为空时
+// 误判为"会话不存在"而触发 createSession 覆盖掉 sessionStorage 恢复的 currentSessionId
 const sessionExists = computed(() => {
   if (!sessionId.value) return false
+  if (!store.sessionsLoaded) return true
   return store.sessions.some((s) => s.id === sessionId.value)
 })
 const showWelcome = computed(() => store.showWelcome)
@@ -140,10 +143,6 @@ onBeforeUnmount(() => {
           <div v-if="selectedReference.sourceType" class="reference-detail__section">
             <span class="reference-detail__label">来源类型</span>
             <span class="reference-detail__value">{{ selectedReference.sourceType }}</span>
-          </div>
-          <div v-if="selectedReference.channel" class="reference-detail__section">
-            <span class="reference-detail__label">检索通道</span>
-            <span class="reference-detail__value">{{ selectedReference.channel }}</span>
           </div>
           <div v-if="selectedReference.snippet" class="reference-detail__snippet">
             <span class="reference-detail__label">引用片段</span>

@@ -1,620 +1,3 @@
-<template>
-  <section class="knowledge-page">
-    <header class="page-header">
-      <div>
-        <span class="section-eyebrow">Knowledge Routing</span>
-        <h3>知识路由配置</h3>
-        <p>按 范围 → 主题 → 画像 → 关联 的顺序逐步配置，构建自动知识问答的候选预选体系。</p>
-      </div>
-      <div class="header-actions">
-        <button :disabled="loading || actionLoading" class="ghost-button" type="button"
-                @click="loadAll">刷新数据
-        </button>
-        <button :disabled="!documents.length || batchLoading" class="primary-button" type="button"
-                @click="regenerateAllProfiles">
-          {{ batchLoading ? '批量重建中...' : '批量重建画像' }}
-        </button>
-      </div>
-    </header>
-
-    <div v-if="notice.message" :class="`page-notice-${notice.type}`" class="page-notice">
-      {{ notice.message }}
-    </div>
-
-    <section class="stats-grid">
-      <article v-for="item in summaryCards" :key="item.label" class="stat-card">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
-        <small>{{ item.description }}</small>
-      </article>
-    </section>
-
-    <section class="coverage-panel">
-      <div class="section-card-head" style="cursor:pointer"
-           @click="coveragePanelCollapsed = !coveragePanelCollapsed">
-        <div>
-          <span class="section-eyebrow">Scope Coverage</span>
-          <h4>范围覆盖率统计</h4>
-        </div>
-        <div class="coverage-toggle-row">
-          <span class="helper-pill helper-pill-soft">整体覆盖率 {{ overallCoverageRateText }}</span>
-          <span :class="{ collapsed: coveragePanelCollapsed }" class="collapse-arrow">&#9660;</span>
-        </div>
-      </div>
-      <div v-show="!coveragePanelCollapsed" class="coverage-grid">
-        <article v-for="item in scopeCoverageRows" :key="item.scopeCode" :class="{ warning: item.pendingTopicCount > 0 }"
-                 class="coverage-card">
-          <div class="coverage-head">
-            <div>
-              <strong>{{ item.scopeName }}</strong>
-              <span>{{ item.scopeCode }}</span>
-            </div>
-            <span class="coverage-rate">{{ item.coverageRateText }}</span>
-          </div>
-          <div class="coverage-track"><span :style="{ width: item.coverageRateText }"></span></div>
-          <div class="coverage-metrics">
-            <span>主题 {{ item.topicCount }}</span>
-            <span>已覆盖 {{ item.coveredTopicCount }}</span>
-            <span>未关联 {{ item.pendingTopicCount }}</span>
-            <span>文档 {{ item.documentCount }}</span>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-      <button v-for="tab in TAB_LIST" :key="tab.key" :class="{ active: activeTab === tab.key }"
-              class="tab-btn"
-              type="button" @click="activeTab = tab.key">
-        <span class="tab-step">{{ tab.step }}</span>
-        <span class="tab-label">{{ tab.label }}</span>
-        <span class="tab-hint">{{ tab.hint }}</span>
-      </button>
-    </nav>
-
-    <!-- Tab 1: 知识范围 -->
-    <section v-show="activeTab === 'scope'" class="tab-content">
-      <article class="panel-card">
-        <div class="panel-head">
-          <div>
-            <h4>知识范围</h4>
-            <p>先把大范围定清楚，自动知识问答才能稳定地在正确文档池里预选。</p>
-          </div>
-          <button class="primary-button" type="button" @click="openCreateDrawer('scope')">新建范围
-          </button>
-        </div>
-        <div class="toolbar-row">
-          <input v-model.trim="scopeKeyword" placeholder="按范围编码、名称或描述筛选"/>
-        </div>
-        <div class="card-grid">
-          <article v-for="item in filteredScopes" :key="item.scopeCode" :class="{ active: item.scopeCode === activeScopeCode }"
-                   class="data-card"
-                   @click="openDrawer('scope', item, 'view')">
-            <div class="data-card-head">
-              <strong>{{ item.scopeName }}</strong>
-            </div>
-            <small>{{ item.description || '暂无描述' }}</small>
-            <div class="data-card-meta">
-              <span>主题 {{ topics.filter(t => t.scopeCode === item.scopeCode).length }}</span>
-              <span>文档 {{
-                  documents.filter(d => d.knowledgeScopeCode === item.scopeCode).length
-                }}</span>
-            </div>
-          </article>
-          <div v-if="!filteredScopes.length" class="empty-inline">没有匹配的知识范围。</div>
-        </div>
-      </article>
-    </section>
-
-    <!-- Tab 2: 知识主题 -->
-    <section v-show="activeTab === 'topic'" class="tab-content">
-      <article class="panel-card">
-        <div class="panel-head">
-          <div>
-            <h4>知识主题</h4>
-            <p>主题是范围里的可回答单元，后续会通过主题文档关联把文档候选进一步收窄。</p>
-          </div>
-          <button class="primary-button" type="button" @click="openCreateDrawer('topic')">新建主题
-          </button>
-        </div>
-        <div class="toolbar-row toolbar-row-filters">
-          <select v-model="activeScopeCode" class="filter-select">
-            <option value="">全部范围</option>
-            <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
-              {{ item.scopeName }}
-            </option>
-          </select>
-          <input v-model.trim="topicKeyword" placeholder="按主题编码、名称、别名或描述筛选"/>
-        </div>
-        <div class="card-grid">
-          <article v-for="item in filteredTopics" :key="item.topicCode" :class="{ active: item.topicCode === activeTopicCode }"
-                   class="data-card"
-                   @click="openDrawer('topic', item, 'view')">
-            <div class="data-card-head">
-              <strong>{{ item.topicName }}</strong>
-            </div>
-            <div class="topic-meta-row">
-              <span class="tag-chip tag-chip-soft">{{
-                  formatAnswerShapeLabel(item.answerShape)
-                }}</span>
-              <span
-                class="tag-chip tag-chip-soft">{{
-                  formatExecutionPreferenceLabel(item.executionPreference)
-                }}</span>
-            </div>
-            <small>{{ item.description || '暂无描述' }}</small>
-          </article>
-          <div v-if="!filteredTopics.length" class="empty-inline">当前范围下还没有主题。</div>
-        </div>
-      </article>
-    </section>
-
-    <!-- Tab 3: 文档画像 -->
-    <section v-show="activeTab === 'profile'" class="tab-content">
-      <article class="panel-card">
-        <div class="panel-head">
-          <div>
-            <h4>文档画像</h4>
-            <p>查看文档的类型、摘要、核心主题和图能力开关，判断自动路由是否有足够信息。</p>
-          </div>
-        </div>
-        <div class="toolbar-row">
-          <input v-model.trim="documentKeyword"
-                 placeholder="按文档名、范围、业务分类或标签筛选文档"/>
-        </div>
-
-        <section v-if="profileAnomalyRows.length" class="anomaly-panel">
-          <div class="section-card-head" style="cursor:pointer"
-               @click="anomalyCollapsed = !anomalyCollapsed">
-            <div>
-              <span class="section-eyebrow">Profile Anomalies</span>
-              <h4>画像异常清单 ({{ profileAnomalyRows.length }})</h4>
-            </div>
-            <div class="coverage-toggle-row">
-              <button :disabled="!selectedProfileRepairIds.length || batchLoading" class="ghost-button"
-                      type="button"
-                      @click.stop="batchRepairProfiles">
-                {{ batchLoading ? '修复中...' : `批量重建 ${selectedProfileRepairIds.length} 份` }}
-              </button>
-              <span :class="{ collapsed: anomalyCollapsed }" class="collapse-arrow">&#9660;</span>
-            </div>
-          </div>
-          <div v-show="!anomalyCollapsed">
-            <div class="batch-actions">
-              <label class="toggle-chip">
-                <input :checked="allVisibleAnomaliesSelected" type="checkbox"
-                       @change="toggleAllVisibleAnomalies"/>
-                <span>全选异常</span>
-              </label>
-            </div>
-            <div class="anomaly-list">
-              <article v-for="item in profileAnomalyRows" :key="`anomaly-${item.documentId}`"
-                       :class="item.tone"
-                       class="anomaly-card">
-                <label class="row-check">
-                  <input :checked="selectedProfileRepairIds.includes(item.documentId)"
-                         type="checkbox"
-                         @change="toggleProfileRepair(item.documentId)"/>
-                  <span></span>
-                </label>
-                <div class="anomaly-main">
-                  <strong>{{ item.documentName }}</strong>
-                  <span>{{ item.scopeText }}</span>
-                  <div class="tag-list">
-                    <span v-for="problem in item.problems" :key="`${item.documentId}-${problem}`"
-                          class="tag-chip tag-chip-warning">{{ problem }}</span>
-                  </div>
-                </div>
-                <button class="ghost-button" type="button"
-                        @click.stop="selectAnomalyDocument(item); openDrawer('profile', null, 'view')">
-                  查看
-                </button>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <div class="card-grid">
-          <article v-for="item in filteredDocuments" :key="item.documentId" :class="{ active: item.documentId === profileDocumentId }"
-                   class="data-card"
-                   @click="selectDocument(item); openDrawer('profile', null, 'view')">
-            <div class="data-card-head">
-              <strong>{{ item.documentName }}</strong>
-            </div>
-            <small>{{ documentMetaLine(item) }}</small>
-          </article>
-          <div v-if="!filteredDocuments.length" class="empty-inline">没有匹配的文档。</div>
-        </div>
-      </article>
-    </section>
-
-    <!-- Tab 4: 主题文档关联 -->
-    <section v-show="activeTab === 'relation'" class="tab-content">
-      <article class="panel-card">
-        <div class="panel-head">
-          <div>
-            <h4>主题文档关联</h4>
-            <p>把"哪个主题该优先看哪份文档"显式维护下来，低置信自动路由时会直接受益。</p>
-          </div>
-          <button class="primary-button" type="button" @click="openCreateDrawer('relation')">
-            新建关联
-          </button>
-        </div>
-        <div class="toolbar-row toolbar-row-filters">
-          <select v-model="activeScopeCode" class="filter-select">
-            <option value="">全部范围</option>
-            <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
-              {{ item.scopeName }}
-            </option>
-          </select>
-          <input v-model.trim="relationKeyword" placeholder="按主题、文档、原因筛选关联结果"/>
-          <button :disabled="actionLoading" class="ghost-button" type="button"
-                  @click="loadRelations">刷新
-          </button>
-        </div>
-        <div class="helper-bar">
-          <span class="helper-pill helper-pill-soft">{{ relations.length }} 条可见关联</span>
-        </div>
-        <div class="relation-table">
-          <article v-for="item in relations" :key="`${item.topicCode}-${item.documentId}`"
-                   class="relation-row"
-                   @click="openDrawer('relation', item, 'view')">
-            <div>
-              <strong>{{ item.documentName }}</strong>
-              <span>{{ item.topicCode }} · 分数 {{
-                  item.relationScore
-                }} · {{
-                  item.knowledgeScopeName ||
-                  item.knowledgeScopeCode || '未分范围'
-                }}</span>
-              <small>{{ item.reason || documentMetaLine(item) }}</small>
-            </div>
-            <button :disabled="actionLoading" class="danger-link" type="button"
-                    @click.stop="removeRelation(item)">移除
-            </button>
-          </article>
-          <div v-if="!relations.length" class="empty-inline">当前筛选下还没有保存的文档关联。</div>
-        </div>
-      </article>
-    </section>
-
-    <!-- Drawer -->
-    <transition name="drawer-fade">
-      <div v-if="drawerVisible" class="drawer-overlay" @click="closeDrawer"></div>
-    </transition>
-    <transition name="drawer-slide">
-      <aside v-if="drawerVisible" class="drawer-panel">
-        <div class="drawer-header">
-          <h4 v-if="drawerType === 'scope'">
-            {{ drawerMode === 'edit' && !scopeTarget ? '新建知识范围' : '知识范围详情' }}</h4>
-          <h4 v-else-if="drawerType === 'topic'">
-            {{ drawerMode === 'edit' && !topicTarget ? '新建知识主题' : '知识主题详情' }}</h4>
-          <h4 v-else-if="drawerType === 'profile'">文档画像详情</h4>
-          <h4 v-else-if="drawerType === 'relation'">
-            {{ drawerMode === 'edit' && !relationTarget ? '新建主题文档关联' : '关联详情' }}
-          </h4>
-          <button class="ghost-button drawer-close" type="button" @click="closeDrawer">关闭</button>
-        </div>
-        <div class="drawer-body">
-
-          <!-- Scope Drawer -->
-          <template v-if="drawerType === 'scope'">
-            <template v-if="drawerMode === 'view' && scopeTarget">
-              <div class="drawer-detail">
-                <div class="detail-row">
-                  <span>范围编码</span>
-                  <strong>{{ scopeTarget.scopeCode }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>范围名称</span>
-                  <strong>{{ scopeTarget.scopeName }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>父级编码</span>
-                  <strong>{{ scopeTarget.parentScopeCode || '-' }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>排序值</span>
-                  <strong>{{ scopeTarget.sortOrder }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>描述</span>
-                  <p>{{ scopeTarget.description || '暂无描述' }}</p>
-                </div>
-                <div v-if="scopeTarget.aliases" class="tag-section">
-                  <p>别名</p>
-                  <div class="tag-list">
-                    <span v-for="a in parseTextList(scopeTarget.aliases)" :key="a"
-                          class="tag-chip tag-chip-soft">{{
-                        a
-                      }}</span>
-                  </div>
-                </div>
-                <div v-if="scopeTarget.examples" class="tag-section">
-                  <p>典型问题</p>
-                  <div class="tag-list">
-                    <span v-for="e in parseJsonArray(scopeTarget.examples)" :key="e"
-                          class="tag-chip">{{
-                        e
-                      }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-if="drawerMode === 'edit'">
-              <div class="form-grid">
-                <input v-model="scopeForm.scopeCode" placeholder="范围编码，例如 operation_rule"/>
-                <input v-model="scopeForm.scopeName" placeholder="范围名称，例如 运营规则"/>
-                <input v-model="scopeForm.parentScopeCode" placeholder="父级编码，可空"/>
-                <input v-model="scopeForm.aliases" placeholder="别名，英文逗号分隔"/>
-                <input v-model="scopeForm.sortOrder" placeholder="排序值"/>
-                <textarea v-model="scopeForm.description" placeholder="范围描述"></textarea>
-                <textarea v-model="scopeForm.examples"
-                          placeholder='典型问题 JSON，例如 ["上线观察多久"]'></textarea>
-              </div>
-            </template>
-          </template>
-
-          <!-- Topic Drawer -->
-          <template v-if="drawerType === 'topic'">
-            <template v-if="drawerMode === 'view' && topicTarget">
-              <div class="drawer-detail">
-                <div class="detail-row">
-                  <span>主题编码</span>
-                  <strong>{{ topicTarget.topicCode }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>主题名称</span>
-                  <strong>{{ topicTarget.topicName }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>所属范围</span>
-                  <strong>{{ topicTarget.scopeCode }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>回答形态</span>
-                  <strong>{{ formatAnswerShapeLabel(topicTarget.answerShape) }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>执行偏好</span>
-                  <strong>{{
-                      formatExecutionPreferenceLabel(topicTarget.executionPreference)
-                    }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>排序值</span>
-                  <strong>{{ topicTarget.sortOrder }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>描述</span>
-                  <p>{{ topicTarget.description || '暂无描述' }}</p>
-                </div>
-                <div v-if="topicTarget.aliases" class="tag-section">
-                  <p>别名</p>
-                  <div class="tag-list">
-                    <span v-for="a in parseTextList(topicTarget.aliases)" :key="a"
-                          class="tag-chip tag-chip-soft">{{
-                        a
-                      }}</span>
-                  </div>
-                </div>
-                <div v-if="topicTarget.examples" class="tag-section">
-                  <p>典型问题</p>
-                  <div class="tag-list">
-                    <span v-for="e in parseJsonArray(topicTarget.examples)" :key="e"
-                          class="tag-chip">{{ e }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-if="drawerMode === 'edit'">
-              <div class="form-grid">
-                <input v-model="topicForm.topicCode" placeholder="主题编码"/>
-                <input v-model="topicForm.topicName" placeholder="主题名称"/>
-                <select v-model="topicForm.scopeCode">
-                  <option value="">选择所属范围</option>
-                  <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
-                    {{ item.scopeName }}
-                  </option>
-                </select>
-                <input v-model="topicForm.aliases" placeholder="别名，英文逗号分隔"/>
-                <select v-model="topicForm.answerShape">
-                  <option value="">选择回答形态</option>
-                  <option v-for="item in ANSWER_SHAPE_OPTIONS" :key="item.value"
-                          :value="item.value">{{ item.label }}
-                  </option>
-                </select>
-                <select v-model="topicForm.executionPreference">
-                  <option value="">选择执行偏好</option>
-                  <option v-for="item in EXECUTION_PREFERENCE_OPTIONS" :key="item.value"
-                          :value="item.value">{{
-                      item.label
-                    }}
-                  </option>
-                </select>
-                <input v-model="topicForm.sortOrder" placeholder="排序值"/>
-                <textarea v-model="topicForm.description" placeholder="主题描述"></textarea>
-                <textarea v-model="topicForm.examples" placeholder='典型问题 JSON'></textarea>
-              </div>
-            </template>
-          </template>
-
-          <!-- Profile Drawer -->
-          <template v-if="drawerType === 'profile'">
-            <div class="drawer-detail">
-              <div class="detail-row">
-                <span>文档名称</span>
-                <strong>{{ selectedProfileDocument?.documentName || '-' }}</strong>
-              </div>
-              <div class="detail-row">
-                <span>元数据</span>
-                <small>{{ selectedProfileDocumentMeta }}</small>
-              </div>
-            </div>
-            <div class="actions" style="margin-top:12px">
-              <button :disabled="!profileDocumentId || actionLoading" class="primary-button"
-                      type="button"
-                      @click="loadProfile">查看画像
-              </button>
-              <button :disabled="!profileDocumentId || actionLoading" class="ghost-button"
-                      type="button"
-                      @click="regenerateProfile">重新生成
-              </button>
-            </div>
-            <div v-if="profile" class="profile-card" style="margin-top:16px">
-              <div class="profile-head">
-                <strong>{{
-                    selectedProfileDocument?.documentName || `文档 ${profileDocumentId}`
-                  }}</strong>
-                <span :class="profileStatusClass(profile.profileStatus)"
-                      class="profile-status-pill">{{
-                    profileStatusText(profile.profileStatus)
-                  }}</span>
-              </div>
-              <p class="profile-summary">{{
-                  profile.documentSummary || '当前画像还没有生成摘要。'
-                }}</p>
-              <div class="profile-grid">
-                <article class="mini-card">
-                  <span>文档类型</span>
-                  <strong>{{ formatDocumentTypeLabel(profile.documentType) }}</strong>
-                </article>
-                <article class="mini-card">
-                  <span>画像来源</span>
-                  <strong>{{ formatProfileSourceLabel(profile.profileSource) }}</strong>
-                </article>
-                <article class="mini-card">
-                  <span>图能力</span>
-                  <strong>{{ graphCapabilityText(profile) }}</strong>
-                </article>
-                <article class="mini-card">
-                  <span>核心主题数</span>
-                  <strong>{{ parseJsonArray(profile.coreTopics).length }}</strong>
-                </article>
-              </div>
-              <div class="tag-section">
-                <p>核心主题</p>
-                <div class="tag-list">
-                  <span v-for="item in parseJsonArray(profile.coreTopics)" :key="`dt-${item}`"
-                        class="tag-chip">{{
-                      item
-                    }}</span>
-                  <span v-if="!parseJsonArray(profile.coreTopics).length"
-                        class="tag-chip tag-chip-empty">暂无</span>
-                </div>
-              </div>
-              <div class="tag-section">
-                <p>示例问题</p>
-                <div class="tag-list">
-                  <span v-for="item in parseJsonArray(profile.exampleQuestions)" :key="`dq-${item}`"
-                        class="tag-chip tag-chip-soft">{{ item }}</span>
-                  <span v-if="!parseJsonArray(profile.exampleQuestions).length"
-                        class="tag-chip tag-chip-empty">暂无</span>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <!-- Relation Drawer -->
-          <template v-if="drawerType === 'relation'">
-            <template v-if="drawerMode === 'view' && relationTarget">
-              <div class="drawer-detail">
-                <div class="detail-row">
-                  <span>主题编码</span>
-                  <strong>{{ relationTarget.topicCode }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>文档名称</span>
-                  <strong>{{ relationTarget.documentName }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>关联分数</span>
-                  <strong>{{ relationTarget.relationScore }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>关联来源</span>
-                  <strong>{{ relationTarget.relationSource || '-' }}</strong>
-                </div>
-                <div class="detail-row">
-                  <span>原因</span>
-                  <p>{{ relationTarget.reason || '未填写' }}</p>
-                </div>
-              </div>
-            </template>
-            <template v-if="drawerMode === 'edit'">
-              <div class="form-grid">
-                <select v-model="relationForm.topicCode">
-                  <option value="">选择主题</option>
-                  <option v-for="item in topics" :key="item.topicCode" :value="item.topicCode">
-                    {{ item.topicName }}
-                  </option>
-                </select>
-                <select v-model="relationForm.documentId">
-                  <option value="">选择文档</option>
-                  <option v-for="item in documents" :key="item.documentId" :value="item.documentId">
-                    {{ item.documentName }}
-                  </option>
-                </select>
-                <input v-model="relationForm.relationScore" placeholder="关联分数，例如 0.9200"/>
-                <input v-model="relationForm.reason" placeholder="关联原因"/>
-              </div>
-            </template>
-          </template>
-        </div>
-
-        <div class="drawer-footer">
-          <template v-if="drawerType === 'scope'">
-            <template v-if="drawerMode === 'view'">
-              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
-              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
-                      @click="deleteScope">删除
-              </button>
-            </template>
-            <template v-else>
-              <button :disabled="actionLoading" class="primary-button" type="button"
-                      @click="saveScope">保存
-              </button>
-              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
-            </template>
-          </template>
-          <template v-if="drawerType === 'topic'">
-            <template v-if="drawerMode === 'view'">
-              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
-              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
-                      @click="deleteTopic">删除
-              </button>
-            </template>
-            <template v-else>
-              <button :disabled="actionLoading" class="primary-button" type="button"
-                      @click="saveTopic">保存
-              </button>
-              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
-            </template>
-          </template>
-          <template v-if="drawerType === 'profile'">
-            <button class="ghost-button" type="button" @click="closeDrawer">关闭</button>
-          </template>
-          <template v-if="drawerType === 'relation'">
-            <template v-if="drawerMode === 'view'">
-              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
-              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
-                      @click="removeRelation(relationTarget); closeDrawer()">移除
-              </button>
-            </template>
-            <template v-else>
-              <button :disabled="actionLoading" class="primary-button" type="button"
-                      @click="saveRelation">保存
-              </button>
-              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
-            </template>
-          </template>
-        </div>
-      </aside>
-    </transition>
-  </section>
-</template>
-
 <script lang="ts" setup>
 import {computed, onMounted, reactive, ref, watch} from 'vue'
 import {knowledgeApi} from '@/api/knowledge'
@@ -1442,6 +825,623 @@ function profileStatusClass(status: number): string {
 
 onMounted(loadAll)
 </script>
+
+<template>
+  <section class="knowledge-page">
+    <header class="page-header">
+      <div>
+        <span class="section-eyebrow">Knowledge Routing</span>
+        <h3>知识路由配置</h3>
+        <p>按 范围 → 主题 → 画像 → 关联 的顺序逐步配置，构建自动知识问答的候选预选体系。</p>
+      </div>
+      <div class="header-actions">
+        <button :disabled="loading || actionLoading" class="ghost-button" type="button"
+                @click="loadAll">刷新数据
+        </button>
+        <button :disabled="!documents.length || batchLoading" class="primary-button" type="button"
+                @click="regenerateAllProfiles">
+          {{ batchLoading ? '批量重建中...' : '批量重建画像' }}
+        </button>
+      </div>
+    </header>
+
+    <div v-if="notice.message" :class="`page-notice-${notice.type}`" class="page-notice">
+      {{ notice.message }}
+    </div>
+
+    <section class="stats-grid">
+      <article v-for="item in summaryCards" :key="item.label" class="stat-card">
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
+        <small>{{ item.description }}</small>
+      </article>
+    </section>
+
+    <section class="coverage-panel">
+      <div class="section-card-head" style="cursor:pointer"
+           @click="coveragePanelCollapsed = !coveragePanelCollapsed">
+        <div>
+          <span class="section-eyebrow">Scope Coverage</span>
+          <h4>范围覆盖率统计</h4>
+        </div>
+        <div class="coverage-toggle-row">
+          <span class="helper-pill helper-pill-soft">整体覆盖率 {{ overallCoverageRateText }}</span>
+          <span :class="{ collapsed: coveragePanelCollapsed }" class="collapse-arrow">&#9660;</span>
+        </div>
+      </div>
+      <div v-show="!coveragePanelCollapsed" class="coverage-grid">
+        <article v-for="item in scopeCoverageRows" :key="item.scopeCode" :class="{ warning: item.pendingTopicCount > 0 }"
+                 class="coverage-card">
+          <div class="coverage-head">
+            <div>
+              <strong>{{ item.scopeName }}</strong>
+              <span>{{ item.scopeCode }}</span>
+            </div>
+            <span class="coverage-rate">{{ item.coverageRateText }}</span>
+          </div>
+          <div class="coverage-track"><span :style="{ width: item.coverageRateText }"></span></div>
+          <div class="coverage-metrics">
+            <span>主题 {{ item.topicCount }}</span>
+            <span>已覆盖 {{ item.coveredTopicCount }}</span>
+            <span>未关联 {{ item.pendingTopicCount }}</span>
+            <span>文档 {{ item.documentCount }}</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button v-for="tab in TAB_LIST" :key="tab.key" :class="{ active: activeTab === tab.key }"
+              class="tab-btn"
+              type="button" @click="activeTab = tab.key">
+        <span class="tab-step">{{ tab.step }}</span>
+        <span class="tab-label">{{ tab.label }}</span>
+        <span class="tab-hint">{{ tab.hint }}</span>
+      </button>
+    </nav>
+
+    <!-- Tab 1: 知识范围 -->
+    <section v-show="activeTab === 'scope'" class="tab-content">
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <h4>知识范围</h4>
+            <p>先把大范围定清楚，自动知识问答才能稳定地在正确文档池里预选。</p>
+          </div>
+          <button class="primary-button" type="button" @click="openCreateDrawer('scope')">新建范围
+          </button>
+        </div>
+        <div class="toolbar-row">
+          <input v-model.trim="scopeKeyword" placeholder="按范围编码、名称或描述筛选"/>
+        </div>
+        <div class="card-grid">
+          <article v-for="item in filteredScopes" :key="item.scopeCode" :class="{ active: item.scopeCode === activeScopeCode }"
+                   class="data-card"
+                   @click="openDrawer('scope', item, 'view')">
+            <div class="data-card-head">
+              <strong>{{ item.scopeName }}</strong>
+            </div>
+            <small>{{ item.description || '暂无描述' }}</small>
+            <div class="data-card-meta">
+              <span>主题 {{ topics.filter(t => t.scopeCode === item.scopeCode).length }}</span>
+              <span>文档 {{
+                  documents.filter(d => d.knowledgeScopeCode === item.scopeCode).length
+                }}</span>
+            </div>
+          </article>
+          <div v-if="!filteredScopes.length" class="empty-inline">没有匹配的知识范围。</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Tab 2: 知识主题 -->
+    <section v-show="activeTab === 'topic'" class="tab-content">
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <h4>知识主题</h4>
+            <p>主题是范围里的可回答单元，后续会通过主题文档关联把文档候选进一步收窄。</p>
+          </div>
+          <button class="primary-button" type="button" @click="openCreateDrawer('topic')">新建主题
+          </button>
+        </div>
+        <div class="toolbar-row toolbar-row-filters">
+          <select v-model="activeScopeCode" class="filter-select">
+            <option value="">全部范围</option>
+            <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
+              {{ item.scopeName }}
+            </option>
+          </select>
+          <input v-model.trim="topicKeyword" placeholder="按主题编码、名称、别名或描述筛选"/>
+        </div>
+        <div class="card-grid">
+          <article v-for="item in filteredTopics" :key="item.topicCode" :class="{ active: item.topicCode === activeTopicCode }"
+                   class="data-card"
+                   @click="openDrawer('topic', item, 'view')">
+            <div class="data-card-head">
+              <strong>{{ item.topicName }}</strong>
+            </div>
+            <div class="topic-meta-row">
+              <span class="tag-chip tag-chip-soft">{{
+                  formatAnswerShapeLabel(item.answerShape)
+                }}</span>
+              <span
+                class="tag-chip tag-chip-soft">{{
+                  formatExecutionPreferenceLabel(item.executionPreference)
+                }}</span>
+            </div>
+            <small>{{ item.description || '暂无描述' }}</small>
+          </article>
+          <div v-if="!filteredTopics.length" class="empty-inline">当前范围下还没有主题。</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Tab 3: 文档画像 -->
+    <section v-show="activeTab === 'profile'" class="tab-content">
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <h4>文档画像</h4>
+            <p>查看文档的类型、摘要、核心主题和图能力开关，判断自动路由是否有足够信息。</p>
+          </div>
+        </div>
+        <div class="toolbar-row">
+          <input v-model.trim="documentKeyword"
+                 placeholder="按文档名、范围、业务分类或标签筛选文档"/>
+        </div>
+
+        <section v-if="profileAnomalyRows.length" class="anomaly-panel">
+          <div class="section-card-head" style="cursor:pointer"
+               @click="anomalyCollapsed = !anomalyCollapsed">
+            <div>
+              <span class="section-eyebrow">Profile Anomalies</span>
+              <h4>画像异常清单 ({{ profileAnomalyRows.length }})</h4>
+            </div>
+            <div class="coverage-toggle-row">
+              <button :disabled="!selectedProfileRepairIds.length || batchLoading" class="ghost-button"
+                      type="button"
+                      @click.stop="batchRepairProfiles">
+                {{ batchLoading ? '修复中...' : `批量重建 ${selectedProfileRepairIds.length} 份` }}
+              </button>
+              <span :class="{ collapsed: anomalyCollapsed }" class="collapse-arrow">&#9660;</span>
+            </div>
+          </div>
+          <div v-show="!anomalyCollapsed">
+            <div class="batch-actions">
+              <label class="toggle-chip">
+                <input :checked="allVisibleAnomaliesSelected" type="checkbox"
+                       @change="toggleAllVisibleAnomalies"/>
+                <span>全选异常</span>
+              </label>
+            </div>
+            <div class="anomaly-list">
+              <article v-for="item in profileAnomalyRows" :key="`anomaly-${item.documentId}`"
+                       :class="item.tone"
+                       class="anomaly-card">
+                <label class="row-check">
+                  <input :checked="selectedProfileRepairIds.includes(item.documentId)"
+                         type="checkbox"
+                         @change="toggleProfileRepair(item.documentId)"/>
+                  <span></span>
+                </label>
+                <div class="anomaly-main">
+                  <strong>{{ item.documentName }}</strong>
+                  <span>{{ item.scopeText }}</span>
+                  <div class="tag-list">
+                    <span v-for="problem in item.problems" :key="`${item.documentId}-${problem}`"
+                          class="tag-chip tag-chip-warning">{{ problem }}</span>
+                  </div>
+                </div>
+                <button class="ghost-button" type="button"
+                        @click.stop="selectAnomalyDocument(item); openDrawer('profile', null, 'view')">
+                  查看
+                </button>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <div class="card-grid">
+          <article v-for="item in filteredDocuments" :key="item.documentId" :class="{ active: item.documentId === profileDocumentId }"
+                   class="data-card"
+                   @click="selectDocument(item); openDrawer('profile', null, 'view')">
+            <div class="data-card-head">
+              <strong>{{ item.documentName }}</strong>
+            </div>
+            <small>{{ documentMetaLine(item) }}</small>
+          </article>
+          <div v-if="!filteredDocuments.length" class="empty-inline">没有匹配的文档。</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Tab 4: 主题文档关联 -->
+    <section v-show="activeTab === 'relation'" class="tab-content">
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <h4>主题文档关联</h4>
+            <p>把"哪个主题该优先看哪份文档"显式维护下来，低置信自动路由时会直接受益。</p>
+          </div>
+          <button class="primary-button" type="button" @click="openCreateDrawer('relation')">
+            新建关联
+          </button>
+        </div>
+        <div class="toolbar-row toolbar-row-filters">
+          <select v-model="activeScopeCode" class="filter-select">
+            <option value="">全部范围</option>
+            <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
+              {{ item.scopeName }}
+            </option>
+          </select>
+          <input v-model.trim="relationKeyword" placeholder="按主题、文档、原因筛选关联结果"/>
+          <button :disabled="actionLoading" class="ghost-button" type="button"
+                  @click="loadRelations">刷新
+          </button>
+        </div>
+        <div class="helper-bar">
+          <span class="helper-pill helper-pill-soft">{{ relations.length }} 条可见关联</span>
+        </div>
+        <div class="relation-table">
+          <article v-for="item in relations" :key="`${item.topicCode}-${item.documentId}`"
+                   class="relation-row"
+                   @click="openDrawer('relation', item, 'view')">
+            <div>
+              <strong>{{ item.documentName }}</strong>
+              <span>{{ item.topicCode }} · 分数 {{
+                  item.relationScore
+                }} · {{
+                  item.knowledgeScopeName ||
+                  item.knowledgeScopeCode || '未分范围'
+                }}</span>
+              <small>{{ item.reason || documentMetaLine(item) }}</small>
+            </div>
+            <button :disabled="actionLoading" class="danger-link" type="button"
+                    @click.stop="removeRelation(item)">移除
+            </button>
+          </article>
+          <div v-if="!relations.length" class="empty-inline">当前筛选下还没有保存的文档关联。</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Drawer -->
+    <transition name="drawer-fade">
+      <div v-if="drawerVisible" class="drawer-overlay" @click="closeDrawer"></div>
+    </transition>
+    <transition name="drawer-slide">
+      <aside v-if="drawerVisible" class="drawer-panel">
+        <div class="drawer-header">
+          <h4 v-if="drawerType === 'scope'">
+            {{ drawerMode === 'edit' && !scopeTarget ? '新建知识范围' : '知识范围详情' }}</h4>
+          <h4 v-else-if="drawerType === 'topic'">
+            {{ drawerMode === 'edit' && !topicTarget ? '新建知识主题' : '知识主题详情' }}</h4>
+          <h4 v-else-if="drawerType === 'profile'">文档画像详情</h4>
+          <h4 v-else-if="drawerType === 'relation'">
+            {{ drawerMode === 'edit' && !relationTarget ? '新建主题文档关联' : '关联详情' }}
+          </h4>
+          <button class="ghost-button drawer-close" type="button" @click="closeDrawer">关闭</button>
+        </div>
+        <div class="drawer-body">
+
+          <!-- Scope Drawer -->
+          <template v-if="drawerType === 'scope'">
+            <template v-if="drawerMode === 'view' && scopeTarget">
+              <div class="drawer-detail">
+                <div class="detail-row">
+                  <span>范围编码</span>
+                  <strong>{{ scopeTarget.scopeCode }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>范围名称</span>
+                  <strong>{{ scopeTarget.scopeName }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>父级编码</span>
+                  <strong>{{ scopeTarget.parentScopeCode || '-' }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>排序值</span>
+                  <strong>{{ scopeTarget.sortOrder }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>描述</span>
+                  <p>{{ scopeTarget.description || '暂无描述' }}</p>
+                </div>
+                <div v-if="scopeTarget.aliases" class="tag-section">
+                  <p>别名</p>
+                  <div class="tag-list">
+                    <span v-for="a in parseTextList(scopeTarget.aliases)" :key="a"
+                          class="tag-chip tag-chip-soft">{{
+                        a
+                      }}</span>
+                  </div>
+                </div>
+                <div v-if="scopeTarget.examples" class="tag-section">
+                  <p>典型问题</p>
+                  <div class="tag-list">
+                    <span v-for="e in parseJsonArray(scopeTarget.examples)" :key="e"
+                          class="tag-chip">{{
+                        e
+                      }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-if="drawerMode === 'edit'">
+              <div class="form-grid">
+                <input v-model="scopeForm.scopeCode" placeholder="范围编码，例如 operation_rule"/>
+                <input v-model="scopeForm.scopeName" placeholder="范围名称，例如 运营规则"/>
+                <input v-model="scopeForm.parentScopeCode" placeholder="父级编码，可空"/>
+                <input v-model="scopeForm.aliases" placeholder="别名，英文逗号分隔"/>
+                <input v-model="scopeForm.sortOrder" placeholder="排序值"/>
+                <textarea v-model="scopeForm.description" placeholder="范围描述"></textarea>
+                <textarea v-model="scopeForm.examples"
+                          placeholder='典型问题 JSON，例如 ["上线观察多久"]'></textarea>
+              </div>
+            </template>
+          </template>
+
+          <!-- Topic Drawer -->
+          <template v-if="drawerType === 'topic'">
+            <template v-if="drawerMode === 'view' && topicTarget">
+              <div class="drawer-detail">
+                <div class="detail-row">
+                  <span>主题编码</span>
+                  <strong>{{ topicTarget.topicCode }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>主题名称</span>
+                  <strong>{{ topicTarget.topicName }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>所属范围</span>
+                  <strong>{{ topicTarget.scopeCode }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>回答形态</span>
+                  <strong>{{ formatAnswerShapeLabel(topicTarget.answerShape) }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>执行偏好</span>
+                  <strong>{{
+                      formatExecutionPreferenceLabel(topicTarget.executionPreference)
+                    }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>排序值</span>
+                  <strong>{{ topicTarget.sortOrder }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>描述</span>
+                  <p>{{ topicTarget.description || '暂无描述' }}</p>
+                </div>
+                <div v-if="topicTarget.aliases" class="tag-section">
+                  <p>别名</p>
+                  <div class="tag-list">
+                    <span v-for="a in parseTextList(topicTarget.aliases)" :key="a"
+                          class="tag-chip tag-chip-soft">{{
+                        a
+                      }}</span>
+                  </div>
+                </div>
+                <div v-if="topicTarget.examples" class="tag-section">
+                  <p>典型问题</p>
+                  <div class="tag-list">
+                    <span v-for="e in parseJsonArray(topicTarget.examples)" :key="e"
+                          class="tag-chip">{{ e }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-if="drawerMode === 'edit'">
+              <div class="form-grid">
+                <input v-model="topicForm.topicCode" placeholder="主题编码"/>
+                <input v-model="topicForm.topicName" placeholder="主题名称"/>
+                <select v-model="topicForm.scopeCode">
+                  <option value="">选择所属范围</option>
+                  <option v-for="item in scopes" :key="item.scopeCode" :value="item.scopeCode">
+                    {{ item.scopeName }}
+                  </option>
+                </select>
+                <input v-model="topicForm.aliases" placeholder="别名，英文逗号分隔"/>
+                <select v-model="topicForm.answerShape">
+                  <option value="">选择回答形态</option>
+                  <option v-for="item in ANSWER_SHAPE_OPTIONS" :key="item.value"
+                          :value="item.value">{{ item.label }}
+                  </option>
+                </select>
+                <select v-model="topicForm.executionPreference">
+                  <option value="">选择执行偏好</option>
+                  <option v-for="item in EXECUTION_PREFERENCE_OPTIONS" :key="item.value"
+                          :value="item.value">{{
+                      item.label
+                    }}
+                  </option>
+                </select>
+                <input v-model="topicForm.sortOrder" placeholder="排序值"/>
+                <textarea v-model="topicForm.description" placeholder="主题描述"></textarea>
+                <textarea v-model="topicForm.examples" placeholder='典型问题 JSON'></textarea>
+              </div>
+            </template>
+          </template>
+
+          <!-- Profile Drawer -->
+          <template v-if="drawerType === 'profile'">
+            <div class="drawer-detail">
+              <div class="detail-row">
+                <span>文档名称</span>
+                <strong>{{ selectedProfileDocument?.documentName || '-' }}</strong>
+              </div>
+              <div class="detail-row">
+                <span>元数据</span>
+                <small>{{ selectedProfileDocumentMeta }}</small>
+              </div>
+            </div>
+            <div class="actions" style="margin-top:12px">
+              <button :disabled="!profileDocumentId || actionLoading" class="primary-button"
+                      type="button"
+                      @click="loadProfile">查看画像
+              </button>
+              <button :disabled="!profileDocumentId || actionLoading" class="ghost-button"
+                      type="button"
+                      @click="regenerateProfile">重新生成
+              </button>
+            </div>
+            <div v-if="profile" class="profile-card" style="margin-top:16px">
+              <div class="profile-head">
+                <strong>{{
+                    selectedProfileDocument?.documentName || `文档 ${profileDocumentId}`
+                  }}</strong>
+                <span :class="profileStatusClass(profile.profileStatus)"
+                      class="profile-status-pill">{{
+                    profileStatusText(profile.profileStatus)
+                  }}</span>
+              </div>
+              <p class="profile-summary">{{
+                  profile.documentSummary || '当前画像还没有生成摘要。'
+                }}</p>
+              <div class="profile-grid">
+                <article class="mini-card">
+                  <span>文档类型</span>
+                  <strong>{{ formatDocumentTypeLabel(profile.documentType) }}</strong>
+                </article>
+                <article class="mini-card">
+                  <span>画像来源</span>
+                  <strong>{{ formatProfileSourceLabel(profile.profileSource) }}</strong>
+                </article>
+                <article class="mini-card">
+                  <span>图能力</span>
+                  <strong>{{ graphCapabilityText(profile) }}</strong>
+                </article>
+                <article class="mini-card">
+                  <span>核心主题数</span>
+                  <strong>{{ parseJsonArray(profile.coreTopics).length }}</strong>
+                </article>
+              </div>
+              <div class="tag-section">
+                <p>核心主题</p>
+                <div class="tag-list">
+                  <span v-for="item in parseJsonArray(profile.coreTopics)" :key="`dt-${item}`"
+                        class="tag-chip">{{
+                      item
+                    }}</span>
+                  <span v-if="!parseJsonArray(profile.coreTopics).length"
+                        class="tag-chip tag-chip-empty">暂无</span>
+                </div>
+              </div>
+              <div class="tag-section">
+                <p>示例问题</p>
+                <div class="tag-list">
+                  <span v-for="item in parseJsonArray(profile.exampleQuestions)" :key="`dq-${item}`"
+                        class="tag-chip tag-chip-soft">{{ item }}</span>
+                  <span v-if="!parseJsonArray(profile.exampleQuestions).length"
+                        class="tag-chip tag-chip-empty">暂无</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Relation Drawer -->
+          <template v-if="drawerType === 'relation'">
+            <template v-if="drawerMode === 'view' && relationTarget">
+              <div class="drawer-detail">
+                <div class="detail-row">
+                  <span>主题编码</span>
+                  <strong>{{ relationTarget.topicCode }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>文档名称</span>
+                  <strong>{{ relationTarget.documentName }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>关联分数</span>
+                  <strong>{{ relationTarget.relationScore }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>关联来源</span>
+                  <strong>{{ relationTarget.relationSource || '-' }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span>原因</span>
+                  <p>{{ relationTarget.reason || '未填写' }}</p>
+                </div>
+              </div>
+            </template>
+            <template v-if="drawerMode === 'edit'">
+              <div class="form-grid">
+                <select v-model="relationForm.topicCode">
+                  <option value="">选择主题</option>
+                  <option v-for="item in topics" :key="item.topicCode" :value="item.topicCode">
+                    {{ item.topicName }}
+                  </option>
+                </select>
+                <select v-model="relationForm.documentId">
+                  <option value="">选择文档</option>
+                  <option v-for="item in documents" :key="item.documentId" :value="item.documentId">
+                    {{ item.documentName }}
+                  </option>
+                </select>
+                <input v-model="relationForm.relationScore" placeholder="关联分数，例如 0.9200"/>
+                <input v-model="relationForm.reason" placeholder="关联原因"/>
+              </div>
+            </template>
+          </template>
+        </div>
+
+        <div class="drawer-footer">
+          <template v-if="drawerType === 'scope'">
+            <template v-if="drawerMode === 'view'">
+              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
+              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
+                      @click="deleteScope">删除
+              </button>
+            </template>
+            <template v-else>
+              <button :disabled="actionLoading" class="primary-button" type="button"
+                      @click="saveScope">保存
+              </button>
+              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
+            </template>
+          </template>
+          <template v-if="drawerType === 'topic'">
+            <template v-if="drawerMode === 'view'">
+              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
+              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
+                      @click="deleteTopic">删除
+              </button>
+            </template>
+            <template v-else>
+              <button :disabled="actionLoading" class="primary-button" type="button"
+                      @click="saveTopic">保存
+              </button>
+              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
+            </template>
+          </template>
+          <template v-if="drawerType === 'profile'">
+            <button class="ghost-button" type="button" @click="closeDrawer">关闭</button>
+          </template>
+          <template v-if="drawerType === 'relation'">
+            <template v-if="drawerMode === 'view'">
+              <button class="primary-button" type="button" @click="switchDrawerToEdit">编辑</button>
+              <button :disabled="actionLoading" class="ghost-button ghost-danger" type="button"
+                      @click="removeRelation(relationTarget); closeDrawer()">移除
+              </button>
+            </template>
+            <template v-else>
+              <button :disabled="actionLoading" class="primary-button" type="button"
+                      @click="saveRelation">保存
+              </button>
+              <button class="ghost-button" type="button" @click="closeDrawer">取消</button>
+            </template>
+          </template>
+        </div>
+      </aside>
+    </transition>
+  </section>
+</template>
 
 <style scoped>
 .knowledge-page {

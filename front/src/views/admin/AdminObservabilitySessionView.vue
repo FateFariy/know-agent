@@ -1,3 +1,166 @@
+<script lang="ts" setup>
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {RouterLink, useRoute} from 'vue-router'
+import {ArrowLeftIcon, ArrowPathIcon, SparklesIcon} from '@heroicons/vue/24/outline'
+import {chatApi} from '@/api/chat'
+import type {ConversationExchange, ConversationSessionResp} from '@/types'
+import {
+  formatChatMode,
+  formatExecutionMode,
+  formatStageStateLabel,
+  listAssistantExchanges,
+  normalizeError,
+  sessionPreview,
+  sessionTitle,
+  truncate,
+  turnStatusTone
+} from '@/utils/observabilityHelpers'
+
+const route = useRoute()
+
+const loadingSession = ref(false)
+const pollingSession = ref(false)
+const activeSession = ref<ConversationSessionResp | null>(null)
+const pageError = ref('')
+const rebuildingSummary = ref(false)
+
+const POLL_INTERVAL_MS = 2500
+let pollTimer: ReturnType<typeof setTimeout> = 0
+let sessionRequestInFlight = false
+
+const conversationId = computed(() => String(route.params.conversationId || ''))
+const assistantExchanges = computed<ConversationExchange[]>(() => listAssistantExchanges(activeSession.value))
+
+interface SessionMetric {
+  label: string
+  value: string | number
+}
+
+const sessionMetrics = computed<SessionMetric[]>(() => {
+  if (!activeSession.value) {
+    return []
+  }
+  return [
+    {
+      label: '助手轮次',
+      value: assistantExchanges.value.length
+    },
+    {
+      label: '会话消息数',
+      value: activeSession.value.messageCount || 0
+    },
+    {
+      label: '长期摘要',
+      value: activeSession.value.memorySummary?.isCompressed ? '已形成' : '未形成'
+    },
+    {
+      label: '最近更新时间',
+      value: activeSession.value.updatedTime
+    }
+  ]
+})
+
+interface LoadSessionOptions {
+  silent?: boolean
+}
+
+async function loadSession(options: LoadSessionOptions = {}): Promise<void> {
+  if (!conversationId.value || sessionRequestInFlight) {
+    return
+  }
+
+  const silent = Boolean(options.silent)
+  sessionRequestInFlight = true
+  if (silent) {
+    pollingSession.value = true
+  } else {
+    loadingSession.value = true
+  }
+  pageError.value = ''
+
+  try {
+    const {data} = await chatApi.getSessionDetail({conversationId: conversationId.value})
+    activeSession.value = data || null
+  } catch (error) {
+    activeSession.value = null
+    pageError.value = normalizeError(error, '加载会话详情失败')
+  } finally {
+    sessionRequestInFlight = false
+    loadingSession.value = false
+    pollingSession.value = false
+    schedulePolling()
+  }
+}
+
+function schedulePolling(): void {
+  clearTimeout(pollTimer)
+  if (!activeSession.value?.running) {
+    return
+  }
+  pollTimer = window.setTimeout(() => {
+    loadSession({silent: true})
+  }, POLL_INTERVAL_MS)
+}
+
+async function rebuildSummary(): Promise<void> {
+  if (!conversationId.value || rebuildingSummary.value) {
+    return
+  }
+
+  rebuildingSummary.value = true
+  pageError.value = ''
+
+  try {
+    const {data} = await chatApi.rebuildSummary({conversationId: conversationId.value})
+    if (activeSession.value?.conversationId === conversationId.value) {
+      activeSession.value = {
+        ...activeSession.value,
+        memorySummary: data || null
+      }
+    }
+  } catch (error) {
+    pageError.value = normalizeError(error, '手动重建长期摘要失败')
+  } finally {
+    rebuildingSummary.value = false
+  }
+}
+
+function exchangeTarget(exchange: ConversationExchange) {
+  return {
+    name: 'AdminObservabilityExchangeDetail',
+    params: {
+      conversationId: conversationId.value,
+      exchangeId: String(exchange.exchangeId)
+    }
+  }
+}
+
+function exchangeTokenCount(exchange: ConversationExchange): string | number {
+  const traces = exchange?.debugTrace?.modelUsageTraces || []
+  const total = traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
+  return total || '无'
+}
+
+function exchangeCost(exchange: ConversationExchange): string {
+  const traces = exchange?.debugTrace?.modelUsageTraces || []
+  const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
+  return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
+}
+
+watch(conversationId, () => {
+  activeSession.value = null
+  loadSession()
+}, {immediate: true})
+
+onMounted(() => {
+  schedulePolling()
+})
+
+onUnmounted(() => {
+  clearTimeout(pollTimer)
+})
+</script>
+
 <template>
   <section class="observability-session">
     <div class="detail-toolbar">
@@ -162,169 +325,6 @@
     </template>
   </section>
 </template>
-
-<script lang="ts" setup>
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
-import {RouterLink, useRoute} from 'vue-router'
-import {ArrowLeftIcon, ArrowPathIcon, SparklesIcon} from '@heroicons/vue/24/outline'
-import {chatApi} from '@/api/chat'
-import type {ConversationExchange, ConversationSessionResp} from '@/types'
-import {
-  formatChatMode,
-  formatExecutionMode,
-  formatStageStateLabel,
-  listAssistantExchanges,
-  normalizeError,
-  sessionPreview,
-  sessionTitle,
-  truncate,
-  turnStatusTone
-} from '@/utils/observabilityHelpers'
-
-const route = useRoute()
-
-const loadingSession = ref(false)
-const pollingSession = ref(false)
-const activeSession = ref<ConversationSessionResp | null>(null)
-const pageError = ref('')
-const rebuildingSummary = ref(false)
-
-const POLL_INTERVAL_MS = 2500
-let pollTimer: ReturnType<typeof setTimeout> = 0
-let sessionRequestInFlight = false
-
-const conversationId = computed(() => String(route.params.conversationId || ''))
-const assistantExchanges = computed<ConversationExchange[]>(() => listAssistantExchanges(activeSession.value))
-
-interface SessionMetric {
-  label: string
-  value: string | number
-}
-
-const sessionMetrics = computed<SessionMetric[]>(() => {
-  if (!activeSession.value) {
-    return []
-  }
-  return [
-    {
-      label: '助手轮次',
-      value: assistantExchanges.value.length
-    },
-    {
-      label: '会话消息数',
-      value: activeSession.value.messageCount || 0
-    },
-    {
-      label: '长期摘要',
-      value: activeSession.value.memorySummary?.isCompressed ? '已形成' : '未形成'
-    },
-    {
-      label: '最近更新时间',
-      value: activeSession.value.updatedTime
-    }
-  ]
-})
-
-interface LoadSessionOptions {
-  silent?: boolean
-}
-
-async function loadSession(options: LoadSessionOptions = {}): Promise<void> {
-  if (!conversationId.value || sessionRequestInFlight) {
-    return
-  }
-
-  const silent = Boolean(options.silent)
-  sessionRequestInFlight = true
-  if (silent) {
-    pollingSession.value = true
-  } else {
-    loadingSession.value = true
-  }
-  pageError.value = ''
-
-  try {
-    const {data} = await chatApi.getSessionDetail({conversationId: conversationId.value})
-    activeSession.value = data || null
-  } catch (error) {
-    activeSession.value = null
-    pageError.value = normalizeError(error, '加载会话详情失败')
-  } finally {
-    sessionRequestInFlight = false
-    loadingSession.value = false
-    pollingSession.value = false
-    schedulePolling()
-  }
-}
-
-function schedulePolling(): void {
-  clearTimeout(pollTimer)
-  if (!activeSession.value?.running) {
-    return
-  }
-  pollTimer = window.setTimeout(() => {
-    loadSession({silent: true})
-  }, POLL_INTERVAL_MS)
-}
-
-async function rebuildSummary(): Promise<void> {
-  if (!conversationId.value || rebuildingSummary.value) {
-    return
-  }
-
-  rebuildingSummary.value = true
-  pageError.value = ''
-
-  try {
-    const {data} = await chatApi.rebuildSummary({conversationId: conversationId.value})
-    if (activeSession.value?.conversationId === conversationId.value) {
-      activeSession.value = {
-        ...activeSession.value,
-        memorySummary: data || null
-      }
-    }
-  } catch (error) {
-    pageError.value = normalizeError(error, '手动重建长期摘要失败')
-  } finally {
-    rebuildingSummary.value = false
-  }
-}
-
-function exchangeTarget(exchange: ConversationExchange) {
-  return {
-    name: 'AdminObservabilityExchangeDetail',
-    params: {
-      conversationId: conversationId.value,
-      exchangeId: String(exchange.exchangeId)
-    }
-  }
-}
-
-function exchangeTokenCount(exchange: ConversationExchange): string | number {
-  const traces = exchange?.debugTrace?.modelUsageTraces || []
-  const total = traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
-  return total || '无'
-}
-
-function exchangeCost(exchange: ConversationExchange): string {
-  const traces = exchange?.debugTrace?.modelUsageTraces || []
-  const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
-  return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
-}
-
-watch(conversationId, () => {
-  activeSession.value = null
-  loadSession()
-}, {immediate: true})
-
-onMounted(() => {
-  schedulePolling()
-})
-
-onUnmounted(() => {
-  clearTimeout(pollTimer)
-})
-</script>
 
 <style scoped>
 .observability-session {

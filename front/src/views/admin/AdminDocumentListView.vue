@@ -1,202 +1,4 @@
-<template>
-  <section class="document-page">
-    <div class="top-grid">
-      <article class="panel-card upload-card">
-        <div class="panel-title">
-          <div>
-            <h3>上传文档并进入推荐流程</h3>
-          </div>
-        </div>
 
-        <div class="upload-grid">
-          <label class="field">
-            <span>文档名称</span>
-            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>选择文件</span>
-            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange"/>
-          </label>
-        </div>
-
-        <div class="upload-footer">
-          <div class="upload-hint">
-            <span>支持 PDF / TXT / MD / HTML</span>
-            <strong>{{ uploadForm.file ? uploadForm.file.name : '尚未选择文件' }}</strong>
-          </div>
-
-          <div class="upload-actions">
-            <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
-            <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button"
-                    @click="submitUpload">
-              {{ uploading ? '上传中...' : '上传并解析' }}
-            </button>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel-card tips-card">
-        <div class="panel-title">
-          <h3>建议操作顺序</h3>
-        </div>
-
-        <ul class="tips-list">
-          <li>先上传文档，系统会异步解析并生成推荐切块策略。</li>
-          <li>点击任意文档，进入单独详情页查看解析结果、Chunk 和任务轨迹。</li>
-          <li>在详情页确认策略并构建索引，列表页专注浏览和筛选。</li>
-        </ul>
-      </article>
-    </div>
-
-    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
-      {{ pageNotice.message }}
-    </div>
-
-    <article class="panel-card list-card">
-      <div class="list-toolbar">
-        <div>
-          <h3>文档列表</h3>
-          <p class="toolbar-caption">共 {{ total }} 份文档，当前第 {{ currentPage }} 页。</p>
-        </div>
-
-        <div class="list-actions">
-          <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名"
-                 type="text"
-                 @keydown.enter="submitSearch"/>
-          <button class="ghost-button" type="button" @click="submitSearch">搜索</button>
-        </div>
-      </div>
-
-      <div class="table-summary">
-        <article class="table-stat-card">
-          <span>当前页文档</span>
-          <strong>{{ documents.length }}</strong>
-        </article>
-        <article class="table-stat-card">
-          <span>解析完成</span>
-          <strong>{{ visibleParseReadyCount }}</strong>
-        </article>
-        <article class="table-stat-card">
-          <span>策略确认</span>
-          <strong>{{ visibleStrategyReadyCount }}</strong>
-        </article>
-        <article class="table-stat-card">
-          <span>索引可用</span>
-          <strong>{{ visibleIndexReadyCount }}</strong>
-        </article>
-      </div>
-
-      <div class="document-table-shell">
-        <div v-if="!listLoading && !documents.length" class="empty-block">
-          还没有文档，先上传一份资料开始体验。
-        </div>
-        <div v-if="listLoading" class="empty-block">正在加载文档列表...</div>
-
-        <div v-if="!listLoading && documents.length" class="document-table-scroll">
-          <table class="document-table">
-            <thead>
-            <tr>
-              <th>文档</th>
-              <th>类型</th>
-              <th>大小</th>
-              <th>更新时间</th>
-              <th>解析</th>
-              <th>策略</th>
-              <th>索引</th>
-              <th class="document-table-action-head">操作</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="item in documents" :key="item.documentId" class="document-table-row">
-              <td class="document-cell document-cell-main">
-                <button class="document-link-button" type="button"
-                        @click="openDocumentDetail(item.documentId)">
-                  <strong>{{ item.documentName }}</strong>
-                  <span>{{ item.originalFileName }}</span>
-                </button>
-              </td>
-              <td class="document-cell">
-                <span class="table-chip">{{ item.fileTypeName || '-' }}</span>
-              </td>
-              <td class="document-cell">
-                <strong>{{ formatFileSize(item.fileSize) }}</strong>
-              </td>
-              <td class="document-cell">
-                <strong>{{ formatDateTime(item.updateTime) }}</strong>
-              </td>
-              <td class="document-cell">
-                <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
-                                  type="parse"/>
-              </td>
-              <td class="document-cell">
-                <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName"
-                                  type="strategy"/>
-              </td>
-              <td class="document-cell">
-                <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
-                                  type="index"/>
-              </td>
-              <td class="document-cell document-cell-action">
-                <div class="document-action-group">
-                  <button class="detail-link" type="button"
-                          @click="openDocumentDetail(item.documentId)">查询详情
-                  </button>
-                  <button :disabled="!canDeleteDocument(item)" :title="buildDeleteTitle(item)" class="danger-link"
-                          type="button" @click="deleteDocument(item)">
-                    {{ deletingDocumentId === item.documentId ? '删除中...' : '删除' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div v-if="documents.length" class="pagination-bar">
-        <button :disabled="currentPage <= 1 || listLoading" class="ghost-button" type="button"
-                @click="changePage(currentPage - 1)">
-          上一页
-        </button>
-        <div class="pagination-status">
-          <strong>第 {{ currentPage }} / {{ totalPages }} 页</strong>
-          <span>共 {{ total }} 条文档</span>
-        </div>
-        <button :disabled="currentPage >= totalPages || listLoading" class="ghost-button"
-                type="button"
-                @click="changePage(currentPage + 1)">
-          下一页
-        </button>
-      </div>
-    </article>
-  </section>
-</template>
 
 <script lang="ts" setup>
 import {computed, onMounted, reactive, ref} from 'vue'
@@ -422,6 +224,206 @@ onMounted(() => {
   loadDocuments()
 })
 </script>
+
+<template>
+  <section class="document-page">
+    <div class="top-grid">
+      <article class="panel-card upload-card">
+        <div class="panel-title">
+          <div>
+            <h3>上传文档并进入推荐流程</h3>
+          </div>
+        </div>
+
+        <div class="upload-grid">
+          <label class="field">
+            <span>文档名称</span>
+            <input v-model="uploadForm.documentName" placeholder="不填则使用原始文件名"
+                   type="text"/>
+          </label>
+
+          <label class="field">
+            <span>知识域编码</span>
+            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
+                   type="text"/>
+          </label>
+
+          <label class="field">
+            <span>知识域名称</span>
+            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则"
+                   type="text"/>
+          </label>
+
+          <label class="field">
+            <span>业务分类</span>
+            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
+                   type="text"/>
+          </label>
+
+          <label class="field">
+            <span>文档标签</span>
+            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
+                   type="text"/>
+          </label>
+
+          <label class="field">
+            <span>选择文件</span>
+            <input ref="fileInputRef" class="file-input" type="file" @change="handleFileChange"/>
+          </label>
+        </div>
+
+        <div class="upload-footer">
+          <div class="upload-hint">
+            <span>支持 PDF / TXT / MD / HTML</span>
+            <strong>{{ uploadForm.file ? uploadForm.file.name : '尚未选择文件' }}</strong>
+          </div>
+
+          <div class="upload-actions">
+            <button class="ghost-button" type="button" @click="clearSelectedFile">清空</button>
+            <button :disabled="uploading || !uploadForm.file" class="primary-button" type="button"
+                    @click="submitUpload">
+              {{ uploading ? '上传中...' : '上传并解析' }}
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel-card tips-card">
+        <div class="panel-title">
+          <h3>建议操作顺序</h3>
+        </div>
+
+        <ul class="tips-list">
+          <li>先上传文档，系统会异步解析并生成推荐切块策略。</li>
+          <li>点击任意文档，进入单独详情页查看解析结果、Chunk 和任务轨迹。</li>
+          <li>在详情页确认策略并构建索引，列表页专注浏览和筛选。</li>
+        </ul>
+      </article>
+    </div>
+
+    <div v-if="pageNotice.message" :class="`page-notice-${pageNotice.type}`" class="page-notice">
+      {{ pageNotice.message }}
+    </div>
+
+    <article class="panel-card list-card">
+      <div class="list-toolbar">
+        <div>
+          <h3>文档列表</h3>
+          <p class="toolbar-caption">共 {{ total }} 份文档，当前第 {{ currentPage }} 页。</p>
+        </div>
+
+        <div class="list-actions">
+          <input v-model="keyword" class="search-input" placeholder="搜索文档名称或原始文件名"
+                 type="text"
+                 @keydown.enter="submitSearch"/>
+          <button class="ghost-button" type="button" @click="submitSearch">搜索</button>
+        </div>
+      </div>
+
+      <div class="table-summary">
+        <article class="table-stat-card">
+          <span>当前页文档</span>
+          <strong>{{ documents.length }}</strong>
+        </article>
+        <article class="table-stat-card">
+          <span>解析完成</span>
+          <strong>{{ visibleParseReadyCount }}</strong>
+        </article>
+        <article class="table-stat-card">
+          <span>策略确认</span>
+          <strong>{{ visibleStrategyReadyCount }}</strong>
+        </article>
+        <article class="table-stat-card">
+          <span>索引可用</span>
+          <strong>{{ visibleIndexReadyCount }}</strong>
+        </article>
+      </div>
+
+      <div class="document-table-shell">
+        <div v-if="!listLoading && !documents.length" class="empty-block">
+          还没有文档，先上传一份资料开始体验。
+        </div>
+        <div v-if="listLoading" class="empty-block">正在加载文档列表...</div>
+
+        <div v-if="!listLoading && documents.length" class="document-table-scroll">
+          <table class="document-table">
+            <thead>
+            <tr>
+              <th>文档</th>
+              <th>类型</th>
+              <th>大小</th>
+              <th>更新时间</th>
+              <th>解析</th>
+              <th>策略</th>
+              <th>索引</th>
+              <th class="document-table-action-head">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="item in documents" :key="item.documentId" class="document-table-row">
+              <td class="document-cell document-cell-main">
+                <button class="document-link-button" type="button"
+                        @click="openDocumentDetail(item.documentId)">
+                  <strong>{{ item.documentName }}</strong>
+                  <span>{{ item.originalFileName }}</span>
+                </button>
+              </td>
+              <td class="document-cell">
+                <span class="table-chip">{{ item.fileTypeName || '-' }}</span>
+              </td>
+              <td class="document-cell">
+                <strong>{{ formatFileSize(item.fileSize) }}</strong>
+              </td>
+              <td class="document-cell">
+                <strong>{{ formatDateTime(item.updateTime) }}</strong>
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :code="item.parseStatus" :label="item.parseStatusName"
+                                  type="parse"/>
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :code="item.strategyStatus" :label="item.strategyStatusName"
+                                  type="strategy"/>
+              </td>
+              <td class="document-cell">
+                <AdminStatusBadge :code="item.indexStatus" :label="item.indexStatusName"
+                                  type="index"/>
+              </td>
+              <td class="document-cell document-cell-action">
+                <div class="document-action-group">
+                  <button class="detail-link" type="button"
+                          @click="openDocumentDetail(item.documentId)">查询详情
+                  </button>
+                  <button :disabled="!canDeleteDocument(item)" :title="buildDeleteTitle(item)" class="danger-link"
+                          type="button" @click="deleteDocument(item)">
+                    {{ deletingDocumentId === item.documentId ? '删除中...' : '删除' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div v-if="documents.length" class="pagination-bar">
+        <button :disabled="currentPage <= 1 || listLoading" class="ghost-button" type="button"
+                @click="changePage(currentPage - 1)">
+          上一页
+        </button>
+        <div class="pagination-status">
+          <strong>第 {{ currentPage }} / {{ totalPages }} 页</strong>
+          <span>共 {{ total }} 条文档</span>
+        </div>
+        <button :disabled="currentPage >= totalPages || listLoading" class="ghost-button"
+                type="button"
+                @click="changePage(currentPage + 1)">
+          下一页
+        </button>
+      </div>
+    </article>
+  </section>
+</template>
 
 <style scoped>
 .document-page {

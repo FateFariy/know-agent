@@ -1,3 +1,68 @@
+<script lang="ts" setup>
+import {onMounted, reactive, ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {documentApi} from '@/api/document'
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
+import {formatCount} from '@/utils/format.ts'
+import type {DocumentDetailResp} from '@/types'
+
+const router = useRouter()
+const loading = ref(false)
+const documents = ref<DocumentDetailResp[]>([])
+const summary = reactive({
+  total: 0,
+  parseSuccess: 0,
+  strategyConfirmed: 0,
+  indexSuccess: 0
+})
+
+async function loadDashboard() {
+  loading.value = true
+
+  try {
+    const {data} = await documentApi.queryDocumentPage({
+      pageNo: 1,
+      pageSize: 50,
+      keyword: ''
+    })
+    documents.value = data?.records || []
+    summary.total = data?.total || documents.value.length || 0
+    let parseSuccess = 0
+    let strategyConfirmed = 0
+    let indexSuccess = 0
+    documents.value.forEach((item) => {
+      if (item.parseStatus === 3) {
+        parseSuccess++
+      }
+      if (item.strategyStatus === 3) {
+        strategyConfirmed++
+      }
+      if (item.indexStatus === 3) {
+        indexSuccess++
+      }
+    })
+    summary.parseSuccess = parseSuccess
+    summary.strategyConfirmed = strategyConfirmed
+    summary.indexSuccess = indexSuccess
+  } catch (error) {
+    console.error('加载后台概览失败', error)
+    documents.value = []
+    summary.total = 0
+    summary.parseSuccess = 0
+    summary.strategyConfirmed = 0
+    summary.indexSuccess = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+function goDocuments() {
+  router.push('/admin/documents')
+}
+
+onMounted(loadDashboard)
+</script>
+
 <template>
   <section class="dashboard-page">
     <div class="hero-card">
@@ -92,71 +157,6 @@
     </div>
   </section>
 </template>
-
-<script lang="ts" setup>
-import {onMounted, reactive, ref} from 'vue'
-import {useRouter} from 'vue-router'
-import {documentApi} from '@/api/document'
-import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
-import {formatCount} from '@/utils/format.ts'
-import type {DocumentDetailResp} from '@/types'
-
-const router = useRouter()
-const loading = ref(false)
-const documents = ref<DocumentDetailResp[]>([])
-const summary = reactive({
-  total: 0,
-  parseSuccess: 0,
-  strategyConfirmed: 0,
-  indexSuccess: 0
-})
-
-async function loadDashboard() {
-  loading.value = true
-
-  try {
-    const {data} = await documentApi.queryDocumentPage({
-      pageNo: 1,
-      pageSize: 50,
-      keyword: ''
-    })
-    documents.value = data?.records || []
-    summary.total = data?.total || documents.value.length || 0
-    let parseSuccess = 0
-    let strategyConfirmed = 0
-    let indexSuccess = 0
-    documents.value.forEach((item) => {
-      if (item.parseStatus === 3) {
-        parseSuccess++
-      }
-      if (item.strategyStatus === 3) {
-        strategyConfirmed++
-      }
-      if (item.indexStatus === 3) {
-        indexSuccess++
-      }
-    })
-    summary.parseSuccess = parseSuccess
-    summary.strategyConfirmed = strategyConfirmed
-    summary.indexSuccess = indexSuccess
-  } catch (error) {
-    console.error('加载后台概览失败', error)
-    documents.value = []
-    summary.total = 0
-    summary.parseSuccess = 0
-    summary.strategyConfirmed = 0
-    summary.indexSuccess = 0
-  } finally {
-    loading.value = false
-  }
-}
-
-function goDocuments() {
-  router.push('/admin/documents')
-}
-
-onMounted(loadDashboard)
-</script>
 
 <style scoped>
 .dashboard-page {

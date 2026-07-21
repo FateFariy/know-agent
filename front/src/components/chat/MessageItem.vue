@@ -125,26 +125,6 @@ function handleReferenceClick(index: number) {
         <p v-if="isError" class="message-notice message-notice--error">生成已中断。</p>
         <p v-else-if="isCancelled" class="message-notice message-notice--cancelled">（已停止生成）</p>
 
-        <!-- 引用来源 -->
-        <div v-if="hasReferences" class="references">
-          <div class="references__header">
-            <el-icon class="references__icon">
-              <Document />
-            </el-icon>
-            <span>参考来源（{{ message.references!.length }}）</span>
-          </div>
-          <ul class="references__list">
-            <li v-for="(ref, idx) in message.references"
-              :key="(ref.documentId ?? ref.url ?? ref.title ?? '') + '-' + idx" class="references__item">
-              <span class="references__index">[{{ idx + 1 }}]</span>
-              <a v-if="ref.url" :href="ref.url" class="references__title" rel="noopener" target="_blank">{{ ref.title ||
-                ref.documentName || ref.url }}</a>
-              <span v-else class="references__title">{{ ref.title || ref.documentName || '参考文档' }}</span>
-              <span v-if="ref.score != null" class="references__score">相似度 {{ (ref.score * 100).toFixed(0) }}%</span>
-            </li>
-          </ul>
-        </div>
-
         <!-- 推荐问题（按钮列表，点击直接发送） -->
         <div v-if="hasRecommendations" class="recommend">
           <div class="recommend__header">

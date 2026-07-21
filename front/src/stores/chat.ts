@@ -372,6 +372,7 @@ export const useChatStore = defineStore('chat', () => {
       conversationId,
       chatMode: 'auto_document'
     }
+    console.log('[chat] sendMessage', req)
 
     const handlers: StreamHandlers = {
       onText: (payload) => {
@@ -534,5 +535,13 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     cancelGeneration,
     submitFeedback
+  }
+}, {
+  // 刷新页面后仅保留当前会话 id，messages 仍走 selectSession 从后端重新拉取
+  // 存储用 sessionStorage：标签页内生效，关闭后失效，避免跨标签污染会话上下文
+  persist: {
+    key: 'chat:currentSessionId',
+    storage: sessionStorage,
+    paths: ['currentSessionId']
   }
 })

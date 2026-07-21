@@ -1,3 +1,247 @@
+<script lang="ts" setup>
+import {computed, ref, watch, watchEffect} from 'vue'
+import {RouterLink, useRoute} from 'vue-router'
+import {ArrowLeftIcon, ArrowPathIcon} from '@heroicons/vue/24/outline'
+import {chatApi} from '@/api/chat'
+import type {
+  ChannelExecutionResp,
+  ConversationExchange,
+  ConversationExchangeDetailResp,
+  ConversationSessionResp,
+  ConversationTraceStage,
+  RetrievalResultResp,
+  Snapshot
+} from '@/types'
+import type {ExchangeStage, StageInspector} from '@/utils/observabilityHelpers'
+import {
+  buildExchangeStages,
+  buildExchangeStatusNarrative,
+  buildTraceStageInspector,
+  buildUsageStageInspector,
+  formatChannelType,
+  formatChatMode,
+  formatExecutionMode,
+  formatExecutionState,
+  formatScore,
+  formatStageStateLabel,
+  formatTurnStatusLabel,
+  groupResultsBySubQuestion,
+  normalizeError,
+  stageStateTone,
+  truncate,
+  turnStatusTone
+} from '@/utils/observabilityHelpers'
+
+const route = useRoute()
+
+const loadingPage = ref(false)
+const activeSession = ref<ConversationSessionResp | null>(null)
+const activeExchangeDetail = ref<ConversationExchangeDetailResp | null>(null)
+const pageError = ref('')
+const traceDetailOpen = ref(false)
+const selectedTraceId = ref('')
+const overlayInspector = ref<StageInspector | null>(null)
+const retrievalResults = ref<RetrievalResultResp[]>([])
+const channelExecutions = ref<ChannelExecutionResp[]>([])
+const loadingRetrievalData = ref(false)
+
+const conversationId = computed(() => String(route.params.conversationId || ''))
+const exchangeId = computed(() => String(route.params.exchangeId || ''))
+const activeExchange = computed<ConversationExchange | null>(() => activeExchangeDetail.value?.exchange || null)
+const stageTraces = computed<ConversationTraceStage[]>(() => activeExchangeDetail.value?.stageTraces || [])
+const activeTraceStage = computed<ConversationTraceStage | null>(() => {
+  if (!selectedTraceId.value) {
+    return stageTraces.value[0] ?? null
+  }
+  return stageTraces.value.find((item) => String(item.id) === selectedTraceId.value) ?? stageTraces.value[0] ?? null
+})
+const exchangeStages = computed<ExchangeStage[]>(() => buildExchangeStages(activeSession.value, activeExchange.value))
+
+const currentExchangeNarrative = computed<string>(() => {
+  if (!activeExchange.value) {
+    return '这页只负责看这一轮的执行链路。'
+  }
+  return buildExchangeStatusNarrative(activeExchange.value)
+})
+
+const totalTokenCount = computed<number>(() => {
+  const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
+  return traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
+})
+
+const totalCostText = computed<string>(() => {
+  const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
+  const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
+  return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
+})
+
+const maxTraceDuration = computed<number>(() => {
+  return stageTraces.value.reduce((max, item) => Math.max(max, Number(item?.durationMs || 0)), 0)
+})
+
+const groupedRetrievalResults = computed<ReturnType<typeof groupResultsBySubQuestion>>(() => groupResultsBySubQuestion(retrievalResults.value))
+
+const activePromptTab = ref('system')
+
+const evidenceBudgetSnapshot = computed<Snapshot | null>(() => {
+  const traces = stageTraces.value || []
+  const budgetTrace = traces.find((item) => item.stageCode === 'EVIDENCE_BUDGET')
+  return budgetTrace?.snapshotJson ? JSON.parse(budgetTrace.snapshotJson) : null
+})
+
+const ragSystemPrompt = computed(() => activeExchange.value?.debugTrace?.ragSystemPrompt || '')
+const ragUserPrompt = computed(() => activeExchange.value?.debugTrace?.ragUserPrompt || '')
+const hasPromptData = computed(() => Boolean(ragSystemPrompt.value || ragUserPrompt.value))
+
+async function loadRetrievalObserveData(): Promise<void> {
+  if (!conversationId.value || !exchangeId.value) {
+    return
+  }
+  loadingRetrievalData.value = true
+  try {
+    const [resultsRes, executionsRes] = await Promise.all([
+      chatApi.getRetrievalResults({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      }),
+      chatApi.getChannelExecutions({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      })
+    ])
+    retrievalResults.value = resultsRes.data || []
+    channelExecutions.value = executionsRes.data || []
+  } catch {
+    retrievalResults.value = []
+    channelExecutions.value = []
+  } finally {
+    loadingRetrievalData.value = false
+  }
+}
+
+async function loadPage(): Promise<void> {
+  if (!conversationId.value || !exchangeId.value) {
+    return
+  }
+  loadingPage.value = true
+  pageError.value = ''
+  try {
+    const [sessionRes, exchangeDetailRes] = await Promise.all([
+      chatApi.getSessionDetail({conversationId: conversationId.value}),
+      chatApi.getExchangeDetail({
+        conversationId: conversationId.value,
+        exchangeId: exchangeId.value
+      })
+    ])
+    activeSession.value = sessionRes.data || null
+    activeExchangeDetail.value = exchangeDetailRes.data || null
+    selectedTraceId.value = String(exchangeDetailRes.data?.stageTraces?.[0]?.id || '')
+    await loadRetrievalObserveData()
+  } catch (error) {
+    activeSession.value = null
+    activeExchangeDetail.value = null
+    pageError.value = normalizeError(error, '加载轮次详情失败')
+  } finally {
+    loadingPage.value = false
+  }
+}
+
+function openTraceDetail(id: string | number): void {
+  selectedTraceId.value = String(id || '')
+  overlayInspector.value = buildTraceStageInspector(activeTraceStage.value, activeExchange.value)
+  traceDetailOpen.value = true
+}
+
+function closeTraceDetail(): void {
+  traceDetailOpen.value = false
+  overlayInspector.value = null
+}
+
+function traceBarWidth(trace: ConversationTraceStage): string {
+  const duration = Number(trace?.durationMs || 0)
+  const maxDuration = maxTraceDuration.value
+  if (!duration || !maxDuration) {
+    return '6%'
+  }
+  return `${Math.max((duration / maxDuration) * 100, 6)}%`
+}
+
+function findStageTrace(stageTitle: string): ConversationTraceStage | null {
+  if (!stageTitle) {
+    return null
+  }
+  if (stageTitle.includes('检索执行')) {
+    return stageTraces.value.find((item) => item.stageCode === 'RAG_RETRIEVE' || item.stageCode === 'REACT_AGENT') || null
+  }
+  if (stageTitle.includes('前置编排')) {
+    return stageTraces.value.find((item) => item.stageCode === 'INTENT') || null
+  }
+  if (stageTitle.includes('请求入口')) {
+    return stageTraces.value.find((item) => item.stageCode === 'ROUTE') || null
+  }
+  if (stageTitle.includes('生成回答')) {
+    return stageTraces.value.find((item) => item.stageCode === 'ANSWER_GENERATE') || null
+  }
+  if (stageTitle.includes('模型使用')) {
+    return stageTraces.value.find((item) => item.stageCode === 'ANSWER_GENERATE') || null
+  }
+  if (stageTitle.includes('结果与诊断')) {
+    return stageTraces.value.find((item) => item.stageCode === 'FINALIZE') || null
+  }
+  return null
+}
+
+function canOpenStage(stage: ExchangeStage): boolean {
+  if (!stage) {
+    return false
+  }
+  return stage.key === 'usage' || Boolean(findStageTrace(stage.title))
+}
+
+function openSummaryStage(stage: ExchangeStage): void {
+  if (!stage) {
+    return
+  }
+  if (stage.key === 'usage') {
+    overlayInspector.value = buildUsageStageInspector(activeExchange.value)
+    traceDetailOpen.value = true
+    return
+  }
+  const trace = findStageTrace(stage.title)
+  if (!trace) {
+    return
+  }
+  selectedTraceId.value = String(trace.id)
+  overlayInspector.value = buildTraceStageInspector(trace, activeExchange.value)
+  traceDetailOpen.value = true
+}
+
+watch([conversationId, exchangeId], () => {
+  activeSession.value = null
+  activeExchangeDetail.value = null
+  traceDetailOpen.value = false
+  overlayInspector.value = null
+  selectedTraceId.value = ''
+  loadPage()
+}, {immediate: true})
+
+watchEffect(() => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.__obsDetailState = {
+    loadingPage: loadingPage.value,
+    hasSession: Boolean(activeSession.value),
+    hasExchangeDetail: Boolean(activeExchangeDetail.value),
+    conversationId: conversationId.value,
+    exchangeId: exchangeId.value,
+    selectedTraceId: selectedTraceId.value,
+    traceDetailOpen: traceDetailOpen.value,
+    overlayTitle: overlayInspector.value?.title || ''
+  }
+})
+</script>
+
 <template>
   <section class="round-detail-page">
     <div class="detail-toolbar">
@@ -450,250 +694,6 @@
     </template>
   </section>
 </template>
-
-<script lang="ts" setup>
-import {computed, ref, watch, watchEffect} from 'vue'
-import {RouterLink, useRoute} from 'vue-router'
-import {ArrowLeftIcon, ArrowPathIcon} from '@heroicons/vue/24/outline'
-import {chatApi} from '@/api/chat'
-import type {
-  ChannelExecutionResp,
-  ConversationExchange,
-  ConversationExchangeDetailResp,
-  ConversationSessionResp,
-  ConversationTraceStage,
-  RetrievalResultResp,
-  Snapshot
-} from '@/types'
-import type {ExchangeStage, StageInspector} from '@/utils/observabilityHelpers'
-import {
-  buildExchangeStages,
-  buildExchangeStatusNarrative,
-  buildTraceStageInspector,
-  buildUsageStageInspector,
-  formatChannelType,
-  formatChatMode,
-  formatExecutionMode,
-  formatExecutionState,
-  formatScore,
-  formatStageStateLabel,
-  formatTurnStatusLabel,
-  groupResultsBySubQuestion,
-  normalizeError,
-  stageStateTone,
-  truncate,
-  turnStatusTone
-} from '@/utils/observabilityHelpers'
-
-const route = useRoute()
-
-const loadingPage = ref(false)
-const activeSession = ref<ConversationSessionResp | null>(null)
-const activeExchangeDetail = ref<ConversationExchangeDetailResp | null>(null)
-const pageError = ref('')
-const traceDetailOpen = ref(false)
-const selectedTraceId = ref('')
-const overlayInspector = ref<StageInspector | null>(null)
-const retrievalResults = ref<RetrievalResultResp[]>([])
-const channelExecutions = ref<ChannelExecutionResp[]>([])
-const loadingRetrievalData = ref(false)
-
-const conversationId = computed(() => String(route.params.conversationId || ''))
-const exchangeId = computed(() => String(route.params.exchangeId || ''))
-const activeExchange = computed<ConversationExchange | null>(() => activeExchangeDetail.value?.exchange || null)
-const stageTraces = computed<ConversationTraceStage[]>(() => activeExchangeDetail.value?.stageTraces || [])
-const activeTraceStage = computed<ConversationTraceStage | null>(() => {
-  if (!selectedTraceId.value) {
-    return stageTraces.value[0] ?? null
-  }
-  return stageTraces.value.find((item) => String(item.id) === selectedTraceId.value) ?? stageTraces.value[0] ?? null
-})
-const exchangeStages = computed<ExchangeStage[]>(() => buildExchangeStages(activeSession.value, activeExchange.value))
-
-const currentExchangeNarrative = computed<string>(() => {
-  if (!activeExchange.value) {
-    return '这页只负责看这一轮的执行链路。'
-  }
-  return buildExchangeStatusNarrative(activeExchange.value)
-})
-
-const totalTokenCount = computed<number>(() => {
-  const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
-  return traces.reduce((sum, item) => sum + Number(item?.totalTokens || 0), 0)
-})
-
-const totalCostText = computed<string>(() => {
-  const traces = activeExchange.value?.debugTrace?.modelUsageTraces || []
-  const total = traces.reduce((sum, item) => sum + Number(item?.estimatedCost || 0), 0)
-  return total > 0 ? `¥ ${total.toFixed(4)}` : '无'
-})
-
-const maxTraceDuration = computed<number>(() => {
-  return stageTraces.value.reduce((max, item) => Math.max(max, Number(item?.durationMs || 0)), 0)
-})
-
-const groupedRetrievalResults = computed<ReturnType<typeof groupResultsBySubQuestion>>(() => groupResultsBySubQuestion(retrievalResults.value))
-
-const activePromptTab = ref('system')
-
-const evidenceBudgetSnapshot = computed<Snapshot | null>(() => {
-  const traces = stageTraces.value || []
-  const budgetTrace = traces.find((item) => item.stageCode === 'EVIDENCE_BUDGET')
-  return budgetTrace?.snapshotJson ? JSON.parse(budgetTrace.snapshotJson) : null
-})
-
-const ragSystemPrompt = computed(() => activeExchange.value?.debugTrace?.ragSystemPrompt || '')
-const ragUserPrompt = computed(() => activeExchange.value?.debugTrace?.ragUserPrompt || '')
-const hasPromptData = computed(() => Boolean(ragSystemPrompt.value || ragUserPrompt.value))
-
-async function loadRetrievalObserveData(): Promise<void> {
-  if (!conversationId.value || !exchangeId.value) {
-    return
-  }
-  loadingRetrievalData.value = true
-  try {
-    const [resultsRes, executionsRes] = await Promise.all([
-      chatApi.getRetrievalResults({
-        conversationId: conversationId.value,
-        exchangeId: exchangeId.value
-      }),
-      chatApi.getChannelExecutions({
-        conversationId: conversationId.value,
-        exchangeId: exchangeId.value
-      })
-    ])
-    retrievalResults.value = resultsRes.data || []
-    channelExecutions.value = executionsRes.data || []
-  } catch {
-    retrievalResults.value = []
-    channelExecutions.value = []
-  } finally {
-    loadingRetrievalData.value = false
-  }
-}
-
-async function loadPage(): Promise<void> {
-  if (!conversationId.value || !exchangeId.value) {
-    return
-  }
-  loadingPage.value = true
-  pageError.value = ''
-  try {
-    const [sessionRes, exchangeDetailRes] = await Promise.all([
-      chatApi.getSessionDetail({conversationId: conversationId.value}),
-      chatApi.getExchangeDetail({
-        conversationId: conversationId.value,
-        exchangeId: exchangeId.value
-      })
-    ])
-    activeSession.value = sessionRes.data || null
-    activeExchangeDetail.value = exchangeDetailRes.data || null
-    selectedTraceId.value = String(exchangeDetailRes.data?.stageTraces?.[0]?.id || '')
-    await loadRetrievalObserveData()
-  } catch (error) {
-    activeSession.value = null
-    activeExchangeDetail.value = null
-    pageError.value = normalizeError(error, '加载轮次详情失败')
-  } finally {
-    loadingPage.value = false
-  }
-}
-
-function openTraceDetail(id: string | number): void {
-  selectedTraceId.value = String(id || '')
-  overlayInspector.value = buildTraceStageInspector(activeTraceStage.value, activeExchange.value)
-  traceDetailOpen.value = true
-}
-
-function closeTraceDetail(): void {
-  traceDetailOpen.value = false
-  overlayInspector.value = null
-}
-
-function traceBarWidth(trace: ConversationTraceStage): string {
-  const duration = Number(trace?.durationMs || 0)
-  const maxDuration = maxTraceDuration.value
-  if (!duration || !maxDuration) {
-    return '6%'
-  }
-  return `${Math.max((duration / maxDuration) * 100, 6)}%`
-}
-
-function findStageTrace(stageTitle: string): ConversationTraceStage | null {
-  if (!stageTitle) {
-    return null
-  }
-  if (stageTitle.includes('检索执行')) {
-    return stageTraces.value.find((item) => item.stageCode === 'RAG_RETRIEVE' || item.stageCode === 'REACT_AGENT') || null
-  }
-  if (stageTitle.includes('前置编排')) {
-    return stageTraces.value.find((item) => item.stageCode === 'INTENT') || null
-  }
-  if (stageTitle.includes('请求入口')) {
-    return stageTraces.value.find((item) => item.stageCode === 'ROUTE') || null
-  }
-  if (stageTitle.includes('生成回答')) {
-    return stageTraces.value.find((item) => item.stageCode === 'ANSWER_GENERATE') || null
-  }
-  if (stageTitle.includes('模型使用')) {
-    return stageTraces.value.find((item) => item.stageCode === 'ANSWER_GENERATE') || null
-  }
-  if (stageTitle.includes('结果与诊断')) {
-    return stageTraces.value.find((item) => item.stageCode === 'FINALIZE') || null
-  }
-  return null
-}
-
-function canOpenStage(stage: ExchangeStage): boolean {
-  if (!stage) {
-    return false
-  }
-  return stage.key === 'usage' || Boolean(findStageTrace(stage.title))
-}
-
-function openSummaryStage(stage: ExchangeStage): void {
-  if (!stage) {
-    return
-  }
-  if (stage.key === 'usage') {
-    overlayInspector.value = buildUsageStageInspector(activeExchange.value)
-    traceDetailOpen.value = true
-    return
-  }
-  const trace = findStageTrace(stage.title)
-  if (!trace) {
-    return
-  }
-  selectedTraceId.value = String(trace.id)
-  overlayInspector.value = buildTraceStageInspector(trace, activeExchange.value)
-  traceDetailOpen.value = true
-}
-
-watch([conversationId, exchangeId], () => {
-  activeSession.value = null
-  activeExchangeDetail.value = null
-  traceDetailOpen.value = false
-  overlayInspector.value = null
-  selectedTraceId.value = ''
-  loadPage()
-}, {immediate: true})
-
-watchEffect(() => {
-  if (typeof window === 'undefined') {
-    return
-  }
-  window.__obsDetailState = {
-    loadingPage: loadingPage.value,
-    hasSession: Boolean(activeSession.value),
-    hasExchangeDetail: Boolean(activeExchangeDetail.value),
-    conversationId: conversationId.value,
-    exchangeId: exchangeId.value,
-    selectedTraceId: selectedTraceId.value,
-    traceDetailOpen: traceDetailOpen.value,
-    overlayTitle: overlayInspector.value?.title || ''
-  }
-})
-</script>
 
 <style scoped>
 .round-detail-page {

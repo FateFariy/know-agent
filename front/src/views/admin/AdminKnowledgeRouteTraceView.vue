@@ -1,3 +1,269 @@
+<script lang="ts" setup>
+import {computed, onMounted, reactive, ref} from 'vue'
+import {knowledgeApi} from '@/api/knowledge'
+import type {KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq} from '@/types'
+import type {
+  DocumentDistributionItem,
+  NormalizedRouteTrace,
+  RouteTraceSummary
+} from '@/utils/knowledgeRoute'
+import {
+  buildTopDocumentDistribution,
+  normalizeRouteTrace,
+  summarizeRouteTraceRecords
+} from '@/utils/knowledgeRoute'
+
+const loading = ref<boolean>(false)
+const records = ref<KnowledgeRouteTraceItem[]>([])
+const selectedId = ref<string | null>(null)
+const insightCollapsed = ref<boolean>(true)
+
+interface Filters {
+  conversationId: string
+  mode: string
+  routeStatus: string
+  pageNo: number
+  pageSize: number
+}
+
+const filters = reactive<Filters>({
+  conversationId: '',
+  mode: '',
+  routeStatus: '',
+  pageNo: 1,
+  pageSize: 20
+})
+
+interface PageInfo {
+  pageNo: number
+  pageSize: number
+  totalSize: number
+  totalPages: number
+}
+
+const page = reactive<PageInfo>({
+  pageNo: 1,
+  pageSize: 20,
+  totalSize: 0,
+  totalPages: 0
+})
+
+const normalizedRecords = computed<NormalizedRouteTrace[]>(() => (records.value || []).map((item) => normalizeRouteTrace(item)))
+const selectedRecord = computed<NormalizedRouteTrace | null>(() => normalizedRecords.value.find((r) => r.id === selectedId.value) || null)
+const traceStats = computed<RouteTraceSummary>(() => summarizeRouteTraceRecords(records.value || []))
+const topDocumentDistribution = computed<DocumentDistributionItem[]>(() => buildTopDocumentDistribution(records.value || []))
+
+interface HeaderStat {
+  label: string
+  value: string | number
+}
+
+const headerStats = computed<HeaderStat[]>(() => [
+  {label: '总追踪量', value: page.totalSize},
+  {label: '成功率', value: traceStats.value.successRateText},
+  {label: '平均置信度', value: traceStats.value.averageConfidenceText},
+  {label: 'shadow 命中率', value: traceStats.value.shadowHitRateText},
+  {
+    label: '低置信或失败',
+    value: traceStats.value.lowConfidenceCount + traceStats.value.failedCount
+  }
+])
+
+interface SummaryCard {
+  label: string
+  value: string | number
+  description: string
+}
+
+const summaryCards = computed<SummaryCard[]>(() => [
+  {label: '总追踪量', value: page.totalSize, description: '符合当前筛选条件的全部路由记录数'},
+  {
+    label: '本页 auto',
+    value: traceStats.value?.autoCount,
+    description: '自动知识问答实际落下的路由记录'
+  },
+  {
+    label: '本页 shadow',
+    value: traceStats.value?.shadowCount,
+    description: '当前文档问答的影子路由对比记录'
+  },
+  {
+    label: '高置信',
+    value: traceStats.value?.highConfidenceCount,
+    description: '置信度 >= 0.8000 的样本数'
+  },
+  {
+    label: '低置信或失败',
+    value: traceStats.value?.lowConfidenceCount + traceStats.value?.failedCount,
+    description: '这些样本最适合回头补知识范围、主题别名或文档画像'
+  },
+  {
+    label: 'shadow Top3 命中率',
+    value: traceStats.value?.shadowHitRateText ?? '0%',
+    description: '人工选文档是否与影子路由基本一致'
+  },
+  {
+    label: '平均置信度',
+    value: traceStats.value?.averageConfidenceText ?? '0.0000',
+    description: '当前页所有路由样本的平均置信度'
+  },
+  {
+    label: '成功率',
+    value: traceStats.value?.successRateText ?? '0%',
+    description: '当前页成功路由样本占比'
+  },
+  {
+    label: '低置信率',
+    value: traceStats.value?.lowConfidenceRateText ?? '0%',
+    description: '低置信或失败样本占比'
+  },
+  {
+    label: '均候选文档',
+    value: traceStats.value?.averageDocumentCountText ?? '0',
+    description: '每轮路由平均产出的候选文档数量'
+  },
+  {
+    label: '扩范围次数',
+    value: traceStats.value?.widenedCount,
+    description: '低置信时自动放宽候选范围的次数'
+  }
+])
+
+interface HealthCard {
+  label: string
+  value: string
+  percent: string
+  tone: 'success' | 'warning' | 'neutral'
+  description: string
+}
+
+const routeHealthCards = computed<HealthCard[]>(() => [
+  {
+    label: '成功率',
+    value: traceStats.value.successRateText,
+    percent: normalizePercent(traceStats.value.successRateText),
+    tone: 'success',
+    description: '越高说明自动候选越稳定。'
+  },
+  {
+    label: '低置信率',
+    value: traceStats.value.lowConfidenceRateText,
+    percent: normalizePercent(traceStats.value.lowConfidenceRateText),
+    tone: 'warning',
+    description: '越高说明范围、主题或画像还需要补强。'
+  },
+  {
+    label: '候选文档均值',
+    value: traceStats.value.averageDocumentCountText,
+    percent: `${Math.min(100, Number(traceStats.value.averageDocumentCountText || 0) * 20)}%`,
+    tone: 'neutral',
+    description: '高置信时通常接近 3，低置信时会放宽到 5。'
+  }
+])
+
+function selectRecord(item: NormalizedRouteTrace): void {
+  selectedId.value = item.id
+}
+
+async function loadTraces(nextPage: number = page.pageNo): Promise<void> {
+  loading.value = true
+  try {
+    const params: KnowledgeRouteTracePageReq = {
+      conversationId: filters.conversationId || undefined,
+      mode: filters.mode || undefined,
+      routeStatus: filters.routeStatus ? Number(filters.routeStatus) : undefined,
+      pageNo: nextPage,
+      pageSize: page.pageSize
+    }
+    const {data} = await knowledgeApi.queryRouteTracePage(params)
+    records.value = data?.records || []
+    page.pageNo = data?.pageNo || 1
+    page.pageSize = data?.pageSize || 20
+    page.totalSize = data?.total || 0
+    page.totalPages = Math.ceil((data?.total || 0) / (data?.pageSize || 20)) || 0
+    selectedId.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetFilters(): void {
+  filters.conversationId = ''
+  filters.mode = ''
+  filters.routeStatus = ''
+  loadTraces(1)
+}
+
+function changePage(nextPage: number): void {
+  if (nextPage <= 0) return
+  loadTraces(nextPage)
+}
+
+function normalizePercent(value: string | number | undefined): string {
+  const numeric = Number(String(value || '').replace('%', ''))
+  if (!Number.isFinite(numeric)) return '0%'
+  return `${Math.max(0, Math.min(100, numeric))}%`
+}
+
+function formatJson(value: string | undefined): string {
+  if (!value) return '[]'
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    return value
+  }
+}
+
+function shortenId(value: string | undefined): string {
+  const normalized = String(value || '')
+  if (normalized.length <= 14) return normalized || '-'
+  return `${normalized.slice(0, 6)}...${normalized.slice(-6)}`
+}
+
+function primaryDocumentText(item: NormalizedRouteTrace): string {
+  return item.topDocument?.documentName || item.topDocument?.documentId || '未形成显式主候选'
+}
+
+function actualSelectionText(item: NormalizedRouteTrace): string {
+  if (item.mode === 'auto') {
+    return item.topDocument?.documentName || item.topDocument?.documentId || '执行期可能回退到通用可检索文档池'
+  }
+  return item.selectedDocument?.documentName || item.selectedDocumentId || '未记录当前文档'
+}
+
+function hitConclusion(item: NormalizedRouteTrace): string {
+  if (item.mode === 'auto') {
+    return item.topDocument ? '自动模式会以该主候选为中心，再进入稳定检索主链。' : '当前没有明确主候选，说明需要继续补范围、主题或文档画像。'
+  }
+  if (item.hitTop3) return '影子路由 Top3 已覆盖当前文档，人工选择与自动路由基本一致。'
+  if (item.missedTop3) return '影子路由 Top3 未覆盖当前文档，说明这轮问题可能更像跨文档。'
+  return '当前样本还不足以判断影子路由与人工选择是否一致。'
+}
+
+function candidateConclusion(item: NormalizedRouteTrace): string {
+  if (item.lowConfidenceWidened) return '当前是低置信样本，系统已经自动放宽候选文档规模。'
+  if (!item.documents.length) return '当前没有候选文档，优先检查文档画像、主题关联与标签是否完整。'
+  return '候选规模已经稳定，后续主要观察 Top1 和 Top3 的命中情况。'
+}
+
+function recommendationTitle(item: NormalizedRouteTrace): string {
+  if (item.mode === 'auto' && item.statusKey === 'SUCCESS' && (item.confidence) >= 0.8) return '可以继续扩大样本观察'
+  if (item.lowConfidenceWidened || item.statusKey === 'LOW_CONFIDENCE') return '建议补强知识范围和主题别名'
+  if (item.statusKey === 'FAILED') return '建议优先排查空路由原因'
+  if (item.mode === 'shadow' && item.missedTop3) return '建议检查当前文档是否放错范围'
+  return '当前配置可继续保留'
+}
+
+function recommendationText(item: NormalizedRouteTrace): string {
+  if (item.lowConfidenceWidened || item.statusKey === 'LOW_CONFIDENCE') return '优先补 documentTags、knowledgeScopeName、topic 别名，以及 topic-document relation 的人工确认。'
+  if (item.statusKey === 'FAILED') return '当前路由没有形成稳定候选，先检查上传元数据、文档画像和主题树是否为空。'
+  if (item.mode === 'shadow' && item.missedTop3) return '人工选文档和自动路由差异较大，建议对比问题表达与文档画像的关键词覆盖情况。'
+  return '当前样本已经接近可教学展示状态，下一步重点看不同问题类型下是否还能持续稳定。'
+}
+
+onMounted(() => loadTraces(1))
+</script>
+
 <template>
   <section class="trace-page">
     <!-- 顶部页头 + 统计条 -->
@@ -266,272 +532,6 @@
     </div>
   </section>
 </template>
-
-<script lang="ts" setup>
-import {computed, onMounted, reactive, ref} from 'vue'
-import {knowledgeApi} from '@/api/knowledge'
-import type {KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq} from '@/types'
-import type {
-  DocumentDistributionItem,
-  NormalizedRouteTrace,
-  RouteTraceSummary
-} from '@/utils/knowledgeRoute'
-import {
-  buildTopDocumentDistribution,
-  normalizeRouteTrace,
-  summarizeRouteTraceRecords
-} from '@/utils/knowledgeRoute'
-
-const loading = ref<boolean>(false)
-const records = ref<KnowledgeRouteTraceItem[]>([])
-const selectedId = ref<string | null>(null)
-const insightCollapsed = ref<boolean>(true)
-
-interface Filters {
-  conversationId: string
-  mode: string
-  routeStatus: string
-  pageNo: number
-  pageSize: number
-}
-
-const filters = reactive<Filters>({
-  conversationId: '',
-  mode: '',
-  routeStatus: '',
-  pageNo: 1,
-  pageSize: 20
-})
-
-interface PageInfo {
-  pageNo: number
-  pageSize: number
-  totalSize: number
-  totalPages: number
-}
-
-const page = reactive<PageInfo>({
-  pageNo: 1,
-  pageSize: 20,
-  totalSize: 0,
-  totalPages: 0
-})
-
-const normalizedRecords = computed<NormalizedRouteTrace[]>(() => (records.value || []).map((item) => normalizeRouteTrace(item)))
-const selectedRecord = computed<NormalizedRouteTrace | null>(() => normalizedRecords.value.find((r) => r.id === selectedId.value) || null)
-const traceStats = computed<RouteTraceSummary>(() => summarizeRouteTraceRecords(records.value || []))
-const topDocumentDistribution = computed<DocumentDistributionItem[]>(() => buildTopDocumentDistribution(records.value || []))
-
-interface HeaderStat {
-  label: string
-  value: string | number
-}
-
-const headerStats = computed<HeaderStat[]>(() => [
-  {label: '总追踪量', value: page.totalSize},
-  {label: '成功率', value: traceStats.value.successRateText},
-  {label: '平均置信度', value: traceStats.value.averageConfidenceText},
-  {label: 'shadow 命中率', value: traceStats.value.shadowHitRateText},
-  {
-    label: '低置信或失败',
-    value: traceStats.value.lowConfidenceCount + traceStats.value.failedCount
-  }
-])
-
-interface SummaryCard {
-  label: string
-  value: string | number
-  description: string
-}
-
-const summaryCards = computed<SummaryCard[]>(() => [
-  {label: '总追踪量', value: page.totalSize, description: '符合当前筛选条件的全部路由记录数'},
-  {
-    label: '本页 auto',
-    value: traceStats.value?.autoCount,
-    description: '自动知识问答实际落下的路由记录'
-  },
-  {
-    label: '本页 shadow',
-    value: traceStats.value?.shadowCount,
-    description: '当前文档问答的影子路由对比记录'
-  },
-  {
-    label: '高置信',
-    value: traceStats.value?.highConfidenceCount,
-    description: '置信度 >= 0.8000 的样本数'
-  },
-  {
-    label: '低置信或失败',
-    value: traceStats.value?.lowConfidenceCount + traceStats.value?.failedCount,
-    description: '这些样本最适合回头补知识范围、主题别名或文档画像'
-  },
-  {
-    label: 'shadow Top3 命中率',
-    value: traceStats.value?.shadowHitRateText ?? '0%',
-    description: '人工选文档是否与影子路由基本一致'
-  },
-  {
-    label: '平均置信度',
-    value: traceStats.value?.averageConfidenceText ?? '0.0000',
-    description: '当前页所有路由样本的平均置信度'
-  },
-  {
-    label: '成功率',
-    value: traceStats.value?.successRateText ?? '0%',
-    description: '当前页成功路由样本占比'
-  },
-  {
-    label: '低置信率',
-    value: traceStats.value?.lowConfidenceRateText ?? '0%',
-    description: '低置信或失败样本占比'
-  },
-  {
-    label: '均候选文档',
-    value: traceStats.value?.averageDocumentCountText ?? '0',
-    description: '每轮路由平均产出的候选文档数量'
-  },
-  {
-    label: '扩范围次数',
-    value: traceStats.value?.widenedCount,
-    description: '低置信时自动放宽候选范围的次数'
-  }
-])
-
-interface HealthCard {
-  label: string
-  value: string
-  percent: string
-  tone: 'success' | 'warning' | 'neutral'
-  description: string
-}
-
-const routeHealthCards = computed<HealthCard[]>(() => [
-  {
-    label: '成功率',
-    value: traceStats.value.successRateText,
-    percent: normalizePercent(traceStats.value.successRateText),
-    tone: 'success',
-    description: '越高说明自动候选越稳定。'
-  },
-  {
-    label: '低置信率',
-    value: traceStats.value.lowConfidenceRateText,
-    percent: normalizePercent(traceStats.value.lowConfidenceRateText),
-    tone: 'warning',
-    description: '越高说明范围、主题或画像还需要补强。'
-  },
-  {
-    label: '候选文档均值',
-    value: traceStats.value.averageDocumentCountText,
-    percent: `${Math.min(100, Number(traceStats.value.averageDocumentCountText || 0) * 20)}%`,
-    tone: 'neutral',
-    description: '高置信时通常接近 3，低置信时会放宽到 5。'
-  }
-])
-
-function selectRecord(item: NormalizedRouteTrace): void {
-  selectedId.value = item.id
-}
-
-async function loadTraces(nextPage: number = page.pageNo): Promise<void> {
-  loading.value = true
-  try {
-    const params: KnowledgeRouteTracePageReq = {
-      conversationId: filters.conversationId || undefined,
-      mode: filters.mode || undefined,
-      routeStatus: filters.routeStatus ? Number(filters.routeStatus) : undefined,
-      pageNo: nextPage,
-      pageSize: page.pageSize
-    }
-    const {data} = await knowledgeApi.queryRouteTracePage(params)
-    records.value = data?.records || []
-    page.pageNo = data?.pageNo || 1
-    page.pageSize = data?.pageSize || 20
-    page.totalSize = data?.total || 0
-    page.totalPages = Math.ceil((data?.total || 0) / (data?.pageSize || 20)) || 0
-    selectedId.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
-function resetFilters(): void {
-  filters.conversationId = ''
-  filters.mode = ''
-  filters.routeStatus = ''
-  loadTraces(1)
-}
-
-function changePage(nextPage: number): void {
-  if (nextPage <= 0) return
-  loadTraces(nextPage)
-}
-
-function normalizePercent(value: string | number | undefined): string {
-  const numeric = Number(String(value || '').replace('%', ''))
-  if (!Number.isFinite(numeric)) return '0%'
-  return `${Math.max(0, Math.min(100, numeric))}%`
-}
-
-function formatJson(value: string | undefined): string {
-  if (!value) return '[]'
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2)
-  } catch {
-    return value
-  }
-}
-
-function shortenId(value: string | undefined): string {
-  const normalized = String(value || '')
-  if (normalized.length <= 14) return normalized || '-'
-  return `${normalized.slice(0, 6)}...${normalized.slice(-6)}`
-}
-
-function primaryDocumentText(item: NormalizedRouteTrace): string {
-  return item.topDocument?.documentName || item.topDocument?.documentId || '未形成显式主候选'
-}
-
-function actualSelectionText(item: NormalizedRouteTrace): string {
-  if (item.mode === 'auto') {
-    return item.topDocument?.documentName || item.topDocument?.documentId || '执行期可能回退到通用可检索文档池'
-  }
-  return item.selectedDocument?.documentName || item.selectedDocumentId || '未记录当前文档'
-}
-
-function hitConclusion(item: NormalizedRouteTrace): string {
-  if (item.mode === 'auto') {
-    return item.topDocument ? '自动模式会以该主候选为中心，再进入稳定检索主链。' : '当前没有明确主候选，说明需要继续补范围、主题或文档画像。'
-  }
-  if (item.hitTop3) return '影子路由 Top3 已覆盖当前文档，人工选择与自动路由基本一致。'
-  if (item.missedTop3) return '影子路由 Top3 未覆盖当前文档，说明这轮问题可能更像跨文档。'
-  return '当前样本还不足以判断影子路由与人工选择是否一致。'
-}
-
-function candidateConclusion(item: NormalizedRouteTrace): string {
-  if (item.lowConfidenceWidened) return '当前是低置信样本，系统已经自动放宽候选文档规模。'
-  if (!item.documents.length) return '当前没有候选文档，优先检查文档画像、主题关联与标签是否完整。'
-  return '候选规模已经稳定，后续主要观察 Top1 和 Top3 的命中情况。'
-}
-
-function recommendationTitle(item: NormalizedRouteTrace): string {
-  if (item.mode === 'auto' && item.statusKey === 'SUCCESS' && (item.confidence) >= 0.8) return '可以继续扩大样本观察'
-  if (item.lowConfidenceWidened || item.statusKey === 'LOW_CONFIDENCE') return '建议补强知识范围和主题别名'
-  if (item.statusKey === 'FAILED') return '建议优先排查空路由原因'
-  if (item.mode === 'shadow' && item.missedTop3) return '建议检查当前文档是否放错范围'
-  return '当前配置可继续保留'
-}
-
-function recommendationText(item: NormalizedRouteTrace): string {
-  if (item.lowConfidenceWidened || item.statusKey === 'LOW_CONFIDENCE') return '优先补 documentTags、knowledgeScopeName、topic 别名，以及 topic-document relation 的人工确认。'
-  if (item.statusKey === 'FAILED') return '当前路由没有形成稳定候选，先检查上传元数据、文档画像和主题树是否为空。'
-  if (item.mode === 'shadow' && item.missedTop3) return '人工选文档和自动路由差异较大，建议对比问题表达与文档画像的关键词覆盖情况。'
-  return '当前样本已经接近可教学展示状态，下一步重点看不同问题类型下是否还能持续稳定。'
-}
-
-onMounted(() => loadTraces(1))
-</script>
 
 <style scoped>
 /* ── 页面骨架 ── */

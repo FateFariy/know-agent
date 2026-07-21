@@ -1,3 +1,37 @@
+<script lang="ts" setup>
+import {computed, ref} from 'vue'
+import {RouterLink, RouterView, useRoute} from 'vue-router'
+import {
+  Bars3Icon,
+  ClipboardDocumentListIcon,
+  CommandLineIcon,
+  EyeIcon,
+  HomeModernIcon,
+  ShareIcon
+} from '@heroicons/vue/24/outline'
+
+const route = useRoute()
+const sidebarOpen = ref(false)
+
+const navItems = [
+  {to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon},
+  {to: '/admin/documents', label: '文档接入', icon: ClipboardDocumentListIcon},
+  {to: '/admin/knowledge-route', label: '知识路由', icon: ShareIcon},
+  {to: '/admin/knowledge-route/traces', label: '路由追踪', icon: EyeIcon},
+  {to: '/admin/observability', label: '对话观测', icon: CommandLineIcon}
+]
+
+const pageTitle = computed(() => route.meta?.title || '管理后台')
+const username = 'admin'
+
+function isNavItemActive(targetPath: string) {
+  if (!targetPath) {
+    return false
+  }
+  return route.path === targetPath
+}
+</script>
+
 <template>
   <section class="admin-shell">
     <aside :class="{ 'admin-sidebar-open': sidebarOpen }" class="admin-sidebar">
@@ -60,40 +94,6 @@
     </div>
   </section>
 </template>
-
-<script lang="ts" setup>
-import {computed, ref} from 'vue'
-import {RouterLink, RouterView, useRoute} from 'vue-router'
-import {
-  Bars3Icon,
-  ClipboardDocumentListIcon,
-  CommandLineIcon,
-  EyeIcon,
-  HomeModernIcon,
-  ShareIcon
-} from '@heroicons/vue/24/outline'
-
-const route = useRoute()
-const sidebarOpen = ref(false)
-
-const navItems = [
-  {to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon},
-  {to: '/admin/documents', label: '文档接入', icon: ClipboardDocumentListIcon},
-  {to: '/admin/knowledge-route', label: '知识路由', icon: ShareIcon},
-  {to: '/admin/knowledge-route/traces', label: '路由追踪', icon: EyeIcon},
-  {to: '/admin/observability', label: '对话观测', icon: CommandLineIcon}
-]
-
-const pageTitle = computed(() => route.meta?.title || '管理后台')
-const username = 'admin'
-
-function isNavItemActive(targetPath: string) {
-  if (!targetPath) {
-    return false
-  }
-  return route.path === targetPath
-}
-</script>
 
 <style scoped>
 /* ── 外壳：仅主内容参与布局，侧边栏 fixed 独立于文档流 ── */

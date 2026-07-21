@@ -1,153 +1,3 @@
-<template>
-  <section class="observability-hub">
-    <header class="page-header">
-      <div class="header-top">
-        <div class="header-copy">
-          <span class="header-kicker">Conversation Observatory</span>
-          <h2>先选会话，再进入整页观测详情</h2>
-          <p>
-            列表页仅用于定位问题会话，详情页按单轮执行阶段分层展示数据，便于故障复盘。
-          </p>
-        </div>
-
-        <div class="header-actions">
-          <button :disabled="loadingSessions" class="primary-button" type="button"
-                  @click="loadSessions()">
-            {{ loadingSessions ? '正在刷新...' : '刷新会话列表' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="stat-badges">
-        <span v-for="item in summaryStats" :key="item.label" :title="item.description"
-              class="stat-badge">
-          <span class="stat-label">{{ item.label }}</span>
-          <strong class="stat-value">{{ item.value }}</strong>
-        </span>
-      </div>
-    </header>
-
-    <section class="filter-bar">
-      <label class="filter-field search-field">
-        <span>搜索会话</span>
-        <input v-model.trim="keyword" placeholder="按会话ID、文档名、问题或回答筛选" type="text"
-               @keydown.enter.prevent="applyFilters"/>
-      </label>
-
-      <label class="filter-field">
-        <span>提问模式</span>
-        <select v-model="modeFilter">
-          <option value="ALL">全部模式</option>
-          <option value="DOCUMENT">当前文档问答</option>
-          <option value="AUTO_DOCUMENT">自动知识问答</option>
-          <option value="OPEN_CHAT">开放式提问</option>
-        </select>
-      </label>
-
-      <label class="filter-field">
-        <span>最近状态</span>
-        <select v-model="statusFilter">
-          <option value="ALL">全部状态</option>
-          <option value="RUNNING">进行中</option>
-          <option value="COMPLETED">已完成</option>
-          <option value="FAILED">失败</option>
-          <option value="STOPPED">已停止</option>
-        </select>
-      </label>
-
-      <div class="filter-actions">
-        <button :disabled="loadingSessions" class="ghost-button" type="button"
-                @click="resetFilters">
-          重置筛选
-        </button>
-        <button :disabled="loadingSessions" class="primary-button inline-primary" type="button"
-                @click="applyFilters">
-          应用筛选
-        </button>
-      </div>
-    </section>
-
-    <div v-if="pageError" class="inline-notice error-notice">{{ pageError }}</div>
-    <div v-if="loadingSessions" class="empty-card">正在加载会话列表...</div>
-    <div v-else-if="!sessions.length" class="empty-card">
-      当前筛选条件下没有匹配的会话。可以先清空筛选，或者去聊天页发起一轮对话再回来观察。
-    </div>
-
-    <div v-else class="session-list">
-      <article v-for="session in sessions" :key="session.conversationId" :class="`status-${sessionTone(session)}`"
-               class="session-item">
-        <RouterLink :to="detailTarget(session)" class="session-link">
-          <div class="session-top">
-            <div class="session-chips">
-              <span class="chip mode-chip">{{ formatChatMode(session.chatMode) }}</span>
-              <span v-if="session.running" class="chip running-chip">实时执行中</span>
-              <span v-else-if="session.latestTurnStatus" :class="`chip-${turnStatusTone(session.latestTurnStatus)}`"
-                    class="chip">
-                {{ formatTurnStatusLabel(session.latestTurnStatus) }}
-              </span>
-            </div>
-            <span class="session-time">{{ formatTime(session.updatedTime) }}</span>
-          </div>
-
-          <h3 class="session-title">{{ sessionTitle(session) }}</h3>
-          <p class="session-desc">{{ sessionPreview(session) }}</p>
-
-          <div class="session-meta">
-            <code class="meta-id">{{ session.conversationId }}</code>
-            <span>{{ sessionMessageCount(session) }} 条消息</span>
-            <span v-if="session.selectedDocumentName">{{ session.selectedDocumentName }}</span>
-          </div>
-
-          <p v-if="session.latestTurnErrorMessage" class="session-error">
-            最近一轮异常：{{ truncate(session.latestTurnErrorMessage, 88) }}
-          </p>
-        </RouterLink>
-
-        <div class="session-foot">
-          <RouterLink :to="detailTarget(session)" class="foot-link">查看整页详情</RouterLink>
-          <RouterLink v-if="session.latestExchangeId" :to="exchangeTarget(session)"
-                      class="foot-link subtle">
-            {{ exchangeLinkLabel(session) }}
-          </RouterLink>
-        </div>
-      </article>
-    </div>
-
-    <nav v-if="!loadingSessions && total > 0" class="pagination">
-      <div class="pagination-info">
-        <strong>第 {{ pageNo }} / {{ totalPages }} 页</strong>
-        <span>共 {{ total }} 条会话记录</span>
-      </div>
-
-      <div class="pagination-controls">
-        <label class="page-size-select">
-          <span>每页</span>
-          <select v-model="pageSize" @change="handlePageSizeChange">
-            <option value="12">12</option>
-            <option value="24">24</option>
-            <option value="36">36</option>
-            <option value="48">48</option>
-          </select>
-        </label>
-
-        <div class="page-buttons">
-          <button :disabled="!canPrev" class="page-btn" type="button" @click="goPrevPage">上一页
-          </button>
-          <button v-for="(item, index) in paginationItems" :key="`page-${item}-${index}`"
-                  :class="{ active: item === pageNo, gap: item === '...' }"
-                  :disabled="item === '...'" class="page-btn"
-                  type="button"
-                  @click="typeof item === 'string' && item !== '...' ? goPage(item) : null">
-            {{ item }}
-          </button>
-          <button :disabled="!canNext" class="page-btn" type="button" @click="goNextPage">下一页
-          </button>
-        </div>
-      </div>
-    </nav>
-  </section>
-</template>
-
 <script lang="ts" setup>
 import {computed, onMounted, ref} from 'vue'
 import {RouterLink} from 'vue-router'
@@ -366,6 +216,156 @@ function exchangeLinkLabel(session: ConversationSessionResp): string {
 
 onMounted(loadSessions)
 </script>
+
+<template>
+  <section class="observability-hub">
+    <header class="page-header">
+      <div class="header-top">
+        <div class="header-copy">
+          <span class="header-kicker">Conversation Observatory</span>
+          <h2>先选会话，再进入整页观测详情</h2>
+          <p>
+            列表页仅用于定位问题会话，详情页按单轮执行阶段分层展示数据，便于故障复盘。
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <button :disabled="loadingSessions" class="primary-button" type="button"
+                  @click="loadSessions()">
+            {{ loadingSessions ? '正在刷新...' : '刷新会话列表' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="stat-badges">
+        <span v-for="item in summaryStats" :key="item.label" :title="item.description"
+              class="stat-badge">
+          <span class="stat-label">{{ item.label }}</span>
+          <strong class="stat-value">{{ item.value }}</strong>
+        </span>
+      </div>
+    </header>
+
+    <section class="filter-bar">
+      <label class="filter-field search-field">
+        <span>搜索会话</span>
+        <input v-model.trim="keyword" placeholder="按会话ID、文档名、问题或回答筛选" type="text"
+               @keydown.enter.prevent="applyFilters"/>
+      </label>
+
+      <label class="filter-field">
+        <span>提问模式</span>
+        <select v-model="modeFilter">
+          <option value="ALL">全部模式</option>
+          <option value="DOCUMENT">当前文档问答</option>
+          <option value="AUTO_DOCUMENT">自动知识问答</option>
+          <option value="OPEN_CHAT">开放式提问</option>
+        </select>
+      </label>
+
+      <label class="filter-field">
+        <span>最近状态</span>
+        <select v-model="statusFilter">
+          <option value="ALL">全部状态</option>
+          <option value="RUNNING">进行中</option>
+          <option value="COMPLETED">已完成</option>
+          <option value="FAILED">失败</option>
+          <option value="STOPPED">已停止</option>
+        </select>
+      </label>
+
+      <div class="filter-actions">
+        <button :disabled="loadingSessions" class="ghost-button" type="button"
+                @click="resetFilters">
+          重置筛选
+        </button>
+        <button :disabled="loadingSessions" class="primary-button inline-primary" type="button"
+                @click="applyFilters">
+          应用筛选
+        </button>
+      </div>
+    </section>
+
+    <div v-if="pageError" class="inline-notice error-notice">{{ pageError }}</div>
+    <div v-if="loadingSessions" class="empty-card">正在加载会话列表...</div>
+    <div v-else-if="!sessions.length" class="empty-card">
+      当前筛选条件下没有匹配的会话。可以先清空筛选，或者去聊天页发起一轮对话再回来观察。
+    </div>
+
+    <div v-else class="session-list">
+      <article v-for="session in sessions" :key="session.conversationId" :class="`status-${sessionTone(session)}`"
+               class="session-item">
+        <RouterLink :to="detailTarget(session)" class="session-link">
+          <div class="session-top">
+            <div class="session-chips">
+              <span class="chip mode-chip">{{ formatChatMode(session.chatMode) }}</span>
+              <span v-if="session.running" class="chip running-chip">实时执行中</span>
+              <span v-else-if="session.latestTurnStatus" :class="`chip-${turnStatusTone(session.latestTurnStatus)}`"
+                    class="chip">
+                {{ formatTurnStatusLabel(session.latestTurnStatus) }}
+              </span>
+            </div>
+            <span class="session-time">{{ formatTime(session.updatedTime) }}</span>
+          </div>
+
+          <h3 class="session-title">{{ sessionTitle(session) }}</h3>
+          <p class="session-desc">{{ sessionPreview(session) }}</p>
+
+          <div class="session-meta">
+            <code class="meta-id">{{ session.conversationId }}</code>
+            <span>{{ sessionMessageCount(session) }} 条消息</span>
+            <span v-if="session.selectedDocumentName">{{ session.selectedDocumentName }}</span>
+          </div>
+
+          <p v-if="session.latestTurnErrorMessage" class="session-error">
+            最近一轮异常：{{ truncate(session.latestTurnErrorMessage, 88) }}
+          </p>
+        </RouterLink>
+
+        <div class="session-foot">
+          <RouterLink :to="detailTarget(session)" class="foot-link">查看整页详情</RouterLink>
+          <RouterLink v-if="session.latestExchangeId" :to="exchangeTarget(session)"
+                      class="foot-link subtle">
+            {{ exchangeLinkLabel(session) }}
+          </RouterLink>
+        </div>
+      </article>
+    </div>
+
+    <nav v-if="!loadingSessions && total > 0" class="pagination">
+      <div class="pagination-info">
+        <strong>第 {{ pageNo }} / {{ totalPages }} 页</strong>
+        <span>共 {{ total }} 条会话记录</span>
+      </div>
+
+      <div class="pagination-controls">
+        <label class="page-size-select">
+          <span>每页</span>
+          <select v-model="pageSize" @change="handlePageSizeChange">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="36">36</option>
+            <option value="48">48</option>
+          </select>
+        </label>
+
+        <div class="page-buttons">
+          <button :disabled="!canPrev" class="page-btn" type="button" @click="goPrevPage">上一页
+          </button>
+          <button v-for="(item, index) in paginationItems" :key="`page-${item}-${index}`"
+                  :class="{ active: item === pageNo, gap: item === '...' }"
+                  :disabled="item === '...'" class="page-btn"
+                  type="button"
+                  @click="typeof item === 'string' && item !== '...' ? goPage(item) : null">
+            {{ item }}
+          </button>
+          <button :disabled="!canNext" class="page-btn" type="button" @click="goNextPage">下一页
+          </button>
+        </div>
+      </div>
+    </nav>
+  </section>
+</template>
 
 <style scoped>
 .observability-hub {

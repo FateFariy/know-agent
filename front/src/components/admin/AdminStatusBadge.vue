@@ -1,10 +1,3 @@
-<template>
-  <span class="status-badge" :class="badgeClass">
-    <span class="status-dot"></span>
-    {{ label || '未设置' }}
-  </span>
-</template>
-
 <script setup lang="ts">
 import {computed} from 'vue'
 
@@ -57,6 +50,13 @@ const badgeClass = computed(() => {
   return targetMap[props.code] ?? targetMap[0]
 })
 </script>
+
+<template>
+  <span class="status-badge" :class="badgeClass">
+    <span class="status-dot"></span>
+    {{ label || '未设置' }}
+  </span>
+</template>
 
 <style scoped>
 .status-badge {
