@@ -40,32 +40,3 @@ func publishStatus(convCtx *vo.ConversationContext, content string) error {
 	payload := builder.Status(content, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
-
-// publishReferences 发布引用事件
-func publishReferences(convCtx *vo.ConversationContext, refs []*vo.SearchReference) error {
-	if convCtx == nil || len(refs) == 0 {
-		return nil
-	}
-	convCtx.AddReferences(refs...)
-	payload := builder.References(refs, convCtx.ConversationId, convCtx.ExchangeId)
-	return support.SafeEmitNext(convCtx.Channel, payload)
-}
-
-// publishRecommendations 发布推荐追问事件
-func publishRecommendations(convCtx *vo.ConversationContext, recommendations []string) error {
-	if convCtx == nil || len(recommendations) == 0 {
-		return nil
-	}
-	payload := builder.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
-	return support.SafeEmitNext(convCtx.Channel, payload)
-}
-
-// publishText 下发普通文本片段
-func publishText(convCtx *vo.ConversationContext, content string) error {
-	if convCtx == nil || strutil.IsBlank(content) {
-		return nil
-	}
-	convCtx.WriteAnswerBuffer(content)
-	payload := builder.Text(content, convCtx.ConversationId, convCtx.ExchangeId)
-	return support.SafeEmitNext(convCtx.Channel, payload)
-}

@@ -134,13 +134,6 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
 	}
 
-	references := retrievalCtx.FlattenReferences()
-	if len(references) > 0 {
-		if err := publishReferences(convCtx, references); err != nil {
-			return nil, err
-		}
-	}
-
 	if err := publishThinking(convCtx, "证据整理完成，正在基于证据生成回答。"); err != nil {
 		return nil, err
 	}

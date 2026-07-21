@@ -358,7 +358,14 @@ export const useChatStore = defineStore('chat', () => {
     thinkingStartAt.value = null
     cancelRequested.value = false
 
-    const conversationId = currentSessionId.value || undefined
+    if (!currentSessionId.value) {
+      currentSessionId.value = crypto.randomUUID().replace(/-/g, '')
+    }
+    if (!sessions.value.find((s) => s.id === currentSessionId.value)) {
+      sessions.value = [{ id: currentSessionId.value, title: content.slice(0, 24) || '新对话', lastTime: new Date().toISOString(), running: true }, ...sessions.value]
+    }
+
+    const conversationId = currentSessionId.value
     const req: ChatReq = {
       question: trimmed,
       conversationId,
