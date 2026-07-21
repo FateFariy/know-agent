@@ -3,6 +3,7 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
+    container_name: know-agent-frontend
     ports:
       - "80:80"
     networks:
@@ -15,6 +16,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: know-agent-backend
+    volumes:
+      - ./etc/config-prod.yaml:/app/etc/config-prod.yaml
     ports:
       - "8080:8080"
     networks:

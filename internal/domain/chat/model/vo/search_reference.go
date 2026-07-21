@@ -11,29 +11,29 @@ import (
 )
 
 type SearchReference struct {
-	ReferenceId        string  `json:"referenceId,omitempty"`        // 参考ID
-	SourceType         string  `json:"sourceType,omitempty"`         // 来源类型
-	Title              string  `json:"title,omitempty"`              // 标题
-	Url                string  `json:"url,omitempty"`                // URL地址
-	Snippet            string  `json:"snippet,omitempty"`            // 摘要
-	DocumentId         int64   `json:"documentId,omitempty"`         // 文档ID
-	DocumentName       string  `json:"documentName,omitempty"`       // 文档名称
-	ChunkId            int64   `json:"chunkId,omitempty"`            // 块ID
-	ParentBlockId      int64   `json:"parentBlockId,omitempty"`      // 父块ID
-	ParentBlockNo      int     `json:"parentBlockNo,omitempty"`      // 父块序号
-	ChunkNo            int     `json:"chunkNo,omitempty"`            // 块序号
-	SectionPath        string  `json:"sectionPath,omitempty"`        // 节点路径
-	StructureNodeId    int64   `json:"structureNodeId,omitempty"`    // 结构节点ID
-	StructureNodeType  int     `json:"structureNodeType,omitempty"`  // 结构节点类型
-	CanonicalPath      string  `json:"canonicalPath,omitempty"`      // 规范路径
-	ItemIndex          int     `json:"itemIndex,omitempty"`          // 项索引
-	Score              float64 `json:"score,omitempty"`              // 分数
-	SubQuestionIndex   int     `json:"subQuestionIndex,omitempty"`   // 子问题索引
-	SubQuestion        string  `json:"subQuestion,omitempty"`        // 子问题内容
-	Channel            string  `json:"channel,omitempty"`            // 渠道名称
-	ToolName           string  `json:"toolName,omitempty"`           // 工具名称
-	KnowledgeScopeCode string  `json:"knowledgeScopeCode,omitempty"` // 知识范围代码
-	KnowledgeScopeName string  `json:"knowledgeScopeName,omitempty"` // 知识范围名称
+	ReferenceId        string  `json:"referenceId"`        // 参考ID
+	SourceType         string  `json:"sourceType"`         // 来源类型
+	Title              string  `json:"title"`              // 标题
+	Url                string  `json:"url"`                // URL地址
+	Snippet            string  `json:"snippet"`            // 摘要
+	DocumentId         int64   `json:"documentId"`         // 文档ID
+	DocumentName       string  `json:"documentName"`       // 文档名称
+	ChunkId            int64   `json:"chunkId"`            // 块ID
+	ParentBlockId      int64   `json:"parentBlockId"`      // 父块ID
+	ParentBlockNo      int     `json:"parentBlockNo"`      // 父块序号
+	ChunkNo            int     `json:"chunkNo"`            // 块序号
+	SectionPath        string  `json:"sectionPath"`        // 节点路径
+	StructureNodeId    int64   `json:"structureNodeId"`    // 结构节点ID
+	StructureNodeType  int     `json:"structureNodeType"`  // 结构节点类型
+	CanonicalPath      string  `json:"canonicalPath"`      // 规范路径
+	ItemIndex          int     `json:"itemIndex"`          // 项索引
+	Score              float64 `json:"score"`              // 分数
+	SubQuestionIndex   int     `json:"subQuestionIndex"`   // 子问题索引
+	SubQuestion        string  `json:"subQuestion"`        // 子问题内容
+	Channel            string  `json:"channel"`            // 渠道名称
+	ToolName           string  `json:"toolName"`           // 工具名称
+	KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围代码
+	KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
 }
 
 func NewSearchReference(chunk *DocumentChunk, subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {

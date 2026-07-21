@@ -12,8 +12,7 @@ Auth:
   AccessExpire: 2h
 
 Mysql:
-  Host: 10.104.0.165
-  Port: 3306
+  Endpoint: 10.104.0.165:3306
   Username: root
   Password: "123456"
   DbName: rag

@@ -32,8 +32,7 @@ type BaseConfig struct {
 }
 
 type MysqlConf struct {
-	Host     string `json:",default=127.0.0.1"`
-	Port     int    `json:",default=3306"`
+	Endpoint string `json:",default=127.0.0.1:3306"`
 	Username string `json:",omitempty"`
 	Password string `json:",omitempty"`
 	DbName   string `json:",omitempty"`
@@ -41,7 +40,7 @@ type MysqlConf struct {
 
 func NewDb(c Config) *gorm.DB {
 	m := c.GetBaseConfig().Mysql
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local", m.Username, m.Password, m.Host, m.Port, m.DbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", m.Username, m.Password, m.Endpoint, m.DbName)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger:         logger.Default.LogMode(logger.Info),
 		NamingStrategy: schema.NamingStrategy{SingularTable: true},
