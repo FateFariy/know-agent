@@ -4,8 +4,7 @@
 *.dll
 *.so
 *.dylib
-xczn-app-api.exe
-xczn-app-api
+*prod.yaml
 
 # Test binary, built with `go test -c`
 *.test

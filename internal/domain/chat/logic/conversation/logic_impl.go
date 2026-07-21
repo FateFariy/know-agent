@@ -632,13 +632,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	snapshot := map[string]any{"recommendationCount": len(recommendations), "recommendations": recommendations}
 	_ = c.tracer.CompleteStage(ctx, recommendationsStage, "推荐追问生成完成。", snapshot)
 
-	// 向客户端流补发引用事件 / 推荐事件，最后发送流 Complete 信号
-	if len(uniqueReferences) > 0 {
-		referencesEvent := c.eventBuilder.References(uniqueReferences, convCtx.ConversationId, convCtx.ExchangeId)
-		if err := support.SafeEmitNext(convCtx.Channel, referencesEvent); err != nil {
-			Warnf("发送引用事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-		}
-	}
+	// 向客户端流补发引用事件，最后发送流 Complete 信号
 	if len(recommendations) > 0 {
 		recommendationsEvent := c.eventBuilder.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, recommendationsEvent); err != nil {

@@ -271,8 +271,8 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, c
 //   - 否则：不指定主文档，退化为多文档范围混合检索
 //   - 需要澄清：返回 Clarification 模式，由用户选择目标知识
 func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
-	// 启动路由阶段追踪（标识为 AUTO_DOCUMENT）
-	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "AUTO_DOCUMENT", "正在生成知识范围候选。", nil)
+	// 启动路由阶段追踪（标识为 auto_document）
+	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "auto_document", "正在生成知识范围候选。", nil)
 	if err != nil {
 		return err
 	}

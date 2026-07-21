@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 	"strings"
+	"time"
 
 	arkemb "github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/model/agenticark"
@@ -42,6 +43,8 @@ type ServiceContext struct {
 
 func NewServiceContext(c *config.Config) *ServiceContext {
 	redisClient := common.NewRedisClient(c)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	return &ServiceContext{
 		Config:    c,
 		Validate:  common.NewValidator(),
@@ -49,9 +52,9 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		Db:        common.NewDb(c),
 		Minio:     NewMinioClient(c),
 		RedSync:   NewRedSync(redisClient),
-		Emb:       NewArkEmbedding(c),
-		ChatModel: NewArkChatModel(c),
-		Milvus:    NewMilvusClient(c),
+		Emb:       NewArkEmbedding(ctx, c),
+		ChatModel: NewArkChatModel(ctx, c),
+		Milvus:    NewMilvusClient(ctx, c),
 	}
 }
 
@@ -78,12 +81,12 @@ func NewRedSync(client *redis.Client) *redsync.Redsync {
 }
 
 // NewArkEmbedding 创建 ark embedding 模型
-func NewArkEmbedding(c *config.Config) embedding.Embedder {
+func NewArkEmbedding(ctx context.Context, c *config.Config) embedding.Embedder {
 	apiType := arkemb.APITypeText
 	if strings.Contains(string(arkemb.APITypeMultiModal), c.Embedding.APIType) {
 		apiType = arkemb.APITypeMultiModal
 	}
-	emb, err := arkemb.NewEmbedder(context.TODO(), &arkemb.EmbeddingConfig{
+	emb, err := arkemb.NewEmbedder(ctx, &arkemb.EmbeddingConfig{
 		APIKey:     c.Embedding.APIKey,
 		Model:      c.Embedding.Model,
 		APIType:    utils.Pointer(apiType),
@@ -95,9 +98,9 @@ func NewArkEmbedding(c *config.Config) embedding.Embedder {
 	return emb
 }
 
-func NewArkChatModel(c *config.Config) *agenticark.Model {
+func NewArkChatModel(ctx context.Context, c *config.Config) *agenticark.Model {
 	llmConf := c.ChatModel["Ark"]
-	chatModel, err := agenticark.New(context.TODO(), &agenticark.Config{
+	chatModel, err := agenticark.New(ctx, &agenticark.Config{
 		APIKey:      llmConf.ApiKey,
 		Model:       llmConf.Model,
 		MaxTokens:   utils.Pointer(llmConf.MaxTokens),
@@ -110,8 +113,8 @@ func NewArkChatModel(c *config.Config) *agenticark.Model {
 	return chatModel
 }
 
-func NewMilvusClient(c *config.Config) *milvusclient.Client {
-	client, err := milvusclient.New(context.TODO(), &milvusclient.ClientConfig{
+func NewMilvusClient(ctx context.Context, c *config.Config) *milvusclient.Client {
+	client, err := milvusclient.New(ctx, &milvusclient.ClientConfig{
 		Address: c.Milvus.Addr,
 	})
 	if err != nil {

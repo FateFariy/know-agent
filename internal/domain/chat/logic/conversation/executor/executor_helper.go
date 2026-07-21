@@ -40,3 +40,13 @@ func publishStatus(convCtx *vo.ConversationContext, content string) error {
 	payload := builder.Status(content, convCtx.ConversationId, convCtx.ExchangeId)
 	return support.SafeEmitNext(convCtx.Channel, payload)
 }
+
+// publishReferences 发布引用事件
+func publishReferences(convCtx *vo.ConversationContext, refs []*vo.SearchReference) error {
+	if convCtx == nil || len(refs) == 0 {
+		return nil
+	}
+	convCtx.AddReferences(refs...)
+	payload := builder.References(refs, convCtx.ConversationId, convCtx.ExchangeId)
+	return support.SafeEmitNext(convCtx.Channel, payload)
+}
