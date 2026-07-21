@@ -1,119 +1,26 @@
 services:
-  etcd:
-    container_name: milvus-etcd
-    image: quay.io/coreos/etcd:v3.5.25
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
-    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-    healthcheck:
-      test: [ "CMD", "etcdctl", "endpoint", "health" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    networks:
+      - know-agent-network
+    depends_on:
+      - backend
     restart: always
 
-  minio:
-    container_name: milvus-minio
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "9001:9001"
-      - "9000:9000"
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
-    command: minio server /minio_data --console-address ":9001"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    restart: always
-
-  milvus:
-    container_name: milvus-standalone
-    image: milvusdb/milvus:v3.0-beta
-    command: [ "milvus", "run", "standalone" ]
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-      MQ_TYPE: woodpecker
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
-      interval: 30s
-      start_period: 90s
-      timeout: 20s
-      retries: 3
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    depends_on:
-      - "etcd"
-      - "minio"
-    restart: always
-
-  namesrv:
-    image: apache/rocketmq:5.3.2
-    container_name: rmqnamesrv
-    ports:
-      - "9876:9876"
+      - "8080:8080"
     networks:
-      - rocketmq
+      - know-agent-network
     restart: always
-    command: sh mqnamesrv
-  broker:
-    image: apache/rocketmq:5.3.2
-    container_name: rmqbroker
-    ports:
-      - "10909:10909"
-      - "10911:10911"
-      - "10912:10912"
-    environment:
-      - NAMESRV_ADDR=rmqnamesrv:9876
-    depends_on:
-      - namesrv
-    networks:
-      - rocketmq
-    restart: always
-    command: sh mqbroker -c /home/rocketmq/rocketmq-5.3.2/conf/broker.conf
-    volumes:
-      - ./broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf
-  proxy:
-    image: apache/rocketmq:5.3.2
-    container_name: rmqproxy
-    networks:
-      - rocketmq
-    depends_on:
-      - broker
-      - namesrv
-    ports:
-      - "7080:8080"
-      - "7081:8081"
-    environment:
-      - NAMESRV_ADDR=rmqnamesrv:9876
-    restart: always
-    command: sh mqproxy
-  dashboard:
-    image: apacherocketmq/rocketmq-dashboard:latest
-    container_name: rmqdashboard
-    ports:
-      - "7070:8080"
-    environment:
-      - JAVA_OPTS=-Drocketmq.namesrv.addr=rmqnamesrv:9876
-    restart: always
-    networks:
-      - rocketmq
 
 networks:
-  rocketmq:
+  know-agent-network:
     driver: bridge
