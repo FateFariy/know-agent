@@ -241,21 +241,13 @@ export const useChatStore = defineStore('chat', () => {
     })
   }
 
-  /** 累加 reference；同名文档去重。 */
+  /** 累加 references */
   function appendReferences(items: SearchReference[]) {
     if (!items?.length) return
     messages.value = messages.value.map((m) => {
       if (m.id !== streamingMessageId.value) return m
       if (m.status === 'cancelled' || m.status === 'error') return m
-      const seen = new Set((m.references || []).map((r) => r.documentId ?? r.url ?? r.title))
-      const next = [...(m.references || [])]
-      for (const r of items) {
-        const key = r.documentId ?? r.url ?? r.title
-        if (!key || seen.has(key)) continue
-        seen.add(key)
-        next.push(r)
-      }
-      return { ...m, references: next }
+      return { ...m, references: [...(m.references || []), ...items] }
     })
   }
 
@@ -372,7 +364,6 @@ export const useChatStore = defineStore('chat', () => {
       conversationId,
       chatMode: 'auto_document'
     }
-    console.log('[chat] sendMessage', req)
 
     const handlers: StreamHandlers = {
       onText: (payload) => {
