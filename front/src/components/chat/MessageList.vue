@@ -8,6 +8,7 @@ import {nextTick, onBeforeUnmount, ref, watch} from 'vue'
 import MessageItem from './MessageItem.vue'
 import WelcomeScreen from './WelcomeScreen.vue'
 import type {ChatMessage} from '@/stores/chat'
+import type {SearchReference} from '@/types'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -19,6 +20,10 @@ const props = defineProps<{
 const scrollerRef = ref<HTMLElement | null>(null)
 const lastSessionRef = ref<string | null>(null)
 const pendingScrollRef = ref(true)
+
+const emit = defineEmits<{
+  (e: 'reference-select', ref: SearchReference): void
+}>()
 
 function scrollToBottom() {
   const scroller = scrollerRef.value
@@ -97,7 +102,7 @@ onBeforeUnmount(() => {
         :class="{ 'messages-list__row--last': index === messages.length - 1 }"
         class="messages-list__row"
       >
-        <MessageItem :is-last="index === messages.length - 1" :message="message"/>
+        <MessageItem :is-last="index === messages.length - 1" :message="message" @reference-select="(ref) => emit('reference-select', ref)"/>
       </div>
       <div aria-hidden="true" class="messages-list__footer"/>
     </div>
