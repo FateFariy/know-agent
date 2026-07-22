@@ -19,8 +19,8 @@ services:
     container_name: know-agent-backend
     volumes:
       - ./etc/config-prod.yaml:/app/etc/config-prod.yaml
-    ports:
-      - "8080:8080"
+    # ports:
+    #   - "8080:8080"
     networks:
       - know-agent-network
     restart: always
