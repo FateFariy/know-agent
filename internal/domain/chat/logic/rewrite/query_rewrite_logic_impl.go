@@ -60,7 +60,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	// 预计算兜底结果，用于快速返回
 	fallback := q.fallback(question)
 
-	// 判断是否需要LLM改写（短问题或有明确多问题特征时跳过）
+	// 判断是否需要LLM改写（短问题或有明确多问题特征时）
 	if !q.needsRewrite(question, historySummary) {
 		logx.Infof("RAG 改写跳过: question='%s', rewritten='%s', subQuestions=%v",
 			question, fallback.RewrittenQuestion, fallback.SubQuestions)

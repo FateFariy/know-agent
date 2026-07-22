@@ -26,7 +26,18 @@ import (
 type ChatModelImpl[M adk.MessageType] struct {
 	chatModel      model.BaseModel[M]
 	config         *config.LLMConf
-	defaultOptions *model.Options
+	defaultOptions *options
+}
+
+type options struct {
+	*model.Options
+	callback func()
+}
+
+func WithCallback(callback func()) model.Option {
+	return model.WrapImplSpecificOptFn(func(opt *options) {
+		opt.callback = callback
+	})
 }
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
@@ -35,11 +46,13 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 	return &ChatModelImpl[*schema.AgenticMessage]{
 		chatModel: svcCtx.ChatModel,
 		config:    conf,
-		defaultOptions: &model.Options{
-			Model:       &conf.Model,
-			Temperature: &conf.Temperature,
-			MaxTokens:   &conf.MaxTokens,
-			TopP:        &conf.TopP,
+		defaultOptions: &options{
+			Options: &model.Options{
+				Model:       &conf.Model,
+				Temperature: &conf.Temperature,
+				MaxTokens:   &conf.MaxTokens,
+				TopP:        &conf.TopP,
+			},
 		},
 	}
 }
@@ -97,6 +110,8 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 	// 记录当前阶段的调用选项日志
 	o.logStageCallOptions(stage, opts...)
 
+	specificOpts := model.GetImplSpecificOptions(o.defaultOptions, opts...)
+
 	// 调用底层模型建立流式连接
 	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
 	if err != nil {
@@ -111,6 +126,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 		// 确保通道在退出时关闭
 		defer close(resultChan)
 		defer stream.Close()
+		defer specificOpts.callback()
 
 		var chunk any
 		for {
@@ -190,16 +206,16 @@ func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Optio
 		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, provider, modelName)
 		return
 	}
-	options := model.GetCommonOptions(o.defaultOptions, opts...)
+	commonOpts := model.GetCommonOptions(o.defaultOptions.Options, opts...)
 
 	temperature := "nil"
-	if options.Temperature != nil {
-		temperature = fmt.Sprintf("%.2f", *options.Temperature)
+	if commonOpts.Temperature != nil {
+		temperature = fmt.Sprintf("%.2f", *commonOpts.Temperature)
 	}
 
 	topP := "nil"
-	if options.TopP != nil {
-		topP = fmt.Sprintf("%.2f", *options.TopP)
+	if commonOpts.TopP != nil {
+		topP = fmt.Sprintf("%.2f", *commonOpts.TopP)
 	}
 
 	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%s, topP=%s", stage, provider, modelName, temperature, topP)

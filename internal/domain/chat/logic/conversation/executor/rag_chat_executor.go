@@ -169,15 +169,18 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	answerStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), "正在基于证据生成回答。", nil)
 
-	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace)
+	callbackOpt := logic.WithCallback(func() {
+		_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
+			"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
+			"answerLength":        convCtx.AnswerLength(),
+		})
+	})
+	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace, callbackOpt)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		_ = e.tracer.FailStage(ctx, answerStage, "答案生成失败。", err, nil)
 		return nil, err
 	}
-	_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
-		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-		"answerLength":        convCtx.AnswerLength(),
-	})
+
 	return streamCh, nil
 }
