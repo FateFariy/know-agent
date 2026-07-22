@@ -65,9 +65,18 @@ export function formatCount(value: string | number): string {
 
 /** 通用数值格式化，空值返回'-' */
 export function formatNum(val: number | null | undefined, digit: number): string {
-  return !val ? '-' : val.toFixed(digit);
+  if (val == null) {
+    return '-';
+  }
+
+  const num = Number(val);
+  if (isNaN(num)) {
+    return '-';
+  }
+
+  return num.toFixed(digit);
 }
 /** 百分比格式化 */
 export function formatPercent(val: number | null | undefined): string {
-  return !val ? '-' : `${val.toFixed(1)}%`;
+  return `${formatNum(val, 1)}%`;
 }
