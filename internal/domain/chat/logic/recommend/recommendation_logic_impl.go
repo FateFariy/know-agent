@@ -2,6 +2,7 @@ package recommend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -56,7 +57,7 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 
 	go func() {
 		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges, trace)
-		if err != nil {
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			errChan <- err
 			return
 		}
