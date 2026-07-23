@@ -5,7 +5,7 @@
  * 复刻 React WelcomeScreen 的视觉与交互：渐变背景、浮动光晕、推荐卡片。
  */
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import {Aim, ChatLineSquare, MagicStick, Reading, Sunny, TopRight} from '@element-plus/icons-vue'
+import {Aim, ChatLineSquare, MagicStick, Reading, Sunny} from '@element-plus/icons-vue'
 import {useChatStore} from '@/stores/chat'
 
 const store = useChatStore()

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -152,7 +151,7 @@ func (s *PromptBuilder) renderSubQuestionReferences(references []*vo.SearchRefer
 				"referenceId": strutil.Trim(ref.ReferenceId),
 			})
 			reuse = reuse + "\n"
-			if budget.tryConsume(utf8.RuneCountInString(reuse)) {
+			if budget.tryConsume(utils.Len(reuse)) {
 				b.WriteString(reuse)
 			}
 			continue
@@ -177,7 +176,7 @@ func (s *PromptBuilder) renderSubQuestionReferences(references []*vo.SearchRefer
 			})
 			block = rendered + "\n\n"
 		}
-		if budget.tryConsume(utf8.RuneCountInString(block)) {
+		if budget.tryConsume(utils.Len(block)) {
 			b.WriteString(block)
 			renderedKeys[ref.UniqueKey()] = struct{}{}
 			budget.markRendered(ref.ReferenceSummary("已纳入 Prompt"))

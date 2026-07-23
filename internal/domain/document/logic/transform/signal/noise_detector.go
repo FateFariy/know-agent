@@ -3,8 +3,8 @@ package signal
 import (
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -49,7 +49,7 @@ func (d *NoiseDetector) Detect(detCtx *DetectorContext, text string, opts ...Det
 		}
 
 		// 重复出现的版本信息或分隔符行（频率 >= 3 且长度 <= 120）
-		if frequency >= 3 && utf8.RuneCountInString(text) <= 120 && (versionFooterPattern.MatchString(text) || strings.Contains(text, "|")) {
+		if frequency >= 3 && utils.Len(text) <= 120 && (versionFooterPattern.MatchString(text) || strings.Contains(text, "|")) {
 			noise.Reasons = []string{"version-footer-noise"}
 			return noise
 		}

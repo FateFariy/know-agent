@@ -1,5 +1,5 @@
-import type { RetrievalResultResp } from '@/types'
-import type { GroupedSubQuestion, SubQuestionChannel } from './types'
+import type {RetrievalResultResp} from '@/types'
+import type {GroupedSubQuestion, SubQuestionChannel} from './types'
 
 export function groupResultsBySubQuestion(results: RetrievalResultResp[] | undefined): GroupedSubQuestion[] {
   if (!results || !results.length) {

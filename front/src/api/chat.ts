@@ -1,19 +1,19 @@
-import axios, { baseURL } from './axios'
+import axios, {baseURL} from './axios'
 import type {
-  Response,
-  ConversationSessionResp,
-  ConversationSessionListResp,
-  RetrievalResultResp,
   ChannelExecutionResp,
-  ConversationStopResp,
-  ConversationResetResp,
-  ConversationMemorySummaryResp,
-  ConversationExchangeDetailResp,
   ChatReq,
-  ConversationIdentityReq,
   ConversationExchangeDetailQueryReq,
+  ConversationExchangeDetailResp,
+  ConversationIdentityReq,
+  ConversationMemorySummaryResp,
+  ConversationResetResp,
   ConversationSessionListReq,
+  ConversationSessionListResp,
+  ConversationSessionResp,
+  ConversationStopResp,
+  Response,
   RetrievalObserveReq,
+  RetrievalResultResp,
   SearchReference,
 } from '@/types'
 

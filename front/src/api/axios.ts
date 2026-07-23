@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import {ElMessage} from 'element-plus'
 import JSONbig from 'json-bigint';
 
 export const baseURL = (import.meta.env.MODE === 'production')

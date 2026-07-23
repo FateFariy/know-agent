@@ -1,4 +1,4 @@
-import type { DocumentStrategyPlan, DocumentStrategyStep, StrategyStepItem } from '@/types'
+import type {DocumentStrategyPlan, DocumentStrategyStep, StrategyStepItem} from '@/types'
 
 export interface StrategyItem {
   type: number

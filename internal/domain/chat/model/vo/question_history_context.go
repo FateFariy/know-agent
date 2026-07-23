@@ -3,7 +3,6 @@ package vo
 import (
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -94,7 +93,7 @@ func looksLikeFollowUpQuestion(question string) bool {
 		return false
 	}
 
-	questionLen := utf8.RuneCountInString(question)
+	questionLen := utils.Len(question)
 	if strutil.ContainsAny(question, followUpHints) || followUpPattern.MatchString(question) || questionLen <= 12 {
 		return true
 	}
@@ -105,7 +104,7 @@ func looksLikeFollowUpQuestion(question string) bool {
 // 渲染最近用户问题
 func renderRecentContext(recentUserContext string, budget int) string {
 	title := "对话承接上下文（仅用于理解指代，不作为事实证据）：\n"
-	titleLen := utf8.RuneCountInString(title)
+	titleLen := utils.Len(title)
 	if budget <= titleLen {
 		return utils.ClipTail(recentUserContext, budget)
 	}

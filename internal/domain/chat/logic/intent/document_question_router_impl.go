@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -737,7 +736,7 @@ func (r *DocumentQuestionRouterImpl) buildSectionPhrases(originalQuestion, rewri
 	// 归一化 & 过滤：仅保留归一化后 rune 数 >= 2 的短语；上限 8，避免下游打分膨胀
 	filtered := make([]string, 0, len(phrases))
 	for _, p := range phrases {
-		if utf8.RuneCountInString(normalizeForSection(p)) >= 2 {
+		if utils.Len(normalizeForSection(p)) >= 2 {
 			filtered = append(filtered, p)
 		}
 		if len(filtered) >= 8 {
@@ -766,7 +765,7 @@ func scoreSection(section *entity.GraphSection, phrases []string) float64 {
 	var best float64
 	for _, phrase := range phrases {
 		normalized := normalizeForSection(phrase)
-		normalizedLen := float64(utf8.RuneCountInString(normalized))
+		normalizedLen := float64(utils.Len(normalized))
 		// 过短短语（< 2 rune）跳过，避免误匹配
 		if normalizedLen < 2 {
 			continue
@@ -1034,7 +1033,7 @@ func splitRoughTerms(question string) []string {
 			break
 		}
 		word := strutil.Trim(p)
-		if utf8.RuneCountInString(word) > 1 && !seen[word] {
+		if utils.Len(word) > 1 && !seen[word] {
 			seen[word] = true
 			result = append(result, word)
 		}

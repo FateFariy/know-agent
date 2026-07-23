@@ -5,12 +5,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -69,7 +68,7 @@ func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle,
 	maxParagraph := slices.MaxFunc(paragraphList, func(a, b string) int { return len(a) - len(b) })
 
 	// 估算token数量（用于成本和分块决策）
-	tokenCount := p.estimateTokenCount(cleanedText)
+	tokenCount := utils.EstimateTokens(cleanedText)
 
 	// 评估文档结构级别（标题数量+段落数量综合判断）
 	structureLevel := p.evaluateStructureLevel(headingCount, len(paragraphList))
@@ -186,30 +185,6 @@ func (p *TextPreProcessLogicImpl) extractParagraphs(text string) []string {
 	return paragraphList
 }
 
-// estimateTokenCount 估计token数量
-func (p *TextPreProcessLogicImpl) estimateTokenCount(text string) int {
-	englishCount, chineseCount := 0, 0
-
-	// 统计英文单词数量
-	for _, word := range strings.Fields(text) {
-		if englishPattern.MatchString(word) {
-			englishCount++
-		}
-	}
-
-	// 统计中文字符数量
-	for _, r := range text {
-		if unicode.Is(unicode.Han, r) {
-			chineseCount++
-		}
-	}
-
-	// 非中英文字符按 4 字符折算 1 Token
-	baseToken := max(1, (utf8.RuneCountInString(text)-chineseCount-englishCount)/4)
-
-	return chineseCount + englishCount + baseToken
-}
-
 // evaluateStructureLevel 评估文档结构等级
 func (p *TextPreProcessLogicImpl) evaluateStructureLevel(headingCount, paragraphCount int) int {
 	if headingCount >= 5 {
@@ -226,7 +201,7 @@ func (p *TextPreProcessLogicImpl) evaluateStructureLevel(headingCount, paragraph
 
 // evaluateContentQuality 评估文档内容质量等级
 func (p *TextPreProcessLogicImpl) evaluateContentQuality(text string) int {
-	charCount := utf8.RuneCountInString(text)
+	charCount := utils.Len(text)
 	if strutil.IsBlank(text) || charCount < 20 {
 		return vo.ContentQualityLevelLow
 	}

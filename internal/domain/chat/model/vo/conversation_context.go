@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode/utf8"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -130,7 +129,7 @@ func (c *ConversationContext) Answer() string {
 func (c *ConversationContext) AnswerLength() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return utf8.RuneCountInString(c.answerBuffer.String())
+	return utils.Len(c.answerBuffer.String())
 }
 
 // ExecutionModeName 获取执行模式名称

@@ -14,8 +14,7 @@ import {
   Message as MessageIcon,
   MoreFilled,
   Plus,
-  Search as SearchIcon,
-  VideoPlay
+  Search as SearchIcon
 } from '@element-plus/icons-vue'
 import {ElMessageBox} from 'element-plus'
 import {useChatStore} from '@/stores/chat'

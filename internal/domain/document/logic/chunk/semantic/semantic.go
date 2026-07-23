@@ -3,10 +3,10 @@ package semantic
 import (
 	"context"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
 )
 
@@ -96,7 +96,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 	opt := chunk.GetChunkImplSpecificOptions(s.opt, opts...)
 
 	// 文本较短时保持原样，避免过碎
-	if utf8.RuneCountInString(input.Text) <= opt.minChars {
+	if utils.Len(input.Text) <= opt.minChars {
 		return []*chunk.TextBlock{input}, nil
 	}
 
@@ -109,8 +109,8 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 	resultList := make([]*chunk.TextBlock, 0, len(sentenceList))
 	currentText := strings.Builder{}
 	for _, sentence := range sentenceList {
-		currentLen := utf8.RuneCountInString(currentText.String())
-		sentenceLen := utf8.RuneCountInString(sentence)
+		currentLen := utils.Len(currentText.String())
+		sentenceLen := utils.Len(sentence)
 		exceedMaxChars := currentLen+sentenceLen > opt.maxChars
 		// 计算语义相似度
 		similarity := 1.0

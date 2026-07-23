@@ -2,7 +2,6 @@ package vo
 
 import (
 	"time"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/convertor"
 
@@ -57,6 +56,6 @@ func (v *ChatRetrievalResult) SetDocumentInfo(doc *DocumentChunk) {
 	v.OriginalScore = doc.Score
 
 	// 设置文本预览
-	v.ChunkCharCount = utf8.RuneCountInString(doc.OriginalSnippet)
+	v.ChunkCharCount = utils.Len(doc.OriginalSnippet)
 	v.ChunkTextPreview = utils.ClipHead(doc.OriginalSnippet, 500)
 }

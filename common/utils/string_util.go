@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -23,7 +25,7 @@ func BlankToDefault(s string, defaultValue string) string {
 // ClipHead 截取头部
 func ClipHead(text string, maxChars int) string {
 	normalized := strutil.Trim(text)
-	if utf8.RuneCountInString(normalized) <= maxChars {
+	if Len(normalized) <= maxChars {
 		return normalized
 	}
 	if maxChars <= 1 {
@@ -35,7 +37,7 @@ func ClipHead(text string, maxChars int) string {
 // ClipTail 截取尾部
 func ClipTail(text string, maxChars int) string {
 	normalized := strutil.Trim(text)
-	if utf8.RuneCountInString(normalized) <= maxChars {
+	if Len(normalized) <= maxChars {
 		return normalized
 	}
 	if maxChars <= 1 {
@@ -102,4 +104,35 @@ func Join[T any](values []T, prefix, suffix, sep string) string {
 	}
 	sb.WriteString(suffix)
 	return sb.String()
+}
+
+var (
+	englishPattern = regexp.MustCompile(`[A-Za-z]`) // 匹配英文字母
+)
+
+func EstimateTokens(content string) int {
+	englishCount, chineseCount := 0, 0
+
+	// 统计英文单词数量
+	for _, word := range strings.Fields(content) {
+		if englishPattern.MatchString(word) {
+			englishCount++
+		}
+	}
+
+	// 统计中文字符数量
+	for _, r := range content {
+		if unicode.Is(unicode.Han, r) {
+			chineseCount++
+		}
+	}
+
+	// 非中英文字符按 4 字符折算 1 Token
+	baseToken := max(1, (Len(content)-chineseCount-englishCount)/4)
+
+	return chineseCount + englishCount + baseToken
+}
+
+func Len(str string) int {
+	return utf8.RuneCountInString(str)
 }

@@ -5,7 +5,7 @@ import type {
   TopicRouteCandidate
 } from '@/types'
 import JSONbig from 'json-bigint'
-import { formatNum, formatPercent } from '@/utils/format.ts'
+import {formatNum, formatPercent} from '@/utils/format.ts'
 
 type RouteMode = 'auto' | 'shadow'
 

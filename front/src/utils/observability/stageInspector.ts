@@ -1,5 +1,5 @@
-import type { ConversationExchange, ConversationTraceStage, Snapshot, SubQuestion } from '@/types'
-import type { StageInspector, StageInspectorSection, StageInspectorTable, TextBlock } from './types'
+import type {ConversationExchange, ConversationTraceStage, Snapshot, SubQuestion} from '@/types'
+import type {StageInspector, StageInspectorSection, StageInspectorTable, TextBlock} from './types'
 import JSONbig from 'json-bigint'
 import {
   formatAnswerShape,

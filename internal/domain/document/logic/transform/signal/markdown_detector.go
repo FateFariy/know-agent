@@ -2,10 +2,10 @@ package signal
 
 import (
 	"regexp"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -49,7 +49,7 @@ func (d *MarkdownHeadingDetector) Detect(detCtx *DetectorContext, text string, o
 		Kind:        vo.SignalKindHeading,
 		NodeCode:    nodeCode,
 		Title:       title,
-		LevelHint:   utf8.RuneCountInString(matches[1]), // # 的数量即为标题级别
+		LevelHint:   utils.Len(matches[1]), // # 的数量即为标题级别
 		NumericPath: d.extractNumericPath(nodeCode),
 		Reasons:     []string{"markdown-heading"},
 		Confidence:  0.98,

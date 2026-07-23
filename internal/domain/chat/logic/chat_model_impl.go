@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components"
@@ -241,10 +240,10 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 	}
 
 	if promptTokens <= 0 {
-		promptTokens = estimateTokens(systemPrompt) + estimateTokens(userPrompt)
+		promptTokens = utils.EstimateTokens(systemPrompt) + utils.EstimateTokens(userPrompt)
 	}
 	if completionTokens <= 0 {
-		completionTokens = estimateTokens(responseText)
+		completionTokens = utils.EstimateTokens(responseText)
 	}
 	if totalTokens <= 0 {
 		totalTokens = promptTokens + completionTokens
@@ -301,11 +300,6 @@ func extractResponseText(response any) string {
 	default:
 		return ""
 	}
-}
-
-// estimateTokens 估算Token数量
-func estimateTokens(content string) int {
-	return (utf8.RuneCountInString(strings.TrimSpace(content)) + 3) / 4
 }
 
 // resolveProvider 解析模型提供商

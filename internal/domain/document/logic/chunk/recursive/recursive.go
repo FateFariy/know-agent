@@ -3,10 +3,10 @@ package recursive
 import (
 	"context"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
 )
 
@@ -90,7 +90,7 @@ func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
 	if text == "" {
 		return nil
 	}
-	if utf8.RuneCountInString(text) <= maxChars {
+	if utils.Len(text) <= maxChars {
 		return []string{text}
 	}
 
@@ -126,7 +126,7 @@ func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars in
 	for _, segment := range segmentList {
 		trimmed := strutil.Trim(segment)
 		if trimmed != "" {
-			if utf8.RuneCountInString(trimmed) > maxChars {
+			if utils.Len(trimmed) > maxChars {
 				// 当前片段过长：先刷出已累积的，然后递归该片段
 				if current.Len() > 0 {
 					rawResultList = append(rawResultList, strutil.Trim(current.String()))
@@ -137,7 +137,7 @@ func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars in
 			}
 
 			// 先刷出，再开启新块
-			if utf8.RuneCountInString(current.String())+utf8.RuneCountInString(trimmed)+1 > maxChars {
+			if utils.Len(current.String())+utils.Len(trimmed)+1 > maxChars {
 				rawResultList = append(rawResultList, strutil.Trim(current.String()))
 				current.Reset()
 			}
@@ -191,7 +191,7 @@ func (s *Strategy) buildOverlapPrefix(previous, current string, maxChars, overla
 	}
 
 	// 计算允许的重叠字符数，重叠字符数不能超过 maxChars，也不能超过 previous 的长度
-	allowed := min(overlapChars, max(0, maxChars-utf8.RuneCountInString(current)-1))
+	allowed := min(overlapChars, max(0, maxChars-utils.Len(current)-1))
 	if allowed <= 0 {
 		return ""
 
@@ -206,7 +206,7 @@ func (s *Strategy) buildOverlapPrefix(previous, current string, maxChars, overla
 // fixedWindowSplit 固定窗口切分超长文本
 func (s *Strategy) fixedWindowSplit(text string, maxChars, overlapChars int) []string {
 	trim := strutil.Trim(text)
-	total := utf8.RuneCountInString(trim)
+	total := utils.Len(trim)
 	if total == 0 {
 		return nil
 	}

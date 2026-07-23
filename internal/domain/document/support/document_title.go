@@ -4,10 +4,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -47,7 +47,7 @@ func LooksLikePlainHeading(lineContext *vo.LineContext, text string, maxPlainHea
 		return false
 	}
 
-	charLen := utf8.RuneCountInString(normalized)
+	charLen := utils.Len(normalized)
 	// 长度超过阈值 → 不是标题
 	if charLen > maxPlainHeadingChars {
 		return false

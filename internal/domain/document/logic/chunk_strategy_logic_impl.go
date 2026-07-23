@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/maputil"
@@ -498,7 +497,7 @@ func (s *ChunkStrategyLogicImpl) isContentBearingSection(node *entity.DocumentSt
 	}
 
 	// 长度显著超过标题或包含换行 → 视为存在独立内容
-	return utf8.RuneCountInString(content) > utf8.RuneCountInString(headingText)+16 || strings.Contains(content, "\n")
+	return utils.Len(content) > utils.Len(headingText)+16 || strings.Contains(content, "\n")
 }
 
 // cloneChunkCandidate 克隆 ChunkCandidate；可替换文本字段，其他元信息保留
@@ -670,7 +669,7 @@ func (s *ChunkStrategyLogicImpl) applyLlmChunking(ctx context.Context, input *ch
 		return outputs
 	}
 	// 输入过长 → 先以递归切块拆分到 LLM 上限
-	if utf8.RuneCountInString(input.Text) > s.llmMaxChars {
+	if utils.Len(input.Text) > s.llmMaxChars {
 		llmMaxChars := utils.Ternary(pipeType == vo.PipelineTypeParent, max(s.llmMaxChars, ParentBlockMaxChars), s.llmMaxChars)
 		outputs, _ = s.registry[vo.StrategyTypeRecursive].Chunk(ctx, input, chunkrecursive.WithOverlapChars(0), chunkrecursive.WithMaxChars(llmMaxChars))
 	}

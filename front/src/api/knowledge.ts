@@ -1,19 +1,19 @@
 import axios from './axios'
 import type {
-  Response,
-  KnowledgeScopeResp,
-  KnowledgeTopicResp,
-  TopicDocumentRelationResp,
+  KnowledgeRouteTracePageReq,
   KnowledgeRouteTracePageResp,
-  KnowledgeScopeSaveReq,
   KnowledgeScopeDeleteReq,
-  KnowledgeTopicSaveReq,
+  KnowledgeScopeResp,
+  KnowledgeScopeSaveReq,
   KnowledgeTopicDeleteReq,
   KnowledgeTopicListReq,
+  KnowledgeTopicResp,
+  KnowledgeTopicSaveReq,
+  Response,
   TopicDocumentRelationListReq,
-  TopicDocumentRelationSaveReq,
   TopicDocumentRelationRemoveReq,
-  KnowledgeRouteTracePageReq,
+  TopicDocumentRelationResp,
+  TopicDocumentRelationSaveReq,
 } from '@/types'
 
 export const knowledgeApi = {

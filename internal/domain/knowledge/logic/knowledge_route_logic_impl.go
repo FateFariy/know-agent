@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/stream"
@@ -209,7 +208,7 @@ func (s *KnowledgeRouteLogicImpl) tokenize(text string) []string {
 	terms := make(map[string]struct{})
 	for _, part := range tokenSplitPattern.Split(cleaned, -1) {
 		trimmed := strutil.Trim(part)
-		if utf8.RuneCountInString(trimmed) > 1 {
+		if utils.Len(trimmed) > 1 {
 			terms[trimmed] = struct{}{}
 			s.expandChineseNgrams(trimmed, terms)
 		}
@@ -383,7 +382,7 @@ func (s *KnowledgeRouteLogicImpl) deriveTopicsFromProfiles(ctx context.Context, 
 	for _, profile := range profiles {
 		for _, topic := range parseJsonStringArray(profile.CoreTopics) {
 			topic = strutil.Trim(topic)
-			if utf8.RuneCountInString(topic) < 2 {
+			if utils.Len(topic) < 2 {
 				continue
 			}
 			routeText := utils.JoinNonBlank(" ", topic, profile.DocumentSummary, profile.ExampleQuestions)
@@ -602,11 +601,11 @@ func (s *KnowledgeRouteLogicImpl) keywordEntityMatchScore(queryTerms []string, r
 	normalizedContent := normalize(routeText)
 	var score float64
 	for _, term := range queryTerms {
-		if !alpNumPattern.MatchString(term) && utf8.RuneCountInString(term) > 4 {
+		if !alpNumPattern.MatchString(term) && utils.Len(term) > 4 {
 			continue
 		}
 		termNorm := normalize(term)
-		if utf8.RuneCountInString(termNorm) < 2 {
+		if utils.Len(termNorm) < 2 {
 			continue
 		}
 		if strings.Contains(normalizedContent, termNorm) {

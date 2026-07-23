@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/stream"
@@ -533,7 +532,7 @@ func (o *PreparationOrchestratorImpl) buildPlanningHistory(memoryContext *vo.Mem
 	recentPart := utils.ClipTail(recentTranscript, recentBudget)
 
 	// 结构化历史预算 = 总预算 - 近期转录长度 - 分隔符长度（取 max 0 防止负数）
-	structuredBudget := max(0, maxChars-utf8.RuneCountInString(recentPart)-2)
+	structuredBudget := max(0, maxChars-utils.Len(recentPart)-2)
 	structuredPart := utils.ClipHead(structuredHistory, structuredBudget)
 
 	// 合并结构化文本与近期转录（非空项以 "\n\n" 分隔）
@@ -808,7 +807,7 @@ func (o *PreparationOrchestratorImpl) extractFallbackTerms(question, rewriteQues
 	terms := make(map[string]struct{})
 	for _, segment := range segments {
 		trimmed := strutil.Trim(segment)
-		trimmedLen := utf8.RuneCountInString(trimmed)
+		trimmedLen := utils.Len(trimmed)
 		if trimmedLen >= 2 {
 			terms[trimmed] = struct{}{}
 			if trimmedLen >= 4 {
@@ -850,23 +849,23 @@ func (o *PreparationOrchestratorImpl) fallbackDescriptorScore(descriptor *vo2.Kn
 	}
 
 	sort.Slice(sortedTerms, func(i, j int) bool {
-		return utf8.RuneCountInString(sortedTerms[i]) > utf8.RuneCountInString(sortedTerms[j])
+		return utils.Len(sortedTerms[i]) > utils.Len(sortedTerms[j])
 	})
 
 	matched := make([]string, 0, len(sortedTerms))
 	for _, term := range sortedTerms {
-		if utf8.RuneCountInString(term) < 2 || strutil.ContainsAny(term, matched) {
+		if utils.Len(term) < 2 || strutil.ContainsAny(term, matched) {
 			continue
 		}
 
 		if strings.Contains(content, term) {
 			matched = append(matched, term)
 			switch {
-			case utf8.RuneCountInString(term) >= 8:
+			case utils.Len(term) >= 8:
 				score += 12
-			case utf8.RuneCountInString(term) >= 5:
+			case utils.Len(term) >= 5:
 				score += 8
-			case utf8.RuneCountInString(term) >= 3:
+			case utils.Len(term) >= 3:
 				score += 4
 			default:
 				score += 2

@@ -3,9 +3,10 @@ package support
 import (
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
+
+	"github.com/swiftbit/know-agent/common/utils"
 )
 
 type LineKind = int
@@ -121,7 +122,7 @@ func (c *DocumentLineClassifier) looksLikeHeadingContent(content string) bool {
 		return false
 	}
 
-	charLen := utf8.RuneCountInString(normalized)
+	charLen := utils.Len(normalized)
 	if strings.ContainsAny(normalized[charLen-1:], "。！？；.!?;") || charLen > maxHeadingLength {
 		return false
 	}

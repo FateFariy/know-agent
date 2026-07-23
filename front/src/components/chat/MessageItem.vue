@@ -7,13 +7,13 @@
  *             text 阶段切到 MarkdownRenderer；
  *             未到任何事件时显示 ai-wait dots 占位。
  */
-import { computed, ref } from 'vue'
-import { ArrowDown, Document, Loading, Promotion } from '@element-plus/icons-vue'
+import {computed, ref} from 'vue'
+import {ArrowDown, Loading, Promotion} from '@element-plus/icons-vue'
 import FeedbackButtons from './FeedbackButtons.vue'
 import MarkdownRenderer from './MarkdownRenderer.vue'
-import { useChatStore } from '@/stores/chat'
-import type { ChatMessage } from '@/stores/chat'
-import type { SearchReference } from '@/types'
+import type {ChatMessage} from '@/stores/chat'
+import {useChatStore} from '@/stores/chat'
+import type {SearchReference} from '@/types'
 
 const props = defineProps<{
   message: ChatMessage

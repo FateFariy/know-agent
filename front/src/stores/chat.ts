@@ -1,8 +1,8 @@
-import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { chatApi, type StreamHandlers } from '@/api/chat'
-import type { SearchReference } from '@/types/chat'
+import {defineStore} from 'pinia'
+import {computed, ref} from 'vue'
+import {ElMessage} from 'element-plus'
+import {chatApi, type StreamHandlers} from '@/api/chat'
+import type {SearchReference} from '@/types/chat'
 import type {
   ChatReq,
   ConversationExchange,

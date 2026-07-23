@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -259,7 +258,7 @@ func (p *ProfileLogicImpl) buildSummary(document *entity.Document, sectionTitles
 		builder.WriteString("。")
 	}
 	excerpt := whitespaceRegexp.ReplaceAllString(strutil.Trim(parsedText), " ")
-	if utf8.RuneCountInString(excerpt) > 180 {
+	if utils.Len(excerpt) > 180 {
 		excerpt = strutil.Substring(excerpt, 0, 180)
 	}
 	if strutil.IsNotBlank(excerpt) {

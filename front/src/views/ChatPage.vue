@@ -7,15 +7,15 @@
  * - 切换会话自动同步 URL。
  * 布局：ChatSidebar + ChatHeader + MessageList/ChatInput。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElDrawer } from 'element-plus'
+import {computed, onBeforeUnmount, ref, watch} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
+import {ElDrawer} from 'element-plus'
 import ChatHeader from '@/components/chat/ChatHeader.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import MessageList from '@/components/chat/MessageList.vue'
-import { useChatStore } from '@/stores/chat'
-import type { SearchReference } from '@/types'
+import {useChatStore} from '@/stores/chat'
+import type {SearchReference} from '@/types'
 
 const store = useChatStore()
 const route = useRoute()

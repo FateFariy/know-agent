@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -121,9 +120,9 @@ func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.Question
 // needsRewrite 是否需要改写
 func (q *QueryRewriteLogicImpl) needsRewrite(question, historySummary string) bool {
 	if strutil.IsBlank(historySummary) {
-		return utf8.RuneCountInString(question) < 8 || q.looksLikeExplicitMultiQuestion(question)
+		return utils.Len(question) < 8 || q.looksLikeExplicitMultiQuestion(question)
 	}
-	return utf8.RuneCountInString(question) < 18 || q.looksLikeExplicitMultiQuestion(question)
+	return utils.Len(question) < 18 || q.looksLikeExplicitMultiQuestion(question)
 }
 
 // looksLikeExplicitMultiQuestion 是否显式多问题

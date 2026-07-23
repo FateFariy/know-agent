@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
-	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -587,8 +584,8 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 			CanonicalPath:     candidate.CanonicalPath,
 			ItemIndex:         candidate.ItemIndex,
 			ParentText:        candidate.Text,
-			CharCount:         utf8.RuneCountInString(candidate.Text),
-			TokenCount:        d.estimateTokenCount(candidate.Text),
+			CharCount:         utils.Len(candidate.Text),
+			TokenCount:        utils.EstimateTokens(candidate.Text),
 			StartChunkNo:      globalChunkNo,
 		}
 
@@ -610,8 +607,8 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 					CanonicalPath:     child.CanonicalPath,
 					ItemIndex:         child.ItemIndex,
 					ChunkText:         child.Text,
-					CharCount:         utf8.RuneCountInString(child.Text),
-					TokenCount:        d.estimateTokenCount(child.Text),
+					CharCount:         utils.Len(child.Text),
+					TokenCount:        utils.EstimateTokens(child.Text),
 					VectorStatus:      vo.VectorStatusWaitVector,
 				})
 				parentBlock.ChildCount++
@@ -752,30 +749,6 @@ func (d *AsyncProcessingLogicImpl) cleanupParentCandidates(candidates []*vo.Pare
 		fn := func(child *vo.ChunkCandidate) bool { return child != nil && strutil.IsNotBlank(child.Text) }
 		return item != nil && strutil.IsNotBlank(item.Text) && slices.ContainsFunc(item.ChildChunks, fn)
 	})
-}
-
-// estimateTokenCount 估算文本 Token 数量
-func (d *AsyncProcessingLogicImpl) estimateTokenCount(text string) int {
-	englishCount, chineseCount := 0, 0
-
-	// 统计英文单词数量
-	for _, word := range strings.Fields(text) {
-		if englishPattern.MatchString(word) {
-			englishCount++
-		}
-	}
-
-	// 统计中文字符数量
-	for _, r := range text {
-		if unicode.Is(unicode.Han, r) {
-			chineseCount++
-		}
-	}
-
-	// 非中英文字符按 4 字符折算 1 Token
-	baseToken := max(1, (utf8.RuneCountInString(text)-chineseCount-englishCount)/4)
-
-	return chineseCount + englishCount + baseToken
 }
 
 // Warnf 统一的告警日志入口

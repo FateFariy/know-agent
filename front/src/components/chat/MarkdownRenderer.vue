@@ -5,7 +5,7 @@
  * - 多行 code 走带语言标签的代码块 + 复制按钮。
  * 复刻 React MarkdownRenderer 的视觉与交互。
  */
-import { computed, nextTick, ref, watch } from 'vue'
+import {computed, nextTick, ref, watch} from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
@@ -17,7 +17,7 @@ import sql from 'highlight.js/lib/languages/sql'
 import typescript from 'highlight.js/lib/languages/typescript'
 import xml from 'highlight.js/lib/languages/xml'
 import yaml from 'highlight.js/lib/languages/yaml'
-import { ElMessage } from 'element-plus'
+import {ElMessage} from 'element-plus'
 
 // markdown-it 子模块类型不能从默认导出直接拿，这里从实例上推导。
 type MdToken = ReturnType<MarkdownIt['parse']>[number]
