@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import {computed, onMounted, reactive, ref, watch} from 'vue'
 import {knowledgeApi} from '@/api/knowledge'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {
   DocumentDetailResp,
   DocumentProfileResp,
@@ -922,7 +923,10 @@ onMounted(loadAll)
             <div class="data-card-head">
               <strong>{{ item.scopeName }}</strong>
             </div>
-            <small>{{ item.description || '暂无描述' }}</small>
+            <small>
+              <MarkdownView v-if="item.description" :content="item.description" size="compact"/>
+              <span v-else>暂无描述</span>
+            </small>
             <div class="data-card-meta">
               <span>主题 {{ topics.filter(t => t.scopeCode === item.scopeCode).length }}</span>
               <span>文档 {{
@@ -971,7 +975,10 @@ onMounted(loadAll)
                   formatExecutionPreferenceLabel(item.executionPreference)
                 }}</span>
             </div>
-            <small>{{ item.description || '暂无描述' }}</small>
+            <small>
+              <MarkdownView v-if="item.description" :content="item.description" size="compact"/>
+              <span v-else>暂无描述</span>
+            </small>
           </article>
           <div v-if="!filteredTopics.length" class="empty-inline">当前范围下还没有主题。</div>
         </div>
@@ -1096,7 +1103,10 @@ onMounted(loadAll)
                   item.knowledgeScopeName ||
                   item.knowledgeScopeCode || '未分范围'
                 }}</span>
-              <small>{{ item.reason || documentMetaLine(item) }}</small>
+              <small>
+                <MarkdownView v-if="item.reason" :content="item.reason" size="compact"/>
+                <span v-else>{{ documentMetaLine(item) }}</span>
+              </small>
             </div>
             <button :disabled="actionLoading" class="danger-link" type="button"
                     @click.stop="removeRelation(item)">移除
@@ -1148,7 +1158,10 @@ onMounted(loadAll)
                 </div>
                 <div class="detail-row">
                   <span>描述</span>
-                  <p>{{ scopeTarget.description || '暂无描述' }}</p>
+                  <div class="detail-row-content">
+                    <MarkdownView v-if="scopeTarget.description" :content="scopeTarget.description"/>
+                    <span v-else>暂无描述</span>
+                  </div>
                 </div>
                 <div v-if="scopeTarget.aliases" class="tag-section">
                   <p>别名</p>
@@ -1216,7 +1229,10 @@ onMounted(loadAll)
                 </div>
                 <div class="detail-row">
                   <span>描述</span>
-                  <p>{{ topicTarget.description || '暂无描述' }}</p>
+                  <div class="detail-row-content">
+                    <MarkdownView v-if="topicTarget.description" :content="topicTarget.description"/>
+                    <span v-else>暂无描述</span>
+                  </div>
                 </div>
                 <div v-if="topicTarget.aliases" class="tag-section">
                   <p>别名</p>
@@ -1300,9 +1316,10 @@ onMounted(loadAll)
                     profileStatusText(profile.profileStatus)
                   }}</span>
               </div>
-              <p class="profile-summary">{{
-                  profile.documentSummary || '当前画像还没有生成摘要。'
-                }}</p>
+              <p class="profile-summary">
+                <MarkdownView v-if="profile.documentSummary" :content="profile.documentSummary"/>
+                <span v-else>当前画像还没有生成摘要。</span>
+              </p>
               <div class="profile-grid">
                 <article class="mini-card">
                   <span>文档类型</span>
@@ -1366,7 +1383,10 @@ onMounted(loadAll)
                 </div>
                 <div class="detail-row">
                   <span>原因</span>
-                  <p>{{ relationTarget.reason || '未填写' }}</p>
+                  <div class="detail-row-content">
+                    <MarkdownView v-if="relationTarget.reason" :content="relationTarget.reason"/>
+                    <span v-else>未填写</span>
+                  </div>
                 </div>
               </div>
             </template>
@@ -1929,6 +1949,7 @@ onMounted(loadAll)
 .profile-summary {
   margin: 0;
   line-height: 1.75;
+  color: var(--color-text-strong);
 }
 
 .profile-grid {
@@ -2339,6 +2360,11 @@ onMounted(loadAll)
 
 .detail-row p {
   margin: 0;
+  color: var(--color-text-strong);
+  line-height: 1.6;
+}
+
+.detail-row-content {
   color: var(--color-text-strong);
   line-height: 1.6;
 }

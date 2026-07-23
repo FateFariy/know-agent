@@ -50,7 +50,7 @@ type DeleteDocumentResp struct {
 }
 
 type DocumentChunkItem struct {
-	ChunkId            string `json:"chunkId"`            // 分片ID
+	ID                 string `json:"chunkId"`            // 分片ID
 	ParentBlockId      string `json:"parentBlockId"`      // 父块ID
 	ParentBlockNo      int    `json:"parentBlockNo"`      // 父块编号
 	ParentChildCount   int    `json:"parentChildCount"`   // 父块下子分片总数

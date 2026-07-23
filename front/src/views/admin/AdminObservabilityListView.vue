@@ -2,6 +2,7 @@
 import {computed, onMounted, ref} from 'vue'
 import {RouterLink} from 'vue-router'
 import {chatApi} from '@/api/chat'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {
   ConversationSessionListReq,
   ConversationSessionListResp,
@@ -318,7 +319,7 @@ onMounted(loadSessions)
           </div>
 
           <p v-if="session.latestTurnErrorMessage" class="session-error">
-            最近一轮异常：{{ truncate(session.latestTurnErrorMessage, 88) }}
+            最近一轮异常：<span>{{ truncate(session.latestTurnErrorMessage, 88) }}</span>
           </p>
         </RouterLink>
 

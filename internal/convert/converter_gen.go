@@ -934,6 +934,7 @@ func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentCh
 	var pDocumentDocumentChunkItem *document.DocumentChunkItem
 	if source != nil {
 		var documentDocumentChunkItem document.DocumentChunkItem
+		documentDocumentChunkItem.ID = Int64ToString((*source).ID)
 		documentDocumentChunkItem.ParentBlockId = Int64ToString((*source).ParentBlockId)
 		documentDocumentChunkItem.ParentBlockNo = (*source).ParentBlockNo
 		documentDocumentChunkItem.ParentChildCount = (*source).ParentChildCount

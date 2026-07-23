@@ -3,6 +3,7 @@ import {computed, ref, watch, watchEffect} from 'vue'
 import {RouterLink, useRoute} from 'vue-router'
 import {ArrowLeftIcon, ArrowPathIcon} from '@heroicons/vue/24/outline'
 import {chatApi} from '@/api/chat'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {
   ChannelExecutionResp,
   ConversationExchange,
@@ -268,7 +269,9 @@ watchEffect(() => {
         <div class="header-copy">
           <span class="header-kicker">Round Detail</span>
           <h2>{{ activeExchange.question || '未记录问题' }}</h2>
-          <p>{{ currentExchangeNarrative }}</p>
+          <div class="header-narrative">
+            <MarkdownView :content="currentExchangeNarrative" size="compact"/>
+          </div>
         </div>
 
         <div class="stat-badges">
@@ -344,7 +347,10 @@ watchEffect(() => {
                 <span class="timeline-time">{{ trace.startTime }}</span>
               </div>
 
-              <p class="timeline-summary">{{ trace.summaryText || '当前阶段已记录。' }}</p>
+              <p class="timeline-summary">
+                <MarkdownView v-if="trace.summaryText" :content="trace.summaryText" size="compact"/>
+                <span v-else>当前阶段已记录。</span>
+              </p>
 
               <div class="timeline-bar">
                 <div :style="{ width: traceBarWidth(trace) }" class="timeline-bar-fill"></div>
@@ -374,7 +380,9 @@ watchEffect(() => {
               <div class="summary-title">
                 <span class="summary-kicker">{{ stage.eyebrow || stage.key }}</span>
                 <h4>{{ stage.title }}</h4>
-                <p>{{ stage.subtitle }}</p>
+                <div class="summary-subtitle">
+                  <MarkdownView v-if="stage.subtitle" :content="stage.subtitle" size="compact"/>
+                </div>
               </div>
               <div v-if="stage.chips?.length" class="summary-chips">
                 <span v-for="item in stage.chips" :key="`${stage.key}-${item.label}-${item.value}`"

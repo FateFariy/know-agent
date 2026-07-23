@@ -3,6 +3,7 @@ import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {RouterLink, useRoute} from 'vue-router'
 import {ArrowLeftIcon, ArrowPathIcon, SparklesIcon} from '@heroicons/vue/24/outline'
 import {chatApi} from '@/api/chat'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {ConversationExchange, ConversationSessionResp} from '@/types'
 import {
   formatChatMode,
@@ -228,11 +229,17 @@ onUnmounted(() => {
         <dl class="context-list">
           <div class="context-item">
             <dt>最近用户问题</dt>
-            <dd>{{ activeSession.latestUserMessage || '无' }}</dd>
+            <dd>
+              <MarkdownView v-if="activeSession.latestUserMessage" :content="activeSession.latestUserMessage" size="compact"/>
+              <span v-else>无</span>
+            </dd>
           </div>
           <div class="context-item">
             <dt>最近助手回答</dt>
-            <dd>{{ sessionPreview(activeSession) }}</dd>
+            <dd>
+              <MarkdownView v-if="sessionPreview(activeSession)" :content="sessionPreview(activeSession)" size="compact"/>
+              <span v-else>无</span>
+            </dd>
           </div>
           <div class="context-item">
             <dt>Checkpoint / 消息数</dt>
@@ -241,7 +248,7 @@ onUnmounted(() => {
           </div>
         </dl>
 
-        <div v-if="activeSession.memorySummary?.isCompressed">" class="memory-block">
+        <div v-if="activeSession.memorySummary?.isCompressed" class="memory-block">
           <h4 class="memory-title">
             <span class="section-kicker">Memory</span>
             长期摘要快照
@@ -257,7 +264,10 @@ onUnmounted(() => {
                 activeSession.memorySummary?.compressionCount ?? 0
               }}</span>
           </div>
-          <pre class="code-block">{{ activeSession.memorySummary?.summaryText || '无' }}</pre>
+          <div v-if="activeSession.memorySummary?.summaryText" class="code-block">
+            <MarkdownView :content="activeSession.memorySummary.summaryText" size="compact"/>
+          </div>
+          <div v-else class="code-block code-block-empty">无</div>
         </div>
 
         <div v-else class="memory-empty">
@@ -300,10 +310,15 @@ onUnmounted(() => {
               </div>
 
               <div class="round-qa">
-                <p class="qa-question"><strong>问：</strong>{{ exchange.question || '未记录问题' }}
+                <p class="qa-question">
+                  <strong>问：</strong>
+                  <MarkdownView v-if="exchange.question" :content="exchange.question" size="compact"/>
+                  <span v-else>未记录问题</span>
                 </p>
                 <p class="qa-answer">
-                  <strong>答：</strong>{{ truncate(exchange.answer || '还没有回答内容', 200) }}
+                  <strong>答：</strong>
+                  <MarkdownView v-if="exchange.answer" :content="truncate(exchange.answer, 200)" size="compact"/>
+                  <span v-else>还没有回答内容</span>
                 </p>
               </div>
 

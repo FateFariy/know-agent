@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import {computed, onMounted, reactive, ref} from 'vue'
 import {knowledgeApi} from '@/api/knowledge'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq} from '@/types'
 import type {
   DocumentDistributionItem,
@@ -446,12 +447,17 @@ onMounted(() => loadTraces(1))
             <article class="summary-card highlight-card">
               <p class="summary-label">主候选文档</p>
               <strong>{{ primaryDocumentText(selectedRecord) }}</strong>
-              <span>{{ selectedRecord.reason || '当前未记录额外路由说明' }}</span>
+              <div class="summary-note">
+                <MarkdownView v-if="selectedRecord.reason" :content="selectedRecord.reason" size="compact"/>
+                <span v-else>当前未记录额外路由说明</span>
+              </div>
             </article>
             <article class="summary-card">
               <p class="summary-label">实际落点</p>
               <strong>{{ actualSelectionText(selectedRecord) }}</strong>
-              <span>{{ hitConclusion(selectedRecord) }}</span>
+              <div class="summary-note">
+                <MarkdownView :content="hitConclusion(selectedRecord)" size="compact"/>
+              </div>
             </article>
             <article class="summary-card">
               <p class="summary-label">候选规模</p>
@@ -459,12 +465,16 @@ onMounted(() => loadTraces(1))
                 {{ selectedRecord.candidateTopicCount }} 主题 / {{
                   selectedRecord.candidateScopeCount
                 }} 范围</strong>
-              <span>{{ candidateConclusion(selectedRecord) }}</span>
+              <div class="summary-note">
+                <MarkdownView :content="candidateConclusion(selectedRecord)" size="compact"/>
+              </div>
             </article>
             <article class="summary-card">
               <p class="summary-label">观察建议</p>
               <strong>{{ recommendationTitle(selectedRecord) }}</strong>
-              <span>{{ recommendationText(selectedRecord) }}</span>
+              <div class="summary-note">
+                <MarkdownView :content="recommendationText(selectedRecord)" size="compact"/>
+              </div>
             </article>
           </div>
 
@@ -482,7 +492,10 @@ onMounted(() => loadTraces(1))
                 <div class="doc-timeline-body">
                   <strong>{{ candidate.documentName || candidate.documentId }}</strong>
                   <span class="doc-score">分数 {{ candidate.scoreText }}</span>
-                  <small>{{ candidate.reason || '基于文档画像与元数据综合召回' }}</small>
+                  <div class="doc-reason">
+                    <MarkdownView v-if="candidate.reason" :content="candidate.reason" size="compact"/>
+                    <span v-else>基于文档画像与元数据综合召回</span>
+                  </div>
                 </div>
               </article>
             </div>
@@ -927,6 +940,13 @@ onMounted(() => loadTraces(1))
   line-height: 1.7;
 }
 
+.summary-note {
+  display: block;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
 /* ── 候选文档时间线 ── */
 .detail-section {
   margin-bottom: 20px;
@@ -992,6 +1012,13 @@ onMounted(() => loadTraces(1))
 }
 
 .doc-timeline-body small {
+  display: block;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.doc-reason {
   display: block;
   font-size: 12px;
   color: var(--color-muted);

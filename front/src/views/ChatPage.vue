@@ -14,6 +14,7 @@ import ChatHeader from '@/components/chat/ChatHeader.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import MessageList from '@/components/chat/MessageList.vue'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import {useChatStore} from '@/stores/chat'
 import type {SearchReference} from '@/types'
 
@@ -146,7 +147,9 @@ onBeforeUnmount(() => {
           </div>
           <div v-if="selectedReference.snippet" class="reference-detail__snippet">
             <span class="reference-detail__label">引用片段</span>
-            <p class="reference-detail__text">{{ selectedReference.snippet }}</p>
+            <div class="reference-detail__text">
+              <MarkdownView :content="selectedReference.snippet" size="compact"/>
+            </div>
           </div>
           <div v-if="selectedReference.url" class="reference-detail__link">
             <a :href="selectedReference.url" target="_blank" rel="noopener">查看原文</a>
@@ -281,8 +284,17 @@ onBeforeUnmount(() => {
   color: #334155;
   font-size: 14px;
   line-height: 1.7;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.reference-detail__text :deep(.markdown-view) {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.reference-detail__text :deep(.markdown-view p:last-child) {
+  margin-bottom: 0;
 }
 
 .reference-detail__link {

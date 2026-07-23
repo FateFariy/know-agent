@@ -21,6 +21,7 @@ import type {
   TaskLog
 } from '@/types'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge.vue'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import {formatCount, formatDateTime} from '@/utils/format.ts'
 import {
   buildPipelineStepPayload,
@@ -775,6 +776,15 @@ function formatChunkCodeList(chunks: DocumentChunkItem[]): string {
   return chunks.map((item) => `C#${item?.chunkNo || '-'}`).join('、')
 }
 
+function truncatePreview(text: string, maxLength: number): string {
+  if (!text) return ''
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+  return `${normalized.slice(0, maxLength)}…`
+}
+
 function isChunkGroupCollapsed(groupKey: string): boolean {
   return Boolean(chunkGroupCollapsedMap.value[groupKey])
 }
@@ -1131,7 +1141,13 @@ function openParentBlockDetail(group: ChunkGroup): void {
   if (!group?.items?.length) {
     return
   }
-  openChunkDetail(group.items[0]?.chunkId || '', 'parent')
+  // 任一子块的 chunkId 缺失都会让 openChunkDetail 早退；优先取首个有效 chunkId
+  const fallbackChunk = group.items.find((item) => !!item.chunkId) || null
+  if (!fallbackChunk?.chunkId) {
+    showNotice('当前父块的子块数据缺少 chunkId，无法加载上下文，请重新构建索引后再试。', 'warning')
+    return
+  }
+  openChunkDetail(fallbackChunk.chunkId, 'parent')
 }
 
 function openLogDrawer(): void {
@@ -1270,7 +1286,9 @@ onBeforeUnmount(() => {
             <span aria-hidden="true" class="build-overlay-spinner"></span>
             <div>
               <h3>{{ buildOverlayTitle }}</h3>
-              <p class="build-overlay-text">{{ buildOverlayDescription }}</p>
+              <div class="build-overlay-text">
+                <MarkdownView :content="buildOverlayDescription" size="compact"/>
+              </div>
             </div>
           </div>
 
@@ -1403,7 +1421,10 @@ onBeforeUnmount(() => {
               <span>字符：{{ formatCount(chunkDetail?.chunk.charCount) }}</span>
               <span>Token：{{ formatCount(chunkDetail?.chunk.tokenCount) }}</span>
             </div>
-            <pre class="chunk-detail-text">{{ chunkDetail?.chunk.chunkText || '' }}</pre>
+            <div class="chunk-detail-text">
+              <MarkdownView v-if="chunkDetail?.chunk.chunkText" :content="chunkDetail.chunk.chunkText" size="compact"/>
+              <span v-else>暂无内容</span>
+            </div>
           </section>
 
           <section v-if="chunkDetail.parentBlock" ref="parentBlockSectionRef"
@@ -1426,9 +1447,10 @@ onBeforeUnmount(() => {
               <span>字符：{{ formatCount(chunkDetail.parentBlock.charCount) }}</span>
               <span>Token：{{ formatCount(chunkDetail.parentBlock.tokenCount) }}</span>
             </div>
-            <pre class="chunk-detail-text parent-block-text">{{
-                chunkDetail.parentBlock.parentText
-              }}</pre>
+            <div class="chunk-detail-text parent-block-text">
+              <MarkdownView v-if="chunkDetail.parentBlock.parentText" :content="chunkDetail.parentBlock.parentText" size="compact"/>
+              <span v-else>暂无内容</span>
+            </div>
           </section>
 
           <section
@@ -1472,8 +1494,11 @@ onBeforeUnmount(() => {
                   <strong>子块 C#{{ item.chunkNo || '-' }}</strong>
                   <span>{{ buildChunkRelationText(item) }}</span>
                 </div>
-                <span>{{ item.sectionPath || '未识别章节' }}</span>
-                <span>{{ item.chunkText }}</span>
+                <span class="sibling-chunk-section">{{ item.sectionPath || '未识别章节' }}</span>
+                <div class="sibling-chunk-body">
+                  <MarkdownView v-if="item.chunkText" :content="truncatePreview(item.chunkText, 120)" size="compact"/>
+                  <span v-else class="sibling-chunk-empty">暂无内容预览</span>
+                </div>
               </button>
             </div>
           </section>
@@ -1561,7 +1586,9 @@ onBeforeUnmount(() => {
                      class="workspace-guidance-card">
               <span class="workspace-guidance-kicker">当前阶段</span>
               <strong>{{ workflowCurrentPhase.title }}</strong>
-              <p>{{ workflowCurrentPhase.description }}</p>
+              <div class="workspace-guidance-text">
+                <MarkdownView :content="workflowCurrentPhase.description" size="compact"/>
+              </div>
             </article>
             <article class="workspace-guidance-card workspace-guidance-card-next">
               <span class="workspace-guidance-kicker">下一步建议</span>
@@ -1605,7 +1632,9 @@ onBeforeUnmount(() => {
           </div>
 
           <div v-if="documentDetail.parseErrorMsg" class="inline-notice inline-notice-danger">
-            {{ documentDetail.parseErrorMsg }}
+            <div class="parse-error-content">
+              <MarkdownView :content="documentDetail.parseErrorMsg" size="compact"/>
+            </div>
           </div>
 
           <div v-if="strategySystemStages.length" class="strategy-status-bar">
@@ -1896,7 +1925,9 @@ onBeforeUnmount(() => {
             <div class="build-progress-header">
               <div>
                 <strong>{{ buildTrackerTitle }}</strong>
-                <p class="build-progress-text">{{ buildTrackerDescription }}</p>
+                <div class="build-progress-text">
+                  <MarkdownView :content="buildTrackerDescription" size="compact"/>
+                </div>
               </div>
               <span :class="{ 'build-pulse-static': !isBuildPolling }" class="build-pulse">
                 {{ isBuildPolling ? '实时轮询中' : '轨迹已保留' }}
@@ -2105,7 +2136,10 @@ onBeforeUnmount(() => {
                       <strong>{{ formatCount(item.tokenCount) }}</strong>
                     </div>
                     <div class="chunk-cell chunk-cell-content" data-label="内容预览">
-                      <p class="chunk-body">{{ item.chunkText }}</p>
+                      <div class="chunk-body">
+                        <MarkdownView v-if="item.chunkText" :content="truncatePreview(item.chunkText, 200)" size="compact"/>
+                        <span v-else class="chunk-empty">暂无内容</span>
+                      </div>
                     </div>
                   </article>
                 </div>
@@ -2147,7 +2181,10 @@ onBeforeUnmount(() => {
                   <strong>{{ formatCount(item.tokenCount) }}</strong>
                 </div>
                 <div class="chunk-cell chunk-cell-content" data-label="内容预览">
-                  <p class="chunk-body">{{ item.chunkText }}</p>
+                  <div class="chunk-body">
+                    <MarkdownView v-if="item.chunkText" :content="truncatePreview(item.chunkText, 1200)" size="compact"/>
+                    <span v-else class="chunk-empty">暂无内容</span>
+                  </div>
                 </div>
               </article>
             </div>
@@ -5185,5 +5222,63 @@ onBeforeUnmount(() => {
   .build-overlay-head {
     grid-template-columns: 1fr;
   }
+}
+
+/* Markdown 渲染适配 */
+.parse-error-content {
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.sibling-chunk-section {
+  display: block;
+  color: var(--color-muted);
+  font-size: 12px;
+  margin: 2px 0 4px;
+}
+
+.sibling-chunk-body {
+  margin-top: 6px;
+  color: #607087;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.sibling-chunk-empty,
+.chunk-empty {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.workspace-guidance-text {
+  margin-top: 8px;
+  color: #4a5870;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.build-progress-text {
+  margin-top: 6px;
+  color: var(--color-muted-strong);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.build-overlay-text {
+  margin-top: 6px;
+  color: var(--color-muted-strong);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.chunk-cell-content .chunk-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #607087;
+  font-size: 13px;
+  line-height: 1.65;
 }
 </style>

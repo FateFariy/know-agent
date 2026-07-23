@@ -11,6 +11,7 @@ import {computed, ref} from 'vue'
 import {ArrowDown, Loading, Promotion} from '@element-plus/icons-vue'
 import FeedbackButtons from './FeedbackButtons.vue'
 import MarkdownRenderer from './MarkdownRenderer.vue'
+import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {ChatMessage} from '@/stores/chat'
 import {useChatStore} from '@/stores/chat'
 import type {SearchReference} from '@/types'
@@ -62,7 +63,7 @@ function handleReferenceClick(index: number) {
 <template>
   <div v-if="isUser" class="message-item message-item--user">
     <div class="user-bubble">
-      <p class="user-bubble__text">{{ message.content }}</p>
+      <MarkdownView v-if="message.content" :content="message.content" size="compact" :enrich-code="false"/>
     </div>
   </div>
 
@@ -164,12 +165,12 @@ function handleReferenceClick(index: number) {
   color: #333333;
   font-size: 15px;
   line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
-.user-bubble__text {
-  margin: 0;
+.user-bubble :deep(.markdown-view) {
+  color: #333333;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .message-item--assistant {
