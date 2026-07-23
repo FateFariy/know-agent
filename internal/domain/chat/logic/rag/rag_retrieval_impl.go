@@ -637,10 +637,15 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 		return fusedDocs[i].RRFScore > fusedDocs[j].RRFScore
 	})
 	rrfRankMap := make(map[string]int)
-	rrdScoreMap := make(map[string]float64)
+	rrfScoreMap := make(map[string]float64)
 	for i, doc := range fusedDocs {
 		rrfRankMap[doc.ID] = i + 1
-		rrdScoreMap[doc.ID] = doc.RRFScore
+		rrfScoreMap[doc.ID] = doc.RRFScore
+	}
+
+	rerankScoreMap := make(map[string]float64)
+	for _, doc := range rerankedDocs {
+		rerankScoreMap[doc.ID] = doc.RerankScore
 	}
 
 	// 构建"通过闸门"的文档 ID 集合（按渠道名分组）—— filteredResults 即通过闸门的结果集
@@ -668,7 +673,8 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 				ChannelType:      channelName,
 				ChannelRank:      i + 1,
 				RrfRank:          rrfRankMap[doc.ID],
-				RrfScore:         rrdScoreMap[doc.ID],
+				RrfScore:         rrfScoreMap[doc.ID],
+				RerankScore:      rerankScoreMap[doc.ID],
 				GatePassed:       gatePassedSet[channelName][doc.ID],
 			}
 
