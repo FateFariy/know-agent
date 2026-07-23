@@ -113,6 +113,7 @@ Chat:
     ParentEvidenceMaxChars: 1024
     MinVectorSimilarity: 0.5
     KeywordRelativeScoreFloor: 0.35
+    RerankScoreThreshold: 0.7
     PlanningHistoryMaxChars: 2000
     QuestionHistoryMaxChars: 1000
     TotalEvidenceMaxChars: 5200

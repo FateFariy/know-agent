@@ -6,7 +6,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 )
 
-var TEXT = "text"
+const TEXT = "text"
 
 type TextParser struct {
 }
@@ -17,6 +17,6 @@ func (p *TextParser) Name() string {
 	return TEXT
 }
 
-func (p *TextParser) Parse(ctx context.Context, bytesData []byte) (string, error) {
+func (p *TextParser) Parse(_ context.Context, bytesData []byte) (string, error) {
 	return string(bytesData), nil
 }

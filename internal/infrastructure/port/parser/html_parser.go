@@ -9,7 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 )
 
-var HTML = "html"
+const HTML = "html"
 
 type HTMLParser struct {
 }

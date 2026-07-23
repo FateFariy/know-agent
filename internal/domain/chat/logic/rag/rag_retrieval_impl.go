@@ -36,6 +36,7 @@ type RetrievalImpl struct {
 	subQuestionTimeout        time.Duration
 	minVectorSimilarity       float64
 	keywordRelativeScoreFloor float64
+	rerankScoreThreshold      float64
 	candidateTopK             int
 	parentEvidenceMaxChars    int
 	rerankEnabled             bool
@@ -55,6 +56,7 @@ func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, r
 		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
 		minVectorSimilarity:       svcCtx.Config.Chat.Rag.MinVectorSimilarity,
 		keywordRelativeScoreFloor: svcCtx.Config.Chat.Rag.KeywordRelativeScoreFloor,
+		rerankScoreThreshold:      svcCtx.Config.Chat.Rag.RerankScoreThreshold,
 		candidateTopK:             svcCtx.Config.Chat.Rag.CandidateTopK,
 		parentEvidenceMaxChars:    svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars,
 		rerankEnabled:             svcCtx.Config.Chat.Rag.RerankEnabled,

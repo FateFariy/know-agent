@@ -154,6 +154,7 @@ type RagConf struct {
 	ParentEvidenceMaxChars         int           `json:",optional,default=1024"` // 父证据最大字符数
 	MinVectorSimilarity            float64       `json:",optional,default=0.5"`  // 向量相似度阈值
 	KeywordRelativeScoreFloor      float64       `json:",optional,default=0.35"` // 关键词相对分数阈值
+	RerankScoreThreshold           float64       `json:",optional,default=0.7"`  // 重排序分数阈值
 	PlanningHistoryMaxChars        int           `json:",optional,default=2000"` // 规划历史最大字符数
 	QuestionHistoryMaxChars        int           `json:",optional,default=1000"` // 问题历史最大字符数
 	TotalEvidenceMaxChars          int           `json:",optional,default=5200"` // 总证据最大字符数
