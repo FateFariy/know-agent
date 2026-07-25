@@ -145,7 +145,7 @@
 - `internal/config`：配置加载
 - `internal/domain/<aggregate>/`
   - `adapter/`：外部接口契约（port / repository）
-  - `logic/`：业务用例
+  - `logic/`：业务实现
   - `model/entity|vo`：领域实体与值对象
   - `support/`：领域支撑工具
 - `internal/infrastructure/`：基础设施实现（MySQL、Milvus、MinIO、Redis、RocketMQ、LLM 等）
