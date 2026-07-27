@@ -31,7 +31,7 @@ type BuildIndexConsumer struct {
 func NewBuildIndexConsumer(svcCtx *svc.ServiceContext, l logic.AsyncProcessingLogic) *BuildIndexConsumer {
 	c, err := rocketmq.NewPushConsumer(
 		consumer.WithGroupName("build-index-group"),
-		consumer.WithNameServer([]string{svcCtx.Config.MQ.Endpoint}),
+		consumer.WithNameServer([]string{svcCtx.Config.MQ.Addr}),
 	)
 	if err != nil {
 		panic(err)

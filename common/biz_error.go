@@ -37,16 +37,9 @@ func (e *BizError) Unwrap() error {
 
 // Format 格式化错误信息
 func (e *BizError) Format(args ...any) *BizError {
-	bizError := e.Clone()
-	bizError.Msg = fmt.Sprintf(e.Msg, args...)
-	return bizError
-}
-
-// Clone 克隆业务错误
-func (e *BizError) Clone() *BizError {
 	return &BizError{
 		Code: e.Code,
-		Msg:  e.Msg,
+		Msg:  fmt.Sprintf(e.Msg, args...),
 		Err:  e.Err,
 	}
 }

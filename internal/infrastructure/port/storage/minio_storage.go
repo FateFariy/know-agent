@@ -135,7 +135,7 @@ func (s *MinioStorage) ensureBucketExists(ctx context.Context) error {
 
 // buildObjectUrl 构建对象 URL
 func (s *MinioStorage) buildObjectUrl(objectName string) string {
-	endpoint := s.Config.Endpoint
+	endpoint := s.Config.Addr
 	if strings.HasSuffix(endpoint, "/") {
 		endpoint = endpoint[:len(endpoint)-1]
 	}

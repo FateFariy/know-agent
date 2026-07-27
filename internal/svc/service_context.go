@@ -2,6 +2,7 @@ package svc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/agenticark"
 	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
+	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
@@ -18,38 +19,38 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
 )
 
 var ProviderSet = wire.NewSet(NewServiceContext)
 
 type ServiceContext struct {
-	Config         *config.Config
-	Validate       *validator.Validate
-	Minio          *minio.Client
-	Db             *gorm.DB
-	Rdb            *redis.Client
-	RedSync        *redsync.Redsync
-	Emb            embedding.Embedder
-	ChatModel      model.BaseModel[*schema.AgenticMessage]
-	ParserRegistry *parse.Registry
-	Milvus         *milvusclient.Client
+	Config    *config.Config
+	Validate  *validator.Validate
+	Minio     *minio.Client
+	Db        *gorm.DB
+	Rdb       *redis.Client
+	RedSync   *redsync.Redsync
+	Emb       embedding.Embedder
+	ChatModel model.BaseModel[*einoschema.AgenticMessage]
+	Milvus    *milvusclient.Client
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {
-	redisClient := common.NewRedisClient(c)
+	redisClient := NewRedisClient(c)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return &ServiceContext{
 		Config:    c,
-		Validate:  common.NewValidator(),
+		Validate:  validator.New(),
 		Rdb:       redisClient,
-		Db:        common.NewDb(c),
+		Db:        NewMySQLDB(c),
 		Minio:     NewMinioClient(c),
 		RedSync:   NewRedSync(redisClient),
 		Emb:       NewArkEmbedding(ctx, c),
@@ -58,9 +59,36 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	}
 }
 
+// NewMySQLDB 创建 MySQL 数据库连接
+func NewMySQLDB(c *config.Config) *gorm.DB {
+	m := c.Mysql
+	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", m.Username, m.Password, m.Endpoint, m.DbName)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger:         logger.Default.LogMode(logger.Info),
+		NamingStrategy: schema.NamingStrategy{SingularTable: true},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// NewRedisClient 创建 Redis 客户端
+func NewRedisClient(c *config.Config) *redis.Client {
+	conf := c.Redis[0]
+	client := redis.NewClient(&redis.Options{
+		Addr: conf.Host,
+		DB:   0,
+	})
+	if _, err := client.Ping(context.Background()).Result(); err != nil {
+		panic(fmt.Sprintf("redis connection error: %v", err))
+	}
+	return client
+}
+
 // NewMinioClient 创建 Minio 客户端
 func NewMinioClient(c *config.Config) *minio.Client {
-	endpoint := c.Minio.Endpoint
+	endpoint := c.Minio.Addr
 	accessKeyID := c.Minio.AccessKeyID
 	accessKey := c.Minio.SecretAccessKey
 	minioClient, err := minio.New(endpoint, &minio.Options{

@@ -26,7 +26,7 @@ type ParseDocumentConsumer struct {
 func NewParseDocumentConsumer(svcCtx *svc.ServiceContext, l logic.AsyncProcessingLogic) *ParseDocumentConsumer {
 	c, err := rocketmq.NewPushConsumer(
 		consumer.WithGroupName("parse-document-group"),
-		consumer.WithNameServer([]string{svcCtx.Config.MQ.Endpoint}),
+		consumer.WithNameServer([]string{svcCtx.Config.MQ.Addr}),
 	)
 	if err != nil {
 		panic(err)
