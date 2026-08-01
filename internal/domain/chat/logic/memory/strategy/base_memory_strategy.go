@@ -21,7 +21,7 @@ const (
 	maxAnswerLength   = 320
 )
 
-func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error) {
+func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
 	panic("implement me")
 }
 

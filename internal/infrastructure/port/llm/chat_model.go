@@ -10,34 +10,24 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components"
-	"github.com/cloudwego/eino/components/model"
+	eino "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // ChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
 type ChatModelImpl[M adk.MessageType] struct {
-	chatModel      model.BaseModel[M]
-	provider       string
-	config         *config.LLMConf
-	defaultOptions *options
-}
-
-type options struct {
-	*model.Options
-	callback func()
-}
-
-func WithCallback(callback func()) model.Option {
-	return model.WrapImplSpecificOptFn(func(opt *options) {
-		opt.callback = callback
-	})
+	chatModel eino.BaseModel[M]
+	provider  string
+	config    *config.LLMConf
+	options   *model.Options
 }
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
@@ -48,13 +38,12 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 		chatModel: svcCtx.ChatModel,
 		provider:  provider,
 		config:    conf,
-		defaultOptions: &options{
-			Options: &model.Options{
-				Model:       &conf.Model,
-				Temperature: &conf.Temperature,
-				MaxTokens:   &conf.MaxTokens,
-				TopP:        &conf.TopP,
-			},
+		options: &model.Options{
+			Model:       conf.Model,
+			Temperature: &conf.Temperature,
+			MaxTokens:   conf.MaxTokens,
+			TopP:        &conf.TopP,
+			Callback:    func() {},
 		},
 	}
 }
@@ -62,7 +51,7 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 // Generate 同步调用模型，返回文本响应
 func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
 	// 调用底层模型执行生成
-	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
+	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
 		return "", err
 	}
@@ -112,10 +101,8 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 	// 记录当前阶段的调用选项日志
 	o.logStageCallOptions(stage, opts...)
 
-	specificOpts := model.GetImplSpecificOptions(o.defaultOptions, opts...)
-
 	// 调用底层模型建立流式连接
-	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), opts...)
+	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
 		// 连接建立失败，记录使用量并返回错误
 		usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
@@ -128,7 +115,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 		// 确保通道在退出时关闭
 		defer close(resultChan)
 		defer stream.Close()
-		defer specificOpts.callback()
+		defer o.options.Callback()
 
 		var chunk any
 		for {
@@ -202,12 +189,12 @@ func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 
 // logStageCallOptions 记录阶段调用选项日志
 func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Option) {
-	modelName := utils.PointerOrDefault(o.defaultOptions.Model, "")
+	modelName := o.options.Model
 	if len(opts) == 0 {
 		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, o.provider, modelName)
 		return
 	}
-	commonOpts := model.GetCommonOptions(o.defaultOptions.Options, opts...)
+	commonOpts := model.GetOptions(o.options, opts...)
 
 	temperature := "nil"
 	if commonOpts.Temperature != nil {
@@ -248,7 +235,7 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 	return &vo.ChatModelUsageTrace{
 		StageName:        stage,
 		Provider:         o.provider,
-		Model:            utils.PointerOrDefault(o.defaultOptions.Model, ""),
+		Model:            o.options.Model,
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
 		TotalTokens:      totalTokens,
@@ -266,6 +253,25 @@ func (o *ChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) floa
 	promptCost := float64(promptTokens) / 1000.0 * o.config.InputTokenCost1k
 	completionCost := float64(completionTokens) / 1000.0 * o.config.OutputTokenCost1k
 	return promptCost + completionCost
+}
+
+// convertOptions 转换模型调用选项
+func (o *ChatModelImpl[M]) convertOptions(opts ...model.Option) []eino.Option {
+	options := make([]eino.Option, len(opts))
+	opt := model.GetOptions(o.options, opts...)
+	if opt.Model != "" {
+		options = append(options, eino.WithModel(opt.Model))
+	}
+	if opt.Temperature != nil {
+		options = append(options, eino.WithTemperature(*opt.Temperature))
+	}
+	if opt.TopP != nil {
+		options = append(options, eino.WithTopP(*opt.TopP))
+	}
+	if opt.MaxTokens != 0 {
+		options = append(options, eino.WithMaxTokens(opt.MaxTokens))
+	}
+	return options
 }
 
 // appendUsage 添加使用量记录
@@ -315,7 +321,7 @@ func extractResponseText(response any) string {
 }
 
 // resolveProvider 解析模型提供商
-func resolveProvider[M adk.MessageType](chatModel model.BaseModel[M]) string {
+func resolveProvider[M adk.MessageType](chatModel eino.BaseModel[M]) string {
 	if provider, ok := components.GetType(chatModel); ok {
 		return provider
 	}

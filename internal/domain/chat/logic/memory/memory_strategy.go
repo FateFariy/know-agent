@@ -10,7 +10,7 @@ import (
 // Strategy 记忆策略接口
 type Strategy interface {
 	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
+	LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error)
 
 	// GetStrategyType 获取记忆策略类型
 	GetStrategyType() string

@@ -166,13 +166,13 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	ctx = vo.OnStart(ctx, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
 
-	callbackOpt := llm.WithCallback(func() {
+	callbackOpt := model.WithCallback(func() {
 		vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "答案生成完成。", Snapshot: map[string]any{
 			"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
 			"answerLength":        convCtx.AnswerLength(),
 		}})
 	})
-	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace, callbackOpt)
+	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, callbackOpt)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		vo.OnError(ctx, "答案生成失败。", err)

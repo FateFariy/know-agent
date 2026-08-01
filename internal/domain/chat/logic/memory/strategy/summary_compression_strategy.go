@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -62,7 +60,7 @@ func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.Chat
 }
 
 // LoadMemoryContext 加载会话记忆上下文（摘要压缩策略）
-func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error) {
+func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
 	memoryCtx := &vo.MemoryContext{}
 
 	// 空会话ID直接返回空上下文
@@ -77,7 +75,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	}
 
 	// 刷新摘要（增量压缩超出保留窗口的对话）
-	summaryState, err = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, trace)
+	summaryState, err = s.refreshSummaryIfNecessary(ctx, conversationId, summaryState)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +127,7 @@ func (s *SummaryCompressionStrategy) RefreshConversationSummaryAsync(conversatio
 
 		summaryState, _ := s.repo.SelectMemorySummary(ctx, conversationId)
 
-		_, err := s.refreshSummaryIfNecessary(ctx, conversationId, summaryState, nil)
+		_, err := s.refreshSummaryIfNecessary(ctx, conversationId, summaryState)
 		if err != nil {
 			logx.Errorf("异步刷新会话摘要失败, conversationId=%s, err=%v", conversationId, err)
 			return
@@ -178,7 +176,7 @@ func (s *SummaryCompressionStrategy) RebuildConversationSummary(ctx context.Cont
 	}
 
 	// 重新生成摘要（从第一条对话开始压缩）
-	rebuiltState, err := s.refreshSummaryIfNecessary(ctx, conversationId, nil, nil)
+	rebuiltState, err := s.refreshSummaryIfNecessary(ctx, conversationId, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +193,7 @@ func (s *SummaryCompressionStrategy) DeleteConversationSummary(ctx context.Conte
 
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
 func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
-	currentState *entity.ChatMemorySummary, trace *vo.ConversationTrace) (*entity.ChatMemorySummary, error) {
+	currentState *entity.ChatMemorySummary) (*entity.ChatMemorySummary, error) {
 	// 获取增量对话（只拉取摘要尚未覆盖的新增轮次，避免重复压缩）
 	coveredExchangeId := int64(0)
 	if currentState != nil {
@@ -229,7 +227,7 @@ func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Conte
 
 		// 优先使用LLM合并摘要，失败时回退到规则合并
 		oldSummary := s.readSummary(workingState)
-		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch, trace)
+		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch)
 		if err != nil {
 			logx.Errorf("LLM合并会话长期摘要失败，回退到规则压缩, conversationId=%s, err=%v", conversationId, err)
 			newSummary = s.fallbackMerge(oldSummary, batch)
@@ -276,7 +274,7 @@ func (s *SummaryCompressionStrategy) renderCompressionTranscript(batch []*entity
 
 // mergeSummaryByLLM 由大模型合并摘要
 func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary,
-	batch []*entity.ChatExchange, trace *vo.ConversationTrace) (*entity.ConversationSummary, error) {
+	batch []*entity.ChatExchange) (*entity.ConversationSummary, error) {
 	// 渲染系统提示词
 	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
 	if err != nil {
@@ -300,7 +298,7 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 	}
 
 	// 调用LLM生成合并后的摘要
-	content, err := s.chatModel.GenerateWithTrace(ctx, vo.ChatStageSummary, systemPrompt, userPrompt, trace)
+	content, err := s.chatModel.GenerateWithTrace(ctx, vo.ChatStageSummary, systemPrompt, userPrompt)
 	newSummary, err := s.deserializeSummary(content)
 	if err != nil {
 		return nil, err
