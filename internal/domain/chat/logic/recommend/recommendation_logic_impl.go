@@ -50,11 +50,12 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 	resultChan := make(chan []string, 1)
 	errChan := make(chan error, 1)
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, r.properties.Timeout)
-	defer close(resultChan)
+
 	defer close(errChan)
 	defer cancelFunc()
 
 	go func() {
+		defer close(resultChan)
 		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges, trace)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			errChan <- err

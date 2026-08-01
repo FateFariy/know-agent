@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"slices"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
+	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -67,7 +67,7 @@ func (r *ChatRepositoryImpl) UpdateExchangeById(ctx context.Context, exchange *e
 func (r *ChatRepositoryImpl) ListExchanges(ctx context.Context, conversationId string) ([]*entity.ChatExchange, error) {
 	var exchanges []*entity.ChatExchange
 	err := r.dbWithContext(ctx).
-		Model(&model2.ChatExchange{}).
+		Model(&model.ChatExchange{}).
 		Where("conversation_id = ?", conversationId).
 		Order("create_time ASC, id ASC").
 		Find(&exchanges).Error
@@ -80,7 +80,7 @@ func (r *ChatRepositoryImpl) ListExchanges(ctx context.Context, conversationId s
 // ListExchangesAfter 列出某个记录之后的记录
 func (r *ChatRepositoryImpl) ListExchangesAfter(ctx context.Context, conversationId string, afterExchangeId int64) ([]*entity.ChatExchange, error) {
 	var exchanges []*entity.ChatExchange
-	query := r.dbWithContext(ctx).Model(&model2.ChatExchange{}).Where("conversation_id = ?", conversationId)
+	query := r.dbWithContext(ctx).Model(&model.ChatExchange{}).Where("conversation_id = ?", conversationId)
 	if afterExchangeId > -1 {
 		query = query.Where("id > ?", afterExchangeId)
 	}
@@ -96,7 +96,7 @@ func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversati
 		return nil, nil
 	}
 	var exchanges []*entity.ChatExchange
-	err := r.dbWithContext(ctx).Model(&model2.ChatExchange{}).
+	err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
 		Where("conversation_id = ?", conversationId).
 		Order("create_time DESC, id DESC").
 		Limit(limit).Find(&exchanges).Error
@@ -110,7 +110,7 @@ func (r *ChatRepositoryImpl) ListRecentExchanges(ctx context.Context, conversati
 // SelectExchangeById 根据ID查询对话记录
 func (r *ChatRepositoryImpl) SelectExchangeById(ctx context.Context, exchangeId int64) (*entity.ChatExchange, error) {
 	exchange := &entity.ChatExchange{}
-	err := r.dbWithContext(ctx).Model(&model2.ChatExchange{}).
+	err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
 		Where("id = ?", exchangeId).
 		First(exchange).Error
 	if err != nil {
@@ -131,7 +131,7 @@ func (r *ChatRepositoryImpl) UpdateDialogueByConversationId(ctx context.Context,
 
 // UpsertDialogue 创建或更新会话
 func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entity.ChatDialogue) error {
-	chatDialogue := &model2.ChatDialogue{}
+	chatDialogue := &model.ChatDialogue{}
 	err := r.dbWithContext(ctx).
 		Where("conversation_id = ?", dialogue.ConversationId).
 		Order("id DESC").
@@ -153,7 +153,7 @@ func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entit
 		chatDialogue.SelectedDocumentName != dialogue.SelectedDocumentName
 
 	if needUpdate {
-		updates := &model2.ChatDialogue{
+		updates := &model.ChatDialogue{
 			SessionStatus:        dialogue.SessionStatus,
 			ChatMode:             dialogue.ChatMode,
 			SelectedDocumentId:   dialogue.SelectedDocumentId,
@@ -224,13 +224,13 @@ func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, pageNo, 
 func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId string) (int64, int64, error) {
 	var exchangeCount, dialogueCount int64
 	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		res := r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model2.ChatExchange{})
+		res := r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model.ChatExchange{})
 		if res.Error != nil {
 			return res.Error
 		}
 		exchangeCount = res.RowsAffected
 
-		res = r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model2.ChatDialogue{})
+		res = r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model.ChatDialogue{})
 		dialogueCount = res.RowsAffected
 		return res.Error
 	})
@@ -243,7 +243,7 @@ func (r *ChatRepositoryImpl) DeleteSession(ctx context.Context, conversationId s
 // SelectMemorySummary 查询会话记忆摘要
 func (r *ChatRepositoryImpl) SelectMemorySummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
 	summary := &entity.ChatMemorySummary{}
-	err := r.dbWithContext(ctx).Model(&model2.ChatMemorySummary{}).
+	err := r.dbWithContext(ctx).Model(&model.ChatMemorySummary{}).
 		Where("conversation_id = ?", conversationId).
 		Order("id DESC").
 		First(summary).Error
@@ -270,7 +270,7 @@ func (r *ChatRepositoryImpl) UpdateMemorySummaryById(ctx context.Context, summar
 
 // DeleteMemorySummary 删除会话记忆摘要
 func (r *ChatRepositoryImpl) DeleteMemorySummary(ctx context.Context, conversationId string) error {
-	return r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model2.ChatMemorySummary{}).Error
+	return r.dbWithContext(ctx).Where("conversation_id = ?", conversationId).Delete(&model.ChatMemorySummary{}).Error
 }
 
 // ========== 会话阶段追踪相关 ==========
@@ -289,7 +289,7 @@ func (r *ChatRepositoryImpl) UpdateStageById(ctx context.Context, stage *entity.
 func (r *ChatRepositoryImpl) SelectStages(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeTraceStage, error) {
 	var stages []*entity.ChatExchangeTraceStage
 	if err := r.dbWithContext(ctx).
-		Model(&model2.ChatExchangeTraceStage{}).
+		Model(&model.ChatExchangeTraceStage{}).
 		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
 		Order("stage_order ASC, start_time ASC, id ASC").
 		Find(&stages).Error; err != nil {
@@ -302,14 +302,14 @@ func (r *ChatRepositoryImpl) SelectStages(ctx context.Context, conversationId st
 func (r *ChatRepositoryImpl) DeleteStage(ctx context.Context, conversationId string) error {
 	return r.dbWithContext(ctx).
 		Where("conversation_id = ?", conversationId).
-		Delete(&model2.ChatExchangeTraceStage{}).Error
+		Delete(&model.ChatExchangeTraceStage{}).Error
 }
 
 // ========== 内部辅助方法 ==========
 
 // buildListDialoguePageQuery 构建分页查询会话的查询条件
 func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, keyword string, chatMode, latestTurnStatus int) *gorm.DB {
-	query := r.dbWithContext(ctx).Model(&model2.ChatDialogue{})
+	query := r.dbWithContext(ctx).Model(&model.ChatDialogue{})
 
 	if chatMode > 0 {
 		query = query.Where("chat_mode = ?", chatMode)
@@ -351,7 +351,7 @@ func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, key
 // selectLatestExchangesByConversationIds 根据会话ID列表获取最新的对话交换记录
 func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.Context, conversationIds []string) (map[string]*entity.ChatExchange, error) {
 	var chatExchanges []*entity.ChatExchange
-	if err := r.dbWithContext(ctx).Model(&model2.ChatExchange{}).
+	if err := r.dbWithContext(ctx).Model(&model.ChatExchange{}).
 		Where("conversation_id IN ?", conversationIds).
 		Order("create_time DESC, id DESC").Find(&chatExchanges).Error; err != nil {
 		return nil, err
@@ -375,7 +375,7 @@ func (r *ChatRepositoryImpl) InsertRetrievalResults(ctx context.Context, results
 func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
 	var results []*vo.ChatRetrievalResult
 	if err := r.dbWithContext(ctx).
-		Model(&model2.ChatRetrievalResult{}).
+		Model(&model.ChatRetrievalResult{}).
 		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
 		Find(&results).Error; err != nil {
 		return nil, err
@@ -387,7 +387,7 @@ func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, convers
 func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
 	var executions []*vo.ChatChannelExecution
 	if err := r.dbWithContext(ctx).
-		Model(&model2.ChatChannelExecution{}).
+		Model(&model.ChatChannelExecution{}).
 		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
 		Find(&executions).Error; err != nil {
 		return nil, err
@@ -399,14 +399,14 @@ func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conver
 func (r *ChatRepositoryImpl) DeleteRetrievalResultsByConversationId(ctx context.Context, conversationId string) error {
 	return r.dbWithContext(ctx).
 		Where("conversation_id = ?", conversationId).
-		Delete(&model2.ChatRetrievalResult{}).Error
+		Delete(&model.ChatRetrievalResult{}).Error
 }
 
 // DeleteChannelExecutionsByConversationId 删除会话所有渠道执行记录
 func (r *ChatRepositoryImpl) DeleteChannelExecutionsByConversationId(ctx context.Context, conversationId string) error {
 	return r.dbWithContext(ctx).
 		Where("conversation_id = ?", conversationId).
-		Delete(&model2.ChatChannelExecution{}).Error
+		Delete(&model.ChatChannelExecution{}).Error
 }
 
 // toChatArchiveRecord 转换为会话记录
