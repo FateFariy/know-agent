@@ -33,6 +33,9 @@ func NewConversationTraceRecorder(repo adapter.ChatRepository) *ConversationTrac
 
 // OnStart 实现 callbacks.Handler，将追踪阶段信息落库
 func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, input any) context.Context {
+	if info.Component != "trace" {
+		return ctx
+	}
 	trace := vo.TraceFromCtx(ctx)
 	if trace == nil {
 		logx.Warn("ConversationTraceHandler.OnStart: ConversationTrace 未在上下文中找到")
@@ -76,6 +79,9 @@ func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.
 
 // OnEnd 实现 callbacks.Handler，更新追踪阶段为完成状态
 func (t *ConversationTraceHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output any) context.Context {
+	if info.Component != "trace" {
+		return ctx
+	}
 	trace := vo.TraceFromCtx(ctx)
 	if trace == nil {
 		return ctx
@@ -91,6 +97,9 @@ func (t *ConversationTraceHandler) OnEnd(ctx context.Context, info *callbacks.Ru
 
 // OnError 实现 callbacks.Handler，更新追踪阶段为失败状态
 func (t *ConversationTraceHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+	if info.Component != "trace" {
+		return ctx
+	}
 	trace := vo.TraceFromCtx(ctx)
 	if trace == nil {
 		return ctx

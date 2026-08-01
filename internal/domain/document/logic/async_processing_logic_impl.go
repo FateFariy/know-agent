@@ -9,8 +9,8 @@ import (
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -540,7 +540,7 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, do
 			})
 		}
 		if err = d.repo.InsertStepBatch(ctx, steps); err != nil {
-			Warnf("插入步骤失败: planId=%d, pipelineType=%s, err=%v", planId, pipelineType, err)
+			logx.Warnf("插入步骤失败: planId=%d, pipelineType=%s, err=%v", planId, pipelineType, err)
 		}
 	}
 
@@ -669,7 +669,7 @@ func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, docum
 		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
 	if err := d.repo.Do(ctx, parseFailTx); err != nil {
-		Warnf("解析失败时收尾失败: taskId=%d, err=%v", task.ID, err)
+		logx.Warnf("解析失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
 
@@ -713,7 +713,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 		return d.repo.InsertTaskLog(txCtx, failLog)
 	}
 	if err := d.repo.Do(ctx, indexBuildFailTx); err != nil {
-		Warnf("索引构建失败时收尾失败: taskId=%d, err=%v", task.ID, err)
+		logx.Warnf("索引构建失败时收尾失败: taskId=%d, err=%v", task.ID, err)
 	}
 }
 
@@ -750,8 +750,3 @@ func (d *AsyncProcessingLogicImpl) cleanupParentCandidates(candidates []*vo.Pare
 		return item != nil && strutil.IsNotBlank(item.Text) && slices.ContainsFunc(item.ChildChunks, fn)
 	})
 }
-
-// Warnf 统一的告警日志入口
-// func Warnf(format string, args ...any) {
-// 	logx.Alert(fmt.Sprintf(format, args...))
-// }

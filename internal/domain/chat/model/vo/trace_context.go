@@ -59,6 +59,7 @@ func OnStart(ctx context.Context, stageCode *ConversationTraceStage, executionMo
 		StageCode:     stageCode,
 		ExecutionMode: executionMode,
 		StartTime:     time.Now(),
+		Component:     "trace",
 	}
 	ctx = callbacks.EnsureRunInfo(ctx, runInfo)
 	ctx = callbacks.OnStart(ctx, input)
@@ -72,5 +73,28 @@ func OnEnd(ctx context.Context, output *StageOutput) context.Context {
 
 // OnError 调用 callbacks.OnError
 func OnError(ctx context.Context, summaryText string, err error) context.Context {
-	return callbacks.OnError(ctx, &StageError{err, summaryText})
+	return callbacks.OnError(ctx, &StageError{Err: err, SummaryText: summaryText})
+}
+
+// ModelCallInput 模型调用追踪的输入
+type ModelCallInput struct {
+	Stage        string
+	SystemPrompt string
+	UserPrompt   string
+	Provider     string
+	ModelName    string
+	Temperature  float32
+	TopP         float32
+}
+
+// ModelCallOutput 模型使用量追踪的输出
+type ModelCallOutput struct {
+	Response     any
+	ResponseText string
+}
+
+// ModelCallError 模型调用错误
+type ModelCallError struct {
+	Response     any
+	ResponseText string
 }

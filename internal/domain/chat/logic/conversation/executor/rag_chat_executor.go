@@ -3,12 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
-
-	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/swiftbit/know-agent/common/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -172,7 +170,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 			"answerLength":        convCtx.AnswerLength(),
 		}})
 	})
-	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, callbackOpt)
+	streamCh, err := e.chatModel.Stream(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, callbackOpt)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		vo.OnError(ctx, "答案生成失败。", err)

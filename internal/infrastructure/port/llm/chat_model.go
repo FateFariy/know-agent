@@ -3,7 +3,6 @@ package llm
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -16,9 +15,10 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -26,18 +26,18 @@ import (
 type ChatModelImpl[M adk.MessageType] struct {
 	chatModel eino.BaseModel[M]
 	provider  string
-	config    *config.LLMConf
 	options   *model.Options
 }
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
 func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.AgenticMessage] {
+	observability.NewModelUsageHandler(svcCtx.Config.ChatModel)
+
 	provider := resolveProvider(svcCtx.ChatModel)
 	conf := svcCtx.Config.ChatModel[provider]
 	return &ChatModelImpl[*schema.AgenticMessage]{
 		chatModel: svcCtx.ChatModel,
 		provider:  provider,
-		config:    conf,
 		options: &model.Options{
 			Model:       conf.Model,
 			Temperature: &conf.Temperature,
@@ -64,49 +64,35 @@ func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPromp
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
 func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
-	startTime := time.Now()
+	input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
+	ctx = OnStart(ctx, input)
 
-	// 记录当前阶段的调用选项日志
-	o.logStageCallOptions(stage, opts...)
-
-	// 预先构建失败状态的使用量轨迹，便于异常时快速记录
-	usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
-
-	// 调用底层模型执行生成
-	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt))
+	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
-		// 调用失败，记录使用量并返回错误
-		appendUsage(ctx, usageTrace)
+		ctx = callbacks.OnError(ctx, err)
 		return "", err
 	}
 
-	// 从响应中提取文本内容
 	responseText := extractResponseText(response)
-
-	// 构建成功状态的使用量轨迹
-	usageTrace = o.buildUsageTrace(stage, response, startTime, "COMPLETED", systemPrompt, userPrompt, responseText)
-
-	// 将使用量记录添加到追踪
-	appendUsage(ctx, usageTrace)
-
+	ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+		Response:     response,
+		ResponseText: responseText,
+	})
 	return responseText, nil
 }
 
-// StreamWithTrace 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (<-chan string, error) {
-	startTime := time.Now()
+// Stream 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
+func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (<-chan string, error) {
+	input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
+	ctx = OnStart(ctx, input)
+
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
-
-	// 记录当前阶段的调用选项日志
-	o.logStageCallOptions(stage, opts...)
 
 	// 调用底层模型建立流式连接
 	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
-		// 连接建立失败，记录使用量并返回错误
-		usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
-		appendUsage(ctx, usageTrace)
+		ctx = callbacks.OnError(ctx, err)
 		return nil, err
 	}
 
@@ -129,8 +115,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 
 			// 处理接收过程中的错误
 			if err != nil {
-				usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-				appendUsage(ctx, usageTrace)
+				ctx = callbacks.OnError(ctx, err)
 				logx.Errorf("模型调用失败: %v", err)
 				return
 			}
@@ -145,20 +130,34 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 					// 成功发送到通道
 				case <-ctx.Done():
 					// 外部主动取消，记录终止日志和使用量
-					usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-					appendUsage(ctx, usageTrace)
+					ctx = callbacks.OnError(ctx, err)
 					logx.Warn("由外部终止调用...")
 					return
 				}
 			}
 		}
 
-		// 流式处理结束，构建成功状态的使用量轨迹并记录
-		usageTrace := o.buildUsageTrace(stage, chunk, startTime, "COMPLETED", systemPrompt, userPrompt, outputBuilder.String())
-		appendUsage(ctx, usageTrace)
+		ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+			Response:     chunk,
+			ResponseText: outputBuilder.String(),
+		})
 	}()
 
 	return resultChan, nil
+}
+
+// buildModelUsageInput 构建模型使用量追踪输入
+func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...model.Option) *vo.ModelCallInput {
+	commonOpts := model.GetOptions(o.options, opts...)
+	return &vo.ModelCallInput{
+		Stage:        stage,
+		Provider:     o.provider,
+		ModelName:    o.options.Model,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
+		Temperature:  utils.PointerOrDefault(commonOpts.Temperature, 0.0),
+		TopP:         utils.PointerOrDefault(commonOpts.TopP, 0.0),
+	}
 }
 
 // buildPrompt 构建提示词
@@ -187,74 +186,6 @@ func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 	}
 }
 
-// logStageCallOptions 记录阶段调用选项日志
-func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Option) {
-	modelName := o.options.Model
-	if len(opts) == 0 {
-		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, o.provider, modelName)
-		return
-	}
-	commonOpts := model.GetOptions(o.options, opts...)
-
-	temperature := "nil"
-	if commonOpts.Temperature != nil {
-		temperature = fmt.Sprintf("%.2f", *commonOpts.Temperature)
-	}
-
-	topP := "nil"
-	if commonOpts.TopP != nil {
-		topP = fmt.Sprintf("%.2f", *commonOpts.TopP)
-	}
-
-	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%s, topP=%s", stage, o.provider, modelName, temperature, topP)
-}
-
-// buildUsageTrace 构建使用量轨迹
-func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Time, status, systemPrompt, userPrompt, responseText string) *vo.ChatModelUsageTrace {
-	tokenUsage := resolveTokenUsage(resp)
-
-	var promptTokens, completionTokens, totalTokens int
-	if tokenUsage != nil {
-		promptTokens = tokenUsage.PromptTokens
-		completionTokens = tokenUsage.CompletionTokens
-		totalTokens = tokenUsage.TotalTokens
-	}
-
-	if promptTokens <= 0 {
-		promptTokens = utils.EstimateTokens(systemPrompt) + utils.EstimateTokens(userPrompt)
-	}
-	if completionTokens <= 0 {
-		completionTokens = utils.EstimateTokens(responseText)
-	}
-	if totalTokens <= 0 {
-		totalTokens = promptTokens + completionTokens
-	}
-
-	estimatedCost := o.estimateCost(promptTokens, completionTokens)
-
-	return &vo.ChatModelUsageTrace{
-		StageName:        stage,
-		Provider:         o.provider,
-		Model:            o.options.Model,
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TotalTokens:      totalTokens,
-		EstimatedCost:    estimatedCost,
-		DurationMs:       time.Since(start).Milliseconds(),
-		Status:           status,
-	}
-}
-
-// estimateCost 估算调用成本
-func (o *ChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) float64 {
-	if promptTokens <= 0 && completionTokens <= 0 {
-		return 0
-	}
-	promptCost := float64(promptTokens) / 1000.0 * o.config.InputTokenCost1k
-	completionCost := float64(completionTokens) / 1000.0 * o.config.OutputTokenCost1k
-	return promptCost + completionCost
-}
-
 // convertOptions 转换模型调用选项
 func (o *ChatModelImpl[M]) convertOptions(opts ...model.Option) []eino.Option {
 	options := make([]eino.Option, len(opts))
@@ -272,31 +203,6 @@ func (o *ChatModelImpl[M]) convertOptions(opts ...model.Option) []eino.Option {
 		options = append(options, eino.WithMaxTokens(opt.MaxTokens))
 	}
 	return options
-}
-
-// appendUsage 添加使用量记录
-func appendUsage(ctx context.Context, usageTrace *vo.ChatModelUsageTrace) {
-	trace := vo.TraceFromCtx(ctx)
-	if trace != nil && usageTrace != nil {
-		trace.AddModelUsageTrace(usageTrace)
-	}
-}
-
-// resolveTokenUsage 解析Token使用量
-func resolveTokenUsage(resp any) *schema.TokenUsage {
-	switch expr := resp.(type) {
-	case *schema.AgenticMessage:
-		if expr == nil || expr.ResponseMeta == nil {
-			return nil
-		}
-		return expr.ResponseMeta.TokenUsage
-	case *schema.Message:
-		if expr == nil || expr.ResponseMeta == nil {
-			return nil
-		}
-		return expr.ResponseMeta.Usage
-	}
-	return nil
 }
 
 // extractResponseText 提取响应文本
@@ -326,4 +232,17 @@ func resolveProvider[M adk.MessageType](chatModel eino.BaseModel[M]) string {
 		return provider
 	}
 	return "unknow"
+}
+
+// OnStart 构造模型使用量的 RunInfo 并调用 callbacks.OnStart，StageCode 携带完整输入信息
+func OnStart(ctx context.Context, input *vo.ModelCallInput) context.Context {
+	runInfo := &callbacks.RunInfo{
+		StageId:   utils.GetSnowflakeNextID(),
+		StageCode: input,
+		StartTime: time.Now(),
+		Component: "model_usage",
+	}
+	ctx = callbacks.EnsureRunInfo(ctx, runInfo)
+	ctx = callbacks.OnStart(ctx, input)
+	return ctx
 }

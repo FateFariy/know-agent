@@ -78,7 +78,8 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	}
 
 	// 调用LLM生成改写结果
-	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, trace, q.options...)
+	ctx = vo.WithTrace(ctx, trace)
+	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, q.options...)
 	if err != nil {
 		logx.Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil

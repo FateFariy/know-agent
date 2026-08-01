@@ -38,7 +38,7 @@ func (q *DefaultStructureGraphQuerier) ListSections(ctx context.Context, documen
 	err := q.db.WithContext(ctx).
 		Table("document_structure_node").
 		Where("document_id = ?", documentId).
-		Order("node_id ASC").
+		Order("id ASC").
 		Scan(&rows).Error
 	if err != nil {
 		logx.Errorf("ListSections 失败, documentId=%d, err=%v", documentId, err)
