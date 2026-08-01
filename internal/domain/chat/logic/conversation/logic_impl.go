@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
 

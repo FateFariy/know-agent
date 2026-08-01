@@ -56,7 +56,7 @@ func (e *StageError) Unwrap() error {
 func OnStart(ctx context.Context, stageCode *ConversationTraceStage, executionMode string, input *StageInput) context.Context {
 	runInfo := &callbacks.RunInfo{
 		StageId:       utils.GetSnowflakeNextID(),
-		StageCode:     stageCode,
+		Payload:       stageCode,
 		ExecutionMode: executionMode,
 		StartTime:     time.Now(),
 		Component:     "trace",
@@ -76,25 +76,23 @@ func OnError(ctx context.Context, summaryText string, err error) context.Context
 	return callbacks.OnError(ctx, &StageError{Err: err, SummaryText: summaryText})
 }
 
-// ModelCallInput 模型调用追踪的输入
+// ModelCallMeta 模型调用通用元信息
+type ModelCallMeta struct {
+	Stage     string
+	Provider  string
+	ModelName string
+}
+
+// ModelCallInput OnStart 专属字段，仅在输入阶段使用
 type ModelCallInput struct {
-	Stage        string
+	Temperature float32
+	TopP        float32
+}
+
+// ModelCallOutput OnEnd 专属字段，包含响应和 token 估算所需的 prompt
+type ModelCallOutput struct {
 	SystemPrompt string
 	UserPrompt   string
-	Provider     string
-	ModelName    string
-	Temperature  float32
-	TopP         float32
-}
-
-// ModelCallOutput 模型使用量追踪的输出
-type ModelCallOutput struct {
-	Response     any
-	ResponseText string
-}
-
-// ModelCallError 模型调用错误
-type ModelCallError struct {
 	Response     any
 	ResponseText string
 }

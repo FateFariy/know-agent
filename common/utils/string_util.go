@@ -25,26 +25,28 @@ func BlankToDefault(s string, defaultValue string) string {
 // ClipHead 截取头部
 func ClipHead(text string, maxChars int) string {
 	normalized := strutil.Trim(text)
-	if Len(normalized) <= maxChars {
+	runes := []rune(normalized)
+	if len(runes) <= maxChars {
 		return normalized
 	}
 	if maxChars <= 1 {
 		return ""
 	}
-	return string(normalized[:maxChars-1]) + "…"
+	return string(runes[:maxChars-1]) + "…"
 }
 
 // ClipTail 截取尾部
 func ClipTail(text string, maxChars int) string {
 	normalized := strutil.Trim(text)
-	if Len(normalized) <= maxChars {
+	runes := []rune(normalized)
+	if len(runes) <= maxChars {
 		return normalized
 	}
 	if maxChars <= 1 {
 		return ""
 	}
 	start := max(0, len(normalized)-maxChars+1)
-	return "…" + string(normalized[start:])
+	return "…" + string(runes[start:])
 }
 
 // JoinNonBlank 连接非空字符串
@@ -76,20 +78,20 @@ func ParseChineseNumber(text string) int {
 		'六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
 	}
 
-	runeStr := []rune(normalized)
+	runes := []rune(normalized)
 	// 处理中文数字：十、十五、二十、二十五
-	if len(runeStr) == 2 && strings.HasPrefix(normalized, "十") {
-		return 10 + digitMap[runeStr[1]]
+	if len(runes) == 2 && strings.HasPrefix(normalized, "十") {
+		return 10 + digitMap[runes[1]]
 	}
-	if len(runeStr) == 2 && strings.HasSuffix(normalized, "十") {
-		return digitMap[runeStr[0]] * 10
+	if len(runes) == 2 && strings.HasSuffix(normalized, "十") {
+		return digitMap[runes[0]] * 10
 	}
-	if len(runeStr) == 3 && strings.Contains(normalized, "十") {
-		return digitMap[runeStr[0]]*10 + digitMap[runeStr[2]]
+	if len(runes) == 3 && strings.Contains(normalized, "十") {
+		return digitMap[runes[0]]*10 + digitMap[runes[2]]
 	}
 
 	// 单个中文数字
-	return digitMap[runeStr[0]]
+	return digitMap[runes[0]]
 }
 
 // Join 连接字符串

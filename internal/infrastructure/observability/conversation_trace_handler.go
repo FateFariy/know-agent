@@ -42,9 +42,9 @@ func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.
 		return ctx
 	}
 
-	stageCode, _ := info.StageCode.(*vo.ConversationTraceStage)
+	stageCode, _ := info.Payload.(*vo.ConversationTraceStage)
 	if stageCode == nil {
-		logx.Warn("ConversationTraceHandler.OnStart: StageCode 无效")
+		logx.Warn("ConversationTraceHandler.OnStart: Payload 无效")
 		return ctx
 	}
 

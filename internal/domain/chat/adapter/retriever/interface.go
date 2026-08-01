@@ -2,6 +2,7 @@ package retriever
 
 import (
 	"context"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 

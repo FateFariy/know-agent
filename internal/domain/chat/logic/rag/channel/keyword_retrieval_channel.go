@@ -3,6 +3,7 @@ package channel
 import (
 	"context"
 	"fmt"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
 
 	"github.com/zeromicro/go-zero/core/logx"

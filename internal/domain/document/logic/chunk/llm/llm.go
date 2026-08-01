@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 
 	"github.com/duke-git/lancet/v2/strutil"

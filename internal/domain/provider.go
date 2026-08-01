@@ -2,6 +2,7 @@ package domain
 
 import (
 	"github.com/google/wire"
+
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"

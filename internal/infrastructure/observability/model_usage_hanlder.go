@@ -41,7 +41,8 @@ func (h *ModelUsageHandler) OnStart(ctx context.Context, info *callbacks.RunInfo
 	if !ok || modelInput == nil {
 		return ctx
 	}
-	logStageCallOptions(modelInput)
+	meta, _ := info.Payload.(*vo.ModelCallMeta)
+	logStageCallOptions(meta, modelInput)
 	return ctx
 }
 
@@ -79,7 +80,7 @@ func (h *ModelUsageHandler) OnError(ctx context.Context, info *callbacks.RunInfo
 
 // buildUsageTrace 构建成功的使用量轨迹
 func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.ModelCallOutput, startTime time.Time) *vo.ChatModelUsageTrace {
-	input, _ := info.StageCode.(*vo.ModelCallInput)
+	meta, _ := info.Payload.(*vo.ModelCallMeta)
 
 	tokenUsage := resolveTokenUsage(output.Response)
 
@@ -90,8 +91,8 @@ func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.
 		totalTokens = tokenUsage.TotalTokens
 	}
 
-	if promptTokens <= 0 && input != nil {
-		promptTokens = utils.EstimateTokens(input.SystemPrompt) + utils.EstimateTokens(input.UserPrompt)
+	if promptTokens <= 0 {
+		promptTokens = utils.EstimateTokens(output.SystemPrompt) + utils.EstimateTokens(output.UserPrompt)
 	}
 	if completionTokens <= 0 {
 		completionTokens = utils.EstimateTokens(output.ResponseText)
@@ -101,18 +102,18 @@ func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.
 	}
 
 	stageName := ""
-	if input != nil {
-		stageName = input.Stage
+	if meta != nil {
+		stageName = meta.Stage
 	}
 
 	return &vo.ChatModelUsageTrace{
 		StageName:        stageName,
-		Provider:         h.resolveProvider(input),
-		Model:            h.resolveModel(input),
+		Provider:         h.resolveProvider(meta),
+		Model:            h.resolveModel(meta),
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
 		TotalTokens:      totalTokens,
-		EstimatedCost:    h.estimateCost(input, promptTokens, completionTokens),
+		EstimatedCost:    h.estimateCost(meta, promptTokens, completionTokens),
 		DurationMs:       time.Since(startTime).Milliseconds(),
 		Status:           "COMPLETED",
 	}
@@ -120,42 +121,42 @@ func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.
 
 // buildFailedUsageTrace 构建失败的使用量轨迹
 func (h *ModelUsageHandler) buildFailedUsageTrace(info *callbacks.RunInfo, startTime time.Time) *vo.ChatModelUsageTrace {
-	input, _ := info.StageCode.(*vo.ModelCallInput)
+	meta, _ := info.Payload.(*vo.ModelCallMeta)
 	stageName := ""
-	if input != nil {
-		stageName = input.Stage
+	if meta != nil {
+		stageName = meta.Stage
 	}
 	return &vo.ChatModelUsageTrace{
 		StageName:  stageName,
-		Provider:   h.resolveProvider(input),
-		Model:      h.resolveModel(input),
+		Provider:   h.resolveProvider(meta),
+		Model:      h.resolveModel(meta),
 		DurationMs: time.Since(startTime).Milliseconds(),
 		Status:     "FAILED",
 	}
 }
 
 // resolveProvider 获取 provider
-func (h *ModelUsageHandler) resolveProvider(input *vo.ModelCallInput) string {
-	if input != nil && input.Provider != "" {
-		return input.Provider
+func (h *ModelUsageHandler) resolveProvider(meta *vo.ModelCallMeta) string {
+	if meta != nil && meta.Provider != "" {
+		return meta.Provider
 	}
 	return "unknown"
 }
 
 // resolveModel 获取 model name
-func (h *ModelUsageHandler) resolveModel(input *vo.ModelCallInput) string {
-	if input != nil && input.ModelName != "" {
-		return input.ModelName
+func (h *ModelUsageHandler) resolveModel(meta *vo.ModelCallMeta) string {
+	if meta != nil && meta.ModelName != "" {
+		return meta.ModelName
 	}
 	return "unknown"
 }
 
 // estimateCost 估算调用成本
-func (h *ModelUsageHandler) estimateCost(input *vo.ModelCallInput, promptTokens, completionTokens int) float64 {
+func (h *ModelUsageHandler) estimateCost(meta *vo.ModelCallMeta, promptTokens, completionTokens int) float64 {
 	if promptTokens <= 0 && completionTokens <= 0 {
 		return 0
 	}
-	provider := h.resolveProvider(input)
+	provider := h.resolveProvider(meta)
 	conf, ok := h.configs[provider]
 	if !ok || conf == nil {
 		return 0
@@ -166,14 +167,21 @@ func (h *ModelUsageHandler) estimateCost(input *vo.ModelCallInput, promptTokens,
 }
 
 // logStageCallOptions 记录阶段调用选项日志
-func logStageCallOptions(input *vo.ModelCallInput) {
-	modelName := input.ModelName
+func logStageCallOptions(meta *vo.ModelCallMeta, input *vo.ModelCallInput) {
+	modelName := ""
+	stage := ""
+	provider := ""
+	if meta != nil {
+		modelName = meta.ModelName
+		stage = meta.Stage
+		provider = meta.Provider
+	}
 	if input.Temperature == 0 && input.TopP == 0 {
-		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", input.Stage, input.Provider, modelName)
+		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, provider, modelName)
 		return
 	}
 	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%.2f, topP=%.2f",
-		input.Stage, input.Provider, modelName, input.Temperature, input.TopP)
+		stage, provider, modelName, input.Temperature, input.TopP)
 }
 
 // resolveTokenUsage 解析 Token 使用量

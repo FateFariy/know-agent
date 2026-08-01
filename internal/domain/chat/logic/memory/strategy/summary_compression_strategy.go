@@ -3,11 +3,12 @@ package strategy
 import (
 	"context"
 	"encoding/json"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"

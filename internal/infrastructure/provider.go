@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/wire"
+
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
 	lock2 "github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"

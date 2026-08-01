@@ -2,10 +2,11 @@ package intent
 
 import (
 	"context"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"

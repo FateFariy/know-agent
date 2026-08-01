@@ -2,10 +2,11 @@ package convert
 
 import (
 	"encoding/json"
-	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"strconv"
 	"strings"
 	"time"
+
+	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"

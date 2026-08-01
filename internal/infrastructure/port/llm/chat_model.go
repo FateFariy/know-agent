@@ -64,8 +64,8 @@ func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPromp
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
 func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
-	input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
-	ctx = OnStart(ctx, input)
+	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
+	ctx = OnStart(ctx, meta, input)
 
 	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
@@ -75,6 +75,8 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 
 	responseText := extractResponseText(response)
 	ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
 		Response:     response,
 		ResponseText: responseText,
 	})
@@ -83,8 +85,8 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 
 // Stream 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
 func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (<-chan string, error) {
-	input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
-	ctx = OnStart(ctx, input)
+	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
+	ctx = OnStart(ctx, meta, input)
 
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
@@ -138,6 +140,8 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 		}
 
 		ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+			SystemPrompt: systemPrompt,
+			UserPrompt:   userPrompt,
 			Response:     chunk,
 			ResponseText: outputBuilder.String(),
 		})
@@ -146,18 +150,19 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 	return resultChan, nil
 }
 
-// buildModelUsageInput 构建模型使用量追踪输入
-func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...model.Option) *vo.ModelCallInput {
+// buildModelUsageInput 构建模型使用量追踪的元信息和输入参数
+func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...model.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
 	commonOpts := model.GetOptions(o.options, opts...)
-	return &vo.ModelCallInput{
-		Stage:        stage,
-		Provider:     o.provider,
-		ModelName:    o.options.Model,
-		SystemPrompt: systemPrompt,
-		UserPrompt:   userPrompt,
-		Temperature:  utils.PointerOrDefault(commonOpts.Temperature, 0.0),
-		TopP:         utils.PointerOrDefault(commonOpts.TopP, 0.0),
+	meta := &vo.ModelCallMeta{
+		Stage:     stage,
+		Provider:  o.provider,
+		ModelName: o.options.Model,
 	}
+	input := &vo.ModelCallInput{
+		Temperature: utils.PointerOrDefault(commonOpts.Temperature, 0.0),
+		TopP:        utils.PointerOrDefault(commonOpts.TopP, 0.0),
+	}
+	return meta, input
 }
 
 // buildPrompt 构建提示词
@@ -234,11 +239,11 @@ func resolveProvider[M adk.MessageType](chatModel eino.BaseModel[M]) string {
 	return "unknow"
 }
 
-// OnStart 构造模型使用量的 RunInfo 并调用 callbacks.OnStart，StageCode 携带完整输入信息
-func OnStart(ctx context.Context, input *vo.ModelCallInput) context.Context {
+// OnStart 构造模型使用量的 RunInfo 并调用 callbacks.OnStart，meta 存入 Payload 供三阶段访问
+func OnStart(ctx context.Context, meta *vo.ModelCallMeta, input *vo.ModelCallInput) context.Context {
 	runInfo := &callbacks.RunInfo{
 		StageId:   utils.GetSnowflakeNextID(),
-		StageCode: input,
+		Payload:   meta,
 		StartTime: time.Now(),
 		Component: "model_usage",
 	}
