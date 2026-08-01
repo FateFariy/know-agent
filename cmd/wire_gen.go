@@ -21,12 +21,12 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/infrastructure"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/keyword"
@@ -82,7 +82,7 @@ func WireApp(c *config.Config) *server.Server {
 	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
 	v2 := domain.ProvideKnowledgeOptions()
 	knowledgeRouteLogicImpl := logic2.NewKnowledgeRouteLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
-	conversationTraceHandler := trace.NewConversationTraceRecorder(chatRepositoryImpl)
+	conversationTraceHandler := observability.NewConversationTraceRecorder(chatRepositoryImpl)
 	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriteLogicImpl, documentQuestionRouterImpl, knowledgeRouteLogicImpl, lifecycleLogicImpl, conversationTraceHandler)
 	recommendationLogicImpl := recommend.NewRecommendationLogicImpl(serviceContext, templateLogicImpl, chatModelImpl)
 	redisMutexLock := lock.NewRedisMutexLock(serviceContext)

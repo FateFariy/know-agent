@@ -15,11 +15,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	knowledgelogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 )
 
 var ProviderSet = wire.NewSet(
@@ -60,7 +60,7 @@ var chatProviderSet = wire.NewSet(
 	executor.NewGraphOnlyExecutor,
 	executor.NewGraphThenEvidenceExecutor,
 	executor.NewClarificationExecutor,
-	trace.NewConversationTraceRecorder,
+	observability.NewConversationTraceRecorder,
 	NewExecutorRegistry,
 	NewRetrievalChannels,
 	wire.Bind(new(conversation.RagPromptAssembler), new(*rag.PromptBuilder)),

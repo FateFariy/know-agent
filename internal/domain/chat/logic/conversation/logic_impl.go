@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
@@ -19,7 +20,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
@@ -64,7 +64,7 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 	memoryLogic logic.SessionMemoryLogic,
 	distributedLock lock.DistributedLock,
 	checkPointStore checkpoint.Store,
-	tracer *trace.ConversationTraceHandler,
+	tracer *observability.ConversationTraceHandler,
 ) *LogicImpl {
 	return &LogicImpl{
 		repo:              repo,

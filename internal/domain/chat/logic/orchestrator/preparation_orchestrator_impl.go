@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"math"
 	"regexp"
 	"sort"
@@ -17,7 +18,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
@@ -66,7 +66,7 @@ func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	documentQuestionRouter logic.DocumentQuestionRouteLogic,
 	knowledgeRoute kelog.KnowledgeRouteLogic,
 	lifecycleLogic doclog.LifecycleLogic,
-	tracer *trace.ConversationTraceHandler,
+	tracer *observability.ConversationTraceHandler,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
 		repo:                   repo,

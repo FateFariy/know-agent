@@ -13,8 +13,8 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -74,7 +74,7 @@ func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPromp
 }
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (string, error) {
+func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
 	startTime := time.Now()
 
 	// 记录当前阶段的调用选项日志
@@ -87,7 +87,7 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt))
 	if err != nil {
 		// 调用失败，记录使用量并返回错误
-		appendUsage(trace, usageTrace)
+		appendUsage(ctx, usageTrace)
 		return "", err
 	}
 
@@ -98,13 +98,13 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 	usageTrace = o.buildUsageTrace(stage, response, startTime, "COMPLETED", systemPrompt, userPrompt, responseText)
 
 	// 将使用量记录添加到追踪
-	appendUsage(trace, usageTrace)
+	appendUsage(ctx, usageTrace)
 
 	return responseText, nil
 }
 
 // StreamWithTrace 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, trace *vo.ConversationTrace, opts ...model.Option) (<-chan string, error) {
+func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (<-chan string, error) {
 	startTime := time.Now()
 	var outputBuilder strings.Builder
 	resultChan := make(chan string, 100)
@@ -119,7 +119,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 	if err != nil {
 		// 连接建立失败，记录使用量并返回错误
 		usageTrace := o.buildUsageTrace(stage, nil, startTime, "FAILED", systemPrompt, userPrompt, "")
-		appendUsage(trace, usageTrace)
+		appendUsage(ctx, usageTrace)
 		return nil, err
 	}
 
@@ -143,7 +143,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 			// 处理接收过程中的错误
 			if err != nil {
 				usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-				appendUsage(trace, usageTrace)
+				appendUsage(ctx, usageTrace)
 				logx.Errorf("模型调用失败: %v", err)
 				return
 			}
@@ -159,8 +159,8 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 				case <-ctx.Done():
 					// 外部主动取消，记录终止日志和使用量
 					usageTrace := o.buildUsageTrace(stage, chunk, startTime, "FAILED", systemPrompt, userPrompt, outputBuilder.String())
-					appendUsage(trace, usageTrace)
-					logx.Alert("由外部终止调用...")
+					appendUsage(ctx, usageTrace)
+					logx.Warn("由外部终止调用...")
 					return
 				}
 			}
@@ -168,7 +168,7 @@ func (o *ChatModelImpl[M]) StreamWithTrace(ctx context.Context, stage, systemPro
 
 		// 流式处理结束，构建成功状态的使用量轨迹并记录
 		usageTrace := o.buildUsageTrace(stage, chunk, startTime, "COMPLETED", systemPrompt, userPrompt, outputBuilder.String())
-		appendUsage(trace, usageTrace)
+		appendUsage(ctx, usageTrace)
 	}()
 
 	return resultChan, nil
@@ -258,8 +258,19 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 	}
 }
 
+// estimateCost 估算调用成本
+func (o *ChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) float64 {
+	if promptTokens <= 0 && completionTokens <= 0 {
+		return 0
+	}
+	promptCost := float64(promptTokens) / 1000.0 * o.config.InputTokenCost1k
+	completionCost := float64(completionTokens) / 1000.0 * o.config.OutputTokenCost1k
+	return promptCost + completionCost
+}
+
 // appendUsage 添加使用量记录
-func appendUsage(trace *vo.ConversationTrace, usageTrace *vo.ChatModelUsageTrace) {
+func appendUsage(ctx context.Context, usageTrace *vo.ChatModelUsageTrace) {
+	trace := vo.TraceFromCtx(ctx)
 	if trace != nil && usageTrace != nil {
 		trace.AddModelUsageTrace(usageTrace)
 	}
@@ -309,14 +320,4 @@ func resolveProvider[M adk.MessageType](chatModel model.BaseModel[M]) string {
 		return provider
 	}
 	return "unknow"
-}
-
-// estimateCost 估算调用成本
-func (o *ChatModelImpl[M]) estimateCost(promptTokens, completionTokens int) float64 {
-	if promptTokens <= 0 && completionTokens <= 0 {
-		return 0
-	}
-	promptCost := float64(promptTokens) / 1000.0 * o.config.InputTokenCost1k
-	completionCost := float64(completionTokens) / 1000.0 * o.config.OutputTokenCost1k
-	return promptCost + completionCost
 }
