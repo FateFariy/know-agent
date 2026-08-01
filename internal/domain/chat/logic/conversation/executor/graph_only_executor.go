@@ -10,7 +10,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -20,18 +19,15 @@ import (
 // 当问题属于纯目录/章节导航类（如 "第 3 章有哪些小节"、"3.2 的上一节是什么"）时，
 // 仅通过结构图查询（父章节 / 兄弟章节 / 子章节），再由 AnswerRender 渲染一个纯文本的导航答复。
 type GraphOnlyExecutor struct {
-	structureQuerier logic.StructureGraphQuerier
-	answerRender     graph.AnswerRender
-	tracer           *trace.ConversationTraceRecorder
+	querier      logic.StructureGraphQuerier
+	answerRender graph.AnswerRender
 }
 
 // NewGraphOnlyExecutor 构造结构图直答执行器
-func NewGraphOnlyExecutor(structureQuerier logic.StructureGraphQuerier, answerRender graph.AnswerRender,
-	tracer *trace.ConversationTraceRecorder) *GraphOnlyExecutor {
+func NewGraphOnlyExecutor(querier logic.StructureGraphQuerier, answerRender graph.AnswerRender) *GraphOnlyExecutor {
 	return &GraphOnlyExecutor{
-		structureQuerier: structureQuerier,
-		answerRender:     answerRender,
-		tracer:           tracer,
+		querier:      querier,
+		answerRender: answerRender,
 	}
 }
 
@@ -60,8 +56,8 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 		return nil, err
 	}
 
-	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageGraphQuery,
-		e.Mode().String(), "正在执行结构图查询。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageGraphQuery,
+		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行结构图查询。"})
 
 	documentId := plan.SelectedDocumentId
 	sectionNodeId := decision.StructureAnchor.StructureNodeId
@@ -71,7 +67,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 
 	graphResult, err := e.buildGraphResult(ctx, documentId, sectionNodeId, decision)
 	if err != nil {
-		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
+		vo.OnError(ctx, "结构图查询失败。", err)
 		if err = publishThinking(convCtx, "结构图查询失败。"); err != nil {
 			return nil, err
 		}
@@ -91,7 +87,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 		"nextSibling":     sectionDisplayTitle(graphResult.NextSibling),
 		"answer":          strutil.Trim(answer),
 	}
-	_ = e.tracer.CompleteStage(ctx, graphStage, "结构图查询完成。", snapshot)
+	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "结构图查询完成。", Snapshot: snapshot})
 
 	return singleValueChan(utils.BlankToDefault(answer, noEvidenceReply)), nil
 }
@@ -103,7 +99,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, sectionNodeId int64,
 	decision *vo.DocumentNavigationDecision) (*ragvo.GraphQueryResult, error) {
 	if decision != nil && decision.NavigationAction == vo.DocumentNavigationActionSectionAdjacencyLookup {
-		siblings, err := e.structureQuerier.FindSectionWithSiblings(ctx, documentId, sectionNodeId)
+		siblings, err := e.querier.FindSectionWithSiblings(ctx, documentId, sectionNodeId)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +111,7 @@ func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, se
 		}, nil
 	}
 
-	children, err := e.structureQuerier.FindSectionWithChildren(ctx, documentId, sectionNodeId)
+	children, err := e.querier.FindSectionWithChildren(ctx, documentId, sectionNodeId)
 	if err != nil {
 		return nil, err
 	}

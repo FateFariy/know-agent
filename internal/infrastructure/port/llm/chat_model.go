@@ -1,4 +1,4 @@
-package logic
+package llm
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 // ChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
 type ChatModelImpl[M adk.MessageType] struct {
 	chatModel      model.BaseModel[M]
+	provider       string
 	config         *config.LLMConf
 	defaultOptions *options
 }
@@ -41,9 +42,11 @@ func WithCallback(callback func()) model.Option {
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
 func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.AgenticMessage] {
-	conf := svcCtx.Config.ChatModel[resolveProvider(svcCtx.ChatModel)]
+	provider := resolveProvider(svcCtx.ChatModel)
+	conf := svcCtx.Config.ChatModel[provider]
 	return &ChatModelImpl[*schema.AgenticMessage]{
 		chatModel: svcCtx.ChatModel,
+		provider:  provider,
 		config:    conf,
 		defaultOptions: &options{
 			Options: &model.Options{
@@ -199,10 +202,9 @@ func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 
 // logStageCallOptions 记录阶段调用选项日志
 func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Option) {
-	provider := resolveProvider(o.chatModel)
 	modelName := utils.PointerOrDefault(o.defaultOptions.Model, "")
 	if len(opts) == 0 {
-		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, provider, modelName)
+		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, o.provider, modelName)
 		return
 	}
 	commonOpts := model.GetCommonOptions(o.defaultOptions.Options, opts...)
@@ -217,19 +219,11 @@ func (o *ChatModelImpl[M]) logStageCallOptions(stage string, opts ...model.Optio
 		topP = fmt.Sprintf("%.2f", *commonOpts.TopP)
 	}
 
-	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%s, topP=%s", stage, provider, modelName, temperature, topP)
-}
-
-// appendUsage 添加使用量记录
-func appendUsage(trace *vo.ConversationTrace, usageTrace *vo.ChatModelUsageTrace) {
-	if trace != nil && usageTrace != nil {
-		trace.AddModelUsageTrace(usageTrace)
-	}
+	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%s, topP=%s", stage, o.provider, modelName, temperature, topP)
 }
 
 // buildUsageTrace 构建使用量轨迹
 func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Time, status, systemPrompt, userPrompt, responseText string) *vo.ChatModelUsageTrace {
-	provider := resolveProvider(o.chatModel)
 	tokenUsage := resolveTokenUsage(resp)
 
 	var promptTokens, completionTokens, totalTokens int
@@ -253,7 +247,7 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 
 	return &vo.ChatModelUsageTrace{
 		StageName:        stage,
-		Provider:         provider,
+		Provider:         o.provider,
 		Model:            utils.PointerOrDefault(o.defaultOptions.Model, ""),
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
@@ -261,6 +255,13 @@ func (o *ChatModelImpl[M]) buildUsageTrace(stage string, resp any, start time.Ti
 		EstimatedCost:    estimatedCost,
 		DurationMs:       time.Since(start).Milliseconds(),
 		Status:           status,
+	}
+}
+
+// appendUsage 添加使用量记录
+func appendUsage(trace *vo.ConversationTrace, usageTrace *vo.ChatModelUsageTrace) {
+	if trace != nil && usageTrace != nil {
+		trace.AddModelUsageTrace(usageTrace)
 	}
 }
 

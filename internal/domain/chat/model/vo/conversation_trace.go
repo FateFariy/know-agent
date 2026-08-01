@@ -1,8 +1,6 @@
 package vo
 
 import (
-	"time"
-
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 )
 
@@ -12,13 +10,6 @@ type ConversationTrace struct {
 	exchangeId       int64
 	traceId          string
 	modelUsageTraces *list.CopyOnWriteList[*ChatModelUsageTrace]
-}
-
-type StageHandle struct {
-	StageId        int64                   // 阶段ID
-	ConversationId string                  // 对话ID
-	StartTime      time.Time               // 开始时间
-	StageCode      *ConversationTraceStage // 阶段代码
 }
 
 func NewConversationTrace(conversationId string, exchangeId int64, traceId string) *ConversationTrace {

@@ -3,10 +3,10 @@ package channel
 import (
 	"context"
 	"fmt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
 
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -14,13 +14,13 @@ import (
 
 // KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
-	retriever adapter.KeywordRetriever
+	retriever retriever.KeywordRetriever
 }
 
 var _ rag.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever adapter.KeywordRetriever) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever retriever.KeywordRetriever) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
 		retriever: retriever,
 	}

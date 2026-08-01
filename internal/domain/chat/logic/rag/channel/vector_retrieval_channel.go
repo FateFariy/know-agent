@@ -3,10 +3,10 @@ package channel
 import (
 	"context"
 	"fmt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
 
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -14,13 +14,13 @@ import (
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	retriever adapter.VectorRetriever
+	retriever retriever.VectorRetriever
 }
 
 var _ rag.RetrievalChannel = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
-func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, retriever adapter.VectorRetriever) *VectorRetrievalChannel {
+func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, retriever retriever.VectorRetriever) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
 		retriever: retriever,
 	}

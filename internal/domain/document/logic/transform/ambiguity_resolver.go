@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/stream"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -16,7 +16,7 @@ import (
 )
 
 type AmbiguityResolver struct {
-	chatModel      *chatlogic.ChatModelImpl[*schema.AgenticMessage]
+	model          model.ChatModel
 	promptTemplate chatlogic.PromptTemplateLogic
 	*ambiguityOption
 }
@@ -59,9 +59,9 @@ func WithContextWindowLines(lines int) TransformerOption {
 	})
 }
 
-func NewAmbiguityResolver(svcCtx *svc.ServiceContext, chatModel *chatlogic.ChatModelImpl[*schema.AgenticMessage], promptTemplate chatlogic.PromptTemplateLogic) *AmbiguityResolver {
+func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate chatlogic.PromptTemplateLogic) *AmbiguityResolver {
 	return &AmbiguityResolver{
-		chatModel:      chatModel,
+		model:          model,
 		promptTemplate: promptTemplate,
 		ambiguityOption: &ambiguityOption{
 			confidenceFloor:            svcCtx.Config.StructureParsing.AmbiguityConfidenceFloor,
@@ -124,7 +124,7 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 	}
 
 	// 调用 LLM 获取结构化判定结果
-	content, err := r.chatModel.Generate(ctx, "", userPrompt)
+	content, err := r.model.Generate(ctx, "", userPrompt)
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -22,21 +21,15 @@ import (
 // 适用场景：用户明确指向某个章节或编号项（如"第 3 节第 2 项讲的是什么"），
 // 先由结构图定位目标节点，再由 AnswerRender 把节点文本/编号项渲染成最终答复。
 type GraphThenEvidenceExecutor struct {
-	structureQuerier logic.StructureGraphQuerier
-	answerRender     graph.AnswerRender
-	tracer           *trace.ConversationTraceRecorder
+	querier      logic.StructureGraphQuerier
+	answerRender graph.AnswerRender
 }
 
 // NewGraphThenEvidenceExecutor 构造"结构图定位后取证"执行器
-func NewGraphThenEvidenceExecutor(
-	structureQuerier logic.StructureGraphQuerier,
-	answerRender graph.AnswerRender,
-	tracer *trace.ConversationTraceRecorder,
-) *GraphThenEvidenceExecutor {
+func NewGraphThenEvidenceExecutor(querier logic.StructureGraphQuerier, answerRender graph.AnswerRender) *GraphThenEvidenceExecutor {
 	return &GraphThenEvidenceExecutor{
-		structureQuerier: structureQuerier,
-		answerRender:     answerRender,
-		tracer:           tracer,
+		querier:      querier,
+		answerRender: answerRender,
 	}
 }
 
@@ -66,8 +59,8 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		return nil, err
 	}
 
-	graphStage, _ := e.tracer.StartStage(ctx, convCtx.Trace,
-		vo.ConversationTraceStageGraphQuery, e.Mode().String(), "正在执行结构图定位与取证。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageGraphQuery,
+		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行结构图定位与取证。"})
 
 	documentId := plan.SelectedDocumentId
 	sectionNodeId := decision.StructureAnchor.StructureNodeId
@@ -81,10 +74,10 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	logx.Infof("GRAPH_THEN_EVIDENCE 执行开始: documentId=%v, sectionNodeId=%v, itemIndex=%v，navigationSummary=%v",
 		documentId, sectionNodeId, itemIndex, decision.SummaryText)
 
-	graphResult, err := e.structureQuerier.BuildGraphResult(ctx, documentId, sectionNodeId, itemIndex, itemKeywordHint)
+	graphResult, err := e.querier.BuildGraphResult(ctx, documentId, sectionNodeId, itemIndex, itemKeywordHint)
 	if err != nil {
-		_ = e.tracer.FailStage(ctx, graphStage, "结构图查询失败。", err, nil)
-		if err := publishThinking(convCtx, "结构图查询失败。"); err != nil {
+		vo.OnError(ctx, "结构图查询失败。", err)
+		if err = publishThinking(convCtx, "结构图查询失败。"); err != nil {
 			return nil, err
 		}
 		return singleValueChan(noEvidenceReply), nil
@@ -96,7 +89,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 			"targetItemIndex": targetItemIndexOf(graphResult),
 			"notes":           []string{"结构图未定位到满足条件的章节或编号项。"},
 		}
-		_ = e.tracer.CompleteStage(ctx, graphStage, "结构图定位完成，但证据不满足约束。", snapshot)
+		_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "结构图定位完成，但证据不满足约束。", Snapshot: snapshot})
 		logx.Infof("GRAPH_THEN_EVIDENCE 证据校验失败: documentId=%v, sectionNodeId=%v", documentId, sectionNodeId)
 		return singleValueChan(noEvidenceReply), nil
 	}
@@ -109,7 +102,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		"matchedItemCount": matchedItemCountOf(graphResult),
 		"answer":           strutil.Trim(answer),
 	}
-	_ = e.tracer.CompleteStage(ctx, graphStage, "结构图取证完成。", snapshot)
+	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "结构图取证完成。", Snapshot: snapshot})
 
 	logx.Infof("GRAPH_THEN_EVIDENCE 执行完成: documentId=%v, sectionNodeId=%v, targetSection=%q, targetItemIndex=%v, answerLength=%v",
 		documentId, sectionNodeId, displayTitleOf(graphResult), targetItemIndexOf(graphResult), len(answer))

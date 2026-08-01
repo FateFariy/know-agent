@@ -2,8 +2,8 @@ package llm
 
 import (
 	"context"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 
-	"github.com/cloudwego/eino/components/model"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -15,12 +15,6 @@ const (
 	documentLlmSplit = "document-llm-split" // 提示词模板名称
 )
 
-// ChatModel 大模型服务的最小接口
-type ChatModel interface {
-	// Generate 同步调用大模型
-	Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error)
-}
-
 // PromptRenderer 负责将 sourceText 渲染为大模型提示词
 type PromptRenderer interface {
 	// Render 渲染提示词
@@ -29,7 +23,7 @@ type PromptRenderer interface {
 
 // Strategy 大模型智能分块策略
 type Strategy struct {
-	model    ChatModel
+	model    model.ChatModel
 	renderer PromptRenderer
 	opt      *options
 }
@@ -49,7 +43,7 @@ func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
 }
 
 // NewStrategy 创建大模型智能分块策略
-func NewStrategy(model ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Strategy {
+func NewStrategy(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Strategy {
 	return &Strategy{
 		opt: chunk.GetChunkImplSpecificOptions(&options{
 			llmSplitPrompt: documentLlmSplit,

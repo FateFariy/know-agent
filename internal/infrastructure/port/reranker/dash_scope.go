@@ -13,7 +13,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpc"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -51,16 +51,16 @@ type rerankUsage struct {
 type DashScope struct {
 	URL    string
 	ApiKey string
-	*adapter.RerankOption
+	*reranker.Options
 }
 
-var _ adapter.Reranker = (*DashScope)(nil)
+var _ reranker.Reranker = (*DashScope)(nil)
 
 func NewDashScope(svcCtx *svc.ServiceContext) *DashScope {
 	return &DashScope{
 		URL:    svcCtx.Config.Chat.Rag.Rerank.URL,
 		ApiKey: svcCtx.Config.Chat.Rag.Rerank.ApiKey,
-		RerankOption: &adapter.RerankOption{
+		Options: &reranker.Options{
 			Model: svcCtx.Config.Chat.Rag.Rerank.Model,
 			TopN:  svcCtx.Config.Chat.Rag.Rerank.TopN,
 		},
@@ -68,9 +68,9 @@ func NewDashScope(svcCtx *svc.ServiceContext) *DashScope {
 }
 
 // Process 调用 DashScope Rerank API 对传入的文档块进行重排序
-func (d *DashScope) Process(ctx context.Context, question string, chunks []*vo.DocumentChunk, opts ...adapter.Option) ([]*vo.DocumentChunk, error) {
+func (d *DashScope) Process(ctx context.Context, question string, chunks []*vo.DocumentChunk, opts ...reranker.Option) ([]*vo.DocumentChunk, error) {
 	// 合并外部选项
-	d.RerankOption = adapter.GetCommonOptions(d.RerankOption, opts...)
+	d.Options = reranker.GetOptions(d.Options, opts...)
 
 	// 调用 DashScope Rerank HTTP API
 	start := time.Now()

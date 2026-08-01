@@ -8,19 +8,16 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ClarificationExecutor 路由歧义澄清执行器
 // 当路由阶段判定候选文档存在歧义时，直接返回澄清话术并记录澄清原因
-type ClarificationExecutor struct {
-	tracer *trace.ConversationTraceRecorder
-}
+type ClarificationExecutor struct{}
 
 // NewClarificationExecutor 构造澄清执行器
-func NewClarificationExecutor(tracer *trace.ConversationTraceRecorder) *ClarificationExecutor {
-	return &ClarificationExecutor{tracer: tracer}
+func NewClarificationExecutor() *ClarificationExecutor {
+	return &ClarificationExecutor{}
 }
 
 var _ conversation.Executor = (*ClarificationExecutor)(nil)
@@ -46,10 +43,7 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 	}
 
 	// 启动澄清路由追踪阶段（以 Mode 名称标识执行路径）
-	routeStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, e.Mode().Name(), "当前候选存在歧义，先返回澄清问题。", nil)
-	if err != nil {
-		return nil, err
-	}
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, e.Mode().Name(), &vo.StageInput{SummaryText: "当前候选存在歧义，先返回澄清问题。"})
 
 	// 从执行计划中取出澄清文本、原因与候选项；原因写入调试轨迹以便离线分析
 	reply := utils.BlankToDefault(plan.ClarificationReply, "当前我无法稳定判断你想问哪份知识文档，请补充更具体的文档名、主题或关键词。")
@@ -63,11 +57,11 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 	}
 
 	// 向客户端流发布思考事件；原因非空时再追加一条状态事件
-	if err = publishThinking(convCtx, "当前问题涉及多份候选文档，先向你确认知识范围。"); err != nil {
+	if err := publishThinking(convCtx, "当前问题涉及多份候选文档，先向你确认知识范围。"); err != nil {
 		return nil, err
 	}
 	if strutil.IsNotBlank(reason) {
-		if err = publishStatus(convCtx, reason); err != nil {
+		if err := publishStatus(convCtx, reason); err != nil {
 			return nil, err
 		}
 	}
@@ -78,8 +72,6 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 		"clarificationReason":  reason,
 		"clarificationOptions": options,
 	}
-	if err = e.tracer.CompleteStage(ctx, routeStage, "已返回澄清问题。", snapshot); err != nil {
-		return nil, err
-	}
+	vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "已返回澄清问题。", Snapshot: snapshot})
 	return singleValueChan(reply), nil
 }

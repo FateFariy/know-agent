@@ -3,16 +3,15 @@ package recommend
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -28,11 +27,11 @@ const (
 type RecommendationLogicImpl struct {
 	properties     config.RecommendationConf
 	promptTemplate logic.PromptTemplateLogic
-	chatModel      *logic.ChatModelImpl[*schema.AgenticMessage]
+	chatModel      model.ChatModel
 }
 
 // NewRecommendationLogicImpl 创建推荐追问逻辑实例
-func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic.PromptTemplateLogic, chatModel *logic.ChatModelImpl[*schema.AgenticMessage]) *RecommendationLogicImpl {
+func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic.PromptTemplateLogic, chatModel model.ChatModel) *RecommendationLogicImpl {
 	return &RecommendationLogicImpl{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,
@@ -69,11 +68,11 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 	select {
 	case result = <-resultChan:
 	case err := <-errChan:
-		Warnf("生成推荐问题失败: %v", err)
+		logx.Warnf("生成推荐问题失败: %v", err)
 	case <-timeoutCtx.Done():
-		Warnf("生成推荐问题超时: %v", r.properties.Timeout)
+		logx.Warnf("生成推荐问题超时: %v", r.properties.Timeout)
 	case <-ctx.Done():
-		Warnf("生成推荐问题被取消: %v", ctx.Err())
+		logx.Warnf("生成推荐问题被取消: %v", ctx.Err())
 	}
 	return result
 }
@@ -102,7 +101,7 @@ func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, q
 	// 解析JSON数组
 	var result []string
 	if err = utils.Unmarshal(content, &result); err != nil {
-		Warnf("解析推荐问题失败: content=%s, err=%v", content, err)
+		logx.Warnf("解析推荐问题失败: content=%s, err=%v", content, err)
 		return nil, err
 	}
 
@@ -137,8 +136,4 @@ func (r *RecommendationLogicImpl) buildRecentContext(recentExchanges []*entity.C
 	}
 
 	return strutil.Trim(sb.String())
-}
-
-func Warnf(format string, v ...any) {
-	logx.Alert(fmt.Sprintf(format, v...))
 }

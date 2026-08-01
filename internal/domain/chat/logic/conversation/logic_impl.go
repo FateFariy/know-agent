@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
@@ -37,15 +40,14 @@ type LogicImpl struct {
 	repo              adapter.ChatRepository
 	orchestratorLogic logic.ChatPreparationOrchestratorLogic
 	promptTempLogic   logic.PromptTemplateLogic
-	tracer            *trace.ConversationTraceRecorder
 	eventBuilder      *support.StreamEventBuilder
 	runtimeRegistry   *support.ChatRuntimeRegistry
 	executorRegistry  *ExecutorRegistry
 	lifecycleLogic    doclog.LifecycleLogic
 	recommendLogic    logic.RecommendationLogic
 	memoryLogic       logic.SessionMemoryLogic
-	distributedLock   adapter.DistributedLock
-	checkPointStore   adapter.CheckPointStore
+	distributedLock   lock.DistributedLock
+	checkPointStore   checkpoint.Store
 	*options
 }
 
@@ -60,15 +62,15 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 	promptTempLogic logic.PromptTemplateLogic,
 	recommendLogic logic.RecommendationLogic,
 	memoryLogic logic.SessionMemoryLogic,
-	distributedLock adapter.DistributedLock,
-	checkPointStore adapter.CheckPointStore,
+	distributedLock lock.DistributedLock,
+	checkPointStore checkpoint.Store,
+	tracer *trace.ConversationTraceHandler,
 ) *LogicImpl {
 	return &LogicImpl{
 		repo:              repo,
 		executorRegistry:  executorRegistry,
 		orchestratorLogic: orchestratorLogic,
 		promptTempLogic:   promptTempLogic,
-		tracer:            trace.NewConversationTraceRecorder(repo),
 		eventBuilder:      &support.StreamEventBuilder{},
 		runtimeRegistry:   &support.ChatRuntimeRegistry{},
 		lifecycleLogic:    lifecycleLogic,
@@ -305,6 +307,9 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 	convCtx := c.buildConversationCtx(plan, exchange)
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	convCtx.CancelFunc = cancelFunc
+
+	// 将 ConversationTrace 存入上下文，供下游 callbacks.Handler 使用
+	cancelCtx = vo.WithTrace(cancelCtx, convCtx.Trace)
 
 	// 注册对话上下文到运行注册表；注册失败意味着会话正被其他执行接管
 	if !c.runtimeRegistry.Register(convCtx) {
@@ -545,8 +550,8 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	//         log.debug("中断 ReactAgent 时出现异常，继续释放资源", exception);
 	//     }
 	responseMessage := "已停止会话生成"
-	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), "正在收尾停止中的会话。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
 
 	// 发送 status 事件
 	statusEvent := c.eventBuilder.Status("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
@@ -566,10 +571,10 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 			"reason":       reason,
 			"answerLength": convCtx.AnswerLength(),
 		}
-		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按停止状态收尾", metadata)
+		_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话已按停止状态收尾", Snapshot: metadata})
 	} else {
 		responseMessage = "会话已停止，收尾落库失败"
-		_ = c.tracer.FailStage(ctx, finalizeStage, "会话已按停止状态收尾", err, nil)
+		_ = vo.OnError(ctx, "会话已按停止状态收尾", err)
 	}
 
 	return &vo.ConversationStop{
@@ -610,12 +615,9 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	answer := convCtx.Answer()
 	uniqueReferences := convCtx.UniqueReferences()
 
-	// 启动 finalize 与 recommendation 两个追踪阶段（忽略 tracer 错误）
-	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), "正在收尾已完成会话。", nil)
-
-	recommendationsStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRecommendation,
-		convCtx.ExecutionModeName(), "正在生成推荐追问。", nil)
+	// 启动 recommendation 阶段
+	recommendCtx := vo.OnStart(ctx, vo.ConversationTraceStageRecommendation,
+		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在生成推荐追问。"})
 
 	// 生成推荐追问
 	// - 若本次交互是澄清（NeedClarification 为真），则直接使用澄清选项作为推荐
@@ -630,7 +632,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 
 	// 完成 recommendation 追踪阶段，并写入推荐数量快照
 	snapshot := map[string]any{"recommendationCount": len(recommendations), "recommendations": recommendations}
-	_ = c.tracer.CompleteStage(ctx, recommendationsStage, "推荐追问生成完成。", snapshot)
+	_ = vo.OnEnd(recommendCtx, &vo.StageOutput{SummaryText: "推荐追问生成完成。", Snapshot: snapshot})
 
 	// 向客户端流补发引用事件，最后发送流 Complete 信号
 	if len(recommendations) > 0 {
@@ -639,6 +641,10 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 			Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
 	}
+
+	// 启动 finalize 与 recommendation 两个追踪阶段
+	finalizeCtx := vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
 
 	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
@@ -655,9 +661,9 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 			"referenceCount":      len(uniqueReferences),
 			"answerLength":        len(answer),
 		}
-		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按完成状态收尾。", snapshot)
+		_ = vo.OnEnd(finalizeCtx, &vo.StageOutput{SummaryText: "会话已按完成状态收尾。", Snapshot: snapshot})
 	} else {
-		_ = c.tracer.FailStage(ctx, finalizeStage, "会话收尾落库失败", err, nil)
+		_ = vo.OnError(finalizeCtx, "会话收尾落库失败", err)
 	}
 }
 
@@ -687,10 +693,10 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 		c.cleanup(convCtx)
 	}()
 
-	// 启动 finalize 追踪阶段（失败时忽略 tracer 错误，不影响主流程）
+	// 启动 finalize 追踪阶段（失败时忽略错误，不影响主流程）
 	errorMessage := err.Error()
-	finalizeStage, _ := c.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), "正在收尾失败会话。", nil)
+	finalizeCtx := vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾失败会话。"})
 
 	// 向失败事件 + 流 Complete 信号；发送失败仅告警
 	errorEvent := c.eventBuilder.Error(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)
@@ -710,9 +716,9 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 			"errorMessage": errorMessage,
 			"answerLength": convCtx.AnswerLength(),
 		}
-		_ = c.tracer.CompleteStage(ctx, finalizeStage, "会话已按失败状态收尾。", snapshot)
+		_ = vo.OnEnd(finalizeCtx, &vo.StageOutput{SummaryText: "会话已按失败状态收尾。", Snapshot: snapshot})
 	} else {
-		_ = c.tracer.FailStage(ctx, finalizeStage, "失败态收尾失败。", err, nil)
+		_ = vo.OnError(finalizeCtx, "失败态收尾失败。", err)
 	}
 }
 

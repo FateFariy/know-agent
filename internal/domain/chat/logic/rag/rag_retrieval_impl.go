@@ -13,10 +13,11 @@ import (
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
@@ -29,7 +30,7 @@ const rrfK = 60
 
 type RetrievalImpl struct {
 	repo                      adapter.ChatRepository
-	reranker                  adapter.Reranker
+	reranker                  reranker.Reranker
 	channels                  []RetrievalChannel
 	documentLogic             doclog.LifecycleLogic
 	channelTimeout            time.Duration
@@ -45,7 +46,7 @@ type RetrievalImpl struct {
 	keywordTopK               int
 }
 
-func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker adapter.Reranker,
+func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker reranker.Reranker,
 	channels []RetrievalChannel, documentLogic doclog.LifecycleLogic) *RetrievalImpl {
 	return &RetrievalImpl{
 		repo:                      repo,
@@ -102,7 +103,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			start := time.Now()
 			channelResults, err := e.retrieveChannelParallel(timeoutCtx, ragCtx, subQuestionIndex, subQuestion, plan)
 			if err != nil {
-				Warnf("子问题检索失败: subQuestionIndex=%d, subQuestion='%v", subQuestionIndex, err)
+				logx.Warnf("子问题检索失败: subQuestionIndex=%d, subQuestion='%v", subQuestionIndex, err)
 				ragCtx.AddRetrievalNotef("子问题%d检索失败或超时，已自动忽略。", subQuestionIndex)
 				resultChan <- &vo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
 				return
@@ -131,7 +132,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			fusedDocs := e.fuseByRRF(filteredResults)
 			parentSearchDocs, err := e.elevateToParentBlocks(timeoutCtx, fusedDocs, e.parentEvidenceMaxChars)
 			if err != nil {
-				Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+				logx.Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				return
 			}
 
@@ -146,10 +147,10 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			// 记录观测数据
 			if trace != nil {
 				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, start, rawChannelResults, filteredResults, channelTraces); err != nil {
-					Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+					logx.Warnf("记录通道观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 				if err = e.recordRetrievalResultObservations(ctx, trace, subQuestionIndex, subQuestion, rawChannelResults, filteredResults, fusedDocs, rerankedDocs, finalDocs); err != nil {
-					Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
+					logx.Warnf("记录检索结果观测数据失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				}
 			}
 
@@ -213,7 +214,7 @@ func (e *RetrievalImpl) retrieveChannelParallel(ctx context.Context, ragCtx *vo.
 			result, err := e.retrieveChannel(timeoutCtx, ch, documentRetrieve)
 			if err != nil {
 				// 失败/超时：仅告警并写入 RAG 上下文提示，返回空结果（自动降级）
-				Warnf("检索通道失败: subQuestionIndex=%d, subQuestion='%s', channel='%s', error=%v",
+				logx.Warnf("检索通道失败: subQuestionIndex=%d, subQuestion='%s', channel='%s', error=%v",
 					subQuestionIndex, subQuestion, ch.ChannelName(), err)
 				ragCtx.AddRetrievalNotef("子问题%d通道[%s]检索失败或超时，已自动降级。", subQuestionIndex, ch.ChannelName())
 				result = &vo.RetrievalChannelResult{ChannelName: ch.ChannelName(), Documents: nil}
@@ -461,7 +462,7 @@ func (e *RetrievalImpl) applyRerank(ctx context.Context, ragCtx *vo.RagRetrieval
 	ragCtx.AddUsedChannel(vo.RetrievalChannelRerank)
 	result, err := e.reranker.Process(ctx, subQuestion, candidates)
 	if err != nil {
-		Warnf("重排序处理失败: subQuestion='%s', error=%v", subQuestion, err)
+		logx.Warnf("重排序处理失败: subQuestion='%s', error=%v", subQuestion, err)
 		return candidates
 	}
 	return result
@@ -743,8 +744,4 @@ func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *den.DocumentParent
 	}
 
 	return utils.ClipHead(composed, max(maxChars, 1))
-}
-
-func Warnf(format string, args ...interface{}) {
-	logx.Alert(fmt.Sprintf(format, args...))
 }

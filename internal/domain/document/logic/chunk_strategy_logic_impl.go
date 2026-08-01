@@ -6,14 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
@@ -54,7 +54,7 @@ type strategyOption struct {
 	recommendLlmWhenLowQuality  bool
 }
 
-func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel *chatlogic.ChatModelImpl[*schema.AgenticMessage],
+func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
 	promptTemplate chatlogic.PromptTemplateLogic, structureNode StructureNodeLogic) *ChunkStrategyLogicImpl {
 
 	registry := make(map[int]chunk.Strategy)
@@ -680,7 +680,7 @@ func (s *ChunkStrategyLogicImpl) applyLlmChunking(ctx context.Context, input *ch
 		if strutil.IsNotBlank(item.Text) {
 			outputs, err = s.registry[vo.StrategyTypeLLM].Chunk(ctx, item)
 			if err != nil {
-				Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
+				logx.Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
 			}
 			if len(outputs) == 0 {
 				outputs, _ = s.registry[vo.StrategyTypeSemantic].Chunk(ctx, item, extraOpts...)
@@ -702,9 +702,4 @@ func (s *ChunkStrategyLogicImpl) newChunkCandidate(node *entity.DocumentStructur
 		Text:              node.ContentText,
 		SourceType:        sourceType,
 	}
-}
-
-func Warnf(format string, args ...any) {
-	logx.Alert(fmt.Sprintf(format, args...))
-
 }

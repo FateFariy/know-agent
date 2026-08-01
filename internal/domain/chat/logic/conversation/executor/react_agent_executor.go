@@ -45,13 +45,13 @@ package executor
 //
 // 	publishThinking(convCtx, "问题涉及多方面信息，交由 ReAct Agent 综合回答。")
 //
-// 	agentStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
+// 	agentStage, err := e.tracer.OnStart(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
 // 		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
 //
 // 	streamCh, err := e.reactAgent.Stream(ctx, plan.OriginalQuestion)
 // 	if err != nil {
 // 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
-// 		e.tracer.FailStage(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
+// 		e.tracer.OnErr(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
 // 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
 // 		return nil, err
 // 	}
@@ -60,6 +60,6 @@ package executor
 // 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
 // 		"answerLength":        convCtx.AnswerLength(),
 // 	}
-// 	_ = e.tracer.CompleteStage(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
+// 	_ = e.tracer.OnEnd(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
 // 	return streamCh, nil
 // }

@@ -2,18 +2,16 @@ package rewrite
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -27,14 +25,14 @@ var (
 
 // QueryRewriteLogicImpl 问题改写逻辑实现
 type QueryRewriteLogicImpl struct {
-	chatModel       *logic.ChatModelImpl[*schema.AgenticMessage]
+	chatModel       model.ChatModel
 	promptTemplate  logic.PromptTemplateLogic
 	maxSubQuestions int
 	options         []model.Option
 }
 
 // NewQueryRewriteLogicImpl 创建问题改写逻辑实例
-func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
+func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
 	promptTemplate logic.PromptTemplateLogic) *QueryRewriteLogicImpl {
 	return &QueryRewriteLogicImpl{
 		chatModel:       chatModel,
@@ -75,14 +73,14 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 	// 渲染提示词
 	promptText, err := q.promptTemplate.Render(prompt.ChatQueryRewrite, templateVars)
 	if err != nil {
-		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
+		logx.Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil
 	}
 
 	// 调用LLM生成改写结果
 	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, trace, q.options...)
 	if err != nil {
-		Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
+		logx.Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil
 	}
 
@@ -218,10 +216,6 @@ func (q *QueryRewriteLogicImpl) ruleBasedSplit(question string) []string {
 	}
 
 	return result
-}
-
-func Warnf(format string, args ...any) {
-	logx.Alert(fmt.Sprintf(format, args...))
 }
 
 type parsedRewritePayload struct {

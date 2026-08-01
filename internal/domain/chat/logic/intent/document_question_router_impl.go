@@ -2,12 +2,11 @@ package intent
 
 import (
 	"context"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
@@ -107,10 +106,10 @@ type questionIntentDecision struct {
 
 // DocumentQuestionRouterImpl 在某个文档内部进行意图判断与章节定位，最终输出导航决策
 type DocumentQuestionRouterImpl struct {
-	chatModel             *logic.ChatModelImpl[*schema.AgenticMessage] // 可选：兜底意图分类用的对话模型
-	structureGraphQuerier logic.StructureGraphQuerier                  // 结构图谱查询能力
-	navigationIndexSvc    NavigationIndexService                       // 可选：章节索引服务；非 nil 时用于章节定位
-	promptTemplateLogic   logic.PromptTemplateLogic                    // 可选：LLM 用的 Prompt 模板渲染
+	chatModel             model.ChatModel             // 可选：兜底意图分类用的对话模型
+	structureGraphQuerier logic.StructureGraphQuerier // 结构图谱查询能力
+	navigationIndexSvc    NavigationIndexService      // 可选：章节索引服务；非 nil 时用于章节定位
+	promptTemplateLogic   logic.PromptTemplateLogic   // 可选：LLM 用的 Prompt 模板渲染
 }
 
 // NavigationIndexService 可选的章节索引服务接口（与结构图谱并列定位章节）
@@ -126,7 +125,7 @@ type NavigationSectionHit struct {
 }
 
 // NewDocumentQuestionRouterImpl 构造文档问题路由器
-func NewDocumentQuestionRouterImpl(chatModel *logic.ChatModelImpl[*schema.AgenticMessage], structureGraphQuerier logic.StructureGraphQuerier,
+func NewDocumentQuestionRouterImpl(chatModel model.ChatModel, structureGraphQuerier logic.StructureGraphQuerier,
 	navigationIndexSvc NavigationIndexService, promptTemplateLogic logic.PromptTemplateLogic) *DocumentQuestionRouterImpl {
 	return &DocumentQuestionRouterImpl{
 		chatModel:             chatModel,

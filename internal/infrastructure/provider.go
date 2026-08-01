@@ -1,7 +1,17 @@
 package infrastructure
 
 import (
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/wire"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
+	lock2 "github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	reranker2 "github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
 
 	chatadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
@@ -28,12 +38,27 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(documentadapter.MessageProducer), new(*mq.RocketMQMessageProducer)),
 	keyword.NewMilvusKeyword,
 	wire.Bind(new(documentadapter.KeywordIndexer), new(*keyword.MilvusKeyword)),
-	wire.Bind(new(chatadapter.KeywordRetriever), new(*keyword.MilvusKeyword)),
+	wire.Bind(new(retriever.KeywordRetriever), new(*keyword.MilvusKeyword)),
 	vector.NewMilvusVector,
 	wire.Bind(new(documentadapter.VectorIndexer), new(*vector.MilvusVector)),
-	wire.Bind(new(chatadapter.VectorRetriever), new(*vector.MilvusVector)),
+	wire.Bind(new(retriever.VectorRetriever), new(*vector.MilvusVector)),
 	lock.NewRedisMutexLock,
-	wire.Bind(new(chatadapter.DistributedLock), new(*lock.RedisMutexLock)),
+	wire.Bind(new(lock2.DistributedLock), new(*lock.RedisMutexLock)),
 	reranker.NewDashScope,
-	wire.Bind(new(chatadapter.Reranker), new(*reranker.DashScope)),
+	wire.Bind(new(reranker2.Reranker), new(*reranker.DashScope)),
+	llm.NewChatModelImpl,
+	wire.Bind(new(model.ChatModel), new(*llm.ChatModelImpl[*schema.AgenticMessage])),
+	check.NewMemoryCheckPointStore,
+	wire.Bind(new(checkpoint.Store), new(*check.MemoryCheckPointStore)),
+	NewParserRegistry,
 )
+
+func NewParserRegistry() *parse.Registry {
+	fallbackParser := &parser.TextParser{}
+	parsers := []parse.Parser{
+		&parser.HTMLParser{},
+		&parser.TextParser{},
+		&parser.PDFParser{},
+	}
+	return parse.NewRegistry(fallbackParser, parsers...)
+}

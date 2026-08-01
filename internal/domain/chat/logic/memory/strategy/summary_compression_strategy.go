@@ -3,6 +3,8 @@ package strategy
 import (
 	"context"
 	"encoding/json"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 	"regexp"
 	"strings"
 	"sync"
@@ -39,7 +41,7 @@ var (
 type SummaryCompressionStrategy struct {
 	baseMemoryStrategy
 	repo                      adapter.ChatRepository
-	chatModel                 *logic.ChatModelImpl[*schema.AgenticMessage]
+	chatModel                 model.ChatModel
 	promptTemplate            logic.PromptTemplateLogic
 	refreshingConversationIds sync.Map
 	historySummary            config.HistorySummaryConf
@@ -48,13 +50,13 @@ type SummaryCompressionStrategy struct {
 }
 
 // NewSummaryCompressionStrategy 创建摘要压缩策略实例
-func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chanMode *logic.ChatModelImpl[*schema.AgenticMessage], promptTemplate logic.PromptTemplateLogic) *SummaryCompressionStrategy {
+func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate logic.PromptTemplateLogic) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
 		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,
 		questionHistoryMaxChars:  svcCtx.Config.Chat.Memory.QuestionHistoryMaxChars,
 		recentTranscriptMaxChars: svcCtx.Config.Chat.Memory.RecentTranscriptMaxChars,
-		chatModel:                chanMode,
+		chatModel:                chatModel,
 		promptTemplate:           promptTemplate,
 	}
 }

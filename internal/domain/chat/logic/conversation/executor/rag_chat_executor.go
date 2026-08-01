@@ -3,14 +3,14 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/trace"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -19,22 +19,19 @@ import (
 type RagChatExecutor struct {
 	retriever       logic.RagRetrieveLogic
 	promptAssembler conversation.RagPromptAssembler
-	chatModel       *logic.ChatModelImpl[*schema.AgenticMessage]
-	tracer          *trace.ConversationTraceRecorder
+	chatModel       model.ChatModel
 }
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
 	retriever logic.RagRetrieveLogic,
 	ragPromptAssembler conversation.RagPromptAssembler,
-	chatModel *logic.ChatModelImpl[*schema.AgenticMessage],
-	tracer *trace.ConversationTraceRecorder,
+	chatModel model.ChatModel,
 ) *RagChatExecutor {
 	return &RagChatExecutor{
 		retriever:       retriever,
 		promptAssembler: ragPromptAssembler,
 		chatModel:       chatModel,
-		tracer:          tracer,
 	}
 }
 
@@ -57,13 +54,13 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 		return nil, err
 	}
 
-	retrieveStage, _ := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRAGRetrieve,
-		e.Mode().String(), "正在执行双通道混合检索。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRAGRetrieve,
+		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行双通道混合检索。"})
 
 	retrievalCtx, err := e.retriever.Retrieve(ctx, plan, convCtx.Trace)
 	if err != nil {
 		logx.Errorf("RAG 检索失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
-		_ = e.tracer.FailStage(ctx, retrieveStage, "RAG 检索失败。", err, nil)
+		vo.OnError(ctx, "RAG 检索失败。", err)
 		return nil, err
 	}
 
@@ -102,7 +99,7 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 		"subQuestions":      subQuestions,
 		"references":        refDetails,
 	}
-	_ = e.tracer.CompleteStage(ctx, retrieveStage, "RAG 检索完成。", snapshot)
+	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "RAG 检索完成。", Snapshot: snapshot})
 
 	return e.streamFromRetrievalContext(ctx, convCtx, plan, retrievalCtx)
 }
@@ -146,12 +143,12 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	}
 
 	// Prompt 装配与预算
-	budgetStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageEvidenceBudget,
-		e.Mode().String(), "正在组装证据与 Prompt 预算。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageEvidenceBudget,
+		e.Mode().String(), &vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})
 	promptResult, err := e.promptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
 		logx.Errorf("Prompt 组装失败: conversationId=%s, err=%v", convCtx.ConversationId, err)
-		_ = e.tracer.FailStage(ctx, budgetStage, "证据预算与 Prompt 组装失败。", err, nil)
+		vo.OnError(ctx, "证据预算与 Prompt 组装失败。", err)
 		return nil, err
 	}
 
@@ -165,20 +162,20 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		"systemPrompt":             promptResult.SystemPrompt,
 		"userPrompt":               promptResult.UserPrompt,
 	}
-	_ = e.tracer.CompleteStage(ctx, budgetStage, "证据预算与 Prompt 组装完成。", snapshot)
+	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "证据预算与 Prompt 组装完成。", Snapshot: snapshot})
 
-	answerStage, err := e.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), "正在基于证据生成回答。", nil)
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
 
-	callbackOpt := logic.WithCallback(func() {
-		_ = e.tracer.CompleteStage(ctx, answerStage, "答案生成完成。", map[string]any{
+	callbackOpt := llm.WithCallback(func() {
+		vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "答案生成完成。", Snapshot: map[string]any{
 			"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
 			"answerLength":        convCtx.AnswerLength(),
-		})
+		}})
 	})
 	streamCh, err := e.chatModel.StreamWithTrace(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, convCtx.Trace, callbackOpt)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
-		_ = e.tracer.FailStage(ctx, answerStage, "答案生成失败。", err, nil)
+		vo.OnError(ctx, "答案生成失败。", err)
 		return nil, err
 	}
 

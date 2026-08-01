@@ -43,7 +43,6 @@ type PreparationOrchestratorImpl struct {
 	documentQuestionRouter logic.DocumentQuestionRouteLogic
 	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
 	lifecycleLogic         doclog.LifecycleLogic
-	tracer                 *trace.ConversationTraceRecorder
 	*option
 }
 
@@ -67,6 +66,7 @@ func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	documentQuestionRouter logic.DocumentQuestionRouteLogic,
 	knowledgeRoute kelog.KnowledgeRouteLogic,
 	lifecycleLogic doclog.LifecycleLogic,
+	tracer *trace.ConversationTraceHandler,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{
 		repo:                   repo,
@@ -75,7 +75,6 @@ func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 		documentQuestionRouter: documentQuestionRouter,
 		knowledgeRouteLogic:    knowledgeRoute,
 		lifecycleLogic:         lifecycleLogic,
-		tracer:                 trace.NewConversationTraceRecorder(repo),
 		option: &option{
 			ragEnabled:              svcCtx.Config.Chat.Rag.Enabled,
 			planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
@@ -213,20 +212,14 @@ func (o *PreparationOrchestratorImpl) prepareOpenChat(ctx context.Context, convC
 	execPlan.Mode = vo.ExecutionModeReactAgent
 
 	// 启动路由追踪阶段（此处以 Rewrite 阶段为名，记录判定结果与时间信号）
-	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), "路由到开放式 Agent。", nil)
-	if err != nil {
-		return err
-	}
-	// 写入快照：聊天模式、执行模式、时间信号关键字段
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
 	snapshot := map[string]any{
 		"chatMode":                     vo.ChatQueryModeName(convCtx.ChatMode),
 		"executionMode":                vo.ExecutionModeReactAgent.String(),
 		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
 		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
 	}
-	if err = o.tracer.CompleteStage(ctx, stage, "已判定走开放式 Agent 路径。", snapshot); err != nil {
-		return err
-	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "已判定走开放式 Agent 路径。", Snapshot: snapshot})
 
 	return nil
 }
@@ -271,10 +264,7 @@ func (o *PreparationOrchestratorImpl) prepareDocumentMode(ctx context.Context, c
 //   - 需要澄清：返回 Clarification 模式，由用户选择目标知识
 func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 启动路由阶段追踪（标识为 auto_document）
-	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, "auto_document", "正在生成知识范围候选。", nil)
-	if err != nil {
-		return err
-	}
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在生成知识范围候选。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
 	//  - 路由失败时仅告警，并以空决策对象兜底（避免后续代码 panic）
@@ -311,9 +301,7 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 		"topDocumentId":          topDocument.DocumentId,
 		"topDocumentName":        topDocument.DocumentName,
 	}
-	if err = o.tracer.CompleteStage(ctx, stage, "知识范围路由完成。", snapshot); err != nil {
-		return err
-	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "知识范围路由完成。", Snapshot: snapshot})
 
 	// 检查是否需要澄清（多个候选相近、路由歧义等）
 	//  - 需要澄清时直接返回 Clarification 模式执行计划（含回复文案、选项、理由）
@@ -349,19 +337,13 @@ func (o *PreparationOrchestratorImpl) prepareAutoDocumentMode(ctx context.Contex
 //  6. 打印关键编排结果并返回
 func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 启动文档内路由阶段追踪，并以 "混合检索" 为默认模式名
-	stage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), "正在判定图查询还是混合检索。", nil)
-	if err != nil {
-		return err
-	}
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
 	navigationDecision, err := o.documentQuestionRouter.Route(ctx, execPlan.SelectedDocumentId, convCtx.Question, rewriteResult)
 	if err != nil {
-		// 路由失败：先记录追踪失败，再向上层返回错误（FailStage 失败时直接返回）
-		if err = o.tracer.FailStage(ctx, stage, "执行路由失败。", err, nil); err != nil {
-			return err
-		}
+		ctx = vo.OnError(ctx, "执行路由失败。", err)
 		return err
 	}
 
@@ -374,9 +356,7 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 	if navigationDecision.ItemAnchor != nil {
 		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
 	}
-	if err = o.tracer.CompleteStage(ctx, stage, "执行路由完成。", snapshot); err != nil {
-		return err
-	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
 
 	// 从路由结果中选取检索问题与子问题列表
 	//  - RetrievalQuestion 优先取自路由计划，为空则回退到改写问题
@@ -410,18 +390,12 @@ func (o *PreparationOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, 
 //  4. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
 func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
 	// 启动记忆追踪阶段，使用 chatMode 作为执行模式名
-	memoryStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageMemory, vo.ChatQueryModeName(convCtx.ChatMode), "正在装载会话记忆与最近窗口。", nil)
-	if err != nil {
-		return nil, err
-	}
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageMemory, vo.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。", Snapshot: nil})
 
 	// 调用 memoryLogic 装载记忆上下文（含长期摘要、近期转录、压缩状态）
 	memoryContext, err := o.memoryLogic.LoadMemoryContext(ctx, convCtx.ConversationId, convCtx.Trace)
 	if err != nil {
-		// 失败：先记录追踪失败，再向上返回错误（FailStage 失败直接返回）
-		if err = o.tracer.FailStage(ctx, memoryStage, "会话记忆装载失败。", err, nil); err != nil {
-			return nil, err
-		}
+		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
 		return nil, err
 	}
 	// 写入快照（压缩状态、覆盖的 exchange 信息、长期/近期摘要）
@@ -435,9 +409,7 @@ func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, conv
 		"RecentQuestionTranscript": strutil.Trim(memoryContext.RecentQuestionTranscript),
 	}
 	// 提交记忆追踪阶段，成功后返回记忆上下文
-	if err = o.tracer.CompleteStage(ctx, memoryStage, "会话记忆装载完成。", snapshot); err != nil {
-		return nil, err
-	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: snapshot})
 	return memoryContext, nil
 }
 
@@ -450,23 +422,15 @@ func (o *PreparationOrchestratorImpl) summarizeHistory(ctx context.Context, conv
 //  4. 成功时提交追踪并对结果做空值兜底（改写失败则回退原始问题、单子问题列表）
 func (o *PreparationOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.QuestionRewriteResult, error) {
 	// 启动改写追踪阶段
-	rewriteStage, err := o.tracer.StartStage(ctx, convCtx.Trace, vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), "正在生成检索友好的问题表达。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil))
-	if err != nil {
-		return nil, err
-	}
+	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), &vo.StageInput{SummaryText: "正在生成检索友好的问题表达。", Snapshot: o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)})
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := o.rewriteLogic.Rewrite(ctx, convCtx.Question, historySummary, convCtx.Trace)
 	if err != nil {
-		// 失败：记录追踪失败并向上返回错误
-		if err = o.tracer.FailStage(ctx, rewriteStage, "问题改写失败。", err, o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)); err != nil {
-			return nil, err
-		}
+		ctx = vo.OnError(ctx, "问题改写失败。", err)
 		return nil, err
 	}
 	// 提交改写追踪（包含改写结果快照以便离线分析）
-	if err = o.tracer.CompleteStage(ctx, rewriteStage, "问题改写完成。", o.buildRewriteStageSnapshot(convCtx.Question, historySummary, rewriteResult)); err != nil {
-		return nil, err
-	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "问题改写完成。", Snapshot: o.buildRewriteStageSnapshot(convCtx.Question, historySummary, rewriteResult)})
 
 	// 对改写结果做兜底处理
 	//  - RewrittenQuestion 为空时回退到原始问题
