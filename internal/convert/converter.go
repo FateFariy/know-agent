@@ -2,6 +2,7 @@ package convert
 
 import (
 	"encoding/json"
+	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"strconv"
 	"strings"
 	"time"
@@ -20,7 +21,6 @@ import (
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
-	"github.com/swiftbit/know-agent/internal/infrastructure/model"
 )
 
 // goverter:converter
@@ -50,18 +50,18 @@ type DocumentConverter interface {
 	ToDocumentProfileResp(src *den.DocumentProfile) *document.DocumentProfileResp
 	ToDocumentProfileRespList(src []*den.DocumentProfile) []*document.DocumentProfileResp
 
-	ToDocumentModel(src *den.Document) *model.Document
-	ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
-	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
-	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
-	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan
-	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model.DocumentStrategyStep
-	ToDocumentStrategyStepModelList(src []*den.DocumentStrategyStep) []*model.DocumentStrategyStep
-	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model.DocumentStructureNode
-	ToDocumentChunkModel(src *den.DocumentChunk) *model.DocumentChunk
-	ToDocumentChunkModelList(src []*den.DocumentChunk) []*model.DocumentChunk
-	ToDocumentParentBlockModel(src *den.DocumentParentBlock) *model.DocumentParentBlock
-	ToDocumentParentBlockModelList(src []*den.DocumentParentBlock) []*model.DocumentParentBlock
+	ToDocumentModel(src *den.Document) *model2.Document
+	ToDocumentProfileModel(src *den.DocumentProfile) *model2.DocumentProfile
+	ToDocumentTaskModel(src *den.DocumentTask) *model2.DocumentTask
+	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model2.DocumentTaskLog
+	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model2.DocumentStrategyPlan
+	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model2.DocumentStrategyStep
+	ToDocumentStrategyStepModelList(src []*den.DocumentStrategyStep) []*model2.DocumentStrategyStep
+	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model2.DocumentStructureNode
+	ToDocumentChunkModel(src *den.DocumentChunk) *model2.DocumentChunk
+	ToDocumentChunkModelList(src []*den.DocumentChunk) []*model2.DocumentChunk
+	ToDocumentParentBlockModel(src *den.DocumentParentBlock) *model2.DocumentParentBlock
+	ToDocumentParentBlockModelList(src []*den.DocumentParentBlock) []*model2.DocumentParentBlock
 }
 
 // goverter:converter
@@ -88,12 +88,12 @@ type ChatConverter interface {
 	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp
 	ToChannelExecutionRespList(src []*cvo.ChatChannelExecution) []*chat.ChannelExecutionResp
 
-	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
-	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
-	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
-	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
-	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model.ChatRetrievalResult
-	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model.ChatChannelExecution
+	ToChatDialogueModel(src *cen.ChatDialogue) *model2.ChatDialogue
+	ToChatExchangeModel(src *cen.ChatExchange) *model2.ChatExchange
+	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model2.ChatExchangeTraceStage
+	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model2.ChatMemorySummary
+	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model2.ChatRetrievalResult
+	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model2.ChatChannelExecution
 }
 
 // goverter:converter
@@ -119,10 +119,10 @@ type KnowledgeConverter interface {
 	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
 	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
 
-	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode
-	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model.KnowledgeTopicNode
-	ToKnowledgeTopicDocumentRelationModel(src *klen.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation
-	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
+	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model2.KnowledgeScopeNode
+	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model2.KnowledgeTopicNode
+	ToKnowledgeTopicDocumentRelationModel(src *klen.KnowledgeTopicDocumentRelation) *model2.KnowledgeTopicDocumentRelation
+	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model2.KnowledgeRouteTrace
 }
 
 func TimeToString(t time.Time) string {

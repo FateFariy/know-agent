@@ -14,7 +14,7 @@ import (
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
-	model "github.com/swiftbit/know-agent/internal/infrastructure/model"
+	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"time"
 )
 
@@ -67,20 +67,20 @@ func ToChannelExecutionRespList(source []*vo.ChatChannelExecution) []*chat.Chann
 	}
 	return pChatChannelExecutionRespList
 }
-func ToChatChannelExecutionModelList(source []*vo.ChatChannelExecution) []*model.ChatChannelExecution {
-	var pModelChatChannelExecutionList []*model.ChatChannelExecution
+func ToChatChannelExecutionModelList(source []*vo.ChatChannelExecution) []*model2.ChatChannelExecution {
+	var pModelChatChannelExecutionList []*model2.ChatChannelExecution
 	if source != nil {
-		pModelChatChannelExecutionList = make([]*model.ChatChannelExecution, len(source))
+		pModelChatChannelExecutionList = make([]*model2.ChatChannelExecution, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelChatChannelExecutionList[i] = pVoChatChannelExecutionToPModelChatChannelExecution(source[i])
 		}
 	}
 	return pModelChatChannelExecutionList
 }
-func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
-	var pModelChatDialogue *model.ChatDialogue
+func ToChatDialogueModel(source *entity.ChatDialogue) *model2.ChatDialogue {
+	var pModelChatDialogue *model2.ChatDialogue
 	if source != nil {
-		var modelChatDialogue model.ChatDialogue
+		var modelChatDialogue model2.ChatDialogue
 		modelChatDialogue.ID = (*source).ID
 		modelChatDialogue.ConversationId = (*source).ConversationId
 		modelChatDialogue.SessionStatus = (*source).SessionStatus
@@ -91,10 +91,10 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 	}
 	return pModelChatDialogue
 }
-func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
-	var pModelChatExchange *model.ChatExchange
+func ToChatExchangeModel(source *entity.ChatExchange) *model2.ChatExchange {
+	var pModelChatExchange *model2.ChatExchange
 	if source != nil {
-		var modelChatExchange model.ChatExchange
+		var modelChatExchange model2.ChatExchange
 		modelChatExchange.ID = (*source).ID
 		modelChatExchange.ConversationId = (*source).ConversationId
 		modelChatExchange.Question = (*source).Question
@@ -112,10 +112,10 @@ func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 	}
 	return pModelChatExchange
 }
-func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model.ChatExchangeTraceStage {
-	var pModelChatExchangeTraceStage *model.ChatExchangeTraceStage
+func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model2.ChatExchangeTraceStage {
+	var pModelChatExchangeTraceStage *model2.ChatExchangeTraceStage
 	if source != nil {
-		var modelChatExchangeTraceStage model.ChatExchangeTraceStage
+		var modelChatExchangeTraceStage model2.ChatExchangeTraceStage
 		modelChatExchangeTraceStage.ID = (*source).ID
 		modelChatExchangeTraceStage.ConversationId = (*source).ConversationId
 		modelChatExchangeTraceStage.ExchangeId = (*source).ExchangeId
@@ -137,10 +137,10 @@ func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model
 	}
 	return pModelChatExchangeTraceStage
 }
-func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemorySummary {
-	var pModelChatMemorySummary *model.ChatMemorySummary
+func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model2.ChatMemorySummary {
+	var pModelChatMemorySummary *model2.ChatMemorySummary
 	if source != nil {
-		var modelChatMemorySummary model.ChatMemorySummary
+		var modelChatMemorySummary model2.ChatMemorySummary
 		modelChatMemorySummary.ID = (*source).ID
 		modelChatMemorySummary.ConversationId = (*source).ConversationId
 		modelChatMemorySummary.CoveredExchangeId = (*source).CoveredExchangeId
@@ -154,10 +154,10 @@ func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemor
 	}
 	return pModelChatMemorySummary
 }
-func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.ChatRetrievalResult {
-	var pModelChatRetrievalResultList []*model.ChatRetrievalResult
+func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model2.ChatRetrievalResult {
+	var pModelChatRetrievalResultList []*model2.ChatRetrievalResult
 	if source != nil {
-		pModelChatRetrievalResultList = make([]*model.ChatRetrievalResult, len(source))
+		pModelChatRetrievalResultList = make([]*model2.ChatRetrievalResult, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelChatRetrievalResultList[i] = pVoChatRetrievalResultToPModelChatRetrievalResult(source[i])
 		}
@@ -330,10 +330,10 @@ func pTimeTimeToString(source *time.Time) string {
 	}
 	return xstring
 }
-func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
-	var pModelChatChannelExecution *model.ChatChannelExecution
+func pVoChatChannelExecutionToPModelChatChannelExecution(source *vo.ChatChannelExecution) *model2.ChatChannelExecution {
+	var pModelChatChannelExecution *model2.ChatChannelExecution
 	if source != nil {
-		var modelChatChannelExecution model.ChatChannelExecution
+		var modelChatChannelExecution model2.ChatChannelExecution
 		modelChatChannelExecution.ID = (*source).ID
 		modelChatChannelExecution.ConversationId = (*source).ConversationId
 		modelChatChannelExecution.ExchangeId = (*source).ExchangeId
@@ -392,10 +392,10 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalRe
 	}
 	return pChatRetrievalResultResp
 }
-func pVoChatRetrievalResultToPModelChatRetrievalResult(source *vo.ChatRetrievalResult) *model.ChatRetrievalResult {
-	var pModelChatRetrievalResult *model.ChatRetrievalResult
+func pVoChatRetrievalResultToPModelChatRetrievalResult(source *vo.ChatRetrievalResult) *model2.ChatRetrievalResult {
+	var pModelChatRetrievalResult *model2.ChatRetrievalResult
 	if source != nil {
-		var modelChatRetrievalResult model.ChatRetrievalResult
+		var modelChatRetrievalResult model2.ChatRetrievalResult
 		modelChatRetrievalResult.ID = (*source).ID
 		modelChatRetrievalResult.ConversationId = (*source).ConversationId
 		modelChatRetrievalResult.ExchangeId = (*source).ExchangeId
@@ -507,10 +507,10 @@ func ToDocumentChunkItemList(source []*entity1.DocumentChunk) []*document.Docume
 	}
 	return pDocumentDocumentChunkItemList
 }
-func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
-	var pModelDocumentChunk *model.DocumentChunk
+func ToDocumentChunkModel(source *entity1.DocumentChunk) *model2.DocumentChunk {
+	var pModelDocumentChunk *model2.DocumentChunk
 	if source != nil {
-		var modelDocumentChunk model.DocumentChunk
+		var modelDocumentChunk model2.DocumentChunk
 		modelDocumentChunk.ID = (*source).ID
 		modelDocumentChunk.DocumentId = (*source).DocumentId
 		modelDocumentChunk.TaskId = (*source).TaskId
@@ -533,10 +533,10 @@ func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
 	}
 	return pModelDocumentChunk
 }
-func ToDocumentChunkModelList(source []*entity1.DocumentChunk) []*model.DocumentChunk {
-	var pModelDocumentChunkList []*model.DocumentChunk
+func ToDocumentChunkModelList(source []*entity1.DocumentChunk) []*model2.DocumentChunk {
+	var pModelDocumentChunkList []*model2.DocumentChunk
 	if source != nil {
-		pModelDocumentChunkList = make([]*model.DocumentChunk, len(source))
+		pModelDocumentChunkList = make([]*model2.DocumentChunk, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelDocumentChunkList[i] = ToDocumentChunkModel(source[i])
 		}
@@ -591,10 +591,10 @@ func ToDocumentDetailRespList(source []*entity1.Document) []*document.DocumentDe
 	}
 	return pDocumentDocumentDetailRespList
 }
-func ToDocumentModel(source *entity1.Document) *model.Document {
-	var pModelDocument *model.Document
+func ToDocumentModel(source *entity1.Document) *model2.Document {
+	var pModelDocument *model2.Document
 	if source != nil {
-		var modelDocument model.Document
+		var modelDocument model2.Document
 		modelDocument.ID = (*source).ID
 		modelDocument.DocumentName = (*source).DocumentName
 		modelDocument.OriginalFileName = (*source).OriginalFileName
@@ -626,10 +626,10 @@ func ToDocumentModel(source *entity1.Document) *model.Document {
 	}
 	return pModelDocument
 }
-func ToDocumentParentBlockModel(source *entity1.DocumentParentBlock) *model.DocumentParentBlock {
-	var pModelDocumentParentBlock *model.DocumentParentBlock
+func ToDocumentParentBlockModel(source *entity1.DocumentParentBlock) *model2.DocumentParentBlock {
+	var pModelDocumentParentBlock *model2.DocumentParentBlock
 	if source != nil {
-		var modelDocumentParentBlock model.DocumentParentBlock
+		var modelDocumentParentBlock model2.DocumentParentBlock
 		modelDocumentParentBlock.ID = (*source).ID
 		modelDocumentParentBlock.DocumentId = (*source).DocumentId
 		modelDocumentParentBlock.TaskId = (*source).TaskId
@@ -651,20 +651,20 @@ func ToDocumentParentBlockModel(source *entity1.DocumentParentBlock) *model.Docu
 	}
 	return pModelDocumentParentBlock
 }
-func ToDocumentParentBlockModelList(source []*entity1.DocumentParentBlock) []*model.DocumentParentBlock {
-	var pModelDocumentParentBlockList []*model.DocumentParentBlock
+func ToDocumentParentBlockModelList(source []*entity1.DocumentParentBlock) []*model2.DocumentParentBlock {
+	var pModelDocumentParentBlockList []*model2.DocumentParentBlock
 	if source != nil {
-		pModelDocumentParentBlockList = make([]*model.DocumentParentBlock, len(source))
+		pModelDocumentParentBlockList = make([]*model2.DocumentParentBlock, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelDocumentParentBlockList[i] = ToDocumentParentBlockModel(source[i])
 		}
 	}
 	return pModelDocumentParentBlockList
 }
-func ToDocumentProfileModel(source *entity1.DocumentProfile) *model.DocumentProfile {
-	var pModelDocumentProfile *model.DocumentProfile
+func ToDocumentProfileModel(source *entity1.DocumentProfile) *model2.DocumentProfile {
+	var pModelDocumentProfile *model2.DocumentProfile
 	if source != nil {
-		var modelDocumentProfile model.DocumentProfile
+		var modelDocumentProfile model2.DocumentProfile
 		modelDocumentProfile.ID = (*source).ID
 		modelDocumentProfile.DocumentId = (*source).DocumentId
 		modelDocumentProfile.ProfileVersion = (*source).ProfileVersion
@@ -733,10 +733,10 @@ func ToDocumentStrategyPlan(source *entity1.DocumentStrategyPlan) *document.Docu
 	}
 	return pDocumentDocumentStrategyPlan
 }
-func ToDocumentStrategyPlanModel(source *entity1.DocumentStrategyPlan) *model.DocumentStrategyPlan {
-	var pModelDocumentStrategyPlan *model.DocumentStrategyPlan
+func ToDocumentStrategyPlanModel(source *entity1.DocumentStrategyPlan) *model2.DocumentStrategyPlan {
+	var pModelDocumentStrategyPlan *model2.DocumentStrategyPlan
 	if source != nil {
-		var modelDocumentStrategyPlan model.DocumentStrategyPlan
+		var modelDocumentStrategyPlan model2.DocumentStrategyPlan
 		modelDocumentStrategyPlan.ID = (*source).ID
 		modelDocumentStrategyPlan.DocumentId = (*source).DocumentId
 		modelDocumentStrategyPlan.PlanVersion = (*source).PlanVersion
@@ -752,10 +752,10 @@ func ToDocumentStrategyPlanModel(source *entity1.DocumentStrategyPlan) *model.Do
 	}
 	return pModelDocumentStrategyPlan
 }
-func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.DocumentStrategyStep {
-	var pModelDocumentStrategyStep *model.DocumentStrategyStep
+func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model2.DocumentStrategyStep {
+	var pModelDocumentStrategyStep *model2.DocumentStrategyStep
 	if source != nil {
-		var modelDocumentStrategyStep model.DocumentStrategyStep
+		var modelDocumentStrategyStep model2.DocumentStrategyStep
 		modelDocumentStrategyStep.ID = (*source).ID
 		modelDocumentStrategyStep.DocumentId = (*source).DocumentId
 		modelDocumentStrategyStep.PlanId = (*source).PlanId
@@ -770,30 +770,30 @@ func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.Do
 	}
 	return pModelDocumentStrategyStep
 }
-func ToDocumentStrategyStepModelList(source []*entity1.DocumentStrategyStep) []*model.DocumentStrategyStep {
-	var pModelDocumentStrategyStepList []*model.DocumentStrategyStep
+func ToDocumentStrategyStepModelList(source []*entity1.DocumentStrategyStep) []*model2.DocumentStrategyStep {
+	var pModelDocumentStrategyStepList []*model2.DocumentStrategyStep
 	if source != nil {
-		pModelDocumentStrategyStepList = make([]*model.DocumentStrategyStep, len(source))
+		pModelDocumentStrategyStepList = make([]*model2.DocumentStrategyStep, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelDocumentStrategyStepList[i] = ToDocumentStrategyStepModel(source[i])
 		}
 	}
 	return pModelDocumentStrategyStepList
 }
-func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) []*model.DocumentStructureNode {
-	var pModelDocumentStructureNodeList []*model.DocumentStructureNode
+func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) []*model2.DocumentStructureNode {
+	var pModelDocumentStructureNodeList []*model2.DocumentStructureNode
 	if source != nil {
-		pModelDocumentStructureNodeList = make([]*model.DocumentStructureNode, len(source))
+		pModelDocumentStructureNodeList = make([]*model2.DocumentStructureNode, len(source))
 		for i := 0; i < len(source); i++ {
 			pModelDocumentStructureNodeList[i] = pEntityDocumentStructureNodeToPModelDocumentStructureNode(source[i])
 		}
 	}
 	return pModelDocumentStructureNodeList
 }
-func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTaskLog {
-	var pModelDocumentTaskLog *model.DocumentTaskLog
+func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model2.DocumentTaskLog {
+	var pModelDocumentTaskLog *model2.DocumentTaskLog
 	if source != nil {
-		var modelDocumentTaskLog model.DocumentTaskLog
+		var modelDocumentTaskLog model2.DocumentTaskLog
 		modelDocumentTaskLog.ID = (*source).ID
 		modelDocumentTaskLog.TaskId = (*source).TaskId
 		modelDocumentTaskLog.DocumentId = (*source).DocumentId
@@ -808,10 +808,10 @@ func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTask
 	}
 	return pModelDocumentTaskLog
 }
-func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
-	var pModelDocumentTask *model.DocumentTask
+func ToDocumentTaskModel(source *entity1.DocumentTask) *model2.DocumentTask {
+	var pModelDocumentTask *model2.DocumentTask
 	if source != nil {
-		var modelDocumentTask model.DocumentTask
+		var modelDocumentTask model2.DocumentTask
 		modelDocumentTask.ID = (*source).ID
 		modelDocumentTask.DocumentId = (*source).DocumentId
 		modelDocumentTask.PlanId = (*source).PlanId
@@ -1007,10 +1007,10 @@ func pEntityDocumentStrategyStepToPDocumentDocumentStrategyStep(source *entity1.
 	}
 	return pDocumentDocumentStrategyStep
 }
-func pEntityDocumentStructureNodeToPModelDocumentStructureNode(source *entity1.DocumentStructureNode) *model.DocumentStructureNode {
-	var pModelDocumentStructureNode *model.DocumentStructureNode
+func pEntityDocumentStructureNodeToPModelDocumentStructureNode(source *entity1.DocumentStructureNode) *model2.DocumentStructureNode {
+	var pModelDocumentStructureNode *model2.DocumentStructureNode
 	if source != nil {
-		var modelDocumentStructureNode model.DocumentStructureNode
+		var modelDocumentStructureNode model2.DocumentStructureNode
 		modelDocumentStructureNode.ID = (*source).ID
 		modelDocumentStructureNode.DocumentId = (*source).DocumentId
 		modelDocumentStructureNode.ParseTaskId = (*source).ParseTaskId
@@ -1150,10 +1150,10 @@ func ToKnowledgeRouteTraceItemList(source []*entity2.KnowledgeRouteTrace) []*kno
 	}
 	return pKnowledgeKnowledgeRouteTraceItemList
 }
-func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.KnowledgeRouteTrace {
-	var pModelKnowledgeRouteTrace *model.KnowledgeRouteTrace
+func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model2.KnowledgeRouteTrace {
+	var pModelKnowledgeRouteTrace *model2.KnowledgeRouteTrace
 	if source != nil {
-		var modelKnowledgeRouteTrace model.KnowledgeRouteTrace
+		var modelKnowledgeRouteTrace model2.KnowledgeRouteTrace
 		modelKnowledgeRouteTrace.ID = (*source).ID
 		modelKnowledgeRouteTrace.ConversationId = NormalizeString((*source).ConversationId)
 		modelKnowledgeRouteTrace.ExchangeId = (*source).ExchangeId
@@ -1172,10 +1172,10 @@ func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.Know
 	}
 	return pModelKnowledgeRouteTrace
 }
-func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.KnowledgeScopeNode {
-	var pModelKnowledgeScopeNode *model.KnowledgeScopeNode
+func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model2.KnowledgeScopeNode {
+	var pModelKnowledgeScopeNode *model2.KnowledgeScopeNode
 	if source != nil {
-		var modelKnowledgeScopeNode model.KnowledgeScopeNode
+		var modelKnowledgeScopeNode model2.KnowledgeScopeNode
 		modelKnowledgeScopeNode.ID = (*source).ID
 		modelKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
 		modelKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
@@ -1214,10 +1214,10 @@ func ToKnowledgeScopeRespList(source []*entity2.KnowledgeScopeNode) []*knowledge
 	}
 	return pKnowledgeKnowledgeScopeRespList
 }
-func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation {
-	var pModelKnowledgeTopicDocumentRelation *model.KnowledgeTopicDocumentRelation
+func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumentRelation) *model2.KnowledgeTopicDocumentRelation {
+	var pModelKnowledgeTopicDocumentRelation *model2.KnowledgeTopicDocumentRelation
 	if source != nil {
-		var modelKnowledgeTopicDocumentRelation model.KnowledgeTopicDocumentRelation
+		var modelKnowledgeTopicDocumentRelation model2.KnowledgeTopicDocumentRelation
 		modelKnowledgeTopicDocumentRelation.ID = (*source).ID
 		modelKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
 		modelKnowledgeTopicDocumentRelation.DocumentId = (*source).DocumentId
@@ -1228,10 +1228,10 @@ func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumen
 	}
 	return pModelKnowledgeTopicDocumentRelation
 }
-func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.KnowledgeTopicNode {
-	var pModelKnowledgeTopicNode *model.KnowledgeTopicNode
+func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model2.KnowledgeTopicNode {
+	var pModelKnowledgeTopicNode *model2.KnowledgeTopicNode
 	if source != nil {
-		var modelKnowledgeTopicNode model.KnowledgeTopicNode
+		var modelKnowledgeTopicNode model2.KnowledgeTopicNode
 		modelKnowledgeTopicNode.ID = (*source).ID
 		modelKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
 		modelKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)

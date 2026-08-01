@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
-	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
@@ -64,7 +63,6 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 	memoryLogic logic.SessionMemoryLogic,
 	distributedLock lock.DistributedLock,
 	checkPointStore checkpoint.Store,
-	tracer *observability.ConversationTraceHandler,
 ) *LogicImpl {
 	return &LogicImpl{
 		repo:              repo,
