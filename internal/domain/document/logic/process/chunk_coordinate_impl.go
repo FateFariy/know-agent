@@ -37,9 +37,9 @@ const (
 
 // ChunkCoordinateImpl 分块策略实现
 type ChunkCoordinateImpl struct {
-	structureNode StructureNodeLogic
-	registry      map[int]chunk.Chunker
-	classifier    *support.DocumentLineClassifier
+	nodeManager StructureNodeManager
+	registry    map[int]chunk.Chunker
+	classifier  *support.DocumentLineClassifier
 	*option
 }
 
@@ -55,7 +55,7 @@ type option struct {
 }
 
 func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate chatlogic.PromptRenderer, structureNode StructureNodeLogic) *ChunkCoordinateImpl {
+	promptTemplate chatlogic.PromptRenderer, nodeManager StructureNodeManager) *ChunkCoordinateImpl {
 
 	registry := make(map[int]chunk.Chunker)
 	// 结构分块
@@ -79,9 +79,9 @@ func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMode
 	)
 
 	return &ChunkCoordinateImpl{
-		structureNode: structureNode,
-		registry:      registry,
-		classifier:    &support.DocumentLineClassifier{},
+		nodeManager: nodeManager,
+		registry:    registry,
+		classifier:  &support.DocumentLineClassifier{},
 		option: &option{
 			recursiveMaxChars:           svcCtx.Config.Chunk.RecursiveMaxChars,
 			recursiveOverlapChars:       svcCtx.Config.Chunk.RecursiveOverlapChars,
@@ -236,7 +236,7 @@ func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *e
 	// 加载已解析的文档结构节点（用于结构切块策略）
 	var structureNodes []*entity.DocumentStructureNode
 	if document != nil {
-		nodes, err := s.structureNode.ListDocumentNodes(ctx, document.ID, document.LastParseTaskId)
+		nodes, err := s.nodeManager.ListDocumentNodes(ctx, document.ID, document.LastParseTaskId)
 		if err != nil {
 			return nil, err
 		}

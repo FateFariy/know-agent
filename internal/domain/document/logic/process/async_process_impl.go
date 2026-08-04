@@ -30,24 +30,24 @@ var (
 //	HandleParseRoute → 解析路由（文件解析 + 结构节点 + 策略推荐）
 //	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库）
 type AsyncProcessImpl struct {
-	repo           adapter.DocumentRepository
-	port           *adapter.DocumentPort
-	strategyLogic  ChunkCoordinator
-	structureLogic StructureNodeLogic
-	textLogic      TextPreprocessor
-	gen            ProfileGenerator
+	repo        adapter.DocumentRepository
+	port        *adapter.DocumentPort
+	coordinator ChunkCoordinator
+	nodeManager StructureNodeManager
+	textLogic   TextPreprocessor
+	gen         ProfileGenerator
 }
 
 // NewAsyncProcessImpl 构造异步处理逻辑实例
-func NewAsyncProcessImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkCoordinator,
-	structureLogic StructureNodeLogic, textLogic TextPreprocessor, gen ProfileGenerator) *AsyncProcessImpl {
+func NewAsyncProcessImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, coordinator ChunkCoordinator,
+	nodeManager StructureNodeManager, textLogic TextPreprocessor, gen ProfileGenerator) *AsyncProcessImpl {
 	return &AsyncProcessImpl{
-		repo:           repo,
-		port:           port,
-		strategyLogic:  strategyLogic,
-		structureLogic: structureLogic,
-		textLogic:      textLogic,
-		gen:            gen,
+		repo:        repo,
+		port:        port,
+		coordinator: coordinator,
+		nodeManager: nodeManager,
+		textLogic:   textLogic,
+		gen:         gen,
 	}
 }
 
@@ -133,7 +133,7 @@ func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, tas
 	}
 
 	// 基于解析文本构建并写入文档结构节点（供结构切块策略使用）
-	structureNodes, err := d.structureLogic.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
+	structureNodes, err := d.nodeManager.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
 	if err != nil {
 		panic(err)
 	}
@@ -171,7 +171,7 @@ func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, tas
 	}
 
 	// 调用策略服务生成推荐切块方案草稿
-	strategyPlanDraft, err := d.strategyLogic.RecommendStrategy(ctx, document, analysisResult)
+	strategyPlanDraft, err := d.coordinator.RecommendStrategy(ctx, document, analysisResult)
 	if err != nil {
 		panic(err)
 	}
@@ -309,7 +309,7 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	}
 
 	// 按步骤执行切块流水线，产出父-子块候选
-	parentCandidates, err := d.strategyLogic.BuildParentBlocks(ctx, document, pipelineSteps, parsedText)
+	parentCandidates, err := d.coordinator.BuildParentBlocks(ctx, document, pipelineSteps, parsedText)
 	if err != nil {
 		panic(err)
 	}
