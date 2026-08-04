@@ -3,7 +3,7 @@ package parser
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 )
 
 const TEXT = "text"

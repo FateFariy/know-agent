@@ -1,4 +1,4 @@
-package logic
+package process
 
 import (
 	"context"
@@ -11,19 +11,19 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-// StructureNodeLogicImpl 文档结构节点服务，负责将解析/结构抽取后的候选节点转化为可持久化的结构节点实体
-type StructureNodeLogicImpl struct {
+// StructureNodeManageImpl 文档结构管理服务，负责将解析/结构抽取后的候选节点转化为可持久化的结构节点实体
+type StructureNodeManageImpl struct {
 	repo adapter.DocumentRepository
 }
 
-var _ StructureNodeLogic = (*StructureNodeLogicImpl)(nil)
+var _ StructureNodeManager = (*StructureNodeManageImpl)(nil)
 
-func NewStructureNodeLogicImpl(repo adapter.DocumentRepository) *StructureNodeLogicImpl {
-	return &StructureNodeLogicImpl{repo: repo}
+func NewStructureNodeManager(repo adapter.DocumentRepository) *StructureNodeManageImpl {
+	return &StructureNodeManageImpl{repo: repo}
 }
 
 // ReplaceDocumentNodes 替换文档结构节点：
-func (l *StructureNodeLogicImpl) ReplaceDocumentNodes(ctx context.Context, documentId, parseTaskId int64,
+func (l *StructureNodeManageImpl) ReplaceDocumentNodes(ctx context.Context, documentId, parseTaskId int64,
 	candidates []*vo.DocumentStructureNodeCandidate) ([]*entity.DocumentStructureNode, error) {
 	if documentId == 0 || parseTaskId == 0 || len(candidates) == 0 {
 		return nil, nil
@@ -75,7 +75,7 @@ func (l *StructureNodeLogicImpl) ReplaceDocumentNodes(ctx context.Context, docum
 }
 
 // ListDocumentNodes 查询文档结构节点列表
-func (l *StructureNodeLogicImpl) ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.DocumentStructureNode, error) {
+func (l *StructureNodeManageImpl) ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.DocumentStructureNode, error) {
 	if documentId == 0 {
 		return nil, nil
 	}
@@ -94,7 +94,7 @@ func (l *StructureNodeLogicImpl) ListDocumentNodes(ctx context.Context, document
 }
 
 // DeleteByDocumentId 按文档ID删除所有结构节点
-func (l *StructureNodeLogicImpl) DeleteByDocumentId(ctx context.Context, documentId int64) error {
+func (l *StructureNodeManageImpl) DeleteByDocumentId(ctx context.Context, documentId int64) error {
 	if documentId == 0 {
 		return nil
 	}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ledongthuc/pdf"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 )
 
 const PDF = "pdf"

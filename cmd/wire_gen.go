@@ -9,7 +9,7 @@ package main
 import (
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain"
-	logic3 "github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
@@ -23,11 +23,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure"
-	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/keyword"
@@ -55,11 +55,12 @@ func WireApp(c *config.Config) *server.Server {
 	documentPort := adapter.NewDocumentPort(minioStorage, rocketMQMessageProducer, milvusVector, milvusKeyword)
 	documentRepositoryImpl := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	chatModelImpl := llm.NewChatModelImpl(serviceContext)
-	templateLogicImpl := prompt.NewPromptTemplateLogicImpl()
-	structureNodeLogicImpl := logic.NewStructureNodeLogicImpl(documentRepositoryImpl)
-	chunkStrategyLogicImpl := logic.NewChunkStrategyLogicImpl(serviceContext, chatModelImpl, templateLogicImpl, structureNodeLogicImpl)
-	lifecycleLogicImpl := logic.NewLifecycleLogicImpl(serviceContext, documentPort, documentRepositoryImpl, chunkStrategyLogicImpl)
-	profileLogicImpl := logic.NewProfileLogicImpl(documentRepositoryImpl, documentPort)
+	templateRenderer := prompt.NewPromptTemplateLogicImpl()
+	structureNodeLogicImpl := process.NewStructureNodeManager(documentRepositoryImpl)
+	chunkCoordinateImpl := process.NewChunkCoordinateImpl(serviceContext, chatModelImpl, templateRenderer, structureNodeLogicImpl)
+	lifecycleLogicImpl := logic.NewLifecycleLogicImpl(serviceContext, documentPort, documentRepositoryImpl, chunkCoordinateImpl)
+	profileGenerateImpl := process.NewProfileGenerateImpl(documentRepositoryImpl)
+	profileLogicImpl := logic.NewProfileLogicImpl(documentRepositoryImpl, documentPort, profileGenerateImpl)
 	documentService := handler.NewDocumentService(lifecycleLogicImpl, profileLogicImpl)
 	chatRepositoryImpl := persistence.NewChatRepository(serviceContext)
 	dashScope := reranker.NewDashScope(serviceContext)
@@ -67,41 +68,40 @@ func WireApp(c *config.Config) *server.Server {
 	keywordRetrievalChannel := channel.NewKeywordRetrievalChannel(serviceContext, milvusKeyword)
 	v := domain.NewRetrievalChannels(vectorRetrievalChannel, keywordRetrievalChannel)
 	retrievalImpl := rag.NewRetrievalImpl(serviceContext, chatRepositoryImpl, dashScope, v, lifecycleLogicImpl)
-	promptBuilder := rag.NewPromptAssembler(serviceContext, templateLogicImpl)
-	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptBuilder, chatModelImpl)
+	promptAssembler := rag.NewPromptAssembler(serviceContext, templateRenderer)
+	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptAssembler, chatModelImpl)
 	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(serviceContext)
 	defaultAnswerRender := graph.NewDefaultAnswerRender()
 	graphOnlyExecutor := executor.NewGraphOnlyExecutor(defaultStructureGraphQuerier, defaultAnswerRender)
 	graphThenEvidenceExecutor := executor.NewGraphThenEvidenceExecutor(defaultStructureGraphQuerier, defaultAnswerRender)
 	clarificationExecutor := executor.NewClarificationExecutor()
 	executorRegistry := domain.NewExecutorRegistry(ragChatExecutor, graphOnlyExecutor, graphThenEvidenceExecutor, clarificationExecutor)
-	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, templateLogicImpl)
+	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, templateRenderer)
 	sessionMemoryLogicImpl := memory.NewSessionMemoryLogicImpl(summaryCompressionStrategy)
-	queryRewriteLogicImpl := rewrite.NewQueryRewriter(serviceContext, chatModelImpl, templateLogicImpl)
+	queryRewriter := rewrite.NewQueryRewriter(serviceContext, chatModelImpl, templateRenderer)
 	defaultNavigationIndexService := intent.NewDefaultNavigationIndexService()
-	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateLogicImpl)
+	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateRenderer)
 	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
 	v2 := domain.ProvideKnowledgeOptions()
-	knowledgeRouteLogicImpl := route.NewKnowledgeRouteImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
-	_ = observability.NewConversationTraceRecorder(chatRepositoryImpl)
-	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriteLogicImpl, documentQuestionRouterImpl, knowledgeRouteLogicImpl, lifecycleLogicImpl)
-	recommendationLogicImpl := recommend.NewQuestionRecommender(serviceContext, templateLogicImpl, chatModelImpl)
+	knowledgeRouteImpl := route.NewKnowledgeRouteImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
+	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriter, documentQuestionRouterImpl, knowledgeRouteImpl, lifecycleLogicImpl)
+	questionRecommender := recommend.NewQuestionRecommender(serviceContext, templateRenderer, chatModelImpl)
 	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
 	memoryCheckPointStore := check.NewMemoryCheckPointStore()
-	logicImpl := logic3.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateLogicImpl, recommendationLogicImpl, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
+	logicImpl := conversation.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateRenderer, questionRecommender, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
 	chatService := handler.NewChatService(logicImpl)
 	knowledgeLogicImpl := logic2.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
 	restServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
 	registry := infrastructure.NewParserRegistry()
 	signalExtractor := transform.NewSignalExtractor()
-	ambiguityResolver := transform.NewAmbiguityResolver(serviceContext, chatModelImpl, templateLogicImpl)
+	ambiguityResolver := transform.NewAmbiguityResolver(serviceContext, chatModelImpl, templateRenderer)
 	hierarchyResolver := transform.NewHierarchyResolver()
 	treeValidator := transform.NewTreeValidator()
-	textPreProcessLogicImpl := logic.NewTextPreProcessLogicImpl(registry, signalExtractor, ambiguityResolver, hierarchyResolver, treeValidator)
-	asyncProcessingLogicImpl := logic.NewAsyncProcessingLogicImpl(documentRepositoryImpl, documentPort, chunkStrategyLogicImpl, structureNodeLogicImpl, textPreProcessLogicImpl, profileLogicImpl)
-	parseDocumentConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessingLogicImpl)
-	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessingLogicImpl)
+	textPreprocessImpl := process.NewTextPreprocessImpl(registry, signalExtractor, ambiguityResolver, hierarchyResolver, treeValidator)
+	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepositoryImpl, documentPort, chunkCoordinateImpl, structureNodeLogicImpl, textPreprocessImpl, profileGenerateImpl)
+	parseDocumentConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessImpl)
+	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessImpl)
 	serverServer := server.NewServer(restServer, parseDocumentConsumer, buildIndexConsumer, rocketMQMessageProducer)
 	return serverServer
 }

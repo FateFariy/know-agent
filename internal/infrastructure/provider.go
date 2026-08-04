@@ -9,7 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	reranker2 "github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
+	parse2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
@@ -54,12 +54,12 @@ var ProviderSet = wire.NewSet(
 	NewParserRegistry,
 )
 
-func NewParserRegistry() *parse.Registry {
+func NewParserRegistry() *parse2.Registry {
 	fallbackParser := &parser.TextParser{}
-	parsers := []parse.Parser{
+	parsers := []parse2.Parser{
 		&parser.HTMLParser{},
 		&parser.TextParser{},
 		&parser.PDFParser{},
 	}
-	return parse.NewRegistry(fallbackParser, parsers...)
+	return parse2.NewRegistry(fallbackParser, parsers...)
 }

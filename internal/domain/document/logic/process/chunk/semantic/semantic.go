@@ -7,8 +7,8 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk/semantic/similarity"
+	chunk2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+	similarity2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic/similarity"
 )
 
 const (
@@ -23,7 +23,7 @@ type options struct {
 	maxChars            int
 	minChars            int
 	similarityThreshold float64
-	similarity          similarity.Similarity
+	similarity          similarity2.Calculator
 }
 
 // Chunker 语义分块策略
@@ -32,20 +32,20 @@ type Chunker struct {
 }
 
 // NewChunker 创建语义分块策略实例，默认使用 JaccardSimilarity 实现相似度计算
-func NewChunker(opts ...chunk.Option) *Chunker {
+func NewChunker(opts ...chunk2.Option) *Chunker {
 	return &Chunker{
-		opt: chunk.GetSpecificOptions(&options{
+		opt: chunk2.GetSpecificOptions(&options{
 			maxChars:            defaultMaxChars,
 			minChars:            defaultMinChars,
 			similarityThreshold: defaultSimilarityThreshold,
-			similarity:          &similarity.JaccardSimilarity{},
+			similarity:          &similarity2.JaccardSimilarity{},
 		}, opts...),
 	}
 }
 
 // WithMaxChars 设置单个块的最大字符数
-func WithMaxChars(maxChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithMaxChars(maxChars int) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if maxChars <= 0 {
 			maxChars = defaultMaxChars
 		}
@@ -54,8 +54,8 @@ func WithMaxChars(maxChars int) chunk.Option {
 }
 
 // WithMinChars 设置触发语义切分的最小字符数
-func WithMinChars(minChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithMinChars(minChars int) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if minChars <= 0 {
 			minChars = defaultMinChars
 		}
@@ -64,8 +64,8 @@ func WithMinChars(minChars int) chunk.Option {
 }
 
 // WithSimilarityThreshold 设置语义相似度阈值
-func WithSimilarityThreshold(threshold float64) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithSimilarityThreshold(threshold float64) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if threshold <= 0 || threshold >= 1 {
 			threshold = defaultSimilarityThreshold
 		}
@@ -74,8 +74,8 @@ func WithSimilarityThreshold(threshold float64) chunk.Option {
 }
 
 // WithSimilarity 注入自定义的相似度计算实现，
-func WithSimilarity(sim similarity.Similarity) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithSimilarity(sim similarity2.Calculator) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if sim == nil {
 			return
 		}
@@ -89,25 +89,25 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行语义分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(ctx context.Context, input *chunk2.TextBlock, opts ...chunk2.Option) ([]*chunk2.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
 
-	opt := chunk.GetSpecificOptions(s.opt, opts...)
+	opt := chunk2.GetSpecificOptions(s.opt, opts...)
 
 	// 文本较短时保持原样，避免过碎
 	if utils.Len(input.Text) <= opt.minChars {
-		return []*chunk.TextBlock{input}, nil
+		return []*chunk2.TextBlock{input}, nil
 	}
 
 	// 按句子分块
-	sentenceList := chunk.SplitSentences(input.Text)
+	sentenceList := chunk2.SplitSentences(input.Text)
 	if len(sentenceList) <= 1 {
-		return []*chunk.TextBlock{input}, nil
+		return []*chunk2.TextBlock{input}, nil
 	}
 
-	resultList := make([]*chunk.TextBlock, 0, len(sentenceList))
+	resultList := make([]*chunk2.TextBlock, 0, len(sentenceList))
 	currentText := strings.Builder{}
 	for _, sentence := range sentenceList {
 		currentLen := utils.Len(currentText.String())

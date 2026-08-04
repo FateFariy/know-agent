@@ -9,7 +9,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform/signal"
+	signal2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform/signal"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
@@ -25,7 +25,7 @@ var (
 // SignalExtractor 文档结构信号抽取器：按行对文本进行结构识别，产出标题/正文/候选标题等信号
 type SignalExtractor struct {
 	lineClassifier       *support.DocumentLineClassifier // 行分类器，判断行的类型，如标题、列表、表格等
-	detectorsManager     *signal.DetectorsManager        // 检测器管理器，包含所有检测器，识别显式标题结构
+	detectorsManager     *signal2.DetectorsManager       // 检测器管理器，包含所有检测器，识别显式标题结构
 	maxPlainHeadingChars int
 }
 
@@ -51,7 +51,7 @@ func WithMaxPlainHeadingChars(maxPlainHeadingChars int) TransformerOption {
 
 func NewSignalExtractor() *SignalExtractor {
 	return &SignalExtractor{
-		detectorsManager: signal.NewDefaultDetectorsManager(),
+		detectorsManager: signal2.NewDefaultDetectorsManager(),
 		lineClassifier:   &support.DocumentLineClassifier{},
 	}
 }
@@ -91,7 +91,7 @@ func (e *SignalExtractor) Transform(ctx context.Context, text string, opts ...Tr
 	}
 
 	// 构造检测器上下文：共享文档标题 + 行频率
-	detectorCtx := signal.NewDetectorContext(opt.documentTitle, lineFrequency)
+	detectorCtx := signal2.NewDetectorContext(opt.documentTitle, lineFrequency)
 
 	// 逐行分类：为每个逻辑行产出一个结构信号
 	for index := 0; index < len(logicalLines); index++ {
@@ -115,7 +115,7 @@ func (e *SignalExtractor) Transform(ctx context.Context, text string, opts ...Tr
 //  3. 其余情况统一标记为正文 Body
 //
 // 返回：单个结构信号（已携带行号/原始文本/缩进级别）
-func (e *SignalExtractor) classify(detCtx *signal.DetectorContext, logicalLines []*vo.DocumentStructureLogicalLine, index int) *vo.DocumentStructureSignal {
+func (e *SignalExtractor) classify(detCtx *signal2.DetectorContext, logicalLines []*vo.DocumentStructureLogicalLine, index int) *vo.DocumentStructureSignal {
 	logicalLine := logicalLines[index]
 	lineNo := logicalLine.LogicalLineNo
 	rawText := logicalLine.RawText
@@ -126,7 +126,7 @@ func (e *SignalExtractor) classify(detCtx *signal.DetectorContext, logicalLines 
 	detCtx.LineContext = lineContext
 
 	// 调用显式检测器链：命中则直接返回信号（置信度由检测器给出）
-	result := e.detectorsManager.Detect(detCtx, normalized, signal.WithMaxPlainHeadingChars(e.maxPlainHeadingChars))
+	result := e.detectorsManager.Detect(detCtx, normalized, signal2.WithMaxPlainHeadingChars(e.maxPlainHeadingChars))
 	if result != nil {
 		// 回填检测器未设置的行级元数据
 		result.LineNo = lineNo

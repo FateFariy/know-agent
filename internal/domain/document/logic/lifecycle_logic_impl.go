@@ -16,6 +16,7 @@ import (
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -24,22 +25,23 @@ import (
 )
 
 type LifecycleLogicImpl struct {
-	port          *adapter.DocumentPort
-	repo          adapter.DocumentRepository
-	chunkStrategy ChunkCoordinator
-	parseTopic    string
-	indexTopic    string
+	port        *adapter.DocumentPort
+	repo        adapter.DocumentRepository
+	generator   process.ProfileGenerator
+	coordinator process.ChunkCoordinator
+	parseTopic  string
+	indexTopic  string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, chunkStrategy ChunkCoordinator) *LifecycleLogicImpl {
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, coordinator process.ChunkCoordinator) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
-		port:          port,
-		repo:          repo,
-		chunkStrategy: chunkStrategy,
-		parseTopic:    svcCtx.Config.MQ.ParseTopic,
-		indexTopic:    svcCtx.Config.MQ.IndexTopic,
+		port:        port,
+		repo:        repo,
+		coordinator: coordinator,
+		parseTopic:  svcCtx.Config.MQ.ParseTopic,
+		indexTopic:  svcCtx.Config.MQ.IndexTopic,
 	}
 }
 
@@ -285,7 +287,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	childTypeList := extractStrategyTypes(cmd.ChildSteps)
 
 	// 标准化策略步骤
-	normalizedStepList, err := d.chunkStrategy.NormalizeSteps(ctx, baseStepList, parentTypeList, childTypeList, cmd.DocumentId)
+	normalizedStepList, err := d.coordinator.NormalizeSteps(ctx, baseStepList, parentTypeList, childTypeList, cmd.DocumentId)
 	if err != nil {
 		return nil, nil, err
 	}

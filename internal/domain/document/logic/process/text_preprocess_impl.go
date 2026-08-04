@@ -1,4 +1,4 @@
-package logic
+package process
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
+	transform2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
@@ -24,18 +24,18 @@ var (
 	paragraphSplitRegex = regexp.MustCompile(`\n\s*\n`)     // 匹配多个换行符
 )
 
-type TextPreProcessLogicImpl struct {
+type TextPreprocessImpl struct {
 	registry          *parse.Registry
-	signalExtractor   *transform.SignalExtractor   // 信号抽取：将原始文本拆分为标题/列表/正文等结构信号
-	ambiguityResolver *transform.AmbiguityResolver // 歧义消解：对候选标题进行 LLM 二次判定（若配置启用）
-	hierarchyResolver *transform.HierarchyResolver // 层级构建：基于信号流组装父子关系与嵌套列表
-	treeValidator     *transform.TreeValidator     // 树验证：规范化父子关系、深度、路径与兄弟链表
+	signalExtractor   *transform2.SignalExtractor   // 信号抽取：将原始文本拆分为标题/列表/正文等结构信号
+	ambiguityResolver *transform2.AmbiguityResolver // 歧义消解：对候选标题进行 LLM 二次判定（若配置启用）
+	hierarchyResolver *transform2.HierarchyResolver // 层级构建：基于信号流组装父子关系与嵌套列表
+	treeValidator     *transform2.TreeValidator     // 树验证：规范化父子关系、深度、路径与兄弟链表
 	classifier        *support.DocumentLineClassifier
 }
 
-func NewTextPreProcessLogicImpl(registry *parse.Registry, signalExtractor *transform.SignalExtractor, ambiguityResolver *transform.AmbiguityResolver,
-	hierarchyResolver *transform.HierarchyResolver, treeValidator *transform.TreeValidator) *TextPreProcessLogicImpl {
-	return &TextPreProcessLogicImpl{
+func NewTextPreprocessImpl(registry *parse.Registry, signalExtractor *transform2.SignalExtractor, ambiguityResolver *transform2.AmbiguityResolver,
+	hierarchyResolver *transform2.HierarchyResolver, treeValidator *transform2.TreeValidator) *TextPreprocessImpl {
+	return &TextPreprocessImpl{
 		registry:          registry,
 		signalExtractor:   signalExtractor,
 		ambiguityResolver: ambiguityResolver,
@@ -45,8 +45,8 @@ func NewTextPreProcessLogicImpl(registry *parse.Registry, signalExtractor *trans
 	}
 }
 
-// PreProcess 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.DocumentAnalysisResult, error) {
+// Process 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
+func (p *TextPreprocessImpl) Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform2.TransformerOption) (*vo.DocumentAnalysisResult, error) {
 	// 解析文本
 	parser := p.registry.Get(fileType)
 	parsedText, err := parser.Parse(ctx, []byte(rawText))
@@ -99,7 +99,7 @@ func (p *TextPreProcessLogicImpl) PreProcess(ctx context.Context, documentTitle,
 //  4. 歧义消解：AmbiguityResolver 对不确定的候选标题做 LLM 判定
 //  5. 层级构建：HierarchyResolver 将扁平信号流组织成带父子关系的节点草稿
 //  6. 树验证：TreeValidator 规范化 Draft 树并输出最终的候选节点列表
-func (p *TextPreProcessLogicImpl) extractStructureNodes(ctx context.Context, documentTitle, parsedText string, opts ...transform.TransformerOption) []*vo.DocumentStructureNodeCandidate {
+func (p *TextPreprocessImpl) extractStructureNodes(ctx context.Context, documentTitle, parsedText string, opts ...transform2.TransformerOption) []*vo.DocumentStructureNodeCandidate {
 	normalizedTitle := strutil.Trim(documentTitle)
 	if normalizedTitle == "" {
 		normalizedTitle = "文档"
@@ -136,7 +136,7 @@ func (p *TextPreProcessLogicImpl) extractStructureNodes(ctx context.Context, doc
 }
 
 // cleanupText 清理文本，移除换行符、制表符、空格等
-func (p *TextPreProcessLogicImpl) cleanupText(rawText string) string {
+func (p *TextPreprocessImpl) cleanupText(rawText string) string {
 	if rawText == "" {
 		return ""
 	}
@@ -154,7 +154,7 @@ func (p *TextPreProcessLogicImpl) cleanupText(rawText string) string {
 }
 
 // countHeadings 统计标题数量
-func (p *TextPreProcessLogicImpl) countHeadings(text string, structureNodes []*vo.DocumentStructureNodeCandidate) int {
+func (p *TextPreprocessImpl) countHeadings(text string, structureNodes []*vo.DocumentStructureNodeCandidate) int {
 	if len(structureNodes) != 0 {
 		count := slice.CountBy(structureNodes, func(_ int, node *vo.DocumentStructureNodeCandidate) bool {
 			return node != nil && node.NodeType == vo.NodeTypeSection && node.Depth > 0
@@ -173,7 +173,7 @@ func (p *TextPreProcessLogicImpl) countHeadings(text string, structureNodes []*v
 }
 
 // extractParagraphs 提取段落
-func (p *TextPreProcessLogicImpl) extractParagraphs(text string) []string {
+func (p *TextPreprocessImpl) extractParagraphs(text string) []string {
 	rawParagraphs := paragraphSplitRegex.Split(text, -1)
 	paragraphList := make([]string, 0, len(rawParagraphs))
 	for _, paragraph := range rawParagraphs {
@@ -186,7 +186,7 @@ func (p *TextPreProcessLogicImpl) extractParagraphs(text string) []string {
 }
 
 // evaluateStructureLevel 评估文档结构等级
-func (p *TextPreProcessLogicImpl) evaluateStructureLevel(headingCount, paragraphCount int) int {
+func (p *TextPreprocessImpl) evaluateStructureLevel(headingCount, paragraphCount int) int {
 	if headingCount >= 5 {
 		return vo.StructureLevelHigh
 	}
@@ -200,7 +200,7 @@ func (p *TextPreProcessLogicImpl) evaluateStructureLevel(headingCount, paragraph
 }
 
 // evaluateContentQuality 评估文档内容质量等级
-func (p *TextPreProcessLogicImpl) evaluateContentQuality(text string) int {
+func (p *TextPreprocessImpl) evaluateContentQuality(text string) int {
 	charCount := utils.Len(text)
 	if strutil.IsBlank(text) || charCount < 20 {
 		return vo.ContentQualityLevelLow

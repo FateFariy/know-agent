@@ -17,14 +17,14 @@ import (
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
 	retriever       logic.RagRetriever
-	promptAssembler conversation.RagPromptBuilder
+	promptAssembler conversation.RagPromptAssembler
 	chatModel       model.ChatModel
 }
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
 	retriever logic.RagRetriever,
-	ragPromptAssembler conversation.RagPromptBuilder,
+	ragPromptAssembler conversation.RagPromptAssembler,
 	chatModel model.ChatModel,
 ) *RagChatExecutor {
 	return &RagChatExecutor{
@@ -144,7 +144,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	// Prompt 装配与预算
 	ctx = vo.OnStart(ctx, vo.ConversationTraceStageEvidenceBudget,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})
-	promptResult, err := e.promptAssembler.Build(ctx, plan, retrievalCtx)
+	promptResult, err := e.promptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
 		logx.Errorf("Prompt 组装失败: conversationId=%s, err=%v", convCtx.ConversationId, err)
 		vo.OnError(ctx, "证据预算与 Prompt 组装失败。", err)

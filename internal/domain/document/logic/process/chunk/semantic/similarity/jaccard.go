@@ -15,7 +15,7 @@ var (
 // JaccardSimilarity 基于 Jaccard 计算相似度，以“英文单词 + 中文字符”为词元，计算两边词元集合的交集并集比值
 type JaccardSimilarity struct{}
 
-var _ Similarity = (*JaccardSimilarity)(nil)
+var _ Calculator = (*JaccardSimilarity)(nil)
 
 // Calculate 两段文本的 Jaccard 相似度，文本为空时返回 0
 func (s *JaccardSimilarity) Calculate(_ context.Context, text1, text2 string) (float64, error) {

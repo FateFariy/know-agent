@@ -12,18 +12,18 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type ParseDocumentConsumer struct {
-	l     logic.AsyncProcessingLogic
+	l     process.AsyncProcessor
 	c     rocketmq.PushConsumer
 	topic string
 }
 
-func NewParseDocumentConsumer(svcCtx *svc.ServiceContext, l logic.AsyncProcessingLogic) *ParseDocumentConsumer {
+func NewParseDocumentConsumer(svcCtx *svc.ServiceContext, l process.AsyncProcessor) *ParseDocumentConsumer {
 	c, err := rocketmq.NewPushConsumer(
 		consumer.WithGroupName("parse-document-group"),
 		consumer.WithNameServer([]string{svcCtx.Config.MQ.Addr}),

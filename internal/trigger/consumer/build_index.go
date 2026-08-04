@@ -13,7 +13,7 @@ import (
 	"github.com/apache/rocketmq-client-go/v2/rlog"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -23,12 +23,12 @@ func init() {
 }
 
 type BuildIndexConsumer struct {
-	l     logic.AsyncProcessingLogic
+	l     process.AsyncProcessor
 	c     rocketmq.PushConsumer
 	topic string
 }
 
-func NewBuildIndexConsumer(svcCtx *svc.ServiceContext, l logic.AsyncProcessingLogic) *BuildIndexConsumer {
+func NewBuildIndexConsumer(svcCtx *svc.ServiceContext, l process.AsyncProcessor) *BuildIndexConsumer {
 	c, err := rocketmq.NewPushConsumer(
 		consumer.WithGroupName("build-index-group"),
 		consumer.WithNameServer([]string{svcCtx.Config.MQ.Addr}),

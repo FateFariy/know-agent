@@ -1,4 +1,4 @@
-package logic
+package process
 
 import (
 	"context"
@@ -25,29 +25,29 @@ var (
 	englishPattern = regexp.MustCompile(`[A-Za-z]`) // 匹配英文字母
 )
 
-// AsyncProcessingLogicImpl 异步处理业务逻辑实现
+// AsyncProcessImpl 异步处理业务逻辑实现
 //
 //	HandleParseRoute → 解析路由（文件解析 + 结构节点 + 策略推荐）
 //	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库）
-type AsyncProcessingLogicImpl struct {
+type AsyncProcessImpl struct {
 	repo           adapter.DocumentRepository
 	port           *adapter.DocumentPort
 	strategyLogic  ChunkCoordinator
 	structureLogic StructureNodeLogic
-	textLogic      TextPreProcessLogic
-	profileLogic   ProfileLogic
+	textLogic      TextPreprocessor
+	gen            ProfileGenerator
 }
 
-// NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
-func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkCoordinator,
-	structureLogic StructureNodeLogic, textLogic TextPreProcessLogic, profileLogic ProfileLogic) *AsyncProcessingLogicImpl {
-	return &AsyncProcessingLogicImpl{
+// NewAsyncProcessImpl 构造异步处理逻辑实例
+func NewAsyncProcessImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkCoordinator,
+	structureLogic StructureNodeLogic, textLogic TextPreprocessor, gen ProfileGenerator) *AsyncProcessImpl {
+	return &AsyncProcessImpl{
 		repo:           repo,
 		port:           port,
 		strategyLogic:  strategyLogic,
 		structureLogic: structureLogic,
 		textLogic:      textLogic,
-		profileLogic:   profileLogic,
+		gen:            gen,
 	}
 }
 
@@ -61,7 +61,7 @@ func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.
 //  5. 基于解析结果调用策略服务生成推荐切块方案
 //  6. 把推荐方案和步骤写入数据库，同步更新文档的解析状态/策略状态/统计信息
 //  7. 以成功或失败状态收尾任务，并记录任务日志
-func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
+func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
 	// 加载文档与任务实体
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
@@ -121,7 +121,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 		panic(err)
 	}
 	// 调用文本预处理逻辑
-	analysisResult, err := d.textLogic.PreProcess(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
+	analysisResult, err := d.textLogic.Process(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
 	if err != nil {
 		panic(err)
 	}
@@ -143,7 +143,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 	}
 
 	// 生成文档画像
-	if _, err = d.profileLogic.GenerateProfile(ctx, documentId, analysisResult, structureNodes); err != nil {
+	if _, err = d.gen.Generate(ctx, documentId, analysisResult, structureNodes); err != nil {
 		return err
 	}
 
@@ -236,7 +236,7 @@ func (d *AsyncProcessingLogicImpl) HandleParseRoute(ctx context.Context, documen
 }
 
 // HandleIndexBuild 执行索引构建主流程：切块流水线 → 父子块落库 → 向量化 → 状态收尾
-func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) (err error) {
+func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) (err error) {
 	// 加载任务相关实体，失败直接返回，交由调度层观察
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
@@ -493,12 +493,12 @@ func (d *AsyncProcessingLogicImpl) HandleIndexBuild(ctx context.Context, documen
 }
 
 // todo 待实现
-func (d *AsyncProcessingLogicImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.DocumentStructureNode) error {
+func (d *AsyncProcessImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.DocumentStructureNode) error {
 	return nil
 }
 
 // persistRecommendation 持久化策略推荐结果：写入方案 + 批量写入父/子流水线步骤 + 推进任务阶段
-func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, document *entity.Document,
+func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *entity.Document,
 	task *entity.DocumentTask, planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
 	// 分配计划 ID 并读取当前最新版本号（用于版本自增）
 	planId := utils.GetSnowflakeNextID()
@@ -562,7 +562,7 @@ func (d *AsyncProcessingLogicImpl) persistRecommendation(ctx context.Context, do
 //   - 每个父块维护 StartChunkNo / EndChunkNo（用于快速定位其覆盖的子块区间）
 //   - 子块的 ChunkNo 在函数内全局递增
 //   - 任何父块至少会得到 1 个兜底子块（由上层 BuildParentBlocks 保证）
-func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, planId int64,
+func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId int64,
 	candidates []*vo.ParentBlockCandidate) ([]*entity.DocumentParentBlock, []*entity.DocumentChunk) {
 
 	parentBlocks := make([]*entity.DocumentParentBlock, 0, len(candidates))
@@ -622,7 +622,7 @@ func (d *AsyncProcessingLogicImpl) buildParentChildEntities(documentId, taskId, 
 }
 
 // finishTaskSuccess 将任务标记为成功状态并写入耗时信息（毫秒），清空错误字段
-func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *entity.DocumentTask, currentStage int, startTime time.Time) error {
+func (d *AsyncProcessImpl) finishTaskSuccess(ctx context.Context, task *entity.DocumentTask, currentStage int, startTime time.Time) error {
 	return d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 		ID:           task.ID,
 		TaskStatus:   vo.TaskStatusSuccess,
@@ -635,7 +635,7 @@ func (d *AsyncProcessingLogicImpl) finishTaskSuccess(ctx context.Context, task *
 }
 
 // handleParseFailure 异步任务"解析路由"阶段失败时的统一收尾流程：先记录错误日志，再在事务内将文档状态、任务状态、失败详情与失败日志一次落库。
-func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
+func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
 	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
 	parseFailTx := func(txCtx context.Context) error {
 		// 文档：标记为解析失败，并保留失败原因
@@ -674,7 +674,7 @@ func (d *AsyncProcessingLogicImpl) handleParseFailure(ctx context.Context, docum
 }
 
 // handleIndexBuildFailure "索引构建"失败时的统一收尾：事务性地将文档 IndexStatus、chunk 向量状态、step 执行状态、任务失败信息与日志一次落库。
-func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, plan *entity.DocumentStrategyPlan, errorMsg string) {
+func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, plan *entity.DocumentStrategyPlan, errorMsg string) {
 	logx.Errorf("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
 	indexBuildFailTx := func(txCtx context.Context) error {
 		// 文档：索引构建失败
@@ -718,7 +718,7 @@ func (d *AsyncProcessingLogicImpl) handleIndexBuildFailure(ctx context.Context, 
 }
 
 // failTask 标记任务失败
-func (d *AsyncProcessingLogicImpl) failTask(txCtx context.Context, task *entity.DocumentTask, errorMsg string) error {
+func (d *AsyncProcessImpl) failTask(txCtx context.Context, task *entity.DocumentTask, errorMsg string) error {
 	return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 		ID:           task.ID,
 		TaskStatus:   vo.TaskStatusFailed,
@@ -731,7 +731,7 @@ func (d *AsyncProcessingLogicImpl) failTask(txCtx context.Context, task *entity.
 }
 
 // countChildCandidates 计算子块候选数
-func (d *AsyncProcessingLogicImpl) countChildCandidates(parentBlockCandidateList []*vo.ParentBlockCandidate) int {
+func (d *AsyncProcessImpl) countChildCandidates(parentBlockCandidateList []*vo.ParentBlockCandidate) int {
 	count := 0
 	for _, candidate := range parentBlockCandidateList {
 		for _, child := range candidate.ChildChunks {
@@ -744,7 +744,7 @@ func (d *AsyncProcessingLogicImpl) countChildCandidates(parentBlockCandidateList
 }
 
 // cleanupParentCandidates 过滤"文本为空"或"无子块"的父块候选
-func (d *AsyncProcessingLogicImpl) cleanupParentCandidates(candidates []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
+func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
 	return slice.Filter(candidates, func(_ int, item *vo.ParentBlockCandidate) bool {
 		fn := func(child *vo.ChunkCandidate) bool { return child != nil && strutil.IsNotBlank(child.Text) }
 		return item != nil && strutil.IsNotBlank(item.Text) && slices.ContainsFunc(item.ChildChunks, fn)

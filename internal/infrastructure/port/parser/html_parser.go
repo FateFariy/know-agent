@@ -6,7 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/parse"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 )
 
 const HTML = "html"

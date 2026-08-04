@@ -18,7 +18,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	knowledgelogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
@@ -69,18 +70,20 @@ var chatProviderSet = wire.NewSet(
 )
 
 var documentProviderSet = wire.NewSet(
-	documentlogic.NewAsyncProcessingLogicImpl,
-	wire.Bind(new(documentlogic.AsyncProcessingLogic), new(*documentlogic.AsyncProcessingLogicImpl)),
-	documentlogic.NewChunkStrategyLogicImpl,
-	wire.Bind(new(documentlogic.ChunkCoordinator), new(*documentlogic.ChunkStrategyLogicImpl)),
+	process.NewAsyncProcessImpl,
+	wire.Bind(new(process.AsyncProcessor), new(*process.AsyncProcessImpl)),
+	process.NewChunkCoordinateImpl,
+	wire.Bind(new(process.ChunkCoordinator), new(*process.ChunkCoordinateImpl)),
 	documentlogic.NewProfileLogicImpl,
 	wire.Bind(new(documentlogic.ProfileLogic), new(*documentlogic.ProfileLogicImpl)),
 	documentlogic.NewLifecycleLogicImpl,
 	wire.Bind(new(documentlogic.LifecycleLogic), new(*documentlogic.LifecycleLogicImpl)),
-	documentlogic.NewStructureNodeLogicImpl,
-	wire.Bind(new(documentlogic.StructureNodeLogic), new(*documentlogic.StructureNodeLogicImpl)),
-	documentlogic.NewTextPreProcessLogicImpl,
-	wire.Bind(new(documentlogic.TextPreProcessLogic), new(*documentlogic.TextPreProcessLogicImpl)),
+	process.NewStructureNodeManager,
+	wire.Bind(new(process.StructureNodeManager), new(*process.StructureNodeManageImpl)),
+	process.NewTextPreprocessImpl,
+	wire.Bind(new(process.TextPreprocessor), new(*process.TextPreprocessImpl)),
+	process.NewProfileGenerateImpl,
+	wire.Bind(new(process.ProfileGenerator), new(*process.ProfileGenerateImpl)),
 	documentadapter.NewDocumentPort,
 	transform.NewAmbiguityResolver,
 	transform.NewHierarchyResolver,

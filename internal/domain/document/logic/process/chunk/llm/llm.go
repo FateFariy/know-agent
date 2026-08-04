@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
 )
 
 const (

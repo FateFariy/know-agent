@@ -7,7 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/chunk"
+	chunk2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 )
 
 const (
@@ -28,9 +28,9 @@ type Chunker struct {
 }
 
 // NewChunker 创建递归分块器
-func NewChunker(opts ...chunk.Option) *Chunker {
+func NewChunker(opts ...chunk2.Option) *Chunker {
 	return &Chunker{
-		opt: chunk.GetSpecificOptions(&options{
+		opt: chunk2.GetSpecificOptions(&options{
 			maxChars:     defaultMaxChars,
 			overlapChars: defaultOverlapChars,
 		}, opts...),
@@ -38,8 +38,8 @@ func NewChunker(opts ...chunk.Option) *Chunker {
 }
 
 // WithMaxChars 设置单个块的最大字符数
-func WithMaxChars(maxChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithMaxChars(maxChars int) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if maxChars <= 0 {
 			maxChars = defaultMaxChars
 		}
@@ -48,8 +48,8 @@ func WithMaxChars(maxChars int) chunk.Option {
 }
 
 // WithOverlapChars 设置相邻块的重叠字符数
-func WithOverlapChars(overlapChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithOverlapChars(overlapChars int) chunk2.Option {
+	return chunk2.WrapSpecificOptFn(func(o *options) {
 		if overlapChars < 0 {
 			overlapChars = defaultOverlapChars
 		}
@@ -63,18 +63,18 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行递归分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(ctx context.Context, input *chunk2.TextBlock, opts ...chunk2.Option) ([]*chunk2.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
 
 	// 允许通过 opts 覆盖原始配置
-	opt := chunk.GetSpecificOptions[options](s.opt, opts...)
+	opt := chunk2.GetSpecificOptions[options](s.opt, opts...)
 
 	// 先按优先级切分为若干原始块
 	rawChunks := s.split(strutil.Trim(input.Text), opt.maxChars, opt.overlapChars)
 
-	result := make([]*chunk.TextBlock, 0, len(rawChunks))
+	result := make([]*chunk2.TextBlock, 0, len(rawChunks))
 	for _, text := range rawChunks {
 		trimmed := strutil.Trim(text)
 		if trimmed == "" {
@@ -97,19 +97,19 @@ func (s *Chunker) split(text string, maxChars, overlapChars int) []string {
 	overlapChars = min(overlapChars, max(0, maxChars-1))
 
 	// 按段落切分
-	segmentList := chunk.SplitByRegex(text, chunk.ParagraphSplitRe)
+	segmentList := chunk2.SplitByRegex(text, chunk2.ParagraphSplitRe)
 	if len(segmentList) > 1 {
 		return s.mergeAndSplit(segmentList, maxChars, overlapChars)
 	}
 
 	// 按换行切分
-	segmentList = chunk.SplitByRegex(text, chunk.LineSplitRe)
+	segmentList = chunk2.SplitByRegex(text, chunk2.LineSplitRe)
 	if len(segmentList) > 1 {
 		return s.mergeAndSplit(segmentList, maxChars, overlapChars)
 	}
 
 	// 按句子切分
-	segmentList = chunk.SplitSentences(text)
+	segmentList = chunk2.SplitSentences(text)
 	if len(segmentList) > 1 {
 		return s.mergeAndSplit(segmentList, maxChars, overlapChars)
 	}
