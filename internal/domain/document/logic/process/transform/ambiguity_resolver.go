@@ -9,7 +9,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -17,7 +16,7 @@ import (
 
 type AmbiguityResolver struct {
 	model          model.ChatModel
-	promptTemplate chatlogic.PromptRenderer
+	promptTemplate prompt.Renderer
 	*ambiguityOption
 }
 
@@ -59,7 +58,7 @@ func WithContextWindowLines(lines int) TransformerOption {
 	})
 }
 
-func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate chatlogic.PromptRenderer) *AmbiguityResolver {
+func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate prompt.Renderer) *AmbiguityResolver {
 	return &AmbiguityResolver{
 		model:          model,
 		promptTemplate: promptTemplate,

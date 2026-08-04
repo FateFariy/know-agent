@@ -1,4 +1,4 @@
-package conversation
+package logic
 
 type options struct {
 	historyPreviewTurns    int // 预览历史轮次

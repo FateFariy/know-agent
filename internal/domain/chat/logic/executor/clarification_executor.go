@@ -7,7 +7,6 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -20,7 +19,7 @@ func NewClarificationExecutor() *ClarificationExecutor {
 	return &ClarificationExecutor{}
 }
 
-var _ conversation.Executor = (*ClarificationExecutor)(nil)
+var _ Executor = (*ClarificationExecutor)(nil)
 
 // Mode 返回 CLARIFICATION
 func (e *ClarificationExecutor) Mode() vo.ExecutionMode {

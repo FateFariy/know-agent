@@ -9,7 +9,6 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -23,14 +22,14 @@ import (
 //  3. 复用已渲染引用（避免重复输出相同证据块）
 //  4. 统计渲染/省略引用详情，供上层跟踪。
 type PromptAssembler struct {
-	promptRenderer               logic.PromptRenderer
+	promptRenderer               prompt.Renderer
 	totalEvidenceBudget          int    // 总证据预算（字符数）
 	perSubQuestionEvidenceBudget int    // 每个子问题的证据预算（字符数）
 	systemPrompt                 string // 系统提示词
 }
 
 // NewPromptAssembler 创建 RAG 提示词组装实现
-func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer logic.PromptRenderer) *PromptAssembler {
+func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer prompt.Renderer) *PromptAssembler {
 	return &PromptAssembler{
 		promptRenderer:               promptRenderer,
 		totalEvidenceBudget:          svcCtx.Config.Chat.Rag.TotalEvidenceMaxChars,

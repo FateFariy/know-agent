@@ -6,13 +6,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-
 	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -105,18 +104,12 @@ type questionIntentDecision struct {
 	source          string                   // 判定来源
 }
 
-// DocumentQuestionRouterImpl 在某个文档内部进行意图判断与章节定位，最终输出导航决策
-type DocumentQuestionRouterImpl struct {
-	chatModel             model.ChatModel        // 可选：兜底意图分类用的对话模型
-	structureGraphQuerier logic.GraphQuerier     // 结构图谱查询能力
-	navigationIndexSvc    NavigationIndexService // 可选：章节索引服务；非 nil 时用于章节定位
-	promptTemplateLogic   logic.PromptRenderer   // 可选：LLM 用的 Prompt 模板渲染
-}
-
-// NavigationIndexService 可选的章节索引服务接口（与结构图谱并列定位章节）
-type NavigationIndexService interface {
-	// SearchSections 按关键词+维度检索匹配的章节命中
-	SearchSections(ctx context.Context, documentId int64, topic, facet, informationNeed, question string, topK int) ([]*NavigationSectionHit, error)
+// DocumentQuestionRouteImpl 在某个文档内部进行意图判断与章节定位，最终输出导航决策
+type DocumentQuestionRouteImpl struct {
+	chatModel          model.ChatModel        // 可选：兜底意图分类用的对话模型
+	graphQuerier       graph.GraphQuerier     // 结构图谱查询
+	navigationIndexSvc NavigationIndexService // 可选：章节索引服务；非 nil 时用于章节定位
+	renderer           prompt.Renderer        // 可选：LLM 用的 Prompt 模板渲染
 }
 
 // NavigationSectionHit 章节索引服务返回的命中节点
@@ -125,14 +118,14 @@ type NavigationSectionHit struct {
 	Score  float64 // 命中分数
 }
 
-// NewDocumentQuestionRouterImpl 构造文档问题路由器
-func NewDocumentQuestionRouterImpl(chatModel model.ChatModel, structureGraphQuerier logic.GraphQuerier,
-	navigationIndexSvc NavigationIndexService, promptTemplateLogic logic.PromptRenderer) *DocumentQuestionRouterImpl {
-	return &DocumentQuestionRouterImpl{
-		chatModel:             chatModel,
-		structureGraphQuerier: structureGraphQuerier,
-		navigationIndexSvc:    navigationIndexSvc,
-		promptTemplateLogic:   promptTemplateLogic,
+// NewDocumentQuestionRouteImpl 构造文档问题路由器
+func NewDocumentQuestionRouteImpl(chatModel model.ChatModel, graphQuerier graph.GraphQuerier,
+	navigationIndexSvc NavigationIndexService, renderer prompt.Renderer) *DocumentQuestionRouteImpl {
+	return &DocumentQuestionRouteImpl{
+		chatModel:          chatModel,
+		graphQuerier:       graphQuerier,
+		navigationIndexSvc: navigationIndexSvc,
+		renderer:           renderer,
 	}
 }
 
@@ -142,7 +135,7 @@ func NewDocumentQuestionRouterImpl(chatModel model.ChatModel, structureGraphQuer
 //  1. 规范化输入（改写问题、子问题列表、拼接路由文本）
 //  2. 识别意图（本地规则 + 可选 LLM 兜底）
 //  3. 按 "GRAPH_ONLY → 编号项定位 → 混合检索" 的优先级输出导航决策
-func (r *DocumentQuestionRouterImpl) Route(ctx context.Context, documentId int64, originalQuestion string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error) {
+func (r *DocumentQuestionRouteImpl) Route(ctx context.Context, documentId int64, originalQuestion string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error) {
 	// 选取改写后的问题，无改写则回退原始问题
 	rewrittenQuestion := strutil.Trim(originalQuestion)
 	if rewriteResult != nil && strutil.IsNotBlank(rewriteResult.RewrittenQuestion) {
@@ -207,7 +200,7 @@ func (r *DocumentQuestionRouterImpl) Route(ctx context.Context, documentId int64
 // ============================================================
 
 // buildDecision 根据执行模式、动作、章节与检索计划，组装最终的 DocumentNavigationDecision
-func (r *DocumentQuestionRouterImpl) buildDecision(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
+func (r *DocumentQuestionRouteImpl) buildDecision(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{}
 	decision.ExecutionMode = mode
 	decision.ExecutionModeName = mode.Name()
@@ -257,7 +250,7 @@ func (r *DocumentQuestionRouterImpl) buildDecision(mode vo.ExecutionMode, action
 //  2. 并行计算五类布尔特征（item/analytic/outline/content/structure）
 //  3. 满足进入条件时执行 GRAPH_ONLY 本地规则并命中即返回
 //  4. 构造本地决策结果，在含糊场景下交由 LLM 兜底
-func (r *DocumentQuestionRouterImpl) detectQuestionIntent(ctx context.Context, routeText, originalQuestion, rewrittenQuestion string, subQuestions []string) *questionIntentDecision {
+func (r *DocumentQuestionRouteImpl) detectQuestionIntent(ctx context.Context, routeText, originalQuestion, rewrittenQuestion string, subQuestions []string) *questionIntentDecision {
 	normalized := strutil.Trim(routeText)
 	// 空问题短路，避免后续无意义的规则与 LLM 开销
 	if strutil.IsBlank(normalized) {
@@ -334,7 +327,7 @@ func (r *DocumentQuestionRouterImpl) detectQuestionIntent(ctx context.Context, r
 //  1. 相邻章节关系规则（5 个子规则，动作：SectionAdjacencyLookup）
 //  2. 目录/子章节展开规则（2 个子规则，动作：ChildSectionDescend）
 //  3. 均未命中时返回 "未命中"，交由下游继续处理
-func (r *DocumentQuestionRouterImpl) detectGraphOnlyIntentByRules(question string) *graphOnlyIntentDecision {
+func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string) *graphOnlyIntentDecision {
 	// 最明确的相邻章节表达（上一节/下一章/属于哪个章节……）→ 最高置信度直答
 	if strutil.ContainsAny(question, adjacencyHints) {
 		return &graphOnlyIntentDecision{
@@ -471,11 +464,11 @@ type llmQuestionIntentPayload struct {
 }
 
 // classifyQuestionIntentWithModel 调用 LLM 对含糊问题做兜底分类；chatModel 为空时回退本地决策
-func (r *DocumentQuestionRouterImpl) classifyQuestionIntentWithModel(ctx context.Context, originalQuestion, rewrittenQuestion, routeText string, localDecision *questionIntentDecision) *questionIntentDecision {
-	if r.chatModel == nil || r.promptTemplateLogic == nil {
+func (r *DocumentQuestionRouteImpl) classifyQuestionIntentWithModel(ctx context.Context, originalQuestion, rewrittenQuestion, routeText string, localDecision *questionIntentDecision) *questionIntentDecision {
+	if r.chatModel == nil || r.renderer == nil {
 		return localDecision
 	}
-	promptText, err := r.promptTemplateLogic.Render(prompt.DocumentGraphOnlyIntent, map[string]any{
+	promptText, err := r.renderer.Render(prompt.DocumentGraphOnlyIntent, map[string]any{
 		"originalQuestion":  strutil.Trim(originalQuestion),
 		"rewrittenQuestion": strutil.Trim(rewrittenQuestion),
 		"routeText":         strutil.Trim(routeText),
@@ -574,9 +567,9 @@ func normalizeConfidence(confidence float64) float64 {
 //  2. 通过可选章节索引服务（navigationIndexSvc）检索 → 依赖外部索引
 //  3. 从问题中抽取短语，对文档内章节本地打分匹配 → 纯本地策略
 //  4. 回退到图谱服务的 FindBestSection（一般基于向量/关键词检索）→ 最终兜底
-func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
+func (r *DocumentQuestionRouteImpl) resolveSection(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 入参/依赖校验 — 无 documentId 或无结构图谱查询器时直接放弃
-	if documentId == 0 || r.structureGraphQuerier == nil {
+	if documentId == 0 || r.graphQuerier == nil {
 		return nil
 	}
 	// 章节编号直接定位（最高置信度）
@@ -596,7 +589,7 @@ func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documen
 		return section
 	}
 	// 最终兜底 — 调用图谱服务的 FindBestSection（一般由图谱实现做向量/关键词混合检索）
-	section, err := r.structureGraphQuerier.FindBestSection(ctx, documentId, rewrittenQuestion, "")
+	section, err := r.graphQuerier.FindBestSection(ctx, documentId, rewrittenQuestion, "")
 	if err != nil {
 		logx.Errorf("FindBestSection 调用失败: documentId=%d, err=%v", documentId, err)
 		return nil
@@ -606,13 +599,13 @@ func (r *DocumentQuestionRouterImpl) resolveSection(ctx context.Context, documen
 
 // resolveBySectionCode 从问题文本中抽取章节编号（小数编号 / 中文 "第X章"）后通过图谱定位。
 // 抽取顺序：先小数编号（如 "1.2"），再中文编号（如 "第3章"）；任一命中即返回。
-func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
+func (r *DocumentQuestionRouteImpl) resolveBySectionCode(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 合并原始与改写问题，提高命中概率
 	combined := strutil.Trim(originalQuestion) + " " + strutil.Trim(rewrittenQuestion)
 
 	// 按 "1.2.3" 类小数编号正则抽取，逐条在图谱中查找
 	for _, code := range sectionCodePattern.FindAllString(combined, -1) {
-		section, err := r.structureGraphQuerier.FindSectionByCode(ctx, documentId, code)
+		section, err := r.graphQuerier.FindSectionByCode(ctx, documentId, code)
 		if err == nil && section != nil {
 			return section
 		}
@@ -629,7 +622,7 @@ func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, d
 			continue
 		}
 		code := strconv.Itoa(parsed)
-		if section, err := r.structureGraphQuerier.FindSectionByCode(ctx, documentId, code); err == nil && section != nil {
+		if section, err := r.graphQuerier.FindSectionByCode(ctx, documentId, code); err == nil && section != nil {
 			return section
 		}
 	}
@@ -640,13 +633,13 @@ func (r *DocumentQuestionRouterImpl) resolveBySectionCode(ctx context.Context, d
 // resolveByLocalStructure 用从问题中抽取的短语对文档内章节打分，返回分数最高且 >= 45 的章节。
 // 打分策略：每个章节的 Title / SectionPath / AnchorText / ContentText 分别与短语做包含匹配，
 // 取所有短语中最高分值作为该章节得分（命中路径/标题优先于命中锚点/正文）。
-func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context, documentId int64, phrases []string) *entity.GraphSection {
+func (r *DocumentQuestionRouteImpl) resolveByLocalStructure(ctx context.Context, documentId int64, phrases []string) *entity.GraphSection {
 	// 无候选短语 → 无法打分，直接返回
 	if len(phrases) == 0 {
 		return nil
 	}
 	// 从图谱获取文档全部章节列表；失败或为空时无法继续
-	sections, err := r.structureGraphQuerier.ListSections(ctx, documentId)
+	sections, err := r.graphQuerier.ListSections(ctx, documentId)
 	if err != nil || len(sections) == 0 {
 		return nil
 	}
@@ -666,9 +659,9 @@ func (r *DocumentQuestionRouterImpl) resolveByLocalStructure(ctx context.Context
 
 // resolveByNavigationIndex 通过可选的章节索引服务定位节点，命中时将最高分数节点转化为图谱章节。
 // 注：索引服务可能未配置（navigationIndexSvc 为 nil），该函数在此场景下直接返回 nil。
-func (r *DocumentQuestionRouterImpl) resolveByNavigationIndex(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
+func (r *DocumentQuestionRouteImpl) resolveByNavigationIndex(ctx context.Context, documentId int64, originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 	// 依赖校验：索引服务或图谱服务未配置则跳过此策略
-	if r.navigationIndexSvc == nil || r.structureGraphQuerier == nil {
+	if r.navigationIndexSvc == nil || r.graphQuerier == nil {
 		return nil
 	}
 	// 以改写后的问题为主要查询词，缺失时回退到原始问题
@@ -679,7 +672,7 @@ func (r *DocumentQuestionRouterImpl) resolveByNavigationIndex(ctx context.Contex
 		return nil
 	}
 	// 将索引服务返回的首条（最高分）节点 ID 映射为图谱章节
-	section, err := r.structureGraphQuerier.FindSectionById(ctx, documentId, hits[0].NodeId)
+	section, err := r.graphQuerier.FindSectionById(ctx, documentId, hits[0].NodeId)
 	return section
 }
 
@@ -693,7 +686,7 @@ func (r *DocumentQuestionRouterImpl) resolveByNavigationIndex(ctx context.Contex
 //  2. 引号包裹的短语（用户显式的标题引用）
 //  3. 相邻章节/目录展开标记词之前的片段（潜在章节标题）
 //  4. "第N步" 等步骤标记之前的片段（潜在步骤所在章节）
-func (r *DocumentQuestionRouterImpl) buildSectionPhrases(originalQuestion, rewrittenQuestion string) []string {
+func (r *DocumentQuestionRouteImpl) buildSectionPhrases(originalQuestion, rewrittenQuestion string) []string {
 	// seen + addIfAbsent 组合：保证短语去重、清洗空白，且最终上限为 8
 	seen := make(map[string]bool)
 	phrases := make([]string, 0, 8)

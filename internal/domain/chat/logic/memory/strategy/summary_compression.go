@@ -8,17 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -41,7 +39,7 @@ type SummaryCompressionStrategy struct {
 	baseMemoryStrategy
 	repo                      adapter.ChatRepository
 	chatModel                 model.ChatModel
-	promptTemplate            logic.PromptRenderer
+	promptTemplate            prompt.Renderer
 	refreshingConversationIds sync.Map
 	historySummary            config.HistorySummaryConf
 	questionHistoryMaxChars   int
@@ -49,7 +47,7 @@ type SummaryCompressionStrategy struct {
 }
 
 // NewSummaryCompressionStrategy 创建摘要压缩策略实例
-func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate logic.PromptRenderer) *SummaryCompressionStrategy {
+func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate prompt.Renderer) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
 		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,
@@ -524,7 +522,7 @@ func (s *SummaryCompressionStrategy) appendBulletSection(builder *strings.Builde
 func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*entity.ConversationSummary, error) {
 	summary := &entity.ConversationSummary{}
 	if err := utils.Unmarshal(raw, summary); err != nil {
-		logx.Debugf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
+		logx.Errorf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
 		return nil, err
 	}
 

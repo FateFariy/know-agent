@@ -1,4 +1,4 @@
-package conversation
+package logic
 
 import (
 	"context"
@@ -16,8 +16,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
@@ -35,46 +38,46 @@ const (
 
 // LogicImpl 聊天业务逻辑实现
 type LogicImpl struct {
-	repo              adapter.ChatRepository
-	orchestratorLogic logic.ChatPreparationOrchestratorLogic
-	promptTempLogic   logic.PromptRenderer
-	eventBuilder      *support.StreamEventBuilder
-	runtimeRegistry   *support.ChatRuntimeRegistry
-	executorRegistry  *ExecutorRegistry
-	lifecycleLogic    doclog.LifecycleLogic
-	recommendLogic    logic.QuestionRecommender
-	memoryLogic       logic.MemoryManager
-	distributedLock   lock.DistributedLock
-	checkPointStore   checkpoint.Store
+	repo             adapter.ChatRepository
+	preOrchestrator  preparation.ConversationPreOrchestrator
+	renderer         prompt.Renderer
+	eventBuilder     *support.StreamEventBuilder
+	runtimeRegistry  *support.ChatRuntimeRegistry
+	executorRegistry *executor.Registry
+	lifecycleLogic   doclog.LifecycleLogic
+	recommender      recommend.QuestionRecommender
+	memoryManager    memory.SessionMemoryManager
+	distributedLock  lock.DistributedLock
+	checkPointStore  checkpoint.Store
 	*options
 }
 
-var _ logic.ConversationLogic = (*LogicImpl)(nil)
+var _ ConversationLogic = (*LogicImpl)(nil)
 
-// NewChatLogic 创建聊天逻辑实例
-func NewChatLogic(svcCtx *svc.ServiceContext,
+// NewConversationLogicImpl 创建聊天逻辑实例
+func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	executorRegistry *ExecutorRegistry,
+	executorRegistry *executor.Registry,
 	lifecycleLogic doclog.LifecycleLogic,
-	orchestratorLogic logic.ChatPreparationOrchestratorLogic,
-	promptTempLogic logic.PromptRenderer,
-	recommendLogic logic.QuestionRecommender,
-	memoryLogic logic.MemoryManager,
+	preOrchestrator preparation.ConversationPreOrchestrator,
+	renderer prompt.Renderer,
+	recommender recommend.QuestionRecommender,
+	memoryManager memory.SessionMemoryManager,
 	distributedLock lock.DistributedLock,
 	checkPointStore checkpoint.Store,
 ) *LogicImpl {
 	return &LogicImpl{
-		repo:              repo,
-		executorRegistry:  executorRegistry,
-		orchestratorLogic: orchestratorLogic,
-		promptTempLogic:   promptTempLogic,
-		eventBuilder:      &support.StreamEventBuilder{},
-		runtimeRegistry:   &support.ChatRuntimeRegistry{},
-		lifecycleLogic:    lifecycleLogic,
-		recommendLogic:    recommendLogic,
-		memoryLogic:       memoryLogic,
-		distributedLock:   distributedLock,
-		checkPointStore:   checkPointStore,
+		repo:             repo,
+		executorRegistry: executorRegistry,
+		preOrchestrator:  preOrchestrator,
+		renderer:         renderer,
+		eventBuilder:     &support.StreamEventBuilder{},
+		runtimeRegistry:  &support.ChatRuntimeRegistry{},
+		lifecycleLogic:   lifecycleLogic,
+		recommender:      recommender,
+		memoryManager:    memoryManager,
+		distributedLock:  distributedLock,
+		checkPointStore:  checkPointStore,
 		options: &options{
 			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
 			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
@@ -138,7 +141,7 @@ func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string)
 	if err != nil {
 		return nil, err
 	}
-	record.MemorySummary, err = c.memoryLogic.GetConversationSummary(ctx, conversationId)
+	record.MemorySummary, err = c.memoryManager.GetConversationSummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +190,7 @@ func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string
 	var err error
 
 	// 删除记忆摘要
-	if err = c.memoryLogic.DeleteConversationSummary(ctx, conversationId); err != nil {
+	if err = c.memoryManager.DeleteConversationSummary(ctx, conversationId); err != nil {
 		return nil, err
 	}
 	fn := func(txCtx context.Context) error {
@@ -227,7 +230,7 @@ func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string
 
 // RebuildConversationSummary 重建会话摘要
 func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
-	summary, err := c.memoryLogic.RebuildConversationSummary(ctx, conversationId)
+	summary, err := c.memoryManager.RebuildConversationSummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +470,7 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 //	3. 根据所选文档刷新会话范围（在文档模式下）
 //	4. 初始化调试轨迹
 func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
-	execPlan, err := c.orchestratorLogic.Prepare(ctx, convCtx)
+	execPlan, err := c.preOrchestrator.Prepare(ctx, convCtx)
 	if err != nil {
 		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 		return nil, err
@@ -481,7 +484,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, err := c.promptTempLogic.Render(prompt.AgentQuestion, variables)
+	agentQuestion, err := c.renderer.Render(prompt.AgentQuestion, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +539,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
+		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(convCtx)
 	}()
 
@@ -587,7 +590,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 //  1. 原子检查 Finalized 标志（CAS：false → true），避免重复收尾
 //  2. defer 中异步刷新会话摘要并执行清理（任何返回路径都会执行）
 //  3. 启动 finalize 与 recommendation 两个追踪阶段（忽略其错误）
-//  4. 生成推荐追问：需要澄清时返回澄清选项，否则由 recommendLogic 生成
+//  4. 生成推荐追问：需要澄清时返回澄清选项，否则由 recommender 生成
 //  5. 向客户端流补发引用事件、推荐事件，并发送流 Complete
 //  6. 刷新 DebugTrace 运行时统计
 //  7. 组装成功态 ChatExchange，调用 completeExchange 落库；根据落库结果完成或标记追踪阶段
@@ -604,7 +607,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
+		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(convCtx)
 	}()
 
@@ -618,13 +621,13 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 
 	// 生成推荐追问
 	// - 若本次交互是澄清（NeedClarification 为真），则直接使用澄清选项作为推荐
-	// - 否则，拉取最近交互记录，由 recommendLogic 基于当前问答与历史生成推荐
+	// - 否则，拉取最近交互记录，由 recommender 基于当前问答与历史生成推荐
 	var recommendations []string
 	if convCtx.NeedClarification() {
 		recommendations = convCtx.ClarificationOptions()
 	} else {
 		recentExchanges := c.fetchRecentExchanges(ctx, convCtx.ConversationId, convCtx.ExchangeId)
-		recommendations = c.recommendLogic.GenerateRecommendations(ctx, convCtx.Question, answer, recentExchanges, convCtx.Trace)
+		recommendations = c.recommender.Generate(ctx, convCtx.Question, answer, recentExchanges)
 	}
 
 	// 完成 recommendation 追踪阶段，并写入推荐数量快照
@@ -686,7 +689,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
 	defer func() {
 		_ = recover()
-		c.memoryLogic.RefreshConversationSummaryAsync(convCtx.ConversationId)
+		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
 		c.cleanup(convCtx)
 	}()
 

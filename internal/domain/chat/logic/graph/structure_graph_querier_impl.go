@@ -9,7 +9,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	docent "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -28,7 +27,7 @@ func NewDefaultStructureGraphQuerier(svcCtx *svc.ServiceContext) *DefaultStructu
 	}
 }
 
-var _ logic.GraphQuerier = (*DefaultStructureGraphQuerier)(nil)
+var _ GraphQuerier = (*DefaultStructureGraphQuerier)(nil)
 
 func (q *DefaultStructureGraphQuerier) ListSections(ctx context.Context, documentId int64) ([]*entity.GraphSection, error) {
 	if documentId == 0 || q.db == nil {

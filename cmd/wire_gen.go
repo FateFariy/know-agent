@@ -9,13 +9,13 @@ package main
 import (
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
+	logic2 "github.com/swiftbit/know-agent/internal/domain/chat/logic"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/orchestrator"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
@@ -25,7 +25,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
-	logic2 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	logic3 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
@@ -55,9 +55,9 @@ func WireApp(c *config.Config) *server.Server {
 	documentPort := adapter.NewDocumentPort(minioStorage, rocketMQMessageProducer, milvusVector, milvusKeyword)
 	documentRepositoryImpl := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	chatModelImpl := llm.NewChatModelImpl(serviceContext)
-	templateRenderer := prompt.NewPromptTemplateLogicImpl()
+	rendererImpl := prompt.NewRendererImpl()
 	structureNodeManageImpl := process.NewStructureNodeManager(documentRepositoryImpl)
-	chunkCoordinateImpl := process.NewChunkCoordinateImpl(serviceContext, chatModelImpl, templateRenderer, structureNodeManageImpl)
+	chunkCoordinateImpl := process.NewChunkCoordinateImpl(serviceContext, chatModelImpl, rendererImpl, structureNodeManageImpl)
 	lifecycleLogicImpl := logic.NewLifecycleLogicImpl(serviceContext, documentPort, documentRepositoryImpl, chunkCoordinateImpl)
 	profileGenerateImpl := process.NewProfileGenerateImpl(documentRepositoryImpl)
 	profileLogicImpl := logic.NewProfileLogicImpl(documentRepositoryImpl, documentPort, profileGenerateImpl)
@@ -68,7 +68,7 @@ func WireApp(c *config.Config) *server.Server {
 	keywordRetrievalChannel := channel.NewKeywordRetrievalChannel(serviceContext, milvusKeyword)
 	v := domain.NewRetrievalChannels(vectorRetrievalChannel, keywordRetrievalChannel)
 	retrievalImpl := rag.NewRetrievalImpl(serviceContext, chatRepositoryImpl, dashScope, v, lifecycleLogicImpl)
-	promptAssembler := rag.NewPromptAssembler(serviceContext, templateRenderer)
+	promptAssembler := rag.NewPromptAssembler(serviceContext, rendererImpl)
 	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptAssembler, chatModelImpl)
 	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(serviceContext)
 	defaultAnswerRender := graph.NewDefaultAnswerRender()
@@ -76,26 +76,26 @@ func WireApp(c *config.Config) *server.Server {
 	graphThenEvidenceExecutor := executor.NewGraphThenEvidenceExecutor(defaultStructureGraphQuerier, defaultAnswerRender)
 	clarificationExecutor := executor.NewClarificationExecutor()
 	executorRegistry := domain.NewExecutorRegistry(ragChatExecutor, graphOnlyExecutor, graphThenEvidenceExecutor, clarificationExecutor)
-	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, templateRenderer)
-	sessionMemoryLogicImpl := memory.NewSessionMemoryLogicImpl(summaryCompressionStrategy)
-	queryRewriter := rewrite.NewQueryRewriter(serviceContext, chatModelImpl, templateRenderer)
+	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, rendererImpl)
+	sessionMemoryManageImpl := memory.NewSessionMemoryManageImpl(summaryCompressionStrategy)
+	queryRewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModelImpl, rendererImpl)
 	defaultNavigationIndexService := intent.NewDefaultNavigationIndexService()
-	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateRenderer)
+	documentQuestionRouteImpl := intent.NewDocumentQuestionRouteImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, rendererImpl)
 	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
 	v2 := domain.ProvideKnowledgeOptions()
 	knowledgeRouteImpl := route.NewKnowledgeRouteImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
-	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriter, documentQuestionRouterImpl, knowledgeRouteImpl, lifecycleLogicImpl)
-	questionRecommender := recommend.NewQuestionRecommender(serviceContext, templateRenderer, chatModelImpl)
+	conversationPreOrchestratorImpl := preparation.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryManageImpl, queryRewriteImpl, documentQuestionRouteImpl, knowledgeRouteImpl, lifecycleLogicImpl)
+	questionRecommendImpl := recommend.NewQuestionRecommendImpl(serviceContext, rendererImpl, chatModelImpl)
 	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
 	memoryCheckPointStore := check.NewMemoryCheckPointStore()
-	logicImpl := conversation.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateRenderer, questionRecommender, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
+	logicImpl := logic2.NewConversationLogicImpl(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, conversationPreOrchestratorImpl, rendererImpl, questionRecommendImpl, sessionMemoryManageImpl, redisMutexLock, memoryCheckPointStore)
 	chatService := handler.NewChatService(logicImpl)
-	knowledgeLogicImpl := logic2.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
+	knowledgeLogicImpl := logic3.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
 	restServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
 	registry := infrastructure.NewParserRegistry()
 	signalExtractor := transform.NewSignalExtractor()
-	ambiguityResolver := transform.NewAmbiguityResolver(serviceContext, chatModelImpl, templateRenderer)
+	ambiguityResolver := transform.NewAmbiguityResolver(serviceContext, chatModelImpl, rendererImpl)
 	hierarchyResolver := transform.NewHierarchyResolver()
 	treeValidator := transform.NewTreeValidator()
 	textPreprocessImpl := process.NewTextPreprocessImpl(registry, signalExtractor, ambiguityResolver, hierarchyResolver, treeValidator)

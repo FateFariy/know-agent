@@ -18,7 +18,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
@@ -68,9 +67,9 @@ func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, r
 	}
 }
 
-var _ logic.RagRetriever = (*RetrievalImpl)(nil)
+var _ Retriever = (*RetrievalImpl)(nil)
 
-func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error) {
+func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan) (*vo.RagRetrievalContext, error) {
 	ragCtx := vo.NewRagRetrievalContext(plan.RetrievalQuestion)
 
 	subQuestions := plan.RetrievalSubQuestions
@@ -78,7 +77,7 @@ func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecu
 		subQuestions = []string{plan.RetrievalQuestion}
 	}
 
-	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan, trace)
+	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, subQuestions, plan)
 	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.Documents) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
@@ -90,8 +89,7 @@ func (e *RetrievalImpl) Retrieve(ctx context.Context, plan *vo.ConversationExecu
 	return ragCtx, nil
 }
 
-func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string,
-	plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) []*vo.SubQuestionEvidence {
+func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RagRetrievalContext, subQuestions []string, plan *vo.ConversationExecutionPlan) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.subQuestionTimeout)
 	defer cancel()
 
@@ -145,6 +143,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			ragCtx.AddRetrievalNotef("子问题%d检索完成：%s，final=%d",
 				subQuestionIndex, e.summarizeChannelResults(filteredResults), len(finalDocs))
 
+			trace := vo.TraceFromCtx(ctx)
 			// 记录观测数据
 			if trace != nil {
 				if err = e.recordChannelObservations(ctx, trace, subQuestionIndex, subQuestion, start, rawChannelResults, filteredResults, channelTraces); err != nil {

@@ -4,13 +4,12 @@ import (
 	"github.com/google/wire"
 
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
+	executor2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/orchestrator"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
@@ -32,24 +31,24 @@ var ProviderSet = wire.NewSet(
 )
 
 var chatProviderSet = wire.NewSet(
-	conversation.NewChatLogic,
-	wire.Bind(new(chatlogic.ConversationLogic), new(*conversation.LogicImpl)),
-	rewrite.NewQueryRewriter,
-	wire.Bind(new(chatlogic.QueryRewriter), new(*rewrite.QueryRewriter)),
-	recommend.NewQuestionRecommender,
-	wire.Bind(new(chatlogic.QuestionRecommender), new(*recommend.QuestionRecommender)),
+	chatlogic.NewConversationLogicImpl,
+	wire.Bind(new(chatlogic.ConversationLogic), new(*chatlogic.LogicImpl)),
+	rewrite.NewQueryRewriteImpl,
+	wire.Bind(new(rewrite.QueryRewriter), new(*rewrite.QueryRewriteImpl)),
+	recommend.NewQuestionRecommendImpl,
+	wire.Bind(new(recommend.QuestionRecommender), new(*recommend.QuestionRecommendImpl)),
 	rag.NewRetrievalImpl,
-	wire.Bind(new(chatlogic.RagRetriever), new(*rag.RetrievalImpl)),
-	prompt.NewPromptTemplateLogicImpl,
-	wire.Bind(new(chatlogic.PromptRenderer), new(*prompt.TemplateRenderer)),
-	orchestrator.NewChatPreparationOrchestratorImpl,
-	wire.Bind(new(chatlogic.ChatPreparationOrchestratorLogic), new(*orchestrator.PreparationOrchestratorImpl)),
-	memory.NewSessionMemoryLogicImpl,
-	wire.Bind(new(chatlogic.MemoryManager), new(*memory.SessionMemoryLogicImpl)),
-	intent.NewDocumentQuestionRouterImpl,
-	wire.Bind(new(chatlogic.DocumentRouter), new(*intent.DocumentQuestionRouterImpl)),
+	wire.Bind(new(rag.Retriever), new(*rag.RetrievalImpl)),
+	prompt.NewRendererImpl,
+	wire.Bind(new(prompt.Renderer), new(*prompt.RendererImpl)),
+	preparation.NewChatPreparationOrchestratorImpl,
+	wire.Bind(new(preparation.ConversationPreOrchestrator), new(*preparation.ConversationPreOrchestratorImpl)),
+	memory.NewSessionMemoryManageImpl,
+	wire.Bind(new(memory.SessionMemoryManager), new(*memory.SessionMemoryManageImpl)),
+	intent.NewDocumentQuestionRouteImpl,
+	wire.Bind(new(intent.DocumentRouter), new(*intent.DocumentQuestionRouteImpl)),
 	graph.NewDefaultStructureGraphQuerier,
-	wire.Bind(new(chatlogic.GraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
+	wire.Bind(new(graph.GraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
 	intent.NewDefaultNavigationIndexService,
 	wire.Bind(new(intent.NavigationIndexService), new(*intent.DefaultNavigationIndexService)),
 	graph.NewDefaultAnswerRender,
@@ -58,15 +57,15 @@ var chatProviderSet = wire.NewSet(
 	channel.NewKeywordRetrievalChannel,
 	channel.NewVectorRetrievalChannel,
 	strategy.NewSummaryCompressionStrategy,
-	wire.Bind(new(memory.Strategy), new(*strategy.SummaryCompressionStrategy)),
-	executor.NewRagChatExecutor,
-	executor.NewGraphOnlyExecutor,
-	executor.NewGraphThenEvidenceExecutor,
-	executor.NewClarificationExecutor,
+	wire.Bind(new(strategy.Memory), new(*strategy.SummaryCompressionStrategy)),
+	executor2.NewRagChatExecutor,
+	executor2.NewGraphOnlyExecutor,
+	executor2.NewGraphThenEvidenceExecutor,
+	executor2.NewClarificationExecutor,
 	observability.NewConversationTraceRecorder,
 	NewExecutorRegistry,
 	NewRetrievalChannels,
-	wire.Bind(new(conversation.RagPromptAssembler), new(*rag.PromptAssembler)),
+	wire.Bind(new(executor2.RagPromptAssembler), new(*rag.PromptAssembler)),
 )
 
 var documentProviderSet = wire.NewSet(
@@ -101,12 +100,12 @@ var knowledgeProviderSet = wire.NewSet(
 
 // NewExecutorRegistry 组合四种 executor 为执行器注册表。
 func NewExecutorRegistry(
-	rag *executor.RagChatExecutor,
-	graphOnly *executor.GraphOnlyExecutor,
-	graphThen *executor.GraphThenEvidenceExecutor,
-	clarification *executor.ClarificationExecutor,
-) *conversation.ExecutorRegistry {
-	return conversation.NewExecutorRegistry(rag, graphOnly, graphThen, clarification)
+	rag *executor2.RagChatExecutor,
+	graphOnly *executor2.GraphOnlyExecutor,
+	graphThen *executor2.GraphThenEvidenceExecutor,
+	clarification *executor2.ClarificationExecutor,
+) *executor2.Registry {
+	return executor2.NewExecutorRegistry(rag, graphOnly, graphThen, clarification)
 }
 
 // ProvideKnowledgeOptions 提供知识路由的可选项（目前为空），

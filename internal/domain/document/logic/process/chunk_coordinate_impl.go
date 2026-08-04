@@ -14,7 +14,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	chunkllm "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/llm"
@@ -55,7 +54,7 @@ type option struct {
 }
 
 func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate chatlogic.PromptRenderer, nodeManager StructureNodeManager) *ChunkCoordinateImpl {
+	promptTemplate prompt.Renderer, nodeManager StructureNodeManager) *ChunkCoordinateImpl {
 
 	registry := make(map[int]chunk.Chunker)
 	// 结构分块

@@ -5,26 +5,24 @@ import (
 	"fmt"
 
 	"github.com/swiftbit/know-agent/common/logx"
-
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // RagChatExecutor 知识问答执行器
 // 流程：双通道混合检索 -> 引用排序 / 预算 / Prompt 装配 -> 模型流式输出
 type RagChatExecutor struct {
-	retriever       logic.RagRetriever
-	promptAssembler conversation.RagPromptAssembler
+	retriever       rag.Retriever
+	promptAssembler RagPromptAssembler
 	chatModel       model.ChatModel
 }
 
 // NewRagChatExecutor 构造知识问答执行器
 func NewRagChatExecutor(
-	retriever logic.RagRetriever,
-	ragPromptAssembler conversation.RagPromptAssembler,
+	retriever rag.Retriever,
+	ragPromptAssembler RagPromptAssembler,
 	chatModel model.ChatModel,
 ) *RagChatExecutor {
 	return &RagChatExecutor{
@@ -34,7 +32,7 @@ func NewRagChatExecutor(
 	}
 }
 
-var _ conversation.Executor = (*RagChatExecutor)(nil)
+var _ Executor = (*RagChatExecutor)(nil)
 
 // Mode 返回执行模式 RETRIEVAL
 func (e *RagChatExecutor) Mode() vo.ExecutionMode {
@@ -56,7 +54,7 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRAGRetrieve,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行双通道混合检索。"})
 
-	retrievalCtx, err := e.retriever.Retrieve(ctx, plan, convCtx.Trace)
+	retrievalCtx, err := e.retriever.Retrieve(ctx, plan)
 	if err != nil {
 		logx.Errorf("RAG 检索失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		vo.OnError(ctx, "RAG 检索失败。", err)

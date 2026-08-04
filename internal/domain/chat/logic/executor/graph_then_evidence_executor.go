@@ -9,8 +9,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -21,19 +19,19 @@ import (
 // 适用场景：用户明确指向某个章节或编号项（如"第 3 节第 2 项讲的是什么"），
 // 先由结构图定位目标节点，再由 AnswerRender 把节点文本/编号项渲染成最终答复。
 type GraphThenEvidenceExecutor struct {
-	querier      logic.GraphQuerier
+	querier      graph.GraphQuerier
 	answerRender graph.AnswerRender
 }
 
 // NewGraphThenEvidenceExecutor 构造"结构图定位后取证"执行器
-func NewGraphThenEvidenceExecutor(querier logic.GraphQuerier, answerRender graph.AnswerRender) *GraphThenEvidenceExecutor {
+func NewGraphThenEvidenceExecutor(querier graph.GraphQuerier, answerRender graph.AnswerRender) *GraphThenEvidenceExecutor {
 	return &GraphThenEvidenceExecutor{
 		querier:      querier,
 		answerRender: answerRender,
 	}
 }
 
-var _ conversation.Executor = (*GraphThenEvidenceExecutor)(nil)
+var _ Executor = (*GraphThenEvidenceExecutor)(nil)
 
 // Mode 返回 GRAPH_THEN_EVIDENCE
 func (e *GraphThenEvidenceExecutor) Mode() vo.ExecutionMode {

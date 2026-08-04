@@ -7,8 +7,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -19,19 +17,19 @@ import (
 // 当问题属于纯目录/章节导航类（如 "第 3 章有哪些小节"、"3.2 的上一节是什么"）时，
 // 仅通过结构图查询（父章节 / 兄弟章节 / 子章节），再由 AnswerRender 渲染一个纯文本的导航答复。
 type GraphOnlyExecutor struct {
-	querier      logic.GraphQuerier
+	querier      graph.GraphQuerier
 	answerRender graph.AnswerRender
 }
 
 // NewGraphOnlyExecutor 构造结构图直答执行器
-func NewGraphOnlyExecutor(querier logic.GraphQuerier, answerRender graph.AnswerRender) *GraphOnlyExecutor {
+func NewGraphOnlyExecutor(querier graph.GraphQuerier, answerRender graph.AnswerRender) *GraphOnlyExecutor {
 	return &GraphOnlyExecutor{
 		querier:      querier,
 		answerRender: answerRender,
 	}
 }
 
-var _ conversation.Executor = (*GraphOnlyExecutor)(nil)
+var _ Executor = (*GraphOnlyExecutor)(nil)
 
 // Mode 返回 GRAPH_ONLY
 func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGraphOnly }

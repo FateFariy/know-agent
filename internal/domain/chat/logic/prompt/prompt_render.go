@@ -16,13 +16,11 @@ const (
 	templateSuffix = ".tmpl"
 )
 
-// TemplateRenderer Prompt模板渲染服务
-type TemplateRenderer struct {
+type RendererImpl struct {
 	cache map[string]*template.Template // key: templatePath, value: *template.Template
 }
 
-// NewPromptTemplateLogicImpl 创建Prompt模板服务实例
-func NewPromptTemplateLogicImpl() *TemplateRenderer {
+func NewRendererImpl() *RendererImpl {
 	cache := make(map[string]*template.Template)
 
 	// 使用 Glob 匹配所有模板文件
@@ -43,13 +41,13 @@ func NewPromptTemplateLogicImpl() *TemplateRenderer {
 		}
 		cache[path] = tmpl
 	}
-	return &TemplateRenderer{
+	return &RendererImpl{
 		cache: cache,
 	}
 }
 
 // Render 渲染模板
-func (s *TemplateRenderer) Render(templateName string, variables map[string]any) (string, error) {
+func (s *RendererImpl) Render(templateName string, variables map[string]any) (string, error) {
 	templatePath := normalizeTemplatePath(templateName)
 	tmpl, ok := s.cache[templatePath]
 	if !ok {

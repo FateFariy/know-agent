@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"slices"
 	"time"
 
@@ -19,10 +18,6 @@ import (
 
 const (
 	embeddingBatch = 100 // 默认向量化批大小
-)
-
-var (
-	englishPattern = regexp.MustCompile(`[A-Za-z]`) // 匹配英文字母
 )
 
 // AsyncProcessImpl 异步处理业务逻辑实现

@@ -12,7 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -23,23 +22,23 @@ const (
 	maxRecommendations = 3
 )
 
-// QuestionRecommender 追问推荐器
-type QuestionRecommender struct {
+// QuestionRecommendImpl 追问推荐实现
+type QuestionRecommendImpl struct {
 	properties     config.RecommendationConf
-	promptTemplate logic.PromptRenderer
+	promptTemplate prompt.Renderer
 	chatModel      model.ChatModel
 }
 
-func NewQuestionRecommender(svcCtx *svc.ServiceContext, promptTemplate logic.PromptRenderer, chatModel model.ChatModel) *QuestionRecommender {
-	return &QuestionRecommender{
+func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate prompt.Renderer, chatModel model.ChatModel) *QuestionRecommendImpl {
+	return &QuestionRecommendImpl{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,
 		chatModel:      chatModel,
 	}
 }
 
-// GenerateRecommendations 生成推荐追问
-func (r *QuestionRecommender) GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string {
+// Generate 生成推荐追问
+func (r *QuestionRecommendImpl) Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) []string {
 	// 检查是否启用推荐且回答不为空
 	if !r.properties.Enabled || strutil.IsBlank(answer) {
 		return []string{}
@@ -55,7 +54,7 @@ func (r *QuestionRecommender) GenerateRecommendations(ctx context.Context, quest
 
 	go func() {
 		defer close(resultChan)
-		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges, trace)
+		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			errChan <- err
 			return
@@ -78,7 +77,7 @@ func (r *QuestionRecommender) GenerateRecommendations(ctx context.Context, quest
 }
 
 // generateRecommendations 生成推荐追问
-func (r *QuestionRecommender) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) ([]string, error) {
+func (r *QuestionRecommendImpl) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) ([]string, error) {
 	// 构建最近上下文
 	recentContext := r.buildRecentContext(recentExchanges)
 
@@ -93,7 +92,6 @@ func (r *QuestionRecommender) generateRecommendations(ctx context.Context, quest
 	}
 
 	// 调用LLM生成推荐
-	ctx = vo.WithTrace(ctx, trace)
 	content, err := r.chatModel.GenerateWithTrace(ctx, vo.ChatStageRecommend, "", userPrompt)
 	if strutil.IsBlank(content) {
 		return nil, err
@@ -116,7 +114,7 @@ func (r *QuestionRecommender) generateRecommendations(ctx context.Context, quest
 }
 
 // buildRecentContext 构建最近对话上下文
-func (r *QuestionRecommender) buildRecentContext(recentExchanges []*entity.ChatExchange) string {
+func (r *QuestionRecommendImpl) buildRecentContext(recentExchanges []*entity.ChatExchange) string {
 	if len(recentExchanges) == 0 {
 		return ""
 	}
