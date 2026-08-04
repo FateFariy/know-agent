@@ -38,7 +38,7 @@ const (
 // ChunkStrategyLogicImpl 分块策略实现
 type ChunkStrategyLogicImpl struct {
 	structureNode StructureNodeLogic
-	registry      map[int]chunk.Strategy
+	registry      map[int]chunk.Chunker
 	classifier    *support.DocumentLineClassifier
 	*strategyOption
 }
@@ -57,24 +57,24 @@ type strategyOption struct {
 func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
 	promptTemplate chatlogic.PromptRenderer, structureNode StructureNodeLogic) *ChunkStrategyLogicImpl {
 
-	registry := make(map[int]chunk.Strategy)
+	registry := make(map[int]chunk.Chunker)
 	// 结构分块
-	registry[vo.StrategyTypeStructure] = chunkstructure.NewStrategy()
+	registry[vo.StrategyTypeStructure] = chunkstructure.NewChunker()
 
 	// 递归分块
-	registry[vo.StrategyTypeRecursive] = chunkrecursive.NewStrategy(
+	registry[vo.StrategyTypeRecursive] = chunkrecursive.NewChunker(
 		chunkrecursive.WithMaxChars(svcCtx.Config.Chunk.RecursiveMaxChars),
 		chunkrecursive.WithOverlapChars(svcCtx.Config.Chunk.RecursiveOverlapChars),
 	)
 
 	// 语义分块
-	registry[vo.StrategyTypeSemantic] = chunksemantic.NewStrategy(
+	registry[vo.StrategyTypeSemantic] = chunksemantic.NewChunker(
 		chunksemantic.WithMinChars(svcCtx.Config.Chunk.SemanticMinChars),
 		chunksemantic.WithMaxChars(svcCtx.Config.Chunk.SemanticMaxChars),
 		chunksemantic.WithSimilarityThreshold(svcCtx.Config.Chunk.SemanticSimilarityThreshold),
 	)
 	// 大模型切块
-	registry[vo.StrategyTypeLLM] = chunkllm.NewStrategy(chatModel, promptTemplate,
+	registry[vo.StrategyTypeLLM] = chunkllm.NewChunker(chatModel, promptTemplate,
 		chunkllm.WithLlmSplitPrompt(prompt.DocumentLlmSplit),
 	)
 

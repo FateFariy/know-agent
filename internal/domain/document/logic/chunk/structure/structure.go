@@ -13,33 +13,33 @@ import (
 )
 
 const (
-	Name = "STRUCTURE"
+	Name = "STRUCTURE" // 名称
 )
 
-// Strategy 基于文档标题结构的分块策略。
+// Chunker 基于文档标题结构的分块器
 //
 // 逐行识别标题行，以标题作为天然的切分边界：
 //   - 维护一个标题栈，记录当前嵌套的标题序列
 //   - 遇到标题时，先输出当前累积的内容，再将新标题推入栈
 //   - 生成的每个文本块都携带其所在章节路径，便于追溯
-type Strategy struct {
+type Chunker struct {
 	classifier *support.DocumentLineClassifier
 }
 
-// NewStrategy 创建结构分块策略实例
-func NewStrategy(opts ...chunk.Option) *Strategy {
-	return &Strategy{
+// NewChunker 创建结构分块器
+func NewChunker(opts ...chunk.Option) *Chunker {
+	return &Chunker{
 		classifier: &support.DocumentLineClassifier{},
 	}
 }
 
 // Name 返回策略名称
-func (s *Strategy) Name() string {
+func (s *Chunker) Name() string {
 	return Name
 }
 
 // Chunk 按标题结构切分文本
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(_ context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.IsBlank(input.Text) {
 		return nil, nil
 	}
@@ -81,7 +81,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 }
 
 // flushChunk 将累积的非空文本作为一个块加入结果
-func (s *Strategy) flushChunk(result []*chunk.TextBlock, sourceType int, sectionPath string, currentChunk strings.Builder) []*chunk.TextBlock {
+func (s *Chunker) flushChunk(result []*chunk.TextBlock, sourceType int, sectionPath string, currentChunk strings.Builder) []*chunk.TextBlock {
 	trimmed := strutil.Trim(currentChunk.String())
 	if trimmed == "" {
 		return result
@@ -95,7 +95,7 @@ func (s *Strategy) flushChunk(result []*chunk.TextBlock, sourceType int, section
 }
 
 // composeSectionPath 拼接基础路径与当前层级路径，用 " > " 分隔
-func (s *Strategy) composeSectionPath(base, current string) string {
+func (s *Chunker) composeSectionPath(base, current string) string {
 	baseTrimmed := strutil.Trim(base)
 	currentTrimmed := strutil.Trim(current)
 	if baseTrimmed == "" {

@@ -25,6 +25,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	logic2 "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
@@ -81,7 +82,7 @@ func WireApp(c *config.Config) *server.Server {
 	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateLogicImpl)
 	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
 	v2 := domain.ProvideKnowledgeOptions()
-	knowledgeRouteLogicImpl := logic2.NewKnowledgeRouteLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
+	knowledgeRouteLogicImpl := route.NewKnowledgeRouteImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
 	_ = observability.NewConversationTraceRecorder(chatRepositoryImpl)
 	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriteLogicImpl, documentQuestionRouterImpl, knowledgeRouteLogicImpl, lifecycleLogicImpl)
 	recommendationLogicImpl := recommend.NewQuestionRecommender(serviceContext, templateLogicImpl, chatModelImpl)

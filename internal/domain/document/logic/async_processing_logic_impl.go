@@ -32,14 +32,14 @@ var (
 type AsyncProcessingLogicImpl struct {
 	repo           adapter.DocumentRepository
 	port           *adapter.DocumentPort
-	strategyLogic  ChunkStrategyLogic
+	strategyLogic  ChunkCoordinator
 	structureLogic StructureNodeLogic
 	textLogic      TextPreProcessLogic
 	profileLogic   ProfileLogic
 }
 
 // NewAsyncProcessingLogicImpl 构造异步处理逻辑实例
-func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkStrategyLogic,
+func NewAsyncProcessingLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, strategyLogic ChunkCoordinator,
 	structureLogic StructureNodeLogic, textLogic TextPreProcessLogic, profileLogic ProfileLogic) *AsyncProcessingLogicImpl {
 	return &AsyncProcessingLogicImpl{
 		repo:           repo,

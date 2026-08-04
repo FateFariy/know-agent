@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Name                = "RECURSIVE" // 策略名称
+	Name                = "RECURSIVE" // 名称
 	defaultMaxChars     = 800         // 默认最大字符数
 	defaultOverlapChars = 120         // 默认重叠字符数
 )
@@ -22,15 +22,15 @@ type options struct {
 	overlapChars int
 }
 
-// Strategy 递归分块策略, 按优先级：段落 -> 行 -> 句子 -> 固定窗口，递归地将超长段落继续切分, 支持在相邻块之间保留一段重叠文本
-type Strategy struct {
+// Chunker 递归分块策略, 按优先级：段落 -> 行 -> 句子 -> 固定窗口，递归地将超长段落继续切分, 支持在相邻块之间保留一段重叠文本
+type Chunker struct {
 	opt *options
 }
 
-// NewStrategy 创建递归分块策略实例
-func NewStrategy(opts ...chunk.Option) *Strategy {
-	return &Strategy{
-		opt: chunk.GetChunkImplSpecificOptions(&options{
+// NewChunker 创建递归分块器
+func NewChunker(opts ...chunk.Option) *Chunker {
+	return &Chunker{
+		opt: chunk.GetSpecificOptions(&options{
 			maxChars:     defaultMaxChars,
 			overlapChars: defaultOverlapChars,
 		}, opts...),
@@ -39,7 +39,7 @@ func NewStrategy(opts ...chunk.Option) *Strategy {
 
 // WithMaxChars 设置单个块的最大字符数
 func WithMaxChars(maxChars int) chunk.Option {
-	return chunk.WrapChunkImplSpecificOptFn(func(o *options) {
+	return chunk.WrapSpecificOptFn(func(o *options) {
 		if maxChars <= 0 {
 			maxChars = defaultMaxChars
 		}
@@ -49,7 +49,7 @@ func WithMaxChars(maxChars int) chunk.Option {
 
 // WithOverlapChars 设置相邻块的重叠字符数
 func WithOverlapChars(overlapChars int) chunk.Option {
-	return chunk.WrapChunkImplSpecificOptFn(func(o *options) {
+	return chunk.WrapSpecificOptFn(func(o *options) {
 		if overlapChars < 0 {
 			overlapChars = defaultOverlapChars
 		}
@@ -58,18 +58,18 @@ func WithOverlapChars(overlapChars int) chunk.Option {
 }
 
 // Name 返回策略名称
-func (s *Strategy) Name() string {
+func (s *Chunker) Name() string {
 	return Name
 }
 
 // Chunk 执行递归分块
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
 
 	// 允许通过 opts 覆盖原始配置
-	opt := chunk.GetChunkImplSpecificOptions[options](s.opt, opts...)
+	opt := chunk.GetSpecificOptions[options](s.opt, opts...)
 
 	// 先按优先级切分为若干原始块
 	rawChunks := s.split(strutil.Trim(input.Text), opt.maxChars, opt.overlapChars)
@@ -86,7 +86,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 }
 
 // split 递归切分主入口
-func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
+func (s *Chunker) split(text string, maxChars, overlapChars int) []string {
 	if text == "" {
 		return nil
 	}
@@ -119,7 +119,7 @@ func (s *Strategy) split(text string, maxChars, overlapChars int) []string {
 }
 
 // mergeAndSplit 将片段依次累加，超出 maxChars 时刷出一个块，然后继续
-func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars int) []string {
+func (s *Chunker) mergeAndSplit(segmentList []string, maxChars, overlapChars int) []string {
 	rawResultList := make([]string, 0, len(segmentList))
 	current := strings.Builder{}
 
@@ -155,7 +155,7 @@ func (s *Strategy) mergeAndSplit(segmentList []string, maxChars, overlapChars in
 }
 
 // applyOverlap 为块列表增加重叠前缀
-func (s *Strategy) applyOverlap(rawChunkList []string, maxChars, overlapChars int) []string {
+func (s *Chunker) applyOverlap(rawChunkList []string, maxChars, overlapChars int) []string {
 	if len(rawChunkList) == 0 || overlapChars <= 0 {
 		return rawChunkList
 	}
@@ -183,7 +183,7 @@ func (s *Strategy) applyOverlap(rawChunkList []string, maxChars, overlapChars in
 }
 
 // buildOverlapPrefix 取 previous 尾部作为重叠前缀，受 maxChars 约束
-func (s *Strategy) buildOverlapPrefix(previous, current string, maxChars, overlapChars int) string {
+func (s *Chunker) buildOverlapPrefix(previous, current string, maxChars, overlapChars int) string {
 	previous = strutil.Trim(previous)
 	current = strutil.Trim(current)
 	if previous == "" || current == "" {
@@ -204,7 +204,7 @@ func (s *Strategy) buildOverlapPrefix(previous, current string, maxChars, overla
 }
 
 // fixedWindowSplit 固定窗口切分超长文本
-func (s *Strategy) fixedWindowSplit(text string, maxChars, overlapChars int) []string {
+func (s *Chunker) fixedWindowSplit(text string, maxChars, overlapChars int) []string {
 	trim := strutil.Trim(text)
 	total := utils.Len(trim)
 	if total == 0 {

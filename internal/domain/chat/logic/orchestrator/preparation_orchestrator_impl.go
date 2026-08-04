@@ -21,7 +21,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -40,7 +40,7 @@ type PreparationOrchestratorImpl struct {
 	memoryLogic            logic.MemoryManager
 	rewriteLogic           logic.QueryRewriter
 	documentQuestionRouter logic.DocumentRouter
-	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
+	knowledgeRouteLogic    kelog.KnowledgeRouter
 	lifecycleLogic         doclog.LifecycleLogic
 	*option
 }
@@ -63,7 +63,7 @@ func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	memoryLogic logic.MemoryManager,
 	rewriteLogic logic.QueryRewriter,
 	documentQuestionRouter logic.DocumentRouter,
-	knowledgeRoute kelog.KnowledgeRouteLogic,
+	knowledgeRoute kelog.KnowledgeRouter,
 	lifecycleLogic doclog.LifecycleLogic,
 ) *PreparationOrchestratorImpl {
 	return &PreparationOrchestratorImpl{

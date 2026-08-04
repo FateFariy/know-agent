@@ -20,6 +20,7 @@ import (
 	documentlogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/transform"
 	knowledgelogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 )
 
@@ -64,14 +65,14 @@ var chatProviderSet = wire.NewSet(
 	observability.NewConversationTraceRecorder,
 	NewExecutorRegistry,
 	NewRetrievalChannels,
-	wire.Bind(new(conversation.RagPromptBuilder), new(*rag.PromptAssembler)),
+	wire.Bind(new(conversation.RagPromptAssembler), new(*rag.PromptAssembler)),
 )
 
 var documentProviderSet = wire.NewSet(
 	documentlogic.NewAsyncProcessingLogicImpl,
 	wire.Bind(new(documentlogic.AsyncProcessingLogic), new(*documentlogic.AsyncProcessingLogicImpl)),
 	documentlogic.NewChunkStrategyLogicImpl,
-	wire.Bind(new(documentlogic.ChunkStrategyLogic), new(*documentlogic.ChunkStrategyLogicImpl)),
+	wire.Bind(new(documentlogic.ChunkCoordinator), new(*documentlogic.ChunkStrategyLogicImpl)),
 	documentlogic.NewProfileLogicImpl,
 	wire.Bind(new(documentlogic.ProfileLogic), new(*documentlogic.ProfileLogicImpl)),
 	documentlogic.NewLifecycleLogicImpl,
@@ -88,8 +89,8 @@ var documentProviderSet = wire.NewSet(
 )
 
 var knowledgeProviderSet = wire.NewSet(
-	knowledgelogic.NewKnowledgeRouteLogicImpl,
-	wire.Bind(new(knowledgelogic.KnowledgeRouteLogic), new(*knowledgelogic.KnowledgeRouteLogicImpl)),
+	route.NewKnowledgeRouteImpl,
+	wire.Bind(new(route.KnowledgeRouter), new(*route.KnowledgeRouteImpl)),
 	knowledgelogic.NewKnowledgeLogicImpl,
 	wire.Bind(new(knowledgelogic.KnowledgeLogic), new(*knowledgelogic.KnowledgeLogicImpl)),
 	ProvideKnowledgeOptions,
@@ -106,8 +107,8 @@ func NewExecutorRegistry(
 }
 
 // ProvideKnowledgeOptions 提供知识路由的可选项（目前为空），
-// 供 NewKnowledgeRouteLogicImpl 消费。
-func ProvideKnowledgeOptions() []knowledgelogic.Option {
+// 供 NewKnowledgeRouteImpl 消费。
+func ProvideKnowledgeOptions() []route.Option {
 	return nil
 }
 

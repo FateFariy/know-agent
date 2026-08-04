@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	Name             = "LLM"                //  策略名称
+	Name             = "LLM"                //  名称
 	documentLlmSplit = "document-llm-split" // 提示词模板名称
 )
 
@@ -22,8 +22,8 @@ type PromptRenderer interface {
 	Render(templateName string, variables map[string]any) (string, error)
 }
 
-// Strategy 大模型智能分块策略
-type Strategy struct {
+// Chunker 大模型智能分块器
+type Chunker struct {
 	model    model.ChatModel
 	renderer PromptRenderer
 	opt      *options
@@ -35,7 +35,7 @@ type options struct {
 
 // WithLlmSplitPrompt 设置LLM分块提示词
 func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
-	return chunk.WrapChunkImplSpecificOptFn(func(o *options) {
+	return chunk.WrapSpecificOptFn(func(o *options) {
 		if llmSplitPrompt == "" {
 			llmSplitPrompt = documentLlmSplit
 		}
@@ -43,10 +43,10 @@ func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
 	})
 }
 
-// NewStrategy 创建大模型智能分块策略
-func NewStrategy(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Strategy {
-	return &Strategy{
-		opt: chunk.GetChunkImplSpecificOptions(&options{
+// NewChunker 创建大模型智能分块器
+func NewChunker(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Chunker {
+	return &Chunker{
+		opt: chunk.GetSpecificOptions(&options{
 			llmSplitPrompt: documentLlmSplit,
 		}, opts...),
 		model:    model,
@@ -55,17 +55,17 @@ func NewStrategy(model model.ChatModel, renderer PromptRenderer, opts ...chunk.O
 }
 
 // Name 返回策略名称
-func (s *Strategy) Name() string {
+func (s *Chunker) Name() string {
 	return Name
 }
 
 // Chunk 执行大模型智能分块
-func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}
 
-	opt := chunk.GetChunkImplSpecificOptions(s.opt, opts...)
+	opt := chunk.GetSpecificOptions(s.opt, opts...)
 
 	sourceTextList := []string{strutil.Trim(input.Text)}
 	resultList := make([]*chunk.TextBlock, 0, len(sourceTextList))
@@ -86,7 +86,7 @@ func (s *Strategy) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...ch
 }
 
 // split 调用大模型，从返回文本中解析 JSON 数组
-func (s *Strategy) split(ctx context.Context, promptTempName, sourceText string) ([]string, error) {
+func (s *Chunker) split(ctx context.Context, promptTempName, sourceText string) ([]string, error) {
 	// 渲染提示词
 	prompt, err := s.renderer.Render(promptTempName, map[string]any{"sourceText": sourceText})
 	if err != nil || strutil.Trim(prompt) == "" {

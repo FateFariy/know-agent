@@ -26,14 +26,14 @@ import (
 type LifecycleLogicImpl struct {
 	port          *adapter.DocumentPort
 	repo          adapter.DocumentRepository
-	chunkStrategy ChunkStrategyLogic
+	chunkStrategy ChunkCoordinator
 	parseTopic    string
 	indexTopic    string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, chunkStrategy ChunkStrategyLogic) *LifecycleLogicImpl {
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, chunkStrategy ChunkCoordinator) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
 		port:          port,
 		repo:          repo,

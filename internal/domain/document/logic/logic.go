@@ -70,8 +70,8 @@ type StructureNodeLogic interface {
 	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
 
-// ChunkStrategyLogic 分块策略业务逻辑接口
-type ChunkStrategyLogic interface {
+// ChunkCoordinator 分块协调器
+type ChunkCoordinator interface {
 	// RecommendStrategy 推荐策略方案
 	RecommendStrategy(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
 
