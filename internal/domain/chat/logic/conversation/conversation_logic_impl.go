@@ -7,17 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
-
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
-
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -39,19 +37,19 @@ const (
 type LogicImpl struct {
 	repo              adapter.ChatRepository
 	orchestratorLogic logic.ChatPreparationOrchestratorLogic
-	promptTempLogic   logic.PromptTemplateLogic
+	promptTempLogic   logic.PromptRenderer
 	eventBuilder      *support.StreamEventBuilder
 	runtimeRegistry   *support.ChatRuntimeRegistry
 	executorRegistry  *ExecutorRegistry
 	lifecycleLogic    doclog.LifecycleLogic
-	recommendLogic    logic.RecommendationLogic
-	memoryLogic       logic.SessionMemoryLogic
+	recommendLogic    logic.QuestionRecommender
+	memoryLogic       logic.MemoryManager
 	distributedLock   lock.DistributedLock
 	checkPointStore   checkpoint.Store
 	*options
 }
 
-var _ logic.ChatLogic = (*LogicImpl)(nil)
+var _ logic.ConversationLogic = (*LogicImpl)(nil)
 
 // NewChatLogic 创建聊天逻辑实例
 func NewChatLogic(svcCtx *svc.ServiceContext,
@@ -59,9 +57,9 @@ func NewChatLogic(svcCtx *svc.ServiceContext,
 	executorRegistry *ExecutorRegistry,
 	lifecycleLogic doclog.LifecycleLogic,
 	orchestratorLogic logic.ChatPreparationOrchestratorLogic,
-	promptTempLogic logic.PromptTemplateLogic,
-	recommendLogic logic.RecommendationLogic,
-	memoryLogic logic.SessionMemoryLogic,
+	promptTempLogic logic.PromptRenderer,
+	recommendLogic logic.QuestionRecommender,
+	memoryLogic logic.MemoryManager,
 	distributedLock lock.DistributedLock,
 	checkPointStore checkpoint.Store,
 ) *LogicImpl {
@@ -453,7 +451,7 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 			}
 			// 执行续期逻辑
 			if err := c.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
-				Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d, err=%v",
+				logx.Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d, err=%v",
 					convCtx.ConversationId, convCtx.ExchangeId, err)
 				c.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
 				return
@@ -471,7 +469,7 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
 	execPlan, err := c.orchestratorLogic.Prepare(ctx, convCtx)
 	if err != nil {
-		Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
+		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 		return nil, err
 	}
 
@@ -498,7 +496,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 			SelectedDocumentName: execPlan.SelectedDocumentName,
 		}
 		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
-			Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
+			logx.Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 			return nil, err
 		}
 	}
@@ -555,7 +553,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	// 发送 status 事件
 	statusEvent := c.eventBuilder.Status("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
 	if err := support.SafeEmitNext(convCtx.Channel, statusEvent); err != nil {
-		Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+		logx.Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		responseMessage = "会话已停止，停止事件发送失败"
 	}
 
@@ -637,7 +635,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	if len(recommendations) > 0 {
 		recommendationsEvent := c.eventBuilder.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
 		if err := support.SafeEmitNext(convCtx.Channel, recommendationsEvent); err != nil {
-			Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+			logx.Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
 	}
 
@@ -700,7 +698,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	// 向失败事件 + 流 Complete 信号；发送失败仅告警
 	errorEvent := c.eventBuilder.Error(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)
 	if err = support.SafeEmitNext(convCtx.Channel, errorEvent); err != nil {
-		Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
+		logx.Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 	}
 
 	// 刷新 DebugTrace 的运行时统计
@@ -809,7 +807,7 @@ func (c *LogicImpl) unlockConversationLock(leaseKey string) {
 	defer cancelFunc()
 	err := c.distributedLock.Unlock(ctx, leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
-		Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
+		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}
 }
 
@@ -841,7 +839,7 @@ func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int6
 func (c *LogicImpl) fetchRecentExchanges(ctx context.Context, conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
 	recent, err := c.repo.ListRecentExchanges(ctx, conversationId, c.options.historyPreviewTurns)
 	if err != nil {
-		Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
+		logx.Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
 		return nil
 	}
 	return slice.Filter(recent, func(_ int, ex *entity.ChatExchange) bool {
@@ -865,8 +863,4 @@ func (c *LogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, tu
 		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
 		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
-}
-
-func Warnf(format string, args ...any) {
-	logx.Alert(fmt.Sprintf(format, args...))
 }

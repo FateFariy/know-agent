@@ -9,7 +9,7 @@ package main
 import (
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	logic3 "github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
@@ -66,7 +66,7 @@ func WireApp(c *config.Config) *server.Server {
 	keywordRetrievalChannel := channel.NewKeywordRetrievalChannel(serviceContext, milvusKeyword)
 	v := domain.NewRetrievalChannels(vectorRetrievalChannel, keywordRetrievalChannel)
 	retrievalImpl := rag.NewRetrievalImpl(serviceContext, chatRepositoryImpl, dashScope, v, lifecycleLogicImpl)
-	promptBuilder := rag.NewPromptBuilder(serviceContext, templateLogicImpl)
+	promptBuilder := rag.NewPromptAssembler(serviceContext, templateLogicImpl)
 	ragChatExecutor := executor.NewRagChatExecutor(retrievalImpl, promptBuilder, chatModelImpl)
 	defaultStructureGraphQuerier := graph.NewDefaultStructureGraphQuerier(serviceContext)
 	defaultAnswerRender := graph.NewDefaultAnswerRender()
@@ -76,7 +76,7 @@ func WireApp(c *config.Config) *server.Server {
 	executorRegistry := domain.NewExecutorRegistry(ragChatExecutor, graphOnlyExecutor, graphThenEvidenceExecutor, clarificationExecutor)
 	summaryCompressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepositoryImpl, chatModelImpl, templateLogicImpl)
 	sessionMemoryLogicImpl := memory.NewSessionMemoryLogicImpl(summaryCompressionStrategy)
-	queryRewriteLogicImpl := rewrite.NewQueryRewriteLogicImpl(serviceContext, chatModelImpl, templateLogicImpl)
+	queryRewriteLogicImpl := rewrite.NewQueryRewriter(serviceContext, chatModelImpl, templateLogicImpl)
 	defaultNavigationIndexService := intent.NewDefaultNavigationIndexService()
 	documentQuestionRouterImpl := intent.NewDocumentQuestionRouterImpl(chatModelImpl, defaultStructureGraphQuerier, defaultNavigationIndexService, templateLogicImpl)
 	knowledgeRepositoryImpl := persistence.NewKnowledgeRepository(serviceContext)
@@ -84,10 +84,10 @@ func WireApp(c *config.Config) *server.Server {
 	knowledgeRouteLogicImpl := logic2.NewKnowledgeRouteLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl, profileLogicImpl, v2...)
 	_ = observability.NewConversationTraceRecorder(chatRepositoryImpl)
 	preparationOrchestratorImpl := orchestrator.NewChatPreparationOrchestratorImpl(serviceContext, chatRepositoryImpl, sessionMemoryLogicImpl, queryRewriteLogicImpl, documentQuestionRouterImpl, knowledgeRouteLogicImpl, lifecycleLogicImpl)
-	recommendationLogicImpl := recommend.NewRecommendationLogicImpl(serviceContext, templateLogicImpl, chatModelImpl)
+	recommendationLogicImpl := recommend.NewQuestionRecommender(serviceContext, templateLogicImpl, chatModelImpl)
 	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
 	memoryCheckPointStore := check.NewMemoryCheckPointStore()
-	logicImpl := conversation.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateLogicImpl, recommendationLogicImpl, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
+	logicImpl := logic3.NewChatLogic(serviceContext, chatRepositoryImpl, executorRegistry, lifecycleLogicImpl, preparationOrchestratorImpl, templateLogicImpl, recommendationLogicImpl, sessionMemoryLogicImpl, redisMutexLock, memoryCheckPointStore)
 	chatService := handler.NewChatService(logicImpl)
 	knowledgeLogicImpl := logic2.NewKnowledgeLogicImpl(knowledgeRepositoryImpl, lifecycleLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)

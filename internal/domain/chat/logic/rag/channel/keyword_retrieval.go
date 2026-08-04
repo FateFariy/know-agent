@@ -8,7 +8,6 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -18,7 +17,7 @@ type KeywordRetrievalChannel struct {
 	retriever retriever.KeywordRetriever
 }
 
-var _ rag.RetrievalChannel = (*KeywordRetrievalChannel)(nil)
+var _ Retrieval = (*KeywordRetrievalChannel)(nil)
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
 func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever retriever.KeywordRetriever) *KeywordRetrievalChannel {

@@ -37,9 +37,9 @@ var (
 // PreparationOrchestratorImpl 聊天准备编排器实现
 type PreparationOrchestratorImpl struct {
 	repo                   adapter.ChatRepository
-	memoryLogic            logic.SessionMemoryLogic
-	rewriteLogic           logic.QueryRewriteLogic
-	documentQuestionRouter logic.DocumentQuestionRouteLogic
+	memoryLogic            logic.MemoryManager
+	rewriteLogic           logic.QueryRewriter
+	documentQuestionRouter logic.DocumentRouter
 	knowledgeRouteLogic    kelog.KnowledgeRouteLogic
 	lifecycleLogic         doclog.LifecycleLogic
 	*option
@@ -60,9 +60,9 @@ type option struct {
 // NewChatPreparationOrchestratorImpl 创建聊天准备编排器实例
 func NewChatPreparationOrchestratorImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	memoryLogic logic.SessionMemoryLogic,
-	rewriteLogic logic.QueryRewriteLogic,
-	documentQuestionRouter logic.DocumentQuestionRouteLogic,
+	memoryLogic logic.MemoryManager,
+	rewriteLogic logic.QueryRewriter,
+	documentQuestionRouter logic.DocumentRouter,
 	knowledgeRoute kelog.KnowledgeRouteLogic,
 	lifecycleLogic doclog.LifecycleLogic,
 ) *PreparationOrchestratorImpl {

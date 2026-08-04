@@ -12,13 +12,13 @@ import (
 
 // ChatService 聊天服务实现
 type ChatService struct {
-	l logic.ChatLogic
+	l logic.ConversationLogic
 }
 
 var _ chat.HTTPServer = (*ChatService)(nil)
 
 // NewChatService 创建聊天服务实例
-func NewChatService(l logic.ChatLogic) *ChatService {
+func NewChatService(l logic.ConversationLogic) *ChatService {
 	return &ChatService{
 		l: l,
 	}

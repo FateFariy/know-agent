@@ -55,7 +55,7 @@ type strategyOption struct {
 }
 
 func NewChunkStrategyLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate chatlogic.PromptTemplateLogic, structureNode StructureNodeLogic) *ChunkStrategyLogicImpl {
+	promptTemplate chatlogic.PromptRenderer, structureNode StructureNodeLogic) *ChunkStrategyLogicImpl {
 
 	registry := make(map[int]chunk.Strategy)
 	// 结构分块

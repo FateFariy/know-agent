@@ -15,23 +15,23 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// PromptBuilder RAG 提示词组装实现
+// PromptAssembler RAG 提示词组装实现
 //
 // 负责：
 //  1. 基于执行计划（ConversationExecutionPlan）构建 system / user prompt
 //  2. 对证据块进行预算裁剪（总预算 + 每个子问题预算）
 //  3. 复用已渲染引用（避免重复输出相同证据块）
 //  4. 统计渲染/省略引用详情，供上层跟踪。
-type PromptBuilder struct {
-	promptRenderer               logic.PromptTemplateLogic
+type PromptAssembler struct {
+	promptRenderer               logic.PromptRenderer
 	totalEvidenceBudget          int    // 总证据预算（字符数）
 	perSubQuestionEvidenceBudget int    // 每个子问题的证据预算（字符数）
 	systemPrompt                 string // 系统提示词
 }
 
-// NewPromptBuilder 创建 RAG 提示词组装实现
-func NewPromptBuilder(svcCtx *svc.ServiceContext, promptRenderer logic.PromptTemplateLogic) *PromptBuilder {
-	return &PromptBuilder{
+// NewPromptAssembler 创建 RAG 提示词组装实现
+func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer logic.PromptRenderer) *PromptAssembler {
+	return &PromptAssembler{
 		promptRenderer:               promptRenderer,
 		totalEvidenceBudget:          svcCtx.Config.Chat.Rag.TotalEvidenceMaxChars,
 		perSubQuestionEvidenceBudget: svcCtx.Config.Chat.Rag.PerSubQuestionEvidenceMaxChars,
@@ -40,7 +40,7 @@ func NewPromptBuilder(svcCtx *svc.ServiceContext, promptRenderer logic.PromptTem
 }
 
 // Assemble 全量组装（返回 system + user + 预算/引用统计）
-func (s *PromptBuilder) Assemble(_ context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error) {
+func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error) {
 	if plan == nil {
 		return nil, fmt.Errorf("plan not is nil")
 	}
@@ -71,12 +71,12 @@ func (s *PromptBuilder) Assemble(_ context.Context, plan *vo.ConversationExecuti
 }
 
 // hasRetrievalQuestion 是否有检索问题
-func (s *PromptBuilder) hasRetrievalQuestion(plan *vo.ConversationExecutionPlan) bool {
+func (s *PromptAssembler) hasRetrievalQuestion(plan *vo.ConversationExecutionPlan) bool {
 	return strutil.IsNotBlank(plan.RetrievalQuestion) && plan.RetrievalQuestion != plan.OriginalQuestion
 }
 
 // hasHistoryContext 是否有历史上下文
-func (s *PromptBuilder) hasHistoryContext(plan *vo.ConversationExecutionPlan) bool {
+func (s *PromptAssembler) hasHistoryContext(plan *vo.ConversationExecutionPlan) bool {
 	if plan.QuestionHistoryContext == nil {
 		return false
 	}
@@ -84,7 +84,7 @@ func (s *PromptBuilder) hasHistoryContext(plan *vo.ConversationExecutionPlan) bo
 }
 
 // buildHistoryContext 构建历史上下文
-func (s *PromptBuilder) buildHistoryContext(plan *vo.ConversationExecutionPlan) string {
+func (s *PromptAssembler) buildHistoryContext(plan *vo.ConversationExecutionPlan) string {
 	if s.hasHistoryContext(plan) {
 		return strutil.Trim(plan.QuestionHistoryContext.RenderedText)
 	}
@@ -92,7 +92,7 @@ func (s *PromptBuilder) buildHistoryContext(plan *vo.ConversationExecutionPlan) 
 }
 
 // buildSubQuestions 构建子问题列表
-func (s *PromptBuilder) buildSubQuestions(plan *vo.ConversationExecutionPlan) string {
+func (s *PromptAssembler) buildSubQuestions(plan *vo.ConversationExecutionPlan) string {
 	if len(plan.RetrievalSubQuestions) < 2 {
 		return ""
 	}
@@ -107,7 +107,7 @@ func (s *PromptBuilder) buildSubQuestions(plan *vo.ConversationExecutionPlan) st
 }
 
 // buildSystemPrompt 构建 system prompt
-func (s *PromptBuilder) buildSystemPrompt() string {
+func (s *PromptAssembler) buildSystemPrompt() string {
 	if strutil.IsNotBlank(s.systemPrompt) {
 		return strutil.Trim(s.systemPrompt)
 	}
@@ -116,7 +116,7 @@ func (s *PromptBuilder) buildSystemPrompt() string {
 }
 
 // buildEvidenceBlocks 组装证据块（每个子问题对应一个块）
-func (s *PromptBuilder) buildEvidenceBlocks(retrievalCtx *vo.RagRetrievalContext, budget *promptBudget) string {
+func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RagRetrievalContext, budget *promptBudget) string {
 	if retrievalCtx == nil || len(retrievalCtx.SubQuestionEvidenceList) == 0 {
 		return s.renderNoEvidenceBlock()
 	}
@@ -135,7 +135,7 @@ func (s *PromptBuilder) buildEvidenceBlocks(retrievalCtx *vo.RagRetrievalContext
 }
 
 // renderSubQuestionReferences 渲染单个子问题的引用列表（复用 + 预算裁剪）
-func (s *PromptBuilder) renderSubQuestionReferences(references []*vo.SearchReference, budget *promptBudget) string {
+func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchReference, budget *promptBudget) string {
 	renderedKeys := make(map[string]struct{})
 	if len(references) == 0 {
 		return s.renderNoEvidenceBlock()
@@ -192,7 +192,7 @@ func (s *PromptBuilder) renderSubQuestionReferences(references []*vo.SearchRefer
 }
 
 // renderNoEvidenceBlock 渲染无证据块
-func (s *PromptBuilder) renderNoEvidenceBlock() string {
+func (s *PromptAssembler) renderNoEvidenceBlock() string {
 	rendered, _ := s.promptRenderer.Render(prompt.RagAnswerNoEvidence, nil)
 	return rendered + "\n"
 }

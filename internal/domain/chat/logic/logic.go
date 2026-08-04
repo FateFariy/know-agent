@@ -7,8 +7,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// ChatLogic 聊天业务逻辑接口
-type ChatLogic interface {
+// ConversationLogic 聊天业务逻辑接口
+type ConversationLogic interface {
 	// OpenConversationStream 打开会话流
 	OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string
 
@@ -37,8 +37,8 @@ type ChatLogic interface {
 	GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
 }
 
-// SessionMemoryLogic 会话记忆逻辑接口
-type SessionMemoryLogic interface {
+// MemoryManager 会话记忆逻辑接口
+type MemoryManager interface {
 	// LoadMemoryContext 加载会话记忆上下文
 	LoadMemoryContext(ctx context.Context, conversationId string, trace *vo.ConversationTrace) (*vo.MemoryContext, error)
 
@@ -55,22 +55,22 @@ type SessionMemoryLogic interface {
 	DeleteConversationSummary(ctx context.Context, conversationId string) error
 }
 
-type PromptTemplateLogic interface {
+type PromptRenderer interface {
 	Render(templateName string, variables map[string]any) (string, error)
 }
 
-type QueryRewriteLogic interface {
+type QueryRewriter interface {
 	Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.QuestionRewriteResult, error)
 }
 
-// RecommendationLogic 推荐追问业务逻辑接口
-type RecommendationLogic interface {
+// QuestionRecommender 追问推荐器
+type QuestionRecommender interface {
 	// GenerateRecommendations 生成推荐追问
 	GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string
 }
 
-// DocumentQuestionRouteLogic 文档问题路由接口
-type DocumentQuestionRouteLogic interface {
+// DocumentRouter 文档路由器
+type DocumentRouter interface {
 	// Route 根据文档ID和问题进行文档内路由
 	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
 }
@@ -81,13 +81,13 @@ type ChatPreparationOrchestratorLogic interface {
 	Prepare(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error)
 }
 
-// RagRetrieveLogic RAG 检索引擎接口
-type RagRetrieveLogic interface {
+// RagRetriever RAG 检索引擎接口
+type RagRetriever interface {
 	Retrieve(ctx context.Context, plan *vo.ConversationExecutionPlan, trace *vo.ConversationTrace) (*vo.RagRetrievalContext, error)
 }
 
-// StructureGraphQuerier 结构图查询接口
-type StructureGraphQuerier interface {
+// GraphQuerier 结构图查询接口
+type GraphQuerier interface {
 	// ListSections 列出指定文档下的所有结构图节点（用于本地短语匹配）
 	ListSections(ctx context.Context, documentId int64) ([]*entity.GraphSection, error)
 

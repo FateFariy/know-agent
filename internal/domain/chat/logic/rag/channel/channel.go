@@ -1,4 +1,4 @@
-package rag
+package channel
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// RetrievalChannel 检索通道接口
-type RetrievalChannel interface {
+// Retrieval 检索通道接口
+type Retrieval interface {
 	// ChannelName 检索通道名称
 	ChannelName() string
 

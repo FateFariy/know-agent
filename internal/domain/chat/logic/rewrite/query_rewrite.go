@@ -23,18 +23,18 @@ var (
 	multiLinePattern             = regexp.MustCompile(`\n+`)
 )
 
-// QueryRewriteLogicImpl 问题改写逻辑实现
-type QueryRewriteLogicImpl struct {
+// QueryRewriter 问题改写逻辑实现
+type QueryRewriter struct {
 	chatModel       model.ChatModel
-	promptTemplate  logic.PromptTemplateLogic
+	promptTemplate  logic.PromptRenderer
 	maxSubQuestions int
 	options         []model.Option
 }
 
-// NewQueryRewriteLogicImpl 创建问题改写逻辑实例
-func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate logic.PromptTemplateLogic) *QueryRewriteLogicImpl {
-	return &QueryRewriteLogicImpl{
+// NewQueryRewriter 创建问题改写逻辑实例
+func NewQueryRewriter(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
+	promptTemplate logic.PromptRenderer) *QueryRewriter {
+	return &QueryRewriter{
 		chatModel:       chatModel,
 		promptTemplate:  promptTemplate,
 		maxSubQuestions: svcCtx.Config.Chat.Rewrite.MaxSubQuestions,
@@ -47,7 +47,7 @@ func NewQueryRewriteLogicImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 
 // Rewrite 改写问题（结合历史上下文）
 // 流程：空问题直接返回 -> 判断是否需要改写 -> 不需要则规则改写 -> 需要则LLM改写 -> 规范化结果
-func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.QuestionRewriteResult, error) {
+func (q *QueryRewriter) Rewrite(ctx context.Context, question, historySummary string, trace *vo.ConversationTrace) (*vo.QuestionRewriteResult, error) {
 	// 空问题直接返回空结果
 	question = strutil.Trim(question)
 	if strutil.IsBlank(question) {
@@ -109,7 +109,7 @@ func (q *QueryRewriteLogicImpl) Rewrite(ctx context.Context, question, historySu
 }
 
 // fallback 兜底改写
-func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.QuestionRewriteResult {
+func (q *QueryRewriter) fallback(normalizedQuestion string) *vo.QuestionRewriteResult {
 	if q.looksLikeExplicitMultiQuestion(normalizedQuestion) {
 		return vo.NewQuestionRewriteResult(normalizedQuestion, q.ruleBasedSplit(normalizedQuestion))
 	}
@@ -117,7 +117,7 @@ func (q *QueryRewriteLogicImpl) fallback(normalizedQuestion string) *vo.Question
 }
 
 // needsRewrite 是否需要改写
-func (q *QueryRewriteLogicImpl) needsRewrite(question, historySummary string) bool {
+func (q *QueryRewriter) needsRewrite(question, historySummary string) bool {
 	if strutil.IsBlank(historySummary) {
 		return utils.Len(question) < 8 || q.looksLikeExplicitMultiQuestion(question)
 	}
@@ -125,7 +125,7 @@ func (q *QueryRewriteLogicImpl) needsRewrite(question, historySummary string) bo
 }
 
 // looksLikeExplicitMultiQuestion 是否显式多问题
-func (q *QueryRewriteLogicImpl) looksLikeExplicitMultiQuestion(question string) bool {
+func (q *QueryRewriter) looksLikeExplicitMultiQuestion(question string) bool {
 	normalized := strutil.Trim(question)
 	if strutil.IsBlank(normalized) {
 		return false
@@ -157,7 +157,7 @@ func (q *QueryRewriteLogicImpl) looksLikeExplicitMultiQuestion(question string) 
 }
 
 // normalizeRewriteResult 规范化改写结果
-func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, parsed *parsedRewritePayload) *vo.QuestionRewriteResult {
+func (q *QueryRewriter) normalizeRewriteResult(originalQuestion string, parsed *parsedRewritePayload) *vo.QuestionRewriteResult {
 	if parsed == nil {
 		return nil
 	}
@@ -204,7 +204,7 @@ func (q *QueryRewriteLogicImpl) normalizeRewriteResult(originalQuestion string, 
 }
 
 // ruleBasedSplit 基于规则(?？；;\n)进行拆分
-func (q *QueryRewriteLogicImpl) ruleBasedSplit(question string) []string {
+func (q *QueryRewriter) ruleBasedSplit(question string) []string {
 	splitPattern := regexp.MustCompile(`[?？；;\n]+`)
 	parts := splitPattern.Split(question, -1)
 	result := stream.FromSlice(parts).

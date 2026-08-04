@@ -28,7 +28,7 @@ func NewDefaultStructureGraphQuerier(svcCtx *svc.ServiceContext) *DefaultStructu
 	}
 }
 
-var _ logic.StructureGraphQuerier = (*DefaultStructureGraphQuerier)(nil)
+var _ logic.GraphQuerier = (*DefaultStructureGraphQuerier)(nil)
 
 func (q *DefaultStructureGraphQuerier) ListSections(ctx context.Context, documentId int64) ([]*entity.GraphSection, error) {
 	if documentId == 0 || q.db == nil {

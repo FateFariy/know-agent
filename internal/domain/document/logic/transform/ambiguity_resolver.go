@@ -17,7 +17,7 @@ import (
 
 type AmbiguityResolver struct {
 	model          model.ChatModel
-	promptTemplate chatlogic.PromptTemplateLogic
+	promptTemplate chatlogic.PromptRenderer
 	*ambiguityOption
 }
 
@@ -59,7 +59,7 @@ func WithContextWindowLines(lines int) TransformerOption {
 	})
 }
 
-func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate chatlogic.PromptTemplateLogic) *AmbiguityResolver {
+func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate chatlogic.PromptRenderer) *AmbiguityResolver {
 	return &AmbiguityResolver{
 		model:          model,
 		promptTemplate: promptTemplate,

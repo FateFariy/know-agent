@@ -19,12 +19,12 @@ import (
 // 当问题属于纯目录/章节导航类（如 "第 3 章有哪些小节"、"3.2 的上一节是什么"）时，
 // 仅通过结构图查询（父章节 / 兄弟章节 / 子章节），再由 AnswerRender 渲染一个纯文本的导航答复。
 type GraphOnlyExecutor struct {
-	querier      logic.StructureGraphQuerier
+	querier      logic.GraphQuerier
 	answerRender graph.AnswerRender
 }
 
 // NewGraphOnlyExecutor 构造结构图直答执行器
-func NewGraphOnlyExecutor(querier logic.StructureGraphQuerier, answerRender graph.AnswerRender) *GraphOnlyExecutor {
+func NewGraphOnlyExecutor(querier logic.GraphQuerier, answerRender graph.AnswerRender) *GraphOnlyExecutor {
 	return &GraphOnlyExecutor{
 		querier:      querier,
 		answerRender: answerRender,

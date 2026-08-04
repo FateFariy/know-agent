@@ -31,28 +31,28 @@ var ProviderSet = wire.NewSet(
 
 var chatProviderSet = wire.NewSet(
 	conversation.NewChatLogic,
-	wire.Bind(new(chatlogic.ChatLogic), new(*conversation.LogicImpl)),
-	rewrite.NewQueryRewriteLogicImpl,
-	wire.Bind(new(chatlogic.QueryRewriteLogic), new(*rewrite.QueryRewriteLogicImpl)),
-	recommend.NewRecommendationLogicImpl,
-	wire.Bind(new(chatlogic.RecommendationLogic), new(*recommend.RecommendationLogicImpl)),
+	wire.Bind(new(chatlogic.ConversationLogic), new(*conversation.LogicImpl)),
+	rewrite.NewQueryRewriter,
+	wire.Bind(new(chatlogic.QueryRewriter), new(*rewrite.QueryRewriter)),
+	recommend.NewQuestionRecommender,
+	wire.Bind(new(chatlogic.QuestionRecommender), new(*recommend.QuestionRecommender)),
 	rag.NewRetrievalImpl,
-	wire.Bind(new(chatlogic.RagRetrieveLogic), new(*rag.RetrievalImpl)),
+	wire.Bind(new(chatlogic.RagRetriever), new(*rag.RetrievalImpl)),
 	prompt.NewPromptTemplateLogicImpl,
-	wire.Bind(new(chatlogic.PromptTemplateLogic), new(*prompt.TemplateLogicImpl)),
+	wire.Bind(new(chatlogic.PromptRenderer), new(*prompt.TemplateRenderer)),
 	orchestrator.NewChatPreparationOrchestratorImpl,
 	wire.Bind(new(chatlogic.ChatPreparationOrchestratorLogic), new(*orchestrator.PreparationOrchestratorImpl)),
 	memory.NewSessionMemoryLogicImpl,
-	wire.Bind(new(chatlogic.SessionMemoryLogic), new(*memory.SessionMemoryLogicImpl)),
+	wire.Bind(new(chatlogic.MemoryManager), new(*memory.SessionMemoryLogicImpl)),
 	intent.NewDocumentQuestionRouterImpl,
-	wire.Bind(new(chatlogic.DocumentQuestionRouteLogic), new(*intent.DocumentQuestionRouterImpl)),
+	wire.Bind(new(chatlogic.DocumentRouter), new(*intent.DocumentQuestionRouterImpl)),
 	graph.NewDefaultStructureGraphQuerier,
-	wire.Bind(new(chatlogic.StructureGraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
+	wire.Bind(new(chatlogic.GraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
 	intent.NewDefaultNavigationIndexService,
 	wire.Bind(new(intent.NavigationIndexService), new(*intent.DefaultNavigationIndexService)),
 	graph.NewDefaultAnswerRender,
 	wire.Bind(new(graph.AnswerRender), new(*graph.DefaultAnswerRender)),
-	rag.NewPromptBuilder,
+	rag.NewPromptAssembler,
 	channel.NewKeywordRetrievalChannel,
 	channel.NewVectorRetrievalChannel,
 	strategy.NewSummaryCompressionStrategy,
@@ -64,7 +64,7 @@ var chatProviderSet = wire.NewSet(
 	observability.NewConversationTraceRecorder,
 	NewExecutorRegistry,
 	NewRetrievalChannels,
-	wire.Bind(new(conversation.RagPromptAssembler), new(*rag.PromptBuilder)),
+	wire.Bind(new(conversation.RagPromptBuilder), new(*rag.PromptAssembler)),
 )
 
 var documentProviderSet = wire.NewSet(
@@ -111,6 +111,6 @@ func ProvideKnowledgeOptions() []knowledgelogic.Option {
 	return nil
 }
 
-func NewRetrievalChannels(ch1 *channel.VectorRetrievalChannel, ch2 *channel.KeywordRetrievalChannel) []rag.RetrievalChannel {
-	return []rag.RetrievalChannel{ch1, ch2}
+func NewRetrievalChannels(ch1 *channel.VectorRetrievalChannel, ch2 *channel.KeywordRetrievalChannel) []channel.Retrieval {
+	return []channel.Retrieval{ch1, ch2}
 }

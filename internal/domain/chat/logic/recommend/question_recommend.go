@@ -23,16 +23,15 @@ const (
 	maxRecommendations = 3
 )
 
-// RecommendationLogicImpl 推荐追问业务逻辑实现
-type RecommendationLogicImpl struct {
+// QuestionRecommender 追问推荐器
+type QuestionRecommender struct {
 	properties     config.RecommendationConf
-	promptTemplate logic.PromptTemplateLogic
+	promptTemplate logic.PromptRenderer
 	chatModel      model.ChatModel
 }
 
-// NewRecommendationLogicImpl 创建推荐追问逻辑实例
-func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic.PromptTemplateLogic, chatModel model.ChatModel) *RecommendationLogicImpl {
-	return &RecommendationLogicImpl{
+func NewQuestionRecommender(svcCtx *svc.ServiceContext, promptTemplate logic.PromptRenderer, chatModel model.ChatModel) *QuestionRecommender {
+	return &QuestionRecommender{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,
 		chatModel:      chatModel,
@@ -40,7 +39,7 @@ func NewRecommendationLogicImpl(svcCtx *svc.ServiceContext, promptTemplate logic
 }
 
 // GenerateRecommendations 生成推荐追问
-func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string {
+func (r *QuestionRecommender) GenerateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) []string {
 	// 检查是否启用推荐且回答不为空
 	if !r.properties.Enabled || strutil.IsBlank(answer) {
 		return []string{}
@@ -79,7 +78,7 @@ func (r *RecommendationLogicImpl) GenerateRecommendations(ctx context.Context, q
 }
 
 // generateRecommendations 生成推荐追问
-func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) ([]string, error) {
+func (r *QuestionRecommender) generateRecommendations(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange, trace *vo.ConversationTrace) ([]string, error) {
 	// 构建最近上下文
 	recentContext := r.buildRecentContext(recentExchanges)
 
@@ -117,7 +116,7 @@ func (r *RecommendationLogicImpl) generateRecommendations(ctx context.Context, q
 }
 
 // buildRecentContext 构建最近对话上下文
-func (r *RecommendationLogicImpl) buildRecentContext(recentExchanges []*entity.ChatExchange) string {
+func (r *QuestionRecommender) buildRecentContext(recentExchanges []*entity.ChatExchange) string {
 	if len(recentExchanges) == 0 {
 		return ""
 	}

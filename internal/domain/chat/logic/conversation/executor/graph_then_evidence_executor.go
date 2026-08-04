@@ -21,12 +21,12 @@ import (
 // 适用场景：用户明确指向某个章节或编号项（如"第 3 节第 2 项讲的是什么"），
 // 先由结构图定位目标节点，再由 AnswerRender 把节点文本/编号项渲染成最终答复。
 type GraphThenEvidenceExecutor struct {
-	querier      logic.StructureGraphQuerier
+	querier      logic.GraphQuerier
 	answerRender graph.AnswerRender
 }
 
 // NewGraphThenEvidenceExecutor 构造"结构图定位后取证"执行器
-func NewGraphThenEvidenceExecutor(querier logic.StructureGraphQuerier, answerRender graph.AnswerRender) *GraphThenEvidenceExecutor {
+func NewGraphThenEvidenceExecutor(querier logic.GraphQuerier, answerRender graph.AnswerRender) *GraphThenEvidenceExecutor {
 	return &GraphThenEvidenceExecutor{
 		querier:      querier,
 		answerRender: answerRender,
