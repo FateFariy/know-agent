@@ -42,3 +42,18 @@ func (d *DocumentChunk) FillParentInfo(parentBlock *DocumentParentBlock) {
 		d.ParentEndChunkNo = parentBlock.EndChunkNo
 	}
 }
+
+// GetID 获取块ID
+func (d *DocumentChunk) GetID() int64 {
+	return d.ID
+}
+
+// GetChunkNo 获取块序号
+func (d *DocumentChunk) GetChunkNo() int {
+	return d.ChunkNo
+}
+
+// GetChunkText 获取块文本
+func (d *DocumentChunk) GetChunkText() string {
+	return d.ChunkText
+}

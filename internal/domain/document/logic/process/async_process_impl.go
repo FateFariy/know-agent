@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/index"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
@@ -23,26 +25,39 @@ const (
 // AsyncProcessImpl 异步处理业务逻辑实现
 //
 //	HandleParseRoute → 解析路由（文件解析 + 结构节点 + 策略推荐）
-//	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库）
+//	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库 + GraphRAG + RAPTOR）
 type AsyncProcessImpl struct {
-	repo        adapter.DocumentRepository
-	port        *adapter.DocumentPort
-	coordinator ChunkCoordinator
-	nodeManager StructureNodeManager
-	textLogic   TextPreprocessor
-	gen         ProfileGenerator
+	repo                    adapter.DocumentRepository
+	port                    *adapter.DocumentPort
+	coordinator             ChunkCoordinator
+	nodeManager             StructureNodeManager
+	textLogic               TextPreprocessor
+	gen                     ProfileGenerator
+	graphRagBuilder         GraphRagBuilder
+	graphRagOutcomePolicy   GraphRagOutcomePolicy
+	graphRagBuildCheckpoint GraphRagBuildCheckpoint
+	crossDocumentIndexer    CrossDocumentIndexer
+	raptorBuilder           RaptorBuilder
 }
 
 // NewAsyncProcessImpl 构造异步处理逻辑实例
 func NewAsyncProcessImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, coordinator ChunkCoordinator,
-	nodeManager StructureNodeManager, textLogic TextPreprocessor, gen ProfileGenerator) *AsyncProcessImpl {
+	nodeManager StructureNodeManager, textLogic TextPreprocessor, gen ProfileGenerator,
+	graphRagBuilder GraphRagBuilder, graphRagOutcomePolicy GraphRagOutcomePolicy,
+	graphRagBuildCheckpoint GraphRagBuildCheckpoint, crossDocumentIndexer CrossDocumentIndexer,
+	raptorBuilder RaptorBuilder) *AsyncProcessImpl {
 	return &AsyncProcessImpl{
-		repo:        repo,
-		port:        port,
-		coordinator: coordinator,
-		nodeManager: nodeManager,
-		textLogic:   textLogic,
-		gen:         gen,
+		repo:                    repo,
+		port:                    port,
+		coordinator:             coordinator,
+		nodeManager:             nodeManager,
+		textLogic:               textLogic,
+		gen:                     gen,
+		graphRagBuilder:         graphRagBuilder,
+		graphRagOutcomePolicy:   graphRagOutcomePolicy,
+		graphRagBuildCheckpoint: graphRagBuildCheckpoint,
+		crossDocumentIndexer:    crossDocumentIndexer,
+		raptorBuilder:           raptorBuilder,
 	}
 }
 
@@ -230,8 +245,72 @@ func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, tas
 	return nil
 }
 
-// HandleIndexBuild 执行索引构建主流程：切块流水线 → 父子块落库 → 向量化 → 状态收尾
+// HandleIndexBuild 执行索引构建主流程（使用责任链模式）：
+// 验证 → 准备 → 切块 → 向量化 → 关键词索引 → GraphRAG → RAPTOR → 完成
 func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) (err error) {
+	// 加载任务相关实体
+	task, err := d.repo.SelectTaskById(ctx, taskId)
+	if err != nil {
+		return err
+	}
+	document, err := d.repo.SelectDocumentById(ctx, documentId)
+	if err != nil {
+		return err
+	}
+	plan, err := d.repo.SelectPlanById(ctx, planId)
+	if err != nil {
+		return err
+	}
+
+	// 前置检查：如果任务已成功或失败，跳过重复执行
+	if task.TaskStatus == vo.TaskStatusSuccess {
+		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
+		return nil
+	}
+	if task.TaskStatus == vo.TaskStatusFailed {
+		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
+		return nil
+	}
+
+	// 记录起始时间；defer recover 统一捕获 panic 为失败状态
+	startTime := time.Now()
+	defer func() {
+		if v := recover(); v != nil {
+			var panicErr *vo.GraphRagBuildFailureException
+			if errors.As(v, &panicErr) {
+				d.handleGraphRagBuildFailure(ctx, document, task, plan, panicErr, startTime)
+			}
+		}
+	}()
+
+	// 构建上下文并执行责任链
+	buildCtx := &index.BuildContext{
+		DocumentID: documentId,
+		TaskID:     taskId,
+		PlanID:     planId,
+		Document:   document,
+		Task:       task,
+		Plan:       plan,
+	}
+
+	deps := &index.PhaseDeps{
+		Repo:                    d.repo,
+		Port:                    d.port,
+		Coordinator:             d.coordinator,
+		GraphRagBuilder:         d.graphRagBuilder,
+		GraphRagOutcomePolicy:   d.graphRagOutcomePolicy,
+		GraphRagBuildCheckpoint: d.graphRagBuildCheckpoint,
+		CrossDocumentIndexer:    d.crossDocumentIndexer,
+		RaptorBuilder:           d.raptorBuilder,
+	}
+
+	chain := index.NewPhaseChain(deps)
+	return chain.Run(ctx, buildCtx)
+}
+
+// HandleIndexBuildLegacy 原始的索引构建流程（保留用于对比参考）
+// 切块流水线 → 父子块落库 → 向量化 → 关键词索引 → GraphRAG 构建 → RAPTOR 构建 → 状态收尾
+func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentId, taskId, planId int64) (err error) {
 	// 加载任务相关实体，失败直接返回，交由调度层观察
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
@@ -245,20 +324,46 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	if err != nil {
 		return err
 	}
-	pipelineSteps, err := d.repo.SelectStepListByPlanId(ctx, planId)
-	if err != nil {
-		return err
+
+	// 前置检查：如果任务已成功或失败，跳过重复执行
+	if task.TaskStatus == vo.TaskStatusSuccess {
+		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
+		return nil
+	}
+	if task.TaskStatus == vo.TaskStatusFailed {
+		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
+		return nil
+	}
+
+	// 读取已有的 GraphRAG 构建结果（用于断点恢复）
+	graphRagBuildResult := d.readGraphRagBuildResult(task)
+	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
+		return nil
 	}
 
 	// 记录起始时间用于耗时统计；defer recover 统一捕获 panic 为失败状态
 	startTime := time.Now()
+	buildStartedNanos := time.Now()
 	defer func() {
 		if v := recover(); v != nil {
-			if panicErr, ok := v.(error); ok {
-				d.handleIndexBuildFailure(ctx, document, task, plan, panicErr.Error())
+			if panicErr, ok := v.(*vo.GraphRagBuildFailureException); ok {
+				d.handleGraphRagBuildFailure(ctx, document, task, plan, panicErr, startTime)
+			} else if err2, ok := v.(error); ok {
+				d.handleIndexBuildFailure(ctx, document, task, plan, err2.Error())
 			}
 		}
 	}()
+
+	logx.Infof("开始执行索引构建任务，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
+
+	// 查询策略步骤列表
+	pipelineSteps, err := d.repo.SelectStepListByPlanId(ctx, planId)
+	if err != nil {
+		return err
+	}
+	logx.Infof("索引构建策略步骤读取完成，documentId=%d, taskId=%d, planId=%d, stepCount=%d",
+		documentId, taskId, planId, len(pipelineSteps))
 
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
@@ -297,91 +402,119 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		panic(err)
 	}
 
-	// 下载解析文本（已在解析路由阶段上传）
-	parsedText, err := d.port.DownloadText(ctx, document.ParseTextPath)
-	if err != nil {
-		panic(err)
+	// 检查是否需要从已提交 GraphRAG 结果恢复
+	resumeCommittedGraph := d.isCommittedGraph(graphRagBuildResult)
+	var parentCandidates []*vo.ParentBlockCandidate
+	var childChunks []*entity.DocumentChunk
+	var parentBlocks []*entity.DocumentParentBlock
+
+	if resumeCommittedGraph {
+		// 从已提交的 GraphRAG outcome 恢复
+		parentBlocks = []*entity.DocumentParentBlock{}
+		childChunks, err = d.listFrozenSourceChunks(ctx, documentId, taskId)
+		if err != nil {
+			panic(err)
+		}
+		graphRagBuildResult = d.repairCrossDocumentProjection(ctx, document, documentId, taskId, graphRagBuildResult)
+		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务: documentId=%d, taskId=%d", documentId, taskId)
+	} else {
+		// 下载解析文本（已在解析路由阶段上传）
+		parsedText, err := d.port.DownloadText(ctx, document.ParseTextPath)
+		if err != nil {
+			panic(err)
+		}
+
+		// 按步骤执行切块流水线，产出父-子块候选
+		chunkStartedNanos := time.Now()
+		parentCandidates, err = d.coordinator.BuildParentBlocks(ctx, document, pipelineSteps, parsedText)
+		if err != nil {
+			panic(err)
+		}
+		chunkCostMillis := time.Since(chunkStartedNanos).Milliseconds()
+		logx.Infof("切块流水线执行完成，documentId=%d, taskId=%d, parentCount=%d, childCount=%d, costMillis=%d",
+			documentId, taskId, len(parentCandidates), d.countChildCandidates(parentCandidates), chunkCostMillis)
+
+		// 事务性标记切块完成 + 推进到切块后处理阶段
+		markChunkCompleteTx := func(txCtx context.Context) error {
+			// 策略步骤状态 -> 执行成功
+			if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
+				return err
+			}
+			chunkEndDetail, _ := json.Marshal(map[string]any{
+				"parentCount": len(parentCandidates),
+				"childCount":  d.countChildCandidates(parentCandidates),
+				"costMillis":  chunkCostMillis,
+			})
+			chunkEndLog := &entity.DocumentTaskLog{
+				TaskId:       taskId,
+				DocumentId:   documentId,
+				StageType:    vo.TaskStageChunkExecute,
+				EventType:    vo.TaskEventComplete,
+				LogLevel:     vo.LogLevelInfo,
+				OperatorType: vo.OperatorTypeSystem,
+				Content:      "切块执行完成",
+				DetailJson:   string(chunkEndDetail),
+			}
+			if err = d.repo.InsertTaskLog(txCtx, chunkEndLog); err != nil {
+				return err
+			}
+			// 推进任务阶段到"切块后处理"
+			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageChunkPostProcess})
+		}
+		if err = d.repo.Do(ctx, markChunkCompleteTx); err != nil {
+			panic(err)
+		}
+
+		// 清理候选并构造持久化实体（父块 + 子块）
+		processStartedNanos := time.Now()
+		finalCandidates := d.cleanupParentCandidates(parentCandidates)
+		parentBlocks, childChunks = d.buildParentChildEntities(documentId, taskId, planId, finalCandidates)
+		processCostMillis := time.Since(processStartedNanos).Milliseconds()
+		logx.Infof("切块后处理完成，documentId=%d, taskId=%d, parentCount=%d, childCount=%d, costMillis=%d",
+			documentId, taskId, len(finalCandidates), d.countChildCandidates(finalCandidates), processCostMillis)
+
+		// 事务性批量落库 + 推进到向量化阶段
+		persistBlocksTx := func(txCtx context.Context) error {
+			// 批量写入父块
+			if err = d.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
+				return err
+			}
+			// 批量写入子块
+			if err = d.repo.InsertChunkBatch(txCtx, childChunks); err != nil {
+				return err
+			}
+			// 记录"切块后处理完成"日志
+			chunkPostDetail, _ := json.Marshal(map[string]any{
+				"parentCount": len(finalCandidates),
+				"childCount":  d.countChildCandidates(finalCandidates),
+				"costMillis":  processCostMillis,
+			})
+			chunkPostLog := &entity.DocumentTaskLog{
+				TaskId:       taskId,
+				DocumentId:   documentId,
+				StageType:    vo.TaskStageChunkPostProcess,
+				EventType:    vo.TaskEventComplete,
+				LogLevel:     vo.LogLevelInfo,
+				OperatorType: vo.OperatorTypeSystem,
+				Content:      "切块后处理完成",
+				DetailJson:   string(chunkPostDetail),
+			}
+			if err = d.repo.InsertTaskLog(txCtx, chunkPostLog); err != nil {
+				return err
+			}
+			// 推进任务阶段到"向量化"
+			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageVectorize})
+		}
+		if err = d.repo.Do(ctx, persistBlocksTx); err != nil {
+			panic(err)
+		}
 	}
 
-	// 按步骤执行切块流水线，产出父-子块候选
-	parentCandidates, err := d.coordinator.BuildParentBlocks(ctx, document, pipelineSteps, parsedText)
-	if err != nil {
-		panic(err)
-	}
-
-	// 事务性标记切块完成 + 推进到切块后处理阶段
-	markChunkCompleteTx := func(txCtx context.Context) error {
-		// 策略步骤状态 -> 执行成功
-		if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
-			return err
-		}
-		chunkEndDetail, _ := json.Marshal(map[string]any{
-			"parentCount": len(parentCandidates),
-			"childCount":  d.countChildCandidates(parentCandidates),
-		})
-		chunkEndLog := &entity.DocumentTaskLog{
-			TaskId:       taskId,
-			DocumentId:   documentId,
-			StageType:    vo.TaskStageChunkExecute,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
-			Content:      "切块执行完成",
-			DetailJson:   string(chunkEndDetail),
-		}
-		if err = d.repo.InsertTaskLog(txCtx, chunkEndLog); err != nil {
-			return err
-		}
-		// 推进任务阶段到"切块后处理"
-		return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageChunkPostProcess})
-	}
-	if err = d.repo.Do(ctx, markChunkCompleteTx); err != nil {
-		panic(err)
-	}
-
-	// 清理候选并构造持久化实体（父块 + 子块）
-	finalCandidates := d.cleanupParentCandidates(parentCandidates)
-	parentBlocks, childChunks := d.buildParentChildEntities(documentId, taskId, planId, finalCandidates)
-
-	// 事务性批量落库 + 推进到向量化阶段
-	persistBlocksTx := func(txCtx context.Context) error {
-		// 批量写入父块
-		if err = d.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
-			return err
-		}
-		// 批量写入子块
-		if err = d.repo.InsertChunkBatch(txCtx, childChunks); err != nil {
-			return err
-		}
-		// 记录"切块后处理完成"日志
-		chunkPostDetail, _ := json.Marshal(map[string]any{
-			"parentCount": len(finalCandidates),
-			"childCount":  d.countChildCandidates(finalCandidates),
-		})
-		chunkPostLog := &entity.DocumentTaskLog{
-			TaskId:       taskId,
-			DocumentId:   documentId,
-			StageType:    vo.TaskStageChunkPostProcess,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
-			Content:      "切块后处理完成",
-			DetailJson:   string(chunkPostDetail),
-		}
-		if err = d.repo.InsertTaskLog(txCtx, chunkPostLog); err != nil {
-			return err
-		}
-		// 推进任务阶段到"向量化"
-		return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageVectorize})
-	}
-	if err = d.repo.Do(ctx, persistBlocksTx); err != nil {
-		panic(err)
-	}
-
-	// 记录"开始执行向量化"日志（单独事务，便于追踪状态）
+	// ========== 向量化阶段 ==========
 	vectorSize := len(childChunks)
 	vectorBatch := (vectorSize + embeddingBatch - 1) / embeddingBatch
 
+	// 记录"开始执行向量化"日志
 	markVectorStartTx := func(txCtx context.Context) error {
 		vectorStartDetail, _ := json.Marshal(map[string]any{
 			"chunkCount":          vectorSize,
@@ -407,13 +540,12 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	}
 
 	// 批量向量化
+	vectorStartedNanos := time.Now()
 	if err = d.port.BuildVectors(ctx, childChunks); err != nil {
 		panic(err)
 	}
-	// 批量关键词索引
-	if err = d.port.BuildIndexes(ctx, childChunks); err != nil {
-		panic(err)
-	}
+	vectorCostMillis := time.Since(vectorStartedNanos).Milliseconds()
+
 	// 回写向量状态
 	for _, chunk := range childChunks {
 		if err = d.repo.UpdateChunkByTaskId(ctx, chunk); err != nil {
@@ -429,6 +561,7 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 			"embeddingBatchCount": vectorBatch,
 			"vectorStoreType":     vo.VectorStoreTypeMilvus,
 			"parentCount":         len(parentBlocks),
+			"vectorCostMillis":    vectorCostMillis,
 		})
 		vectorEndLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
@@ -446,7 +579,193 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		panic(err)
 	}
 
-	// 事务性最终状态更新（任务/方案/文档），并写入索引构建完成日志
+	// ========== 关键词索引阶段 ==========
+	markKeywordIndexTx := func(txCtx context.Context) error {
+		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageKeywordIndex}); err != nil {
+			return err
+		}
+		keywordStartDetail, _ := json.Marshal(map[string]any{"chunkCount": vectorSize})
+		keywordStartLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageKeywordIndex,
+			EventType:    vo.TaskEventStart,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "开始构建关键词索引",
+			DetailJson:   string(keywordStartDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, keywordStartLog)
+	}
+	if err = d.repo.Do(ctx, markKeywordIndexTx); err != nil {
+		panic(err)
+	}
+
+	keywordStartedNanos := time.Now()
+	if err = d.port.BuildIndexes(ctx, childChunks); err != nil {
+		panic(err)
+	}
+	keywordCostMillis := time.Since(keywordStartedNanos).Milliseconds()
+
+	markKeywordCompleteTx := func(txCtx context.Context) error {
+		keywordEndDetail, _ := json.Marshal(map[string]any{
+			"chunkCount": vectorSize,
+			"costMillis": keywordCostMillis,
+		})
+		keywordEndLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageKeywordIndex,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "关键词索引完成",
+			DetailJson:   string(keywordEndDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, keywordEndLog)
+	}
+	if err = d.repo.Do(ctx, markKeywordCompleteTx); err != nil {
+		panic(err)
+	}
+
+	// ========== GraphRAG 构建阶段 ==========
+	if !resumeCommittedGraph {
+		markGraphRagStartTx := func(txCtx context.Context) error {
+			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageGraphRag}); err != nil {
+				return err
+			}
+			graphStartDetail, _ := json.Marshal(map[string]any{
+				"chunkCount":  vectorSize,
+				"parentCount": len(parentBlocks),
+			})
+			graphStartLog := &entity.DocumentTaskLog{
+				TaskId:       taskId,
+				DocumentId:   documentId,
+				StageType:    vo.TaskStageGraphRag,
+				EventType:    vo.TaskEventStart,
+				LogLevel:     vo.LogLevelInfo,
+				OperatorType: vo.OperatorTypeSystem,
+				Content:      "开始构建 GraphRAG 实体关系图谱",
+				DetailJson:   string(graphStartDetail),
+			}
+			return d.repo.InsertTaskLog(txCtx, graphStartLog)
+		}
+		if err = d.repo.Do(ctx, markGraphRagStartTx); err != nil {
+			panic(err)
+		}
+
+		graphRagStartedNanos := time.Now()
+		graphRagBuildResult, err = d.graphRagBuilder.RebuildDocumentGraph(ctx, documentId, taskId, childChunks)
+		if err != nil {
+			panic(&vo.GraphRagBuildFailureException{Result: graphRagBuildResult, Err: err})
+		}
+		graphRagCostMillis := time.Since(graphRagStartedNanos).Milliseconds()
+		logx.Infof("GraphRAG 构建阶段完成，documentId=%d, taskId=%d, entityCount=%d, relationCount=%d, costMillis=%d",
+			documentId, taskId, graphRagBuildResult.EntityCount, graphRagBuildResult.RelationCount, graphRagCostMillis)
+
+		markGraphRagCompleteTx := func(txCtx context.Context) error {
+			graphEndDetail, _ := json.Marshal(map[string]any{
+				"entityCount":   graphRagBuildResult.EntityCount,
+				"relationCount": graphRagBuildResult.RelationCount,
+				"costMillis":    graphRagCostMillis,
+			})
+			graphEndLog := &entity.DocumentTaskLog{
+				TaskId:       taskId,
+				DocumentId:   documentId,
+				StageType:    vo.TaskStageGraphRag,
+				EventType:    vo.TaskEventComplete,
+				LogLevel:     vo.LogLevelInfo,
+				OperatorType: vo.OperatorTypeSystem,
+				Content:      "GraphRAG 实体关系图谱构建完成",
+				DetailJson:   string(graphEndDetail),
+			}
+			return d.repo.InsertTaskLog(txCtx, graphEndLog)
+		}
+		if err = d.repo.Do(ctx, markGraphRagCompleteTx); err != nil {
+			panic(err)
+		}
+	}
+
+	// ========== GraphRAG 结果处理 ==========
+	graphFinalization := d.finalizeGraphRagOutcome(ctx, document, documentId, taskId, planId, task, childChunks, graphRagBuildResult, resumeCommittedGraph)
+	graphRagBuildResult = graphFinalization.Result
+	var graphTypedChunkList []vo.TypedChunk
+	if graphFinalization.TypedChunks != nil {
+		graphTypedChunkList = graphFinalization.TypedChunks
+	}
+
+	if graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+		// 需要修复，保持 RUNNING 状态
+		if err = d.repo.UpdateTaskById(ctx, &entity.DocumentTask{ID: taskId, TaskStatus: vo.TaskStatusRunning, CurrentStage: vo.TaskStageGraphTypedIndex}); err != nil {
+			panic(err)
+		}
+		logx.Warnf("GraphRAG post-commit component requires repair; BUILD_INDEX remains RUNNING: documentId=%d, taskId=%d", documentId, taskId)
+		return nil
+	}
+	if graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
+		return nil
+	}
+
+	// ========== RAPTOR 构建阶段 ==========
+	markRaptorStartTx := func(txCtx context.Context) error {
+		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageRaptor}); err != nil {
+			return err
+		}
+		raptorStartDetail, _ := json.Marshal(map[string]any{
+			"chunkCount":  vectorSize,
+			"parentCount": len(parentBlocks),
+		})
+		raptorStartLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageRaptor,
+			EventType:    vo.TaskEventStart,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "开始构建 RAPTOR 层级摘要树",
+			DetailJson:   string(raptorStartDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, raptorStartLog)
+	}
+	if err = d.repo.Do(ctx, markRaptorStartTx); err != nil {
+		panic(err)
+	}
+
+	raptorStartedNanos := time.Now()
+	raptorBuildResult, err := d.raptorBuilder.RebuildDocumentTree(ctx, documentId, taskId, childChunks)
+	if err != nil {
+		panic(err)
+	}
+	raptorCostMillis := time.Since(raptorStartedNanos).Milliseconds()
+	logx.Infof("RAPTOR 构建阶段完成，documentId=%d, taskId=%d, nodeCount=%d, levelCount=%d, costMillis=%d",
+		documentId, taskId, raptorBuildResult.NodeCount, raptorBuildResult.LevelCount, raptorCostMillis)
+
+	markRaptorCompleteTx := func(txCtx context.Context) error {
+		raptorEndDetail, _ := json.Marshal(map[string]any{
+			"nodeCount":   raptorBuildResult.NodeCount,
+			"levelCount":  raptorBuildResult.LevelCount,
+			"sourceCount": raptorBuildResult.SourceChunkCount,
+			"costMillis":  raptorCostMillis,
+		})
+		raptorEndLog := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    vo.TaskStageRaptor,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "RAPTOR 层级摘要树构建完成",
+			DetailJson:   string(raptorEndDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, raptorEndLog)
+	}
+	if err = d.repo.Do(ctx, markRaptorCompleteTx); err != nil {
+		panic(err)
+	}
+
+	// ========== 事务性最终状态更新（任务/方案/文档），并写入索引构建完成日志 ==========
+	totalCostMillis := time.Since(buildStartedNanos).Milliseconds()
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
 		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageStoreComplete}); err != nil {
@@ -466,8 +785,10 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		}
 		// 索引构建完成日志
 		buildCompleteDetail, _ := json.Marshal(map[string]any{
-			"parentBlockCount": len(parentBlocks),
-			"chunkCount":       len(childChunks),
+			"parentBlockCount":     len(parentBlocks),
+			"chunkCount":           len(childChunks),
+			"graphTypedChunkCount": len(graphTypedChunkList),
+			"costMillis":           totalCostMillis,
 		})
 		buildCompleteLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
@@ -484,6 +805,8 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	if err = d.repo.Do(ctx, finalizeTx); err != nil {
 		panic(err)
 	}
+	logx.Infof("索引构建任务执行完成，documentId=%d, taskId=%d, planId=%d, parentCount=%d, chunkCount=%d, costMillis=%d",
+		documentId, taskId, planId, len(parentBlocks), len(childChunks), totalCostMillis)
 	return nil
 }
 
@@ -744,4 +1067,341 @@ func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentBlockC
 		fn := func(child *vo.ChunkCandidate) bool { return child != nil && strutil.IsNotBlank(child.Text) }
 		return item != nil && strutil.IsNotBlank(item.Text) && slices.ContainsFunc(item.ChildChunks, fn)
 	})
+}
+
+// ============================================================
+// GraphRAG 辅助方法
+// ============================================================
+
+// isCommittedGraph 检查图谱是否已提交
+func (d *AsyncProcessImpl) isCommittedGraph(result *vo.GraphRagBuildResult) bool {
+	return result != nil && result.KgCommitted && result.GraphPersistenceOutcome != "" && result.GraphPersistenceOutcome != vo.GraphPersistenceOutcomeFailed
+}
+
+// readGraphRagBuildResult 从任务扩展 JSON 读取 GraphRAG 构建结果
+func (d *AsyncProcessImpl) readGraphRagBuildResult(task *entity.DocumentTask) *vo.GraphRagBuildResult {
+	if task == nil || strutil.IsBlank(task.ExtJson) {
+		return nil
+	}
+	var state map[string]any
+	if err := json.Unmarshal([]byte(task.ExtJson), &state); err != nil {
+		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", task.ID, err)
+		return nil
+	}
+	rawState, ok := state["graphRagBuild"]
+	if !ok {
+		return nil
+	}
+	stateMap, ok := rawState.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	result := &vo.GraphRagBuildResult{}
+	if v, ok := stateMap["entityCount"].(float64); ok {
+		result.EntityCount = int(v)
+	}
+	if v, ok := stateMap["relationCount"].(float64); ok {
+		result.RelationCount = int(v)
+	}
+	if v, ok := stateMap["evidenceCount"].(float64); ok {
+		result.EvidenceCount = int(v)
+	}
+	if v, ok := stateMap["communityCount"].(float64); ok {
+		result.CommunityCount = int(v)
+	}
+	if v, ok := stateMap["graphPersistenceOutcome"].(string); ok {
+		result.GraphPersistenceOutcome = vo.GraphPersistenceOutcome(v)
+	}
+	if v, ok := stateMap["graphPersistenceReason"].(string); ok {
+		result.GraphPersistenceReason = v
+	}
+	if v, ok := stateMap["kgCommitted"].(bool); ok {
+		result.KgCommitted = v
+	}
+	if v, ok := stateMap["typedIndexOutcome"].(string); ok {
+		result.TypedIndexOutcome = vo.ComponentOutcome(v)
+	}
+	if v, ok := stateMap["crossDocumentIndexOutcome"].(string); ok {
+		result.CrossDocumentIndexOutcome = vo.ComponentOutcome(v)
+	}
+	if v, ok := stateMap["derivedIndexOutcome"].(string); ok {
+		result.DerivedIndexOutcome = vo.DerivedIndexOutcome(v)
+	}
+	if v, ok := stateMap["observationProjectionOutcome"].(string); ok {
+		result.ObservationProjectionOutcome = vo.ObservationProjectionOutcome(v)
+	}
+	if v, ok := stateMap["outerTaskDisposition"].(string); ok {
+		result.OuterTaskDisposition = vo.OuterTaskDisposition(v)
+	}
+	if v, ok := stateMap["pythonInvocationOutcome"].(string); ok {
+		result.PythonInvocationOutcome = vo.InvocationOutcome(v)
+	}
+	if v, ok := stateMap["advisorInvocationOutcome"].(string); ok {
+		result.AdvisorInvocationOutcome = vo.InvocationOutcome(v)
+	}
+	if v, ok := stateMap["attempt"].(float64); ok {
+		result.Attempt = int(v)
+	}
+	if v, ok := stateMap["maxAttempts"].(float64); ok {
+		result.MaxAttempts = int(v)
+	}
+
+	return result
+}
+
+// applyGraphFailureDisposition 应用图谱失败处置
+func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, document *entity.Document,
+	task *entity.DocumentTask, planId int64, result *vo.GraphRagBuildResult, cause error) {
+	failedStage := vo.TaskStageGraphRag
+	if task.CurrentStage != 0 {
+		failedStage = task.CurrentStage
+	}
+	if cause == nil {
+		cause = &vo.GraphRagBuildFailureException{Result: result}
+	}
+
+	markFailureTx := func(txCtx context.Context) error {
+		// 文档：索引构建失败
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
+			return err
+		}
+		// chunk：按任务 ID 批量将向量状态置为失败
+		if err := d.repo.UpdateChunkByTaskId(txCtx, &entity.DocumentChunk{
+			TaskId:          task.ID,
+			VectorStatus:    vo.VectorStatusVectorFailed,
+			VectorStoreType: vo.VectorStoreTypeMilvus,
+		}); err != nil {
+			return err
+		}
+		// 标记当前计划所有步骤为失败
+		if err := d.repo.UpdateStepExecuteStatus(txCtx, planId, vo.StrategyExecuteStatusExecuteFailed); err != nil {
+			return err
+		}
+		// 通用任务失败收尾
+		if err := d.failTask(txCtx, task, cause.Error()); err != nil {
+			return err
+		}
+		// 写入失败事件日志
+		failDetail, _ := json.Marshal(map[string]any{
+			"error":        cause.Error(),
+			"currentStage": failedStage,
+		})
+		failLog := &entity.DocumentTaskLog{
+			TaskId:       task.ID,
+			DocumentId:   task.DocumentId,
+			StageType:    failedStage,
+			EventType:    vo.TaskEventFailed,
+			LogLevel:     vo.LogLevelError,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "GraphRAG 构建失败",
+			DetailJson:   string(failDetail),
+		}
+		return d.repo.InsertTaskLog(txCtx, failLog)
+	}
+	if err := d.repo.Do(ctx, markFailureTx); err != nil {
+		logx.Warnf("图谱失败时收尾失败: taskId=%d, err=%v", task.ID, err)
+	}
+}
+
+// handleGraphRagBuildFailure 处理 GraphRAG 构建失败
+func (d *AsyncProcessImpl) handleGraphRagBuildFailure(ctx context.Context, document *entity.Document,
+	task *entity.DocumentTask, plan *entity.DocumentStrategyPlan, exception *vo.GraphRagBuildFailureException, startTime time.Time) {
+	logx.Errorf("GraphRAG 构建异常: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, exception)
+
+	failureResult := exception.Result
+	if failureResult == nil {
+		failureResult = &vo.GraphRagBuildResult{
+			GraphPersistenceOutcome: vo.GraphPersistenceOutcomeFailed,
+			KgCommitted:             false,
+		}
+	}
+
+	// 计算最终结果
+	terminalResult := d.graphRagOutcomePolicy.FinalizeOuterDisposition(
+		failureResult,
+		vo.ComponentOutcomeNotApplicable,
+		vo.ObservationProjectionOutcomeSuccess,
+	)
+
+	// 尝试标记检查点
+	if err := d.graphRagBuildCheckpoint.MarkOutcome(ctx, document.ID, task.ID, terminalResult, 0, 1); err != nil {
+		logx.Warnf("GraphRAG 检查点标记失败: documentId=%d, taskId=%d, err=%v", document.ID, task.ID, err)
+		// 降级为观察失败
+		terminalResult = d.graphRagOutcomePolicy.FinalizeOuterDisposition(
+			failureResult,
+			vo.ComponentOutcomeNotApplicable,
+			vo.ObservationProjectionOutcomeFailed,
+		)
+	}
+
+	d.applyGraphFailureDisposition(ctx, document, task, plan.ID, terminalResult, exception)
+}
+
+// listFrozenSourceChunks 列出已冻结的源块（用于断点恢复）
+func (d *AsyncProcessImpl) listFrozenSourceChunks(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentChunk, error) {
+	// TODO: 实现从数据库查询非 GRAPH_RAG 来源的 chunk
+	return []*entity.DocumentChunk{}, nil
+}
+
+// listFrozenTypedChunks 列出已冻结的类型化块
+func (d *AsyncProcessImpl) listFrozenTypedChunks(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentChunk, error) {
+	// TODO: 实现从数据库查询 GRAPH_RAG 来源的 chunk
+	return []*entity.DocumentChunk{}, nil
+}
+
+// finalizeGraphRagOutcome 最终化 GraphRAG 结果
+func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document *entity.Document,
+	documentId, taskId, planId int64, task *entity.DocumentTask, sourceChunks []*entity.DocumentChunk,
+	buildResult *vo.GraphRagBuildResult, resumeCommittedGraph bool) *vo.GraphRagFinalization {
+
+	if buildResult == nil || buildResult.GraphPersistenceOutcome == "" {
+		panic(&vo.GraphRagBuildFailureException{Err: errors.New("GraphRAG build did not return an explicit persistence outcome.")})
+	}
+
+	var typedChunks []vo.TypedChunk
+	typedOutcome := vo.ComponentOutcomeNotApplicable
+
+	if !buildResult.KgCommitted || buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeFailed {
+		typedOutcome = vo.ComponentOutcomeNotApplicable
+	} else {
+		existingTypedChunks, err := d.listFrozenTypedChunks(ctx, documentId, taskId)
+		if err != nil {
+			panic(err)
+		}
+
+		// 转换为 TypedChunk 接口切片
+		existingTypedInterface := make([]vo.TypedChunk, len(existingTypedChunks))
+		for i, chunk := range existingTypedChunks {
+			existingTypedInterface[i] = chunk
+		}
+
+		graphEmpty := buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeEmpty
+		reuseSuccessfulTyped := resumeCommittedGraph &&
+			buildResult.TypedIndexOutcome == vo.ComponentOutcomeSuccess &&
+			len(existingTypedChunks) > 0
+		reuseEmptyTyped := resumeCommittedGraph &&
+			graphEmpty &&
+			buildResult.TypedIndexOutcome == vo.ComponentOutcomeNotApplicable &&
+			len(existingTypedChunks) == 0
+
+		if reuseSuccessfulTyped {
+			typedChunks = existingTypedInterface
+			typedOutcome = vo.ComponentOutcomeSuccess
+		} else if reuseEmptyTyped {
+			typedOutcome = vo.ComponentOutcomeNotApplicable
+		} else {
+			// 执行类型化索引替换
+			if err := d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
+				ID:           taskId,
+				CurrentStage: vo.TaskStageGraphTypedIndex,
+			}); err != nil {
+				panic(err)
+			}
+
+			replaced, err := d.graphRagBuilder.ReplaceTypedIndex(ctx, documentId, taskId, planId, sourceChunks, d.nextChunkNo(sourceChunks))
+			if err != nil {
+				logx.Warnf("GraphRAG typed projection failed; preserving committed KG: documentId=%d, taskId=%d, message=%v",
+					documentId, taskId, err)
+				typedChunks = []vo.TypedChunk{}
+				typedOutcome = vo.ComponentOutcomeFailed
+			} else {
+				if replaced == nil {
+					typedChunks = []vo.TypedChunk{}
+				} else {
+					typedChunks = make([]vo.TypedChunk, len(replaced))
+					for i, chunk := range replaced {
+						typedChunks[i] = chunk
+					}
+				}
+				if graphEmpty && len(typedChunks) == 0 {
+					typedOutcome = vo.ComponentOutcomeNotApplicable
+				} else if len(typedChunks) == 0 {
+					typedOutcome = vo.ComponentOutcomeFailed
+				} else {
+					typedOutcome = vo.ComponentOutcomeSuccess
+				}
+			}
+		}
+	}
+
+	// 计算候选最终结果
+	candidate := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeSuccess)
+	if candidate.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+		candidate = d.withdrawPendingCrossDocumentProjection(ctx, document, taskId, candidate)
+	}
+
+	// 标记检查点
+	if err := d.graphRagBuildCheckpoint.MarkOutcome(ctx, documentId, taskId, candidate, d.resultAttempt(candidate), d.resultMaxAttempts(candidate)); err != nil {
+		logx.Warnf("GraphRAG final outcome projection failed; BUILD_INDEX remains repairable: documentId=%d, taskId=%d, message=%v",
+			documentId, taskId, err)
+		failedObservation := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeFailed)
+		failedObservation = d.withdrawPendingCrossDocumentProjection(ctx, document, taskId, failedObservation)
+		return &vo.GraphRagFinalization{Result: failedObservation, TypedChunks: typedChunks}
+	}
+
+	return &vo.GraphRagFinalization{Result: candidate, TypedChunks: typedChunks}
+}
+
+// repairCrossDocumentProjection 修复跨文档投影
+func (d *AsyncProcessImpl) repairCrossDocumentProjection(ctx context.Context, document *entity.Document,
+	documentId, taskId int64, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
+	alreadyActive := document != nil && document.LastIndexTaskId == taskId
+	if alreadyActive && buildResult.CrossDocumentIndexOutcome == vo.ComponentOutcomeSuccess {
+		return buildResult
+	}
+	if err := d.crossDocumentIndexer.RebuildAll(ctx, documentId, taskId); err != nil {
+		logx.Warnf("GraphRAG cross-document repair failed: documentId=%d, taskId=%d, message=%v", documentId, taskId, err)
+		return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeFailed)
+	}
+	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeSuccess)
+}
+
+// withdrawPendingCrossDocumentProjection 撤回待处理的跨文档投影
+func (d *AsyncProcessImpl) withdrawPendingCrossDocumentProjection(ctx context.Context, document *entity.Document,
+	taskId int64, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
+	if buildResult == nil ||
+		buildResult.CrossDocumentIndexOutcome != vo.ComponentOutcomeSuccess ||
+		document == nil ||
+		document.LastIndexTaskId == taskId {
+		return buildResult
+	}
+	if err := d.crossDocumentIndexer.RebuildAll(ctx, 0, 0); err != nil {
+		logx.Errorf("GraphRAG pending cross-document projection withdrawal failed; task cannot publish current I: documentId=%d, taskId=%d, message=%v",
+			document.ID, taskId, err)
+	} else {
+		logx.Infof("GraphRAG pending cross-document projection withdrawn to active document pointers: documentId=%d, taskId=%d",
+			document.ID, taskId)
+	}
+	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeFailed)
+}
+
+// resultAttempt 获取尝试次数
+func (d *AsyncProcessImpl) resultAttempt(result *vo.GraphRagBuildResult) int {
+	if result == nil {
+		return 0
+	}
+	return max(0, result.Attempt)
+}
+
+// resultMaxAttempts 获取最大尝试次数
+func (d *AsyncProcessImpl) resultMaxAttempts(result *vo.GraphRagBuildResult) int {
+	if result == nil {
+		return 1
+	}
+	return max(1, result.MaxAttempts)
+}
+
+// nextChunkNo 获取下一个块编号
+func (d *AsyncProcessImpl) nextChunkNo(chunks []*entity.DocumentChunk) int {
+	if len(chunks) == 0 {
+		return 1
+	}
+	maxNo := 0
+	for _, chunk := range chunks {
+		if chunk != nil && chunk.ChunkNo > maxNo {
+			maxNo = chunk.ChunkNo
+		}
+	}
+	return maxNo + 1
 }

@@ -49,6 +49,43 @@ type StructureNodeManager interface {
 	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
 
+// ProfileGenerator 文档画像生成器
 type ProfileGenerator interface {
 	Generate(ctx context.Context, documentId int64, analysisResult *vo.DocumentAnalysisResult, structureNodes []*entity.DocumentStructureNode) (*entity.DocumentProfile, error)
+}
+
+// GraphRagBuilder GraphRAG 图谱构建器
+type GraphRagBuilder interface {
+	// RebuildDocumentGraph 重建文档图谱
+	RebuildDocumentGraph(ctx context.Context, documentId, taskId int64, chunks []*entity.DocumentChunk) (*vo.GraphRagBuildResult, error)
+
+	// ReplaceTypedIndex 替换类型化索引
+	ReplaceTypedIndex(ctx context.Context, documentId, taskId, planId int64, chunks []*entity.DocumentChunk, nextChunkNo int) ([]*entity.DocumentChunk, error)
+}
+
+// GraphRagOutcomePolicy GraphRAG 结果策略
+type GraphRagOutcomePolicy interface {
+	// FinalizeOuterDisposition 最终化外部处置
+	FinalizeOuterDisposition(buildResult *vo.GraphRagBuildResult, typedOutcome vo.ComponentOutcome, observationOutcome vo.ObservationProjectionOutcome) *vo.GraphRagBuildResult
+
+	// WithCrossDocumentOutcome 设置跨文档结果
+	WithCrossDocumentOutcome(buildResult *vo.GraphRagBuildResult, outcome vo.ComponentOutcome) *vo.GraphRagBuildResult
+}
+
+// GraphRagBuildCheckpoint GraphRAG 构建检查点
+type GraphRagBuildCheckpoint interface {
+	// MarkOutcome 标记结果
+	MarkOutcome(ctx context.Context, documentId, taskId int64, result *vo.GraphRagBuildResult, attempt, maxAttempts int) error
+}
+
+// CrossDocumentIndexer 跨文档索引器
+type CrossDocumentIndexer interface {
+	// RebuildAll 重建所有跨文档索引
+	RebuildAll(ctx context.Context, documentId, taskId int64) error
+}
+
+// RaptorBuilder RAPTOR 层级摘要树构建器
+type RaptorBuilder interface {
+	// RebuildDocumentTree 重建文档树
+	RebuildDocumentTree(ctx context.Context, documentId, taskId int64, chunks []*entity.DocumentChunk) (*vo.RaptorBuildResult, error)
 }

@@ -14,6 +14,7 @@
 
 # Dependency directories
 vendor/
+.venv/
 
 # Go workspace file
 go.work
