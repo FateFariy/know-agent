@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	model2 "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
-
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -22,6 +20,7 @@ import (
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 )
 
 // goverter:converter
@@ -51,18 +50,28 @@ type DocumentConverter interface {
 	ToDocumentProfileResp(src *den.DocumentProfile) *document.DocumentProfileResp
 	ToDocumentProfileRespList(src []*den.DocumentProfile) []*document.DocumentProfileResp
 
-	ToDocumentModel(src *den.Document) *model2.Document
-	ToDocumentProfileModel(src *den.DocumentProfile) *model2.DocumentProfile
-	ToDocumentTaskModel(src *den.DocumentTask) *model2.DocumentTask
-	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model2.DocumentTaskLog
-	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model2.DocumentStrategyPlan
-	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model2.DocumentStrategyStep
-	ToDocumentStrategyStepModelList(src []*den.DocumentStrategyStep) []*model2.DocumentStrategyStep
-	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model2.DocumentStructureNode
-	ToDocumentChunkModel(src *den.DocumentChunk) *model2.DocumentChunk
-	ToDocumentChunkModelList(src []*den.DocumentChunk) []*model2.DocumentChunk
-	ToDocumentParentBlockModel(src *den.DocumentParentBlock) *model2.DocumentParentBlock
-	ToDocumentParentBlockModelList(src []*den.DocumentParentBlock) []*model2.DocumentParentBlock
+	// goverter:map . Model
+	ToDocumentModel(src *den.Document) *model.Document
+	// goverter:map . Model
+	ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
+	// goverter:map . Model
+	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
+	// goverter:map . Model
+	ToDocumentTaskLogModel(src *den.DocumentTaskLog) *model.DocumentTaskLog
+	// goverter:map . Model
+	ToDocumentStrategyPlanModel(src *den.DocumentStrategyPlan) *model.DocumentStrategyPlan
+	// goverter:map . Model
+	ToDocumentStrategyStepModel(src *den.DocumentStrategyStep) *model.DocumentStrategyStep
+	ToDocumentStrategyStepModelList(src []*den.DocumentStrategyStep) []*model.DocumentStrategyStep
+	// goverter:map . Model
+	ToDocumentStructureNodeModel(src *den.DocumentStructureNode) *model.DocumentStructureNode
+	ToDocumentStructureNodeModelList(src []*den.DocumentStructureNode) []*model.DocumentStructureNode
+	// goverter:map . Model
+	ToDocumentChunkModel(src *den.DocumentChunk) *model.DocumentChunk
+	ToDocumentChunkModelList(src []*den.DocumentChunk) []*model.DocumentChunk
+	// goverter:map . Model
+	ToDocumentParentBlockModel(src *den.DocumentParentBlock) *model.DocumentParentBlock
+	ToDocumentParentBlockModelList(src []*den.DocumentParentBlock) []*model.DocumentParentBlock
 }
 
 // goverter:converter
@@ -89,12 +98,20 @@ type ChatConverter interface {
 	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp
 	ToChannelExecutionRespList(src []*cvo.ChatChannelExecution) []*chat.ChannelExecutionResp
 
-	ToChatDialogueModel(src *cen.ChatDialogue) *model2.ChatDialogue
-	ToChatExchangeModel(src *cen.ChatExchange) *model2.ChatExchange
-	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model2.ChatExchangeTraceStage
-	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model2.ChatMemorySummary
-	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model2.ChatRetrievalResult
-	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model2.ChatChannelExecution
+	// goverter:map . Model
+	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
+	// goverter:map . Model
+	ToChatExchangeModel(src *cen.ChatExchange) *model.ChatExchange
+	// goverter:map . Model
+	ToChatExchangeTraceStageModel(src *cen.ChatExchangeTraceStage) *model.ChatExchangeTraceStage
+	// goverter:map . Model
+	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
+	// goverter:map . Model
+	ToChatRetrievalResultModel(src *cvo.ChatRetrievalResult) *model.ChatRetrievalResult
+	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model.ChatRetrievalResult
+	// goverter:map . Model
+	ToChatChannelExecutionModel(src *cvo.ChatChannelExecution) *model.ChatChannelExecution
+	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model.ChatChannelExecution
 }
 
 // goverter:converter
@@ -120,10 +137,14 @@ type KnowledgeConverter interface {
 	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
 	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
 
-	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model2.KnowledgeScopeNode
-	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model2.KnowledgeTopicNode
-	ToKnowledgeTopicDocumentRelationModel(src *klen.KnowledgeTopicDocumentRelation) *model2.KnowledgeTopicDocumentRelation
-	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model2.KnowledgeRouteTrace
+	// goverter:map . Model
+	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode
+	// goverter:map . Model
+	ToKnowledgeTopicNodeModel(src *klen.KnowledgeTopicNode) *model.KnowledgeTopicNode
+	// goverter:map . Model
+	ToKnowledgeTopicDocumentRelationModel(src *klen.KnowledgeTopicDocumentRelation) *model.KnowledgeTopicDocumentRelation
+	// goverter:map . Model
+	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 }
 
 func TimeToString(t time.Time) string {
@@ -183,7 +204,6 @@ func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 	}
 }
 
-// ToChatDocumentNavigationDecision 将领域层 DocumentNavigationDecision 转换为 API 层
 func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat.DocumentNavigationDecision {
 	if src == nil {
 		return nil
@@ -205,7 +225,6 @@ func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat
 	}
 }
 
-// ToChatStructureAnchor 将领域层结构锚点转换为 API 层结构锚点
 func ToChatStructureAnchor(src *cvo.ConversationStructureAnchor) *chat.ConversationStructureAnchor {
 	if src == nil {
 		return nil
