@@ -1,6 +1,8 @@
 package entity
 
-import "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+import (
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+)
 
 type DocumentChunk struct {
 	ID                 int64  `gorm:"column:id"`                  // ID
@@ -30,8 +32,8 @@ type DocumentChunk struct {
 }
 
 func (d *DocumentChunk) FillEnumName() {
-	d.VectorStatusName = vo.VectorStatusName(d.VectorStatus)
-	d.SourceTypeName = vo.DocumentChunkSourceTypeName(d.SourceType)
+	d.VectorStatusName = enum.VectorStatusName(d.VectorStatus)
+	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }
 
 func (d *DocumentChunk) FillParentInfo(parentBlock *DocumentParentBlock) {
@@ -41,4 +43,19 @@ func (d *DocumentChunk) FillParentInfo(parentBlock *DocumentParentBlock) {
 		d.ParentStartChunkNo = parentBlock.StartChunkNo
 		d.ParentEndChunkNo = parentBlock.EndChunkNo
 	}
+}
+
+// GetID 获取块ID
+func (d *DocumentChunk) GetID() int64 {
+	return d.ID
+}
+
+// GetChunkNo 获取块序号
+func (d *DocumentChunk) GetChunkNo() int {
+	return d.ChunkNo
+}
+
+// GetChunkText 获取块文本
+func (d *DocumentChunk) GetChunkText() string {
+	return d.ChunkText
 }

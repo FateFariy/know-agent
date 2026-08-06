@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // DocumentTaskLog 任务日志实体
@@ -25,7 +25,7 @@ type DocumentTaskLog struct {
 }
 
 func (d *DocumentTaskLog) FillEnumNames() {
-	d.StageTypeName = vo.TaskStageName(d.StageType)
-	d.EventTypeName = vo.TaskEventTypeName(d.EventType)
-	d.LogLevelName = vo.LogLevelName(d.LogLevel)
+	d.StageTypeName = enum.TaskStageName(d.StageType)
+	d.EventTypeName = enum.TaskEventTypeName(d.EventType)
+	d.LogLevelName = enum.LogLevelName(d.LogLevel)
 }

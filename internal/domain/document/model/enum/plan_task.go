@@ -1,4 +1,4 @@
-package vo
+package enum
 
 // ============================================================
 // PlanSource 方案来源
@@ -63,6 +63,11 @@ const (
 	TaskEventUserConfirm
 	TaskEventUserAdjust
 	TaskEventRecommendStrategy
+	TaskEventChunkSaved           // 块已保存
+	TaskEventChunksSaved          // 批次块已保存
+	TaskEventChunkVectorizedBatch // 块向量化批次
+	TaskEventAllChunksVectorized  // 所有块已向量化
+	TaskEventKeywordIndexBuilt    // 关键词索引构建完成
 )
 
 func TaskEventTypeName(et TaskEventType) string {
@@ -79,6 +84,16 @@ func TaskEventTypeName(et TaskEventType) string {
 		return "用户调整"
 	case TaskEventRecommendStrategy:
 		return "推荐策略"
+	case TaskEventChunkSaved:
+		return "块已保存"
+	case TaskEventChunksSaved:
+		return "批次块已保存"
+	case TaskEventChunkVectorizedBatch:
+		return "块向量化批次"
+	case TaskEventAllChunksVectorized:
+		return "所有块已向量化"
+	case TaskEventKeywordIndexBuilt:
+		return "关键词索引构建完成"
 	default:
 		return ""
 	}
@@ -129,6 +144,10 @@ const (
 	TaskStageChunkExecute                          // 切块执行
 	TaskStageChunkPostProcess                      // 切块后处理
 	TaskStageVectorize                             // 向量化
+	TaskStageKeywordIndex                          // 关键词索引
+	TaskStageGraphRag                              // GraphRAG 构建
+	TaskStageGraphTypedIndex                       // GraphRAG 类型化索引
+	TaskStageRaptor                                // RAPTOR 层级摘要树
 	TaskStageStoreComplete                         // 存储完成
 )
 
@@ -146,6 +165,14 @@ func TaskStageName(ts TaskStage) string {
 		return "切块后处理"
 	case TaskStageVectorize:
 		return "向量化"
+	case TaskStageKeywordIndex:
+		return "关键词索引"
+	case TaskStageGraphRag:
+		return "GraphRAG 构建"
+	case TaskStageGraphTypedIndex:
+		return "GraphRAG 类型化索引"
+	case TaskStageRaptor:
+		return "RAPTOR 层级摘要树"
 	case TaskStageStoreComplete:
 		return "存储完成"
 	case TaskStageStrategyRoute:

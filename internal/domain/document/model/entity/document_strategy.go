@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // DocumentStrategyPlan 策略方案实体
@@ -30,13 +30,13 @@ type DocumentStrategyPlan struct {
 }
 
 func (d *DocumentStrategyPlan) FillEnumNames() {
-	d.PlanSourceName = vo.PlanSourceName(d.PlanSource)
-	d.PlanStatusName = vo.ParseStatusName(d.PlanStatus)
+	d.PlanSourceName = enum.PlanSourceName(d.PlanSource)
+	d.PlanStatusName = enum.ParseStatusName(d.PlanStatus)
 }
 
 func (d *DocumentStrategyPlan) FillAndProcessPipeline(stepList []*DocumentStrategyStep) {
-	d.ParentPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeParent, stepList)
-	d.ChildPipeline = NewDocumentStrategyPipeline(vo.PipelineTypeChild, stepList)
+	d.ParentPipeline = NewDocumentStrategyPipeline(enum.PipelineTypeParent, stepList)
+	d.ChildPipeline = NewDocumentStrategyPipeline(enum.PipelineTypeChild, stepList)
 	d.StrategySnapshot = "PARENT:" + d.ParentPipeline.StrategySnapshot + ";CHILD:" + d.ChildPipeline.StrategySnapshot
 }
 
@@ -60,11 +60,11 @@ type DocumentStrategyStep struct {
 }
 
 func (d *DocumentStrategyStep) FillEnumNames() {
-	d.PipelineTypeName = vo.PipelineTypeName(d.PipelineType)
-	d.StrategyTypeName = vo.StrategyTypeName(d.StrategyType)
-	d.StrategyRoleName = vo.StrategyRoleName(d.StrategyRole)
-	d.SourceTypeName = vo.StrategySourceTypeName(d.SourceType)
-	d.ExecuteStatusName = vo.StrategyStatusName(d.ExecuteStatus)
+	d.PipelineTypeName = enum.PipelineTypeName(d.PipelineType)
+	d.StrategyTypeName = enum.StrategyTypeName(d.StrategyType)
+	d.StrategyRoleName = enum.StrategyRoleName(d.StrategyRole)
+	d.SourceTypeName = enum.StrategySourceTypeName(d.SourceType)
+	d.ExecuteStatusName = enum.StrategyStatusName(d.ExecuteStatus)
 }
 
 type DocumentStrategyPipeline struct {
@@ -81,11 +81,11 @@ func NewDocumentStrategyPipeline(pipelineType string, stepList []*DocumentStrate
 }
 
 func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrategyStep) {
-	d.PipelineTypeName = vo.PipelineTypeName(d.PipelineType)
+	d.PipelineTypeName = enum.PipelineTypeName(d.PipelineType)
 	steps := make([]*DocumentStrategyStep, 0, len(stepList))
 	strategyTypes := make([]string, 0, len(stepList))
 	for i := range stepList {
-		stepList[i].PipelineType = utils.BlankToDefault(stepList[i].PipelineType, vo.PipelineTypeChild)
+		stepList[i].PipelineType = utils.BlankToDefault(stepList[i].PipelineType, enum.PipelineTypeChild)
 		if stepList[i].PipelineType == d.PipelineType {
 			stepList[i].FillEnumNames()
 			steps = append(steps, stepList[i])

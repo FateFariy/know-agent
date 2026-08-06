@@ -125,21 +125,21 @@ func (d *DocumentStructureNodeDraft) AppendLine(line string) {
 	d.ContentText.WriteString(strutil.Trim(line))
 }
 
-func (d *DocumentStructureNodeDraft) ToCandidate() *DocumentStructureNodeCandidate {
-	return &DocumentStructureNodeCandidate{
-		NodeNo:            d.NodeNo,
-		NodeType:          d.NodeType,
-		ParentNodeNo:      d.ParentNodeNo,
-		PrevSiblingNodeNo: d.PrevSiblingNodeNo,
-		NextSiblingNodeNo: d.NextSiblingNodeNo,
-		Depth:             d.Depth,
-		NodeCode:          d.NodeCode,
-		Title:             d.Title,
-		AnchorText:        d.AnchorText,
-		CanonicalPath:     d.CanonicalPath,
-		SectionPath:       d.SectionPath,
-		ContentText:       d.ContentText.String(),
-		ItemIndex:         d.ItemIndex,
+func (d *DocumentStructureNodeDraft) ToCandidate() *StructureNode {
+	return &StructureNode{
+		NodeNumber:            d.NodeNo,
+		NodeType:              d.NodeType,
+		ParentNodeNumber:      d.ParentNodeNo,
+		PreviousSiblingNumber: d.PrevSiblingNodeNo,
+		NextSiblingNumber:     d.NextSiblingNodeNo,
+		Depth:                 d.Depth,
+		NodeCode:              d.NodeCode,
+		Title:                 d.Title,
+		AnchorText:            d.AnchorText,
+		CanonicalPath:         d.CanonicalPath,
+		SectionPath:           d.SectionPath,
+		ContentText:           d.ContentText.String(),
+		ItemIndex:             d.ItemIndex,
 	}
 }
 
@@ -151,22 +151,6 @@ const (
 	NodeTypeListItem
 	NodeTypeStep
 )
-
-type DocumentStructureNodeCandidate struct {
-	NodeNo            int               `json:"nodeNo"`            // 节点编号
-	NodeType          StructureNodeType `json:"nodeType"`          // 节点类型
-	ParentNodeNo      int               `json:"parentNodeNo"`      // 父节点编号
-	PrevSiblingNodeNo int               `json:"prevSiblingNodeNo"` // 前兄弟节点编号
-	NextSiblingNodeNo int               `json:"nextSiblingNodeNo"` // 后兄弟节点编号
-	Depth             int               `json:"depth"`             // 深度
-	NodeCode          string            `json:"nodeCode"`          // 节点代码
-	Title             string            `json:"title"`             // 标题
-	AnchorText        string            `json:"anchorText"`        // 锚文本
-	CanonicalPath     string            `json:"canonicalPath"`     // 规范路径
-	SectionPath       string            `json:"sectionPath"`       // 段落路径
-	ContentText       string            `json:"contentText"`       // 内容文本
-	ItemIndex         int               `json:"itemIndex"`         // 项目索引
-}
 
 type DisambiguationResult struct {
 	LineNo       int    `json:"line_no"`

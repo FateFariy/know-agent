@@ -108,6 +108,9 @@ type DocumentRepository interface {
 	// UpdateChunkByTaskId 根据任务ID更新块
 	UpdateChunkByTaskId(ctx context.Context, chunk *entity.DocumentChunk) error
 
+	// UpdateBatchChunkById 根据ID批量更新块
+	UpdateBatchChunkById(ctx context.Context, chunks []*entity.DocumentChunk, fields ...string) error
+
 	// DeleteChunkByDocumentId 根据文档ID删除块
 	DeleteChunkByDocumentId(ctx context.Context, documentId int64) error
 

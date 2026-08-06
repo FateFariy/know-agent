@@ -1,6 +1,8 @@
 package entity
 
-import "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+import (
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+)
 
 // DocumentParentBlock 文档父块实体
 type DocumentParentBlock struct {
@@ -25,5 +27,5 @@ type DocumentParentBlock struct {
 }
 
 func (d *DocumentParentBlock) FillEnumName() {
-	d.SourceTypeName = vo.DocumentChunkSourceTypeName(d.SourceType)
+	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }
