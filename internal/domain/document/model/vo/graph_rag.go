@@ -1,9 +1,6 @@
 package vo
 
-// ============================================================
 // GraphRagBuildResult GraphRAG 构建结果
-// ============================================================
-
 type GraphRagBuildResult struct {
 	EntityCount                  int                          `json:"entityCount"`
 	RelationCount                int                          `json:"relationCount"`
@@ -27,10 +24,7 @@ type GraphRagBuildResult struct {
 	MaxAttempts                  int                          `json:"maxAttempts"`
 }
 
-// ============================================================
 // GraphPersistenceOutcome 图谱持久化结果枚举
-// ============================================================
-
 type GraphPersistenceOutcome = string
 
 const (
@@ -39,10 +33,7 @@ const (
 	GraphPersistenceOutcomeEmpty   GraphPersistenceOutcome = "EMPTY"
 )
 
-// ============================================================
 // ComponentOutcome 组件执行结果枚举
-// ============================================================
-
 type ComponentOutcome = string
 
 const (
@@ -51,10 +42,7 @@ const (
 	ComponentOutcomeNotApplicable ComponentOutcome = "NOT_APPLICABLE"
 )
 
-// ============================================================
 // DerivedIndexOutcome 衍生索引结果枚举
-// ============================================================
-
 type DerivedIndexOutcome = string
 
 const (
@@ -62,10 +50,7 @@ const (
 	DerivedIndexOutcomeFailed  DerivedIndexOutcome = "FAILED"
 )
 
-// ============================================================
 // ObservationProjectionOutcome 观察投影结果枚举
-// ============================================================
-
 type ObservationProjectionOutcome = string
 
 const (
@@ -73,10 +58,7 @@ const (
 	ObservationProjectionOutcomeFailed  ObservationProjectionOutcome = "FAILED"
 )
 
-// ============================================================
 // OuterTaskDisposition 外部任务处置枚举
-// ============================================================
-
 type OuterTaskDisposition = string
 
 const (
@@ -85,10 +67,7 @@ const (
 	OuterTaskDispositionFailIndexTask  OuterTaskDisposition = "FAIL_INDEX_TASK"
 )
 
-// ============================================================
 // InvocationOutcome 调用结果枚举
-// ============================================================
-
 type InvocationOutcome = string
 
 const (
@@ -96,29 +75,20 @@ const (
 	InvocationOutcomeFailed  InvocationOutcome = "FAILED"
 )
 
-// ============================================================
 // TypedChunk 类型化块接口
-// ============================================================
-
 type TypedChunk interface {
 	GetID() int64
 	GetChunkNo() int
 	GetChunkText() string
 }
 
-// ============================================================
 // GraphRagFinalization GraphRAG 最终化结果
-// ============================================================
-
 type GraphRagFinalization struct {
 	Result      *GraphRagBuildResult
 	TypedChunks []TypedChunk
 }
 
-// ============================================================
 // RaptorBuildResult RAPTOR 构建结果
-// ============================================================
-
 type RaptorBuildResult struct {
 	NodeCount           int    `json:"nodeCount"`
 	LevelCount          int    `json:"levelCount"`
@@ -127,10 +97,7 @@ type RaptorBuildResult struct {
 	SavedQualityReport  string `json:"savedQualityReport"`
 }
 
-// ============================================================
 // GraphRagBuildFailureException GraphRAG 构建失败异常
-// ============================================================
-
 type GraphRagBuildFailureException struct {
 	Result *GraphRagBuildResult
 	Err    error

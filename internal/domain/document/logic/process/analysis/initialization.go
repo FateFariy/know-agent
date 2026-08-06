@@ -59,7 +59,7 @@ func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) er
 			EventType:    vo.TaskEventStart,
 			LogLevel:     vo.LogLevelInfo,
 			OperatorType: vo.OperatorTypeSystem,
-			Content:      "开始解析文档内容，解析方式已确定：" + vo.FileTypeName(parseCtx.Document.FileType),
+			Content:      "开始解析文档内容，文档类型：" + vo.FileTypeName(parseCtx.Document.FileType),
 			DetailJson:   string(detail),
 		}
 		return p.repo.InsertTaskLog(txCtx, startLog)

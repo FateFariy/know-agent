@@ -84,11 +84,14 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			"costMills":          time.Since(parseCtx.StartTime).Milliseconds(),
 		})
 		recommendLog := &entity.DocumentTaskLog{
-			TaskId: parseCtx.TaskID, DocumentId: parseCtx.DocumentID,
-			StageType: vo.TaskStageStrategyRoute, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
-			Content:    "系统已生成推荐策略",
-			DetailJson: string(recommendDetail),
+			TaskId:       parseCtx.TaskID,
+			DocumentId:   parseCtx.DocumentID,
+			StageType:    vo.TaskStageStrategyRoute,
+			EventType:    vo.TaskEventComplete,
+			LogLevel:     vo.LogLevelInfo,
+			OperatorType: vo.OperatorTypeSystem,
+			Content:      "系统已生成推荐策略",
+			DetailJson:   string(recommendDetail),
 		}
 		return p.repo.InsertTaskLog(txCtx, recommendLog)
 	}
