@@ -8,6 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -327,6 +328,19 @@ func (d *DocumentRepositoryImpl) InsertChunkBatch(ctx context.Context, chunks []
 // UpdateChunkByTaskId 根据任务ID更新块
 func (d *DocumentRepositoryImpl) UpdateChunkByTaskId(ctx context.Context, chunk *entity.DocumentChunk) error {
 	return d.dbWithContext(ctx).Where("task_id = ?", chunk.TaskId).Updates(convert.ToDocumentChunkModel(chunk)).Error
+}
+
+// UpdateBatchChunkById 根据ID批量更新块
+func (d *DocumentRepositoryImpl) UpdateBatchChunkById(ctx context.Context, chunks []*entity.DocumentChunk, fields ...string) error {
+	if len(fields) == 0 {
+		return errors.New("fields is empty")
+	}
+	assignments := clause.AssignmentColumns(fields)
+	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: gorm.Expr("NOW()")})
+	return d.dbWithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: assignments,
+	}).Create(convert.ToDocumentChunkModelList(chunks)).Error
 }
 
 // DeleteChunkByDocumentId 根据文档ID删除块

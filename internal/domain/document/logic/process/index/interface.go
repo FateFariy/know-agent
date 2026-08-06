@@ -23,7 +23,7 @@ type BuildContext struct {
 
 	// 业务数据
 	StartTime            time.Time
-	BuildStartedNanos    time.Time
+	BuildStartedTime     time.Time
 	PipelineSteps        []*entity.DocumentStrategyStep
 	ParentCandidates     []*vo.ParentBlockCandidate
 	ChildChunks          []*entity.DocumentChunk

@@ -3,19 +3,21 @@ package index
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // ValidationPhase 验证阶段：检查任务状态、读取 GraphRAG 检查点
 type ValidationPhase struct {
-	deps *PhaseDeps
+	*PhaseDeps
 }
 
 func NewValidationPhase(deps *PhaseDeps) *ValidationPhase {
-	return &ValidationPhase{deps: deps}
+	return &ValidationPhase{PhaseDeps: deps}
 }
 
 func (p *ValidationPhase) Name() string {
@@ -41,8 +43,7 @@ func (p *ValidationPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 
 	// 检查是否需要直接失败
 	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
-		p.applyGraphFailureDisposition(ctx, buildCtx.Document, buildCtx.Task, buildCtx.PlanID, graphRagBuildResult, nil)
-		return nil
+		p.applyGraphFailureDisposition(ctx, buildCtx, nil)
 	}
 
 	return nil
@@ -53,113 +54,44 @@ func (p *ValidationPhase) readGraphRagBuildResult(task *entity.DocumentTask) *vo
 	if task == nil || task.ExtJson == "" {
 		return nil
 	}
-	var state map[string]any
-	if err := json.Unmarshal([]byte(task.ExtJson), &state); err != nil {
+	var wrapper struct {
+		GraphRagBuild *vo.GraphRagBuildResult `json:"graphRagBuild"`
+	}
+	if err := json.Unmarshal([]byte(task.ExtJson), &wrapper); err != nil {
 		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", task.ID, err)
 		return nil
 	}
-	rawState, ok := state["graphRagBuild"]
-	if !ok {
-		return nil
-	}
-	stateMap, ok := rawState.(map[string]any)
-	if !ok {
-		return nil
-	}
 
-	result := &vo.GraphRagBuildResult{}
-	if v, ok := stateMap["entityCount"].(float64); ok {
-		result.EntityCount = int(v)
-	}
-	if v, ok := stateMap["relationCount"].(float64); ok {
-		result.RelationCount = int(v)
-	}
-	if v, ok := stateMap["evidenceCount"].(float64); ok {
-		result.EvidenceCount = int(v)
-	}
-	if v, ok := stateMap["communityCount"].(float64); ok {
-		result.CommunityCount = int(v)
-	}
-	if v, ok := stateMap["graphPersistenceOutcome"].(string); ok {
-		result.GraphPersistenceOutcome = vo.GraphPersistenceOutcome(v)
-	}
-	if v, ok := stateMap["graphPersistenceReason"].(string); ok {
-		result.GraphPersistenceReason = v
-	}
-	if v, ok := stateMap["kgCommitted"].(bool); ok {
-		result.KgCommitted = v
-	}
-	if v, ok := stateMap["typedIndexOutcome"].(string); ok {
-		result.TypedIndexOutcome = vo.ComponentOutcome(v)
-	}
-	if v, ok := stateMap["crossDocumentIndexOutcome"].(string); ok {
-		result.CrossDocumentIndexOutcome = vo.ComponentOutcome(v)
-	}
-	if v, ok := stateMap["derivedIndexOutcome"].(string); ok {
-		result.DerivedIndexOutcome = vo.DerivedIndexOutcome(v)
-	}
-	if v, ok := stateMap["observationProjectionOutcome"].(string); ok {
-		result.ObservationProjectionOutcome = vo.ObservationProjectionOutcome(v)
-	}
-	if v, ok := stateMap["outerTaskDisposition"].(string); ok {
-		result.OuterTaskDisposition = vo.OuterTaskDisposition(v)
-	}
-	if v, ok := stateMap["pythonInvocationOutcome"].(string); ok {
-		result.PythonInvocationOutcome = vo.InvocationOutcome(v)
-	}
-	if v, ok := stateMap["advisorInvocationOutcome"].(string); ok {
-		result.AdvisorInvocationOutcome = vo.InvocationOutcome(v)
-	}
-	if v, ok := stateMap["attempt"].(float64); ok {
-		result.Attempt = int(v)
-	}
-	if v, ok := stateMap["maxAttempts"].(float64); ok {
-		result.MaxAttempts = int(v)
-	}
-
-	return result
+	return wrapper.GraphRagBuild
 }
 
 // applyGraphFailureDisposition 应用图谱失败处置
-func (p *ValidationPhase) applyGraphFailureDisposition(ctx context.Context, document *entity.Document,
-	task *entity.DocumentTask, planId int64, result *vo.GraphRagBuildResult, cause error) {
+func (p *ValidationPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *BuildContext, cause error) {
 	failedStage := vo.TaskStageGraphRag
-	if task.CurrentStage != 0 {
-		failedStage = task.CurrentStage
+	if buildCtx.Task.CurrentStage != 0 {
+		failedStage = buildCtx.Task.CurrentStage
 	}
-	if cause == nil {
-		cause = &vo.GraphRagBuildFailureException{Result: result}
+	errMsg := "Graph build failed"
+	if cause != nil {
+		errMsg = utils.BlankToDefault(cause.Error(), "Graph build failed")
 	}
 
 	markFailureTx := func(txCtx context.Context) error {
-		if err := p.deps.Repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed,
+		if err := p.Repo.UpdateDocumentById(txCtx, &entity.Document{
+			ID: buildCtx.Document.ID, IndexStatus: vo.IndexStatusBuildFailed,
 		}); err != nil {
 			return err
 		}
-		if err := p.deps.Repo.UpdateChunkByTaskId(txCtx, &entity.DocumentChunk{
-			TaskId: task.ID, VectorStatus: vo.VectorStatusVectorFailed,
-		}); err != nil {
+		if err := p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanID, vo.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
-		if err := p.deps.Repo.UpdateStepExecuteStatus(txCtx, planId, vo.StrategyExecuteStatusExecuteFailed); err != nil {
-			return err
-		}
-		if err := p.deps.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: failedStage,
-		}); err != nil {
-			return err
-		}
-		failDetail, _ := json.Marshal(map[string]any{"error": cause.Error(), "currentStage": failedStage})
-		failLog := &entity.DocumentTaskLog{
-			TaskId: task.ID, DocumentId: task.DocumentId,
-			StageType: failedStage, EventType: vo.TaskEventFailed,
-			LogLevel: vo.LogLevelError, OperatorType: vo.OperatorTypeSystem,
-			Content: "GraphRAG 构建失败", DetailJson: string(failDetail),
-		}
-		return p.deps.Repo.InsertTaskLog(txCtx, failLog)
+		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID: buildCtx.Task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: failedStage,
+			FinishTime: utils.Pointer(time.Now()), CostMillis: time.Since(buildCtx.StartTime).Milliseconds(),
+			ErrorCode: utils.Pointer("TASK_FAILED"), ErrorMsg: utils.Pointer(errMsg),
+		})
 	}
-	if err := p.deps.Repo.Do(ctx, markFailureTx); err != nil {
-		logx.Warnf("图谱失败时收尾失败: taskId=%d, err=%v", task.ID, err)
+	if err := p.Repo.Do(ctx, markFailureTx); err != nil {
+		logx.Warnf("图谱失败时收尾失败: taskId=%d, err=%v", buildCtx.Task.ID, err)
 	}
 }

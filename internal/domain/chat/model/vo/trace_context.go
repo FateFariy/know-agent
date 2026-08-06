@@ -53,10 +53,10 @@ func (e *StageError) Unwrap() error {
 }
 
 // OnStart 构造 RunInfo 并调用 callbacks.OnStart
-func OnStart(ctx context.Context, stageCode *ConversationTraceStage, executionMode string, input *StageInput) context.Context {
+func OnStart(ctx context.Context, stage *ConversationTraceStage, executionMode string, input *StageInput) context.Context {
 	runInfo := &callbacks.RunInfo{
 		StageId:       utils.GetSnowflakeNextID(),
-		Payload:       stageCode,
+		Payload:       stage,
 		ExecutionMode: executionMode,
 		StartTime:     time.Now(),
 		Component:     "trace",

@@ -11,11 +11,11 @@ import (
 
 // KeywordIndexPhase 关键词索引阶段
 type KeywordIndexPhase struct {
-	deps *PhaseDeps
+	*PhaseDeps
 }
 
 func NewKeywordIndexPhase(deps *PhaseDeps) *KeywordIndexPhase {
-	return &KeywordIndexPhase{deps: deps}
+	return &KeywordIndexPhase{PhaseDeps: deps}
 }
 
 func (p *KeywordIndexPhase) Name() string {
@@ -27,7 +27,7 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 
 	// 标记开始关键词索引
 	markKeywordIndexTx := func(txCtx context.Context) error {
-		if err := p.deps.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 			ID: buildCtx.TaskID, CurrentStage: vo.TaskStageKeywordIndex,
 		}); err != nil {
 			return err
@@ -39,18 +39,18 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
 			Content: "开始构建关键词索引", DetailJson: string(keywordStartDetail),
 		}
-		return p.deps.Repo.InsertTaskLog(txCtx, keywordStartLog)
+		return p.Repo.InsertTaskLog(txCtx, keywordStartLog)
 	}
-	if err := p.deps.Repo.Do(ctx, markKeywordIndexTx); err != nil {
+	if err := p.Repo.Do(ctx, markKeywordIndexTx); err != nil {
 		return err
 	}
 
 	// 执行关键词索引构建
-	keywordStartedNanos := time.Now()
-	if err := p.deps.Port.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
+	keywordStartedTime := time.Now()
+	if err := p.Port.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
-	buildCtx.KeywordCostMillis = time.Since(keywordStartedNanos).Milliseconds()
+	buildCtx.KeywordCostMillis = time.Since(keywordStartedTime).Milliseconds()
 
 	// 标记完成
 	markKeywordCompleteTx := func(txCtx context.Context) error {
@@ -64,7 +64,7 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
 			Content: "关键词索引完成", DetailJson: string(keywordEndDetail),
 		}
-		return p.deps.Repo.InsertTaskLog(txCtx, keywordEndLog)
+		return p.Repo.InsertTaskLog(txCtx, keywordEndLog)
 	}
-	return p.deps.Repo.Do(ctx, markKeywordCompleteTx)
+	return p.Repo.Do(ctx, markKeywordCompleteTx)
 }
