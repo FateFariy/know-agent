@@ -81,6 +81,9 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 		if err = d.DeleteDocumentBlocksByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
+		//if err = d.DeleteTablesByDocumentId(ctx, documentId); err != nil {
+		//	return err
+		//}
 		if err = d.DeleteArtifactsByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
@@ -459,6 +462,29 @@ func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context
 	return nodes, err
 }
 
+// SelectStructureNodeListByTask 根据文档ID和任务ID查询结构节点列表
+func (d *DocumentRepositoryImpl) SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentStructureNode, error) {
+	var nodes []*entity.DocumentStructureNode
+	if err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
+		Where("document_id = ? AND parse_task_id = ?", documentId, taskId).
+		Order("node_no ASC, id ASC").
+		Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+// CountStructureNodes 统计结构节点数量
+func (d *DocumentRepositoryImpl) CountStructureNodes(ctx context.Context, documentId, taskId int64) (int64, error) {
+	var count int64
+	if err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
+		Where("document_id = ? AND parse_task_id = ?", documentId, taskId).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // ========== 属性相关 ==========
 
 // InsertProfile 插入文档属性
@@ -588,4 +614,41 @@ func (d *DocumentRepositoryImpl) DeleteDocumentBlocksByTask(ctx context.Context,
 // DeleteDocumentBlocksByDocumentId 根据文档ID删除文档块
 func (d *DocumentRepositoryImpl) DeleteDocumentBlocksByDocumentId(ctx context.Context, documentId int64) error {
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentBlock{}).Error
+}
+
+// CountDocumentBlocks 统计文档块数量
+func (d *DocumentRepositoryImpl) CountDocumentBlocks(ctx context.Context, documentId, taskId int64) (int64, error) {
+	var count int64
+	if err := d.dbWithContext(ctx).Model(&model.DocumentBlock{}).
+		Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// SelectDocumentBlocksWithLimit 查询文档块列表（带限制）
+func (d *DocumentRepositoryImpl) SelectDocumentBlocksWithLimit(ctx context.Context, documentId, taskId int64, limit int) ([]*entity.DocumentBlock, error) {
+	var blocks []*entity.DocumentBlock
+	if err := d.dbWithContext(ctx).Model(&model.DocumentBlock{}).
+		Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Order("block_no ASC, id ASC").
+		Limit(limit).
+		Find(&blocks).Error; err != nil {
+		return nil, err
+	}
+	return blocks, nil
+}
+
+// SelectDocumentBlockPageNumbers 查询文档块中不重复的页码列表
+func (d *DocumentRepositoryImpl) SelectDocumentBlockPageNumbers(ctx context.Context, documentId, taskId int64) ([]int, error) {
+	var pageNumbers []int
+	if err := d.dbWithContext(ctx).Model(&model.DocumentBlock{}).
+		Where("document_id = ? AND task_id = ? AND page_no IS NOT NULL AND bbox_json IS NOT NULL AND bbox_json != ''", documentId, taskId).
+		Distinct("page_no").
+		Order("page_no ASC").
+		Pluck("page_no", &pageNumbers).Error; err != nil {
+		return nil, err
+	}
+	return pageNumbers, nil
 }

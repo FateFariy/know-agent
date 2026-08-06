@@ -154,6 +154,12 @@ type DocumentRepository interface {
 	// SelectStructureNodeListByDocumentId 根据文档ID查询结构节点列表
 	SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentStructureNode, error)
 
+	// SelectStructureNodeListByTask 根据文档ID和任务ID查询结构节点列表
+	SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentStructureNode, error)
+
+	// CountStructureNodes 统计结构节点数量
+	CountStructureNodes(ctx context.Context, documentId, taskId int64) (int64, error)
+
 	// ========== 属性相关 ==========
 
 	// InsertProfile 插入文档属性
@@ -175,17 +181,6 @@ type DocumentRepository interface {
 
 	// DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 	DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error
-
-	// ========== 表格候选相关 ==========
-
-	// // InsertTableCandidate 插入表格候选
-	// InsertTableCandidate(ctx context.Context, candidate *entity.DocumentTableCandidate) error
-
-	// // DeleteTableCandidateByDocumentId 根据文档ID删除表格候选
-	// DeleteTableCandidateByDocumentId(ctx context.Context, documentId int64) error
-
-	// // SelectTableCandidateListByDocumentId 根据文档ID查询表格候选列表
-	// SelectTableCandidateListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentTableCandidate, error)
 
 	// ========== 解析产物相关 ==========
 
@@ -217,4 +212,57 @@ type DocumentRepository interface {
 
 	// DeleteDocumentBlocksByDocumentId 根据文档ID删除文档块
 	DeleteDocumentBlocksByDocumentId(ctx context.Context, documentId int64) error
+
+	// CountDocumentBlocks 统计文档块数量
+	CountDocumentBlocks(ctx context.Context, documentId, taskId int64) (int64, error)
+
+	// SelectDocumentBlocksWithLimit 查询文档块列表（带限制）
+	SelectDocumentBlocksWithLimit(ctx context.Context, documentId, taskId int64, limit int) ([]*entity.DocumentBlock, error)
+
+	// SelectDocumentBlockPageNumbers 查询文档块中不重复的页码列表
+	SelectDocumentBlockPageNumbers(ctx context.Context, documentId, taskId int64) ([]int, error)
+}
+
+type TableRepository interface {
+	// InsertTable 插入表格
+	InsertTable(ctx context.Context, table *entity.DocumentTable) error
+
+	// InsertTableColumnBatch 批量插入表格列
+	InsertTableColumnBatch(ctx context.Context, columns []*entity.DocumentTableColumn) error
+
+	// InsertTableRowBatch 批量插入表格行
+	InsertTableRowBatch(ctx context.Context, rows []*entity.DocumentTableRow) error
+
+	// InsertTableCellBatch 批量插入表格单元格
+	InsertTableCellBatch(ctx context.Context, cells []*entity.DocumentTableCell) error
+
+	// SelectTableById 根据ID查询表格
+	SelectTableById(ctx context.Context, tableId int64) (*entity.DocumentTable, error)
+
+	// SelectTablesByTask 根据文档ID和任务ID查询表格列表
+	SelectTablesByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentTable, error)
+
+	// SelectTableColumnsByTableId 根据表格ID查询列列表
+	SelectTableColumnsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableColumn, error)
+
+	// SelectTableRowsByTableId 根据表格ID查询行列表
+	SelectTableRowsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableRow, error)
+
+	// SelectTableCellsByTableId 根据表格ID查询单元格列表
+	SelectTableCellsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableCell, error)
+
+	// DeleteTableDetailByTableIds 根据表格ID列表删除表格列、行、单元格
+	DeleteTableDetailByTableIds(ctx context.Context, tableIds []int64) error
+
+	// DeleteTablesByTask 根据文档ID和任务ID删除表格
+	DeleteTablesByTask(ctx context.Context, documentId, taskId int64) error
+
+	// DeleteTablesByDocumentId 根据文档ID删除表格
+	DeleteTablesByDocumentId(ctx context.Context, documentId int64) error
+
+	// CountTables 统计表格数量
+	CountTables(ctx context.Context, documentId, taskId int64) (int64, error)
+
+	// SelectTablePageNumbers 查询表格中不重复的页码列表
+	SelectTablePageNumbers(ctx context.Context, documentId, taskId int64) ([]int, error)
 }

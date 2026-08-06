@@ -29,6 +29,8 @@ import (
 var ProviderSet = wire.NewSet(
 	persistence.NewDocumentRepository,
 	wire.Bind(new(documentadapter.DocumentRepository), new(*persistence.DocumentRepositoryImpl)),
+	persistence.NewTableRepository,
+	wire.Bind(new(documentadapter.TableRepository), new(*persistence.TableRepositoryImpl)),
 	persistence.NewChatRepository,
 	wire.Bind(new(chatadapter.ChatRepository), new(*persistence.ChatRepositoryImpl)),
 	persistence.NewKnowledgeRepository,

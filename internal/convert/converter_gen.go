@@ -527,6 +527,41 @@ func ToConfirmStrategyResp(source *entity1.DocumentStrategyPlan) *document.Confi
 	}
 	return pDocumentConfirmStrategyResp
 }
+func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
+	var pModelDocumentBlock *model.DocumentBlock
+	if source != nil {
+		var modelDocumentBlock model.DocumentBlock
+		modelDocumentBlock.Model = entityDocumentBlockToCommonModel((*source))
+		modelDocumentBlock.DocumentID = (*source).DocumentID
+		modelDocumentBlock.TaskID = (*source).TaskID
+		modelDocumentBlock.BlockNo = (*source).BlockNo
+		modelDocumentBlock.BlockType = (*source).BlockType
+		modelDocumentBlock.ParentBlockID = (*source).ParentBlockID
+		modelDocumentBlock.SectionPath = (*source).SectionPath
+		modelDocumentBlock.CanonicalPath = (*source).CanonicalPath
+		modelDocumentBlock.PageNo = (*source).PageNo
+		modelDocumentBlock.PageRange = (*source).PageRange
+		modelDocumentBlock.BboxJSON = (*source).BboxJSON
+		modelDocumentBlock.Text = (*source).Text
+		modelDocumentBlock.ContentWithWeight = (*source).ContentWithWeight
+		modelDocumentBlock.TableHTML = (*source).TableHTML
+		modelDocumentBlock.ImageObjectName = (*source).ImageObjectName
+		modelDocumentBlock.ImageCaption = (*source).ImageCaption
+		modelDocumentBlock.MetadataJSON = (*source).MetadataJSON
+		pModelDocumentBlock = &modelDocumentBlock
+	}
+	return pModelDocumentBlock
+}
+func ToDocumentBlockModelList(source []*entity1.DocumentBlock) []*model.DocumentBlock {
+	var pModelDocumentBlockList []*model.DocumentBlock
+	if source != nil {
+		pModelDocumentBlockList = make([]*model.DocumentBlock, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentBlockList[i] = ToDocumentBlockModel(source[i])
+		}
+	}
+	return pModelDocumentBlockList
+}
 func ToDocumentChunkItemList(source []*entity1.DocumentChunk) []*document.DocumentChunkItem {
 	var pDocumentDocumentChunkItemList []*document.DocumentChunkItem
 	if source != nil {
@@ -844,6 +879,121 @@ func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) [
 	}
 	return pModelDocumentStructureNodeList
 }
+func ToDocumentTableCellModel(source *entity1.DocumentTableCell) *model.DocumentTableCell {
+	var pModelDocumentTableCell *model.DocumentTableCell
+	if source != nil {
+		var modelDocumentTableCell model.DocumentTableCell
+		modelDocumentTableCell.Model = entityDocumentTableCellToCommonModel((*source))
+		modelDocumentTableCell.DocumentID = (*source).DocumentID
+		modelDocumentTableCell.TaskID = (*source).TaskID
+		modelDocumentTableCell.TableID = (*source).TableID
+		modelDocumentTableCell.RowID = (*source).RowID
+		modelDocumentTableCell.ColumnID = (*source).ColumnID
+		modelDocumentTableCell.RowNo = (*source).RowNo
+		modelDocumentTableCell.ColumnNo = (*source).ColumnNo
+		modelDocumentTableCell.CellText = (*source).CellText
+		modelDocumentTableCell.NumericValue = (*source).NumericValue
+		modelDocumentTableCell.SourceRowNo = (*source).SourceRowNo
+		modelDocumentTableCell.SourceColumnNo = (*source).SourceColumnNo
+		modelDocumentTableCell.SourceCellRef = (*source).SourceCellRef
+		modelDocumentTableCell.BboxJSON = (*source).BboxJSON
+		modelDocumentTableCell.MetadataJSON = (*source).MetadataJSON
+		pModelDocumentTableCell = &modelDocumentTableCell
+	}
+	return pModelDocumentTableCell
+}
+func ToDocumentTableCellModelList(source []*entity1.DocumentTableCell) []*model.DocumentTableCell {
+	var pModelDocumentTableCellList []*model.DocumentTableCell
+	if source != nil {
+		pModelDocumentTableCellList = make([]*model.DocumentTableCell, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentTableCellList[i] = ToDocumentTableCellModel(source[i])
+		}
+	}
+	return pModelDocumentTableCellList
+}
+func ToDocumentTableColumnModel(source *entity1.DocumentTableColumn) *model.DocumentTableColumn {
+	var pModelDocumentTableColumn *model.DocumentTableColumn
+	if source != nil {
+		var modelDocumentTableColumn model.DocumentTableColumn
+		modelDocumentTableColumn.Model = entityDocumentTableColumnToCommonModel((*source))
+		modelDocumentTableColumn.DocumentID = (*source).DocumentID
+		modelDocumentTableColumn.TaskID = (*source).TaskID
+		modelDocumentTableColumn.TableID = (*source).TableID
+		modelDocumentTableColumn.ColumnNo = (*source).ColumnNo
+		modelDocumentTableColumn.ColumnName = (*source).ColumnName
+		modelDocumentTableColumn.NormalizedName = (*source).NormalizedName
+		modelDocumentTableColumn.ValueType = (*source).ValueType
+		pModelDocumentTableColumn = &modelDocumentTableColumn
+	}
+	return pModelDocumentTableColumn
+}
+func ToDocumentTableColumnModelList(source []*entity1.DocumentTableColumn) []*model.DocumentTableColumn {
+	var pModelDocumentTableColumnList []*model.DocumentTableColumn
+	if source != nil {
+		pModelDocumentTableColumnList = make([]*model.DocumentTableColumn, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentTableColumnList[i] = ToDocumentTableColumnModel(source[i])
+		}
+	}
+	return pModelDocumentTableColumnList
+}
+func ToDocumentTableModel(source *entity1.DocumentTable) *model.DocumentTable {
+	var pModelDocumentTable *model.DocumentTable
+	if source != nil {
+		var modelDocumentTable model.DocumentTable
+		modelDocumentTable.Model = entityDocumentTableToCommonModel((*source))
+		modelDocumentTable.DocumentID = (*source).DocumentID
+		modelDocumentTable.TaskID = (*source).TaskID
+		modelDocumentTable.BlockID = (*source).BlockID
+		modelDocumentTable.TableNo = (*source).TableNo
+		modelDocumentTable.SectionPath = (*source).SectionPath
+		modelDocumentTable.PageNo = (*source).PageNo
+		modelDocumentTable.PageRange = (*source).PageRange
+		modelDocumentTable.BboxJSON = (*source).BboxJSON
+		modelDocumentTable.Title = (*source).Title
+		modelDocumentTable.RowCount = (*source).RowCount
+		modelDocumentTable.ColumnCount = (*source).ColumnCount
+		modelDocumentTable.TableHTML = (*source).TableHTML
+		modelDocumentTable.MetadataJSON = (*source).MetadataJSON
+		pModelDocumentTable = &modelDocumentTable
+	}
+	return pModelDocumentTable
+}
+func ToDocumentTableModelList(source []*entity1.DocumentTable) []*model.DocumentTable {
+	var pModelDocumentTableList []*model.DocumentTable
+	if source != nil {
+		pModelDocumentTableList = make([]*model.DocumentTable, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentTableList[i] = ToDocumentTableModel(source[i])
+		}
+	}
+	return pModelDocumentTableList
+}
+func ToDocumentTableRowModel(source *entity1.DocumentTableRow) *model.DocumentTableRow {
+	var pModelDocumentTableRow *model.DocumentTableRow
+	if source != nil {
+		var modelDocumentTableRow model.DocumentTableRow
+		modelDocumentTableRow.Model = entityDocumentTableRowToCommonModel((*source))
+		modelDocumentTableRow.DocumentID = (*source).DocumentID
+		modelDocumentTableRow.TaskID = (*source).TaskID
+		modelDocumentTableRow.TableID = (*source).TableID
+		modelDocumentTableRow.RowNo = (*source).RowNo
+		modelDocumentTableRow.RowText = (*source).RowText
+		pModelDocumentTableRow = &modelDocumentTableRow
+	}
+	return pModelDocumentTableRow
+}
+func ToDocumentTableRowModelList(source []*entity1.DocumentTableRow) []*model.DocumentTableRow {
+	var pModelDocumentTableRowList []*model.DocumentTableRow
+	if source != nil {
+		pModelDocumentTableRowList = make([]*model.DocumentTableRow, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentTableRowList[i] = ToDocumentTableRowModel(source[i])
+		}
+	}
+	return pModelDocumentTableRowList
+}
 func ToDocumentTaskLogModel(source *entity1.DocumentTaskLog) *model.DocumentTaskLog {
 	var pModelDocumentTaskLog *model.DocumentTaskLog
 	if source != nil {
@@ -920,41 +1070,6 @@ func ToParseArtifactModelList(source []*entity1.ParseArtifact) []*model.Document
 		}
 	}
 	return pModelDocumentParseArtifactList
-}
-func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
-	var pModelDocumentBlock *model.DocumentBlock
-	if source != nil {
-		var modelDocumentBlock model.DocumentBlock
-		modelDocumentBlock.Model = entityDocumentBlockToCommonModel((*source))
-		modelDocumentBlock.DocumentID = (*source).DocumentID
-		modelDocumentBlock.TaskID = (*source).TaskID
-		modelDocumentBlock.BlockNo = (*source).BlockNo
-		modelDocumentBlock.BlockType = (*source).BlockType
-		modelDocumentBlock.ParentBlockID = (*source).ParentBlockID
-		modelDocumentBlock.SectionPath = (*source).SectionPath
-		modelDocumentBlock.CanonicalPath = (*source).CanonicalPath
-		modelDocumentBlock.PageNo = (*source).PageNo
-		modelDocumentBlock.PageRange = (*source).PageRange
-		modelDocumentBlock.BboxJSON = (*source).BboxJSON
-		modelDocumentBlock.Text = (*source).Text
-		modelDocumentBlock.ContentWithWeight = (*source).ContentWithWeight
-		modelDocumentBlock.TableHTML = (*source).TableHTML
-		modelDocumentBlock.ImageObjectName = (*source).ImageObjectName
-		modelDocumentBlock.ImageCaption = (*source).ImageCaption
-		modelDocumentBlock.MetadataJSON = (*source).MetadataJSON
-		pModelDocumentBlock = &modelDocumentBlock
-	}
-	return pModelDocumentBlock
-}
-func ToDocumentBlockModelList(source []*entity1.DocumentBlock) []*model.DocumentBlock {
-	var pModelDocumentBlockList []*model.DocumentBlock
-	if source != nil {
-		pModelDocumentBlockList = make([]*model.DocumentBlock, len(source))
-		for i := 0; i < len(source); i++ {
-			pModelDocumentBlockList[i] = ToDocumentBlockModel(source[i])
-		}
-	}
-	return pModelDocumentBlockList
 }
 func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
@@ -1035,6 +1150,11 @@ func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentRe
 	}
 	return pDocumentUploadDocumentResp
 }
+func entityDocumentBlockToCommonModel(source entity1.DocumentBlock) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
 func entityDocumentChunkToCommonModel(source entity1.DocumentChunk) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
@@ -1065,6 +1185,26 @@ func entityDocumentStructureNodeToCommonModel(source entity1.DocumentStructureNo
 	commonModel.ID = source.ID
 	return commonModel
 }
+func entityDocumentTableCellToCommonModel(source entity1.DocumentTableCell) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentTableColumnToCommonModel(source entity1.DocumentTableColumn) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentTableRowToCommonModel(source entity1.DocumentTableRow) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentTableToCommonModel(source entity1.DocumentTable) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
 func entityDocumentTaskLogToCommonModel(source entity1.DocumentTaskLog) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
@@ -1081,11 +1221,6 @@ func entityDocumentToCommonModel(source entity1.Document) common.Model {
 	return commonModel
 }
 func entityParseArtifactToCommonModel(source entity1.ParseArtifact) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentBlockToCommonModel(source entity1.DocumentBlock) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

@@ -82,6 +82,19 @@ type DocumentConverter interface {
 	// goverter:map . Model
 	ToDocumentBlockModel(src *den.DocumentBlock) *model.DocumentBlock
 	ToDocumentBlockModelList(src []*den.DocumentBlock) []*model.DocumentBlock
+
+	// goverter:map . Model
+	ToDocumentTableModel(src *den.DocumentTable) *model.DocumentTable
+	ToDocumentTableModelList(src []*den.DocumentTable) []*model.DocumentTable
+	// goverter:map . Model
+	ToDocumentTableColumnModel(src *den.DocumentTableColumn) *model.DocumentTableColumn
+	ToDocumentTableColumnModelList(src []*den.DocumentTableColumn) []*model.DocumentTableColumn
+	// goverter:map . Model
+	ToDocumentTableRowModel(src *den.DocumentTableRow) *model.DocumentTableRow
+	ToDocumentTableRowModelList(src []*den.DocumentTableRow) []*model.DocumentTableRow
+	// goverter:map . Model
+	ToDocumentTableCellModel(src *den.DocumentTableCell) *model.DocumentTableCell
+	ToDocumentTableCellModelList(src []*den.DocumentTableCell) []*model.DocumentTableCell
 }
 
 // goverter:converter
