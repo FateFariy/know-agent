@@ -5,7 +5,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/slice"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // DocumentTask 文档任务实体
@@ -32,9 +32,9 @@ type DocumentTask struct {
 }
 
 func (d *DocumentTask) FillEnumNames() {
-	d.TaskTypeName = vo.TaskTypeName(d.TaskType)
-	d.TaskStatusName = vo.TaskStatusName(d.TaskStatus)
-	d.CurrentStageName = vo.TaskStageName(d.CurrentStage)
+	d.TaskTypeName = enum.TaskTypeName(d.TaskType)
+	d.TaskStatusName = enum.TaskStatusName(d.TaskStatus)
+	d.CurrentStageName = enum.TaskStageName(d.CurrentStage)
 	slice.ForEach(d.Logs, func(index int, log *DocumentTaskLog) {
 		log.FillEnumNames()
 	})

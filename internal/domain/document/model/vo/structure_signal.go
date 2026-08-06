@@ -127,19 +127,19 @@ func (d *DocumentStructureNodeDraft) AppendLine(line string) {
 
 func (d *DocumentStructureNodeDraft) ToCandidate() *StructureNode {
 	return &StructureNode{
-		NodeNo:            d.NodeNo,
-		NodeType:          d.NodeType,
-		ParentNodeNo:      d.ParentNodeNo,
-		PrevSiblingNodeNo: d.PrevSiblingNodeNo,
-		NextSiblingNodeNo: d.NextSiblingNodeNo,
-		Depth:             d.Depth,
-		NodeCode:          d.NodeCode,
-		Title:             d.Title,
-		AnchorText:        d.AnchorText,
-		CanonicalPath:     d.CanonicalPath,
-		SectionPath:       d.SectionPath,
-		ContentText:       d.ContentText.String(),
-		ItemIndex:         d.ItemIndex,
+		NodeNumber:            d.NodeNo,
+		NodeType:              d.NodeType,
+		ParentNodeNumber:      d.ParentNodeNo,
+		PreviousSiblingNumber: d.PrevSiblingNodeNo,
+		NextSiblingNumber:     d.NextSiblingNodeNo,
+		Depth:                 d.Depth,
+		NodeCode:              d.NodeCode,
+		Title:                 d.Title,
+		AnchorText:            d.AnchorText,
+		CanonicalPath:         d.CanonicalPath,
+		SectionPath:           d.SectionPath,
+		ContentText:           d.ContentText.String(),
+		ItemIndex:             d.ItemIndex,
 	}
 }
 

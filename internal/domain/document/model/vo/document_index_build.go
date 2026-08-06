@@ -1,5 +1,7 @@
 package vo
 
+import "github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+
 type DocumentIndexBuild struct {
 	DocumentId      int64  // 文档ID
 	TaskId          int64  // 任务ID
@@ -12,7 +14,7 @@ type DocumentIndexBuild struct {
 }
 
 func (d *DocumentIndexBuild) FillEnumNames() {
-	d.TaskTypeName = TaskTypeName(d.TaskType)
-	d.TaskStatusName = TaskStatusName(d.TaskStatus)
-	d.IndexStatusName = IndexStatusName(d.IndexStatus)
+	d.TaskTypeName = enum.TaskTypeName(d.TaskType)
+	d.TaskStatusName = enum.TaskStatusName(d.TaskStatus)
+	d.IndexStatusName = enum.IndexStatusName(d.IndexStatus)
 }

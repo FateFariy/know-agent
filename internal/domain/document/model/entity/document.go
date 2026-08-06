@@ -7,7 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 type Document struct {
@@ -55,19 +55,19 @@ type Document struct {
 
 // FillEnumNames 填充枚举名称
 func (d *Document) FillEnumNames() {
-	d.FileTypeName = vo.FileTypeName(d.FileType)
-	d.ParseStatusName = vo.ParseStatusName(d.ParseStatus)
-	d.StrategyStatusName = vo.StrategyStatusName(d.StrategyStatus)
-	d.IndexStatusName = vo.IndexStatusName(d.IndexStatus)
+	d.FileTypeName = enum.FileTypeName(d.FileType)
+	d.ParseStatusName = enum.ParseStatusName(d.ParseStatus)
+	d.StrategyStatusName = enum.StrategyStatusName(d.StrategyStatus)
+	d.IndexStatusName = enum.IndexStatusName(d.IndexStatus)
 }
 
 // FillLatestTaskInfo 填充最新任务信息
 func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
 	d.LatestTaskId = task.ID
 	d.LatestTaskType = task.TaskType
-	d.LatestTaskTypeName = vo.TaskTypeName(task.TaskType)
+	d.LatestTaskTypeName = enum.TaskTypeName(task.TaskType)
 	d.LatestTaskStatus = task.TaskStatus
-	d.LatestTaskStatusName = vo.TaskStatusName(task.TaskStatus)
+	d.LatestTaskStatusName = enum.TaskStatusName(task.TaskStatus)
 }
 
 // FillDocumentTags 填充文档标签，逗号分隔

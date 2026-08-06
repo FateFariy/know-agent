@@ -1,4 +1,4 @@
-package vo
+package enum
 
 import (
 	"path/filepath"
