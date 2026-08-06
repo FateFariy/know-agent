@@ -8,6 +8,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -43,8 +44,8 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 		structureNodeCount := len(parseCtx.StructureNodes)
 		updatedDoc := &entity.Document{
 			ID:                  document.ID,
-			ParseStatus:         vo.ParseStatusParseSuccess,
-			StrategyStatus:      vo.StrategyStatusRecommended,
+			ParseStatus:         enum.ParseStatusParseSuccess,
+			StrategyStatus:      enum.StrategyStatusRecommended,
 			CharCount:           parseCtx.AnalysisResult.CharCount,
 			TokenCount:          parseCtx.AnalysisResult.TokenCount,
 			StructureLevel:      parseCtx.AnalysisResult.StructureLevel,
@@ -62,8 +63,8 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 		// 标记任务成功完成
 		taskUpdate := &entity.DocumentTask{
 			ID:           task.ID,
-			TaskStatus:   vo.TaskStatusSuccess,
-			CurrentStage: vo.TaskStageStrategyRoute,
+			TaskStatus:   enum.TaskStatusSuccess,
+			CurrentStage: enum.TaskStageStrategyRoute,
 			FinishTime:   utils.Pointer(time.Now()),
 			CostMillis:   time.Since(parseCtx.StartTime).Milliseconds(),
 			ErrorCode:    utils.Pointer(""),
@@ -86,10 +87,10 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 		recommendLog := &entity.DocumentTaskLog{
 			TaskId:       parseCtx.TaskID,
 			DocumentId:   parseCtx.DocumentID,
-			StageType:    vo.TaskStageStrategyRoute,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageStrategyRoute,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "系统已生成推荐策略",
 			DetailJson:   string(recommendDetail),
 		}
@@ -114,8 +115,8 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 		ID:               planId,
 		DocumentId:       document.ID,
 		PlanVersion:      latestVersion + 1,
-		PlanSource:       vo.PlanSourceSystemRecommend,
-		PlanStatus:       vo.PlanStatusWaitConfirm,
+		PlanSource:       enum.PlanSourceSystemRecommend,
+		PlanStatus:       enum.PlanStatusWaitConfirm,
 		StrategyCount:    len(planDraft.ParentSteps) + len(planDraft.ChildSteps),
 		StrategySnapshot: planDraft.StrategySnapshot,
 		RecommendReason:  planDraft.RecommendReason,
@@ -125,8 +126,8 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 	}
 
 	// 批量写入流水线步骤
-	parentSteps := p.convertStepDraftsToEntities(planId, document, vo.PipelineTypeParent, planDraft)
-	childSteps := p.convertStepDraftsToEntities(planId, document, vo.PipelineTypeChild, planDraft)
+	parentSteps := p.convertStepDraftsToEntities(planId, document, enum.PipelineTypeParent, planDraft)
+	childSteps := p.convertStepDraftsToEntities(planId, document, enum.PipelineTypeChild, planDraft)
 	steps := append(parentSteps, childSteps...)
 	if err = p.repo.InsertStepBatch(ctx, steps); err != nil {
 		return 0, err
@@ -135,9 +136,9 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 	return planId, nil
 }
 
-func (p *FinalizationPhase) convertStepDraftsToEntities(planId int64, document *entity.Document, pipelineType vo.PipelineType, draft *vo.DocumentStrategyPlanDraft) []*entity.DocumentStrategyStep {
+func (p *FinalizationPhase) convertStepDraftsToEntities(planId int64, document *entity.Document, pipelineType enum.PipelineType, draft *vo.DocumentStrategyPlanDraft) []*entity.DocumentStrategyStep {
 	stepDrafts := draft.ParentSteps
-	if pipelineType == vo.PipelineTypeChild {
+	if pipelineType == enum.PipelineTypeChild {
 		stepDrafts = draft.ChildSteps
 	}
 	steps := make([]*entity.DocumentStrategyStep, 0, len(stepDrafts))
@@ -151,7 +152,7 @@ func (p *FinalizationPhase) convertStepDraftsToEntities(planId int64, document *
 			StrategyType:    step.StrategyType,
 			StrategyRole:    step.StrategyRole,
 			SourceType:      step.SourceType,
-			ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
+			ExecuteStatus:   enum.StrategyExecuteStatusWaitExecute,
 			RecommendReason: draft.RecommendReason,
 		})
 	}

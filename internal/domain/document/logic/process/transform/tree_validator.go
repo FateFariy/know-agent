@@ -38,7 +38,7 @@ func NewTreeValidator() *TreeValidator {
 //  6. 重建 CanonicalPath / SectionPath（显示路径）
 //  7. 重建兄弟节点之间的双向链表指针
 //  8. 将 Draft 转换为 Candidate 并按 NodeNo 排序返回
-func (v *TreeValidator) Transform(documentTitle string, drafts []*vo.DocumentStructureNodeDraft, opts ...TransformerOption) []*vo.DocumentStructureNodeCandidate {
+func (v *TreeValidator) Transform(documentTitle string, drafts []*vo.DocumentStructureNodeDraft, opts ...TransformerOption) []*vo.StructureNode {
 	if len(drafts) == 0 {
 		return nil
 	}
@@ -70,10 +70,10 @@ func (v *TreeValidator) Transform(documentTitle string, drafts []*vo.DocumentStr
 	v.rebuildSiblingLinks(draftMap)
 
 	// 转换为候选节点并按节点编号升序排序
-	candidates := slice.Map(maputil.Values(draftMap), func(index int, draft *vo.DocumentStructureNodeDraft) *vo.DocumentStructureNodeCandidate {
+	candidates := slice.Map(maputil.Values(draftMap), func(index int, draft *vo.DocumentStructureNodeDraft) *vo.StructureNode {
 		return draft.ToCandidate()
 	})
-	slices.SortFunc(candidates, func(a, b *vo.DocumentStructureNodeCandidate) int { return a.NodeNo - b.NodeNo })
+	slices.SortFunc(candidates, func(a, b *vo.StructureNode) int { return a.NodeNo - b.NodeNo })
 
 	return candidates
 }

@@ -895,6 +895,67 @@ func ToKnowledgeDocumentOptionRespList(source []*vo1.KnowledgeDocument) []*docum
 	}
 	return pDocumentKnowledgeDocumentOptionRespList
 }
+func ToParseArtifactModel(source *entity1.ParseArtifact) *model.DocumentParseArtifact {
+	var pModelDocumentParseArtifact *model.DocumentParseArtifact
+	if source != nil {
+		var modelDocumentParseArtifact model.DocumentParseArtifact
+		modelDocumentParseArtifact.Model = entityParseArtifactToCommonModel((*source))
+		modelDocumentParseArtifact.DocumentID = (*source).DocumentID
+		modelDocumentParseArtifact.TaskID = (*source).TaskID
+		modelDocumentParseArtifact.ArtifactType = (*source).ArtifactType
+		modelDocumentParseArtifact.ObjectName = (*source).ObjectName
+		modelDocumentParseArtifact.ContentHash = (*source).ContentHash
+		modelDocumentParseArtifact.ParserName = (*source).ParserName
+		modelDocumentParseArtifact.ParserVersion = (*source).ParserVersion
+		pModelDocumentParseArtifact = &modelDocumentParseArtifact
+	}
+	return pModelDocumentParseArtifact
+}
+func ToParseArtifactModelList(source []*entity1.ParseArtifact) []*model.DocumentParseArtifact {
+	var pModelDocumentParseArtifactList []*model.DocumentParseArtifact
+	if source != nil {
+		pModelDocumentParseArtifactList = make([]*model.DocumentParseArtifact, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentParseArtifactList[i] = ToParseArtifactModel(source[i])
+		}
+	}
+	return pModelDocumentParseArtifactList
+}
+func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
+	var pModelDocumentBlock *model.DocumentBlock
+	if source != nil {
+		var modelDocumentBlock model.DocumentBlock
+		modelDocumentBlock.Model = entityDocumentBlockToCommonModel((*source))
+		modelDocumentBlock.DocumentID = (*source).DocumentID
+		modelDocumentBlock.TaskID = (*source).TaskID
+		modelDocumentBlock.BlockNo = (*source).BlockNo
+		modelDocumentBlock.BlockType = (*source).BlockType
+		modelDocumentBlock.ParentBlockID = (*source).ParentBlockID
+		modelDocumentBlock.SectionPath = (*source).SectionPath
+		modelDocumentBlock.CanonicalPath = (*source).CanonicalPath
+		modelDocumentBlock.PageNo = (*source).PageNo
+		modelDocumentBlock.PageRange = (*source).PageRange
+		modelDocumentBlock.BboxJSON = (*source).BboxJSON
+		modelDocumentBlock.Text = (*source).Text
+		modelDocumentBlock.ContentWithWeight = (*source).ContentWithWeight
+		modelDocumentBlock.TableHTML = (*source).TableHTML
+		modelDocumentBlock.ImageObjectName = (*source).ImageObjectName
+		modelDocumentBlock.ImageCaption = (*source).ImageCaption
+		modelDocumentBlock.MetadataJSON = (*source).MetadataJSON
+		pModelDocumentBlock = &modelDocumentBlock
+	}
+	return pModelDocumentBlock
+}
+func ToDocumentBlockModelList(source []*entity1.DocumentBlock) []*model.DocumentBlock {
+	var pModelDocumentBlockList []*model.DocumentBlock
+	if source != nil {
+		pModelDocumentBlockList = make([]*model.DocumentBlock, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelDocumentBlockList[i] = ToDocumentBlockModel(source[i])
+		}
+	}
+	return pModelDocumentBlockList
+}
 func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
 	if source != nil {
@@ -1015,6 +1076,16 @@ func entityDocumentTaskToCommonModel(source entity1.DocumentTask) common.Model {
 	return commonModel
 }
 func entityDocumentToCommonModel(source entity1.Document) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityParseArtifactToCommonModel(source entity1.ParseArtifact) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentBlockToCommonModel(source entity1.DocumentBlock) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

@@ -7,16 +7,16 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // RaptorPhase RAPTOR 层级摘要树构建阶段
 type RaptorPhase struct {
-	deps *PhaseDeps
+	*PhaseDeps
 }
 
 func NewRaptorPhase(deps *PhaseDeps) *RaptorPhase {
-	return &RaptorPhase{deps: deps}
+	return &RaptorPhase{PhaseDeps: deps}
 }
 
 func (p *RaptorPhase) Name() string {
@@ -28,8 +28,8 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 
 	// 标记开始 RAPTOR 构建
 	markRaptorStartTx := func(txCtx context.Context) error {
-		if err := p.deps.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: vo.TaskStageRaptor,
+		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageRaptor,
 		}); err != nil {
 			return err
 		}
@@ -38,20 +38,24 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 			"parentCount": len(buildCtx.ParentBlocks),
 		})
 		raptorStartLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageRaptor, EventType: vo.TaskEventStart,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
-			Content: "开始构建 RAPTOR 层级摘要树", DetailJson: string(raptorStartDetail),
+			TaskId:       buildCtx.TaskID,
+			DocumentId:   buildCtx.DocumentID,
+			StageType:    enum.TaskStageRaptor,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
+			Content:      "开始构建 RAPTOR 层级摘要树",
+			DetailJson:   string(raptorStartDetail),
 		}
-		return p.deps.Repo.InsertTaskLog(txCtx, raptorStartLog)
+		return p.Repo.InsertTaskLog(txCtx, raptorStartLog)
 	}
-	if err := p.deps.Repo.Do(ctx, markRaptorStartTx); err != nil {
+	if err := p.Repo.Do(ctx, markRaptorStartTx); err != nil {
 		return err
 	}
 
 	// 执行 RAPTOR 构建
 	raptorStartedNanos := time.Now()
-	raptorBuildResult, err := p.deps.RaptorBuilder.RebuildDocumentTree(ctx, buildCtx.DocumentID, buildCtx.TaskID, buildCtx.ChildChunks)
+	raptorBuildResult, err := p.RaptorBuilder.RebuildDocumentTree(ctx, buildCtx.DocumentID, buildCtx.TaskID, buildCtx.ChildChunks)
 	if err != nil {
 		return err
 	}
@@ -70,11 +74,11 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 		})
 		raptorEndLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageRaptor, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageRaptor, EventType: enum.TaskEventComplete,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "RAPTOR 层级摘要树构建完成", DetailJson: string(raptorEndDetail),
 		}
-		return p.deps.Repo.InsertTaskLog(txCtx, raptorEndLog)
+		return p.Repo.InsertTaskLog(txCtx, raptorEndLog)
 	}
-	return p.deps.Repo.Do(ctx, markRaptorCompleteTx)
+	return p.Repo.Do(ctx, markRaptorCompleteTx)
 }

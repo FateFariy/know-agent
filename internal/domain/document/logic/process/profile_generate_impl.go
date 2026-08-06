@@ -14,6 +14,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
@@ -97,10 +98,10 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 		}
 	}
 	combined := combinedText(document, parsedText, sectionTitles)
-	docType := vo.InferDocumentType(combined, supportsItemLookup)
+	docType := enum.InferDocumentType(combined, supportsItemLookup)
 	coreTopics := p.buildCoreTopics(document, sectionTitles)
 	exampleQuestions := utils.DistinctFilterLimit(coreTopics, 6, func(t string) (string, bool) {
-		return vo.ExampleQuestion(docType, t), true
+		return enum.ExampleQuestion(docType, t), true
 	})
 	profile := &entity.DocumentProfile{
 		DocumentId:           document.ID,
@@ -127,7 +128,7 @@ func (p *ProfileGenerateImpl) buildDocumentMetadata(document *entity.Document, p
 	var coreTopics []string
 	_ = json.Unmarshal([]byte(profile.CoreTopics), &coreTopics)
 
-	businessCategory := vo.InferBusinessCategory(code, combined)
+	businessCategory := enum.InferBusinessCategory(code, combined)
 	scopeName := klvo.KnowledgeScopeName(code)
 	updateDoc := &entity.Document{
 		ID: document.ID,

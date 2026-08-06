@@ -41,11 +41,10 @@ type BuildContext struct {
 	KeywordCostMillis  int64
 	GraphRagCostMillis int64
 	RaptorCostMillis   int64
-	TotalCostMillis    int64
 }
 
-// BuildPhase 索引构建阶段接口
-type BuildPhase interface {
+// Phase 索引构建阶段接口
+type Phase interface {
 	// Name 阶段名称
 	Name() string
 	// Execute 执行阶段

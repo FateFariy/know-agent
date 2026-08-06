@@ -1,13 +1,14 @@
 package config
 
 type MinioConf struct {
-	Addr             string `json:",default=127.0.0.1:9000"`
-	AccessKeyID      string `json:",default=minioadmin"`
-	SecretAccessKey  string `json:",default=minioadmin"`
-	BucketName       string `json:",default=super-agent-document"`
-	ObjectPrefix     string `json:",default=rag/document"`
-	ParsedTextPrefix string `json:",default=rag/parsed-text"`
-	UseSSL           bool   `json:",default=false"`
+	Addr                string `json:",default=127.0.0.1:9000"`
+	AccessKeyID         string `json:",default=minioadmin"`
+	SecretAccessKey     string `json:",default=minioadmin"`
+	BucketName          string `json:",default=super-agent-document"`
+	ObjectPrefix        string `json:",default=rag/document"`
+	ParsedTextPrefix    string `json:",default=rag/parsed-text"`
+	ParseArtifactPrefix string `json:"rag/parse-artifact"`
+	UseSSL              bool   `json:",default=false"`
 }
 
 type MQConf struct {

@@ -12,6 +12,7 @@ import (
 	"github.com/minio/minio-go/v7"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -51,6 +52,18 @@ func (s *MinioStorage) UploadParsedText(ctx context.Context, documentID int64, p
 	return objectName, nil
 }
 
+// UploadParseArtifact 上传解析产物
+func (s *MinioStorage) UploadParseArtifact(ctx context.Context, documentID, taskID int64, name, contentType string, content []byte) (string, error) {
+	safeFileName := utils.BlankToDefault(name, "artifact.bin")
+	safeFileName = strings.ReplaceAll(safeFileName, "/", "-")
+	safeFileName = strings.ReplaceAll(safeFileName, "\\", "-")
+	objectName := fmt.Sprintf("%s/%d/%d/%d-%s", s.Config.ParseArtifactPrefix, documentID, taskID, time.Now().UnixMilli(), safeFileName)
+	if err := s.upload(ctx, objectName, content, contentType); err != nil {
+		return "", err
+	}
+	return objectName, nil
+}
+
 // DownloadObject 下载对象
 func (s *MinioStorage) DownloadObject(ctx context.Context, objectName string) ([]byte, error) {
 	object, err := s.Client.GetObject(ctx, s.Config.BucketName, objectName, minio.GetObjectOptions{})
@@ -76,15 +89,10 @@ func (s *MinioStorage) DownloadText(ctx context.Context, objectName string) (str
 
 // DeleteObjects 删除对象
 func (s *MinioStorage) DeleteObjects(ctx context.Context, objectNameList []string) error {
-	validObjectNameList := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, name := range objectNameList {
+	validObjectNameList := utils.DistinctFilterLimit(objectNameList, -1, func(name string) (string, bool) {
 		trimmed := strings.TrimSpace(name)
-		if trimmed != "" && !seen[trimmed] {
-			seen[trimmed] = true
-			validObjectNameList = append(validObjectNameList, trimmed)
-		}
-	}
+		return trimmed, trimmed != ""
+	})
 
 	if len(validObjectNameList) == 0 {
 		return nil

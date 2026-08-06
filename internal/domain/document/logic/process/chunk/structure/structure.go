@@ -8,7 +8,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
 )
 
@@ -90,7 +90,7 @@ func (s *Chunker) flushChunk(result []*chunk.TextBlock, sourceType int, sectionP
 	return append(result, &chunk.TextBlock{
 		SectionPath: sectionPath,
 		Text:        trimmed,
-		SourceType:  utils.Ternary(sourceType == 0, vo.ChunkSourceTypeOriginal, sourceType),
+		SourceType:  utils.Ternary(sourceType == 0, enum.ChunkSourceTypeOriginal, sourceType),
 	})
 }
 

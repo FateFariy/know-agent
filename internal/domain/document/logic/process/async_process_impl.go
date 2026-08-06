@@ -13,8 +13,10 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/index"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -27,221 +29,65 @@ const (
 //	HandleParseRoute → 解析路由（文件解析 + 结构节点 + 策略推荐）
 //	HandleIndexBuild → 索引构建（切块流水线 + 向量化 + 落库 + GraphRAG + RAPTOR）
 type AsyncProcessImpl struct {
-	repo                    adapter.DocumentRepository
-	port                    *adapter.DocumentPort
-	coordinator             ChunkCoordinator
-	nodeManager             StructureNodeManager
-	textLogic               TextPreprocessor
-	gen                     ProfileGenerator
-	graphRagBuilder         GraphRagBuilder
-	graphRagOutcomePolicy   GraphRagOutcomePolicy
-	graphRagBuildCheckpoint GraphRagBuildCheckpoint
-	crossDocumentIndexer    CrossDocumentIndexer
-	raptorBuilder           RaptorBuilder
+	repo          adapter.DocumentRepository
+	port          *adapter.DocumentPort
+	analysisChain analysis.PhaseChain
+	indexChain    index.PhaseChain
 }
 
 // NewAsyncProcessImpl 构造异步处理逻辑实例
-func NewAsyncProcessImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, coordinator ChunkCoordinator,
-	nodeManager StructureNodeManager, textLogic TextPreprocessor, gen ProfileGenerator,
-	graphRagBuilder GraphRagBuilder, graphRagOutcomePolicy GraphRagOutcomePolicy,
-	graphRagBuildCheckpoint GraphRagBuildCheckpoint, crossDocumentIndexer CrossDocumentIndexer,
-	raptorBuilder RaptorBuilder) *AsyncProcessImpl {
+func NewAsyncProcessImpl(repo adapter.DocumentRepository,
+	port *adapter.DocumentPort,
+	analysisChain analysis.PhaseChain,
+	indexChain index.PhaseChain) *AsyncProcessImpl {
 	return &AsyncProcessImpl{
-		repo:                    repo,
-		port:                    port,
-		coordinator:             coordinator,
-		nodeManager:             nodeManager,
-		textLogic:               textLogic,
-		gen:                     gen,
-		graphRagBuilder:         graphRagBuilder,
-		graphRagOutcomePolicy:   graphRagOutcomePolicy,
-		graphRagBuildCheckpoint: graphRagBuildCheckpoint,
-		crossDocumentIndexer:    crossDocumentIndexer,
-		raptorBuilder:           raptorBuilder,
+		repo:          repo,
+		port:          port,
+		analysisChain: analysisChain,
+		indexChain:    indexChain,
 	}
 }
 
 // HandleParseRoute 处理解析路由任务
 //
-// 整体阶段：
-//  1. 读取文档/任务，将任务标记为 RUNNING，当前阶段推进到 CONTENT_PARSE
-//  2. 从对象存储下载原始文件并调用解析器提取纯文本
-//  3. 将解析后的纯文本重新上传为 txt，便于后续索引构建直接复用
-//  4. 用结构节点服务替换文档结构节点（便于结构切块策略依赖）
-//  5. 基于解析结果调用策略服务生成推荐切块方案
-//  6. 把推荐方案和步骤写入数据库，同步更新文档的解析状态/策略状态/统计信息
-//  7. 以成功或失败状态收尾任务，并记录任务日志
+// 整体阶段：initialization → download → parse → upload → structure → strategy → finalization
 func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
 	// 加载文档与任务实体
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
 	if err != nil {
 		return err
 	}
-
 	task, err := d.repo.SelectTaskById(ctx, taskId)
 	if err != nil {
 		return err
 	}
 
-	// 记录开始时间并注册 panic recover → 失败时统一调用 handleParseFailure
+	logx.Infof("开始异步解析文档，documentId=%d, taskId=%d, fileName=%s, fileType=%s, objectName=%s",
+		documentId, taskId, document.OriginalFileName, enum.FileTypeName(document.FileType), document.ObjectName)
+
+	// 记录开始时间 → 失败时统一调用 handleParseFailure
 	startTime := time.Now()
 	defer func() {
-		if v := recover(); v != nil {
-			if panicErr, ok := v.(error); ok {
-				d.handleParseFailure(ctx, document, task, panicErr.Error())
-			}
+		if err != nil {
+			d.handleParseFailure(ctx, document, task, err.Error())
 		}
 	}()
 
-	// 事务性标记任务运行中 + 文档解析中，并写入"开始解析"日志
-	markParseStartTx := func(txCtx context.Context) error {
-		runningTask := &entity.DocumentTask{
-			ID:           taskId,
-			TaskStatus:   vo.TaskStatusRunning,
-			CurrentStage: vo.TaskStageContentParse,
-			StartTime:    utils.Pointer(startTime),
-		}
-		if err = d.repo.UpdateTaskById(txCtx, runningTask); err != nil {
-			return err
-		}
-		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, ParseStatus: vo.ParseStatusParsing}); err != nil {
-			return err
-		}
-		// 写入"开始解析文档"日志，附带对象存储 key
-		startDetail, _ := json.Marshal(map[string]any{"objectName": document.ObjectName})
-		startLog := &entity.DocumentTaskLog{
-			TaskId:       taskId,
-			DocumentId:   documentId,
-			StageType:    vo.TaskStageContentParse,
-			EventType:    vo.TaskEventStart,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
-			Content:      "开始解析文档内容",
-			DetailJson:   string(startDetail),
-		}
-		return d.repo.InsertTaskLog(txCtx, startLog)
-	}
-	if err = d.repo.Do(ctx, markParseStartTx); err != nil {
-		panic(err)
+	// 构建上下文并执行责任链
+	parseCtx := &analysis.Context{
+		DocumentID: documentId,
+		TaskID:     taskId,
+		Document:   document,
+		Task:       task,
+		StartTime:  startTime,
 	}
 
-	// 从对象存储下载原始文件字节
-	rawFileBytes, err := d.port.DownloadObject(ctx, document.ObjectName)
-	if err != nil {
-		panic(err)
-	}
-	// 调用文本预处理逻辑
-	analysisResult, err := d.textLogic.Process(ctx, document.OriginalFileName, string(rawFileBytes), vo.FileTypeName(document.FileType))
-	if err != nil {
-		panic(err)
-	}
-
-	// 上传解析后的纯文本到对象存储，供"索引构建阶段"直接下载复用
-	parsedTextPath, err := d.port.UploadParsedText(ctx, documentId, analysisResult.ParsedText)
-	if err != nil {
-		panic(err)
-	}
-
-	// 基于解析文本构建并写入文档结构节点（供结构切块策略使用）
-	structureNodes, err := d.nodeManager.ReplaceDocumentNodes(ctx, documentId, taskId, analysisResult.StructureNodes)
-	if err != nil {
-		panic(err)
-	}
-
-	if err = d.syncNavigationArtifacts(ctx, documentId, taskId, structureNodes); err != nil {
-		panic(err)
-	}
-
-	// 生成文档画像
-	if _, err = d.gen.Generate(ctx, documentId, analysisResult, structureNodes); err != nil {
+	if err = d.analysisChain.Run(ctx, parseCtx); err != nil {
+		logx.Errorf("解析路由任务失败，documentId=%d, taskId=%d, err=%v", documentId, taskId, err)
 		return err
 	}
+	logx.Infof("解析路由任务成功，documentId=%d, taskId=%d", documentId, taskId)
 
-	// 写入"文档解析完成"日志（附带字符数/段落/结构节点数量等统计信息）
-	parseFinishDetail, _ := json.Marshal(map[string]any{
-		"charCount":           analysisResult.CharCount,
-		"tokenCount":          analysisResult.TokenCount,
-		"structureLevel":      analysisResult.StructureLevel,
-		"contentQualityLevel": analysisResult.ContentQualityLevel,
-		"structureNodeCount":  len(structureNodes),
-		"paragraphCount":      analysisResult.ParagraphCount,
-	})
-	parseFinishLog := &entity.DocumentTaskLog{
-		TaskId:       taskId,
-		DocumentId:   documentId,
-		StageType:    vo.TaskStageContentParse,
-		EventType:    vo.TaskEventComplete,
-		LogLevel:     vo.LogLevelInfo,
-		OperatorType: vo.OperatorTypeSystem,
-		Content:      "文档解析完成",
-		DetailJson:   string(parseFinishDetail),
-	}
-	if err = d.repo.InsertTaskLog(ctx, parseFinishLog); err != nil {
-		panic(err)
-	}
-
-	// 调用策略服务生成推荐切块方案草稿
-	strategyPlanDraft, err := d.coordinator.RecommendStrategy(ctx, document, analysisResult)
-	if err != nil {
-		panic(err)
-	}
-
-	// 事务性持久化策略方案 → 回写文档统计/状态 → 收尾任务 → 写入"生成推荐策略"日志
-	persistStrategyTx := func(txCtx context.Context) error {
-		// 持久化方案和步骤（写入 document_plan 与 document_strategy_step）
-		var planId int64
-		planId, err = d.persistRecommendation(txCtx, document, task, strategyPlanDraft)
-		if err != nil {
-			return err
-		}
-
-		// 写回文档统计 + 标记解析成功/策略已推荐
-		updatedDoc := &entity.Document{
-			ID:                  documentId,
-			ParseStatus:         vo.ParseStatusParseSuccess,
-			StrategyStatus:      vo.StrategyStatusRecommended,
-			CharCount:           analysisResult.CharCount,
-			TokenCount:          analysisResult.TokenCount,
-			StructureLevel:      analysisResult.StructureLevel,
-			ContentQualityLevel: analysisResult.ContentQualityLevel,
-			ParseTextPath:       parsedTextPath,
-			ParseErrorMsg:       utils.Pointer(""),
-			CurrentPlanId:       planId,
-			LastParseTaskId:     taskId,
-			StructureNodeCount:  len(structureNodes),
-		}
-		if err = d.repo.UpdateDocumentById(txCtx, updatedDoc); err != nil {
-			return err
-		}
-		// 标记任务成功完成并收尾（写入耗时等）
-		if err = d.finishTaskSuccess(txCtx, task, vo.TaskStageStrategyRoute, startTime); err != nil {
-			return err
-		}
-
-		// 记录"系统已生成推荐策略"日志
-		recommendDetail, _ := json.Marshal(map[string]any{
-			"planId":             planId,
-			"strategySnapshot":   strategyPlanDraft.StrategySnapshot,
-			"parentStepCount":    len(strategyPlanDraft.ParentSteps),
-			"childStepCount":     len(strategyPlanDraft.ChildSteps),
-			"structureNodeCount": len(structureNodes),
-			"recommendReason":    strategyPlanDraft.RecommendReason,
-		})
-		recommendLog := &entity.DocumentTaskLog{
-			TaskId:       taskId,
-			DocumentId:   documentId,
-			StageType:    vo.TaskStageContentParse,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
-			Content:      "系统已生成推荐策略",
-			DetailJson:   string(recommendDetail),
-		}
-		return d.repo.InsertTaskLog(txCtx, recommendLog)
-	}
-	if err = d.repo.Do(ctx, persistStrategyTx); err != nil {
-		panic(err)
-	}
 	return nil
 }
 
@@ -260,16 +106,6 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	plan, err := d.repo.SelectPlanById(ctx, planId)
 	if err != nil {
 		return err
-	}
-
-	// 前置检查：如果任务已成功或失败，跳过重复执行
-	if task.TaskStatus == vo.TaskStatusSuccess {
-		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
-		return nil
-	}
-	if task.TaskStatus == vo.TaskStatusFailed {
-		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
-		return nil
 	}
 
 	// 记录起始时间；defer recover 统一捕获 panic 为失败状态
@@ -291,21 +127,14 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		Document:   document,
 		Task:       task,
 		Plan:       plan,
+		StartTime:  startTime,
 	}
-
-	deps := &index.PhaseDeps{
-		Repo:                    d.repo,
-		Port:                    d.port,
-		Coordinator:             d.coordinator,
-		GraphRagBuilder:         d.graphRagBuilder,
-		GraphRagOutcomePolicy:   d.graphRagOutcomePolicy,
-		GraphRagBuildCheckpoint: d.graphRagBuildCheckpoint,
-		CrossDocumentIndexer:    d.crossDocumentIndexer,
-		RaptorBuilder:           d.raptorBuilder,
+	if err = d.indexChain.Run(ctx, buildCtx); err != nil {
+		return err
 	}
+	logx.Infof("索引构建任务成功，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
 
-	chain := index.NewPhaseChain(deps)
-	return chain.Run(ctx, buildCtx)
+	return nil
 }
 
 // HandleIndexBuildLegacy 原始的索引构建流程（保留用于对比参考）
@@ -326,11 +155,11 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 	}
 
 	// 前置检查：如果任务已成功或失败，跳过重复执行
-	if task.TaskStatus == vo.TaskStatusSuccess {
+	if task.TaskStatus == enum.TaskStatusSuccess {
 		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
 		return nil
 	}
-	if task.TaskStatus == vo.TaskStatusFailed {
+	if task.TaskStatus == enum.TaskStatusFailed {
 		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
 		return nil
 	}
@@ -368,11 +197,11 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
 		// 文档状态
-		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuilding}); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: enum.IndexStatusBuilding}); err != nil {
 			return err
 		}
 		// 策略步骤标记执行中
-		if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuting); err != nil {
+		if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, enum.StrategyExecuteStatusExecuting); err != nil {
 			return err
 		}
 		// 记录开始执行切块日志
@@ -380,10 +209,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		chunkStartLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageChunkExecute,
-			EventType:    vo.TaskEventStart,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageChunkExecute,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "开始执行切块流水线",
 			DetailJson:   string(chunkStartDetail),
 		}
@@ -393,8 +222,8 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		// 推进任务阶段为"切块执行中"
 		return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 			ID:           taskId,
-			TaskStatus:   vo.TaskStatusRunning,
-			CurrentStage: vo.TaskStageChunkExecute,
+			TaskStatus:   enum.TaskStatusRunning,
+			CurrentStage: enum.TaskStageChunkExecute,
 			StartTime:    utils.Pointer(time.Now()),
 		})
 	}
@@ -437,7 +266,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		// 事务性标记切块完成 + 推进到切块后处理阶段
 		markChunkCompleteTx := func(txCtx context.Context) error {
 			// 策略步骤状态 -> 执行成功
-			if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
+			if err = d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, enum.StrategyExecuteStatusExecuteSuccess); err != nil {
 				return err
 			}
 			chunkEndDetail, _ := json.Marshal(map[string]any{
@@ -448,10 +277,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			chunkEndLog := &entity.DocumentTaskLog{
 				TaskId:       taskId,
 				DocumentId:   documentId,
-				StageType:    vo.TaskStageChunkExecute,
-				EventType:    vo.TaskEventComplete,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: vo.OperatorTypeSystem,
+				StageType:    enum.TaskStageChunkExecute,
+				EventType:    enum.TaskEventComplete,
+				LogLevel:     enum.LogLevelInfo,
+				OperatorType: enum.OperatorTypeSystem,
 				Content:      "切块执行完成",
 				DetailJson:   string(chunkEndDetail),
 			}
@@ -459,7 +288,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 				return err
 			}
 			// 推进任务阶段到"切块后处理"
-			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageChunkPostProcess})
+			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageChunkPostProcess})
 		}
 		if err = d.repo.Do(ctx, markChunkCompleteTx); err != nil {
 			panic(err)
@@ -492,10 +321,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			chunkPostLog := &entity.DocumentTaskLog{
 				TaskId:       taskId,
 				DocumentId:   documentId,
-				StageType:    vo.TaskStageChunkPostProcess,
-				EventType:    vo.TaskEventComplete,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: vo.OperatorTypeSystem,
+				StageType:    enum.TaskStageChunkPostProcess,
+				EventType:    enum.TaskEventComplete,
+				LogLevel:     enum.LogLevelInfo,
+				OperatorType: enum.OperatorTypeSystem,
 				Content:      "切块后处理完成",
 				DetailJson:   string(chunkPostDetail),
 			}
@@ -503,7 +332,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 				return err
 			}
 			// 推进任务阶段到"向量化"
-			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageVectorize})
+			return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageVectorize})
 		}
 		if err = d.repo.Do(ctx, persistBlocksTx); err != nil {
 			panic(err)
@@ -520,16 +349,16 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			"chunkCount":          vectorSize,
 			"embeddingBatchSize":  embeddingBatch,
 			"embeddingBatchCount": vectorBatch,
-			"vectorStoreType":     vo.VectorStoreTypeMilvus,
+			"vectorStoreType":     enum.VectorStoreTypeMilvus,
 			"parentCount":         len(parentBlocks),
 		})
 		vectorStartLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageVectorize,
-			EventType:    vo.TaskEventStart,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageVectorize,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "开始执行向量化",
 			DetailJson:   string(vectorStartDetail),
 		}
@@ -559,17 +388,17 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			"chunkCount":          vectorSize,
 			"embeddingBatchSize":  embeddingBatch,
 			"embeddingBatchCount": vectorBatch,
-			"vectorStoreType":     vo.VectorStoreTypeMilvus,
+			"vectorStoreType":     enum.VectorStoreTypeMilvus,
 			"parentCount":         len(parentBlocks),
 			"vectorCostMillis":    vectorCostMillis,
 		})
 		vectorEndLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageVectorize,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageVectorize,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "向量化完成",
 			DetailJson:   string(vectorEndDetail),
 		}
@@ -581,17 +410,17 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 
 	// ========== 关键词索引阶段 ==========
 	markKeywordIndexTx := func(txCtx context.Context) error {
-		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageKeywordIndex}); err != nil {
+		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageKeywordIndex}); err != nil {
 			return err
 		}
 		keywordStartDetail, _ := json.Marshal(map[string]any{"chunkCount": vectorSize})
 		keywordStartLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageKeywordIndex,
-			EventType:    vo.TaskEventStart,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageKeywordIndex,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "开始构建关键词索引",
 			DetailJson:   string(keywordStartDetail),
 		}
@@ -615,10 +444,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		keywordEndLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageKeywordIndex,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageKeywordIndex,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "关键词索引完成",
 			DetailJson:   string(keywordEndDetail),
 		}
@@ -631,7 +460,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 	// ========== GraphRAG 构建阶段 ==========
 	if !resumeCommittedGraph {
 		markGraphRagStartTx := func(txCtx context.Context) error {
-			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageGraphRag}); err != nil {
+			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageGraphRag}); err != nil {
 				return err
 			}
 			graphStartDetail, _ := json.Marshal(map[string]any{
@@ -641,10 +470,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			graphStartLog := &entity.DocumentTaskLog{
 				TaskId:       taskId,
 				DocumentId:   documentId,
-				StageType:    vo.TaskStageGraphRag,
-				EventType:    vo.TaskEventStart,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: vo.OperatorTypeSystem,
+				StageType:    enum.TaskStageGraphRag,
+				EventType:    enum.TaskEventStart,
+				LogLevel:     enum.LogLevelInfo,
+				OperatorType: enum.OperatorTypeSystem,
 				Content:      "开始构建 GraphRAG 实体关系图谱",
 				DetailJson:   string(graphStartDetail),
 			}
@@ -672,10 +501,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 			graphEndLog := &entity.DocumentTaskLog{
 				TaskId:       taskId,
 				DocumentId:   documentId,
-				StageType:    vo.TaskStageGraphRag,
-				EventType:    vo.TaskEventComplete,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: vo.OperatorTypeSystem,
+				StageType:    enum.TaskStageGraphRag,
+				EventType:    enum.TaskEventComplete,
+				LogLevel:     enum.LogLevelInfo,
+				OperatorType: enum.OperatorTypeSystem,
 				Content:      "GraphRAG 实体关系图谱构建完成",
 				DetailJson:   string(graphEndDetail),
 			}
@@ -696,7 +525,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 
 	if graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
 		// 需要修复，保持 RUNNING 状态
-		if err = d.repo.UpdateTaskById(ctx, &entity.DocumentTask{ID: taskId, TaskStatus: vo.TaskStatusRunning, CurrentStage: vo.TaskStageGraphTypedIndex}); err != nil {
+		if err = d.repo.UpdateTaskById(ctx, &entity.DocumentTask{ID: taskId, TaskStatus: enum.TaskStatusRunning, CurrentStage: enum.TaskStageGraphTypedIndex}); err != nil {
 			panic(err)
 		}
 		logx.Warnf("GraphRAG post-commit component requires repair; BUILD_INDEX remains RUNNING: documentId=%d, taskId=%d", documentId, taskId)
@@ -709,7 +538,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 
 	// ========== RAPTOR 构建阶段 ==========
 	markRaptorStartTx := func(txCtx context.Context) error {
-		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageRaptor}); err != nil {
+		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageRaptor}); err != nil {
 			return err
 		}
 		raptorStartDetail, _ := json.Marshal(map[string]any{
@@ -719,10 +548,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		raptorStartLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageRaptor,
-			EventType:    vo.TaskEventStart,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageRaptor,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "开始构建 RAPTOR 层级摘要树",
 			DetailJson:   string(raptorStartDetail),
 		}
@@ -751,10 +580,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		raptorEndLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageRaptor,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageRaptor,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "RAPTOR 层级摘要树构建完成",
 			DetailJson:   string(raptorEndDetail),
 		}
@@ -768,19 +597,19 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 	totalCostMillis := time.Since(buildStartedNanos).Milliseconds()
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
-		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: vo.TaskStageStoreComplete}); err != nil {
+		if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: taskId, CurrentStage: enum.TaskStageStoreComplete}); err != nil {
 			return err
 		}
 		// 方案状态标记为已执行
-		if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: planId, PlanStatus: vo.PlanStatusExecuted}); err != nil {
+		if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: planId, PlanStatus: enum.PlanStatusExecuted}); err != nil {
 			return err
 		}
 		// 文档索引状态更新为构建成功
-		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuildSuccess, LastIndexTaskId: taskId}); err != nil {
+		if err = d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: enum.IndexStatusBuildSuccess, LastIndexTaskId: taskId}); err != nil {
 			return err
 		}
 		// 写入成功耗时/统计日志
-		if err = d.finishTaskSuccess(txCtx, task, vo.TaskStageStoreComplete, startTime); err != nil {
+		if err = d.finishTaskSuccess(txCtx, task, enum.TaskStageStoreComplete, startTime); err != nil {
 			panic(err)
 		}
 		// 索引构建完成日志
@@ -793,10 +622,10 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		buildCompleteLog := &entity.DocumentTaskLog{
 			TaskId:       taskId,
 			DocumentId:   documentId,
-			StageType:    vo.TaskStageStoreComplete,
-			EventType:    vo.TaskEventComplete,
-			LogLevel:     vo.LogLevelInfo,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageStoreComplete,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "索引构建完成",
 			DetailJson:   string(buildCompleteDetail),
 		}
@@ -830,8 +659,8 @@ func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *
 		ID:               planId,
 		DocumentId:       document.ID,
 		PlanVersion:      latestVersion + 1,
-		PlanSource:       vo.PlanSourceSystemRecommend,
-		PlanStatus:       vo.PlanStatusWaitConfirm,
+		PlanSource:       enum.PlanSourceSystemRecommend,
+		PlanStatus:       enum.PlanStatusWaitConfirm,
 		StrategyCount:    len(planDraft.ParentSteps) + len(planDraft.ChildSteps),
 		StrategySnapshot: planDraft.StrategySnapshot,
 		RecommendReason:  planDraft.RecommendReason,
@@ -853,7 +682,7 @@ func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *
 				StrategyType:    draft.StrategyType,
 				StrategyRole:    draft.StrategyRole,
 				SourceType:      draft.SourceType,
-				ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
+				ExecuteStatus:   enum.StrategyExecuteStatusWaitExecute,
 				RecommendReason: draft.RecommendReason,
 			})
 		}
@@ -863,11 +692,11 @@ func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *
 	}
 
 	// 顺序写入父块与子块流水线步骤
-	insertPipelineSteps(planDraft.ParentSteps, vo.PipelineTypeParent)
-	insertPipelineSteps(planDraft.ChildSteps, vo.PipelineTypeChild)
+	insertPipelineSteps(planDraft.ParentSteps, enum.PipelineTypeParent)
+	insertPipelineSteps(planDraft.ChildSteps, enum.PipelineTypeChild)
 
 	// 推进任务阶段到"策略路由"
-	task.CurrentStage = vo.TaskStageStrategyRoute
+	task.CurrentStage = enum.TaskStageStrategyRoute
 	if err = d.repo.UpdateTaskById(ctx, task); err != nil {
 		return 0, err
 	}
@@ -927,7 +756,7 @@ func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId i
 					ChunkText:         child.Text,
 					CharCount:         utils.Len(child.Text),
 					TokenCount:        utils.EstimateTokens(child.Text),
-					VectorStatus:      vo.VectorStatusWaitVector,
+					VectorStatus:      enum.VectorStatusWaitVector,
 				})
 				parentBlock.ChildCount++
 			}
@@ -943,7 +772,7 @@ func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId i
 func (d *AsyncProcessImpl) finishTaskSuccess(ctx context.Context, task *entity.DocumentTask, currentStage int, startTime time.Time) error {
 	return d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 		ID:           task.ID,
-		TaskStatus:   vo.TaskStatusSuccess,
+		TaskStatus:   enum.TaskStatusSuccess,
 		CurrentStage: currentStage,
 		FinishTime:   utils.Pointer(time.Now()),
 		CostMillis:   time.Since(startTime).Milliseconds(),
@@ -958,13 +787,13 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 	parseFailTx := func(txCtx context.Context) error {
 		// 文档：标记为解析失败，并保留失败原因
 		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: document.ID, ParseStatus: vo.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg),
+			ID: document.ID, ParseStatus: enum.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg),
 		}); err != nil {
 			return err
 		}
 		// 任务：标记为失败并停留在 CONTENT_PARSE
 		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: vo.TaskStageContentParse,
+			ID: task.ID, TaskStatus: enum.TaskStatusFailed, CurrentStage: enum.TaskStageContentParse,
 		}); err != nil {
 			return err
 		}
@@ -977,10 +806,10 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 		failLog := &entity.DocumentTaskLog{
 			TaskId:       task.ID,
 			DocumentId:   task.DocumentId,
-			StageType:    vo.TaskStageContentParse,
-			EventType:    vo.TaskEventFailed,
-			LogLevel:     vo.LogLevelError,
-			OperatorType: vo.OperatorTypeSystem,
+			StageType:    enum.TaskStageContentParse,
+			EventType:    enum.TaskEventFailed,
+			LogLevel:     enum.LogLevelError,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "文档解析失败",
 			DetailJson:   string(failDetail),
 		}
@@ -996,20 +825,20 @@ func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document
 	logx.Errorf("索引构建失败: documentId=%d, taskId=%d, planId=%d, err=%v", document.ID, task.ID, plan.ID, errorMsg)
 	indexBuildFailTx := func(txCtx context.Context) error {
 		// 文档：索引构建失败
-		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: enum.IndexStatusBuildFailed}); err != nil {
 			return err
 		}
 		// chunk：按任务 ID 批量将向量状态置为失败（Milvus 为默认向量库类型）
 		failedChunkMarker := &entity.DocumentChunk{
 			TaskId:          task.ID,
-			VectorStatus:    vo.VectorStatusVectorFailed,
-			VectorStoreType: vo.VectorStoreTypeMilvus,
+			VectorStatus:    enum.VectorStatusVectorFailed,
+			VectorStoreType: enum.VectorStoreTypeMilvus,
 		}
 		if err := d.repo.UpdateChunkByTaskId(txCtx, failedChunkMarker); err != nil {
 			return err
 		}
 		// 标记当前计划所有步骤为失败
-		if err := d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, vo.StrategyExecuteStatusExecuteFailed); err != nil {
+		if err := d.repo.UpdateStepExecuteStatus(txCtx, plan.ID, enum.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
 		// 通用任务失败收尾（耗时/错误码等）
@@ -1022,9 +851,9 @@ func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document
 			TaskId:       task.ID,
 			DocumentId:   task.DocumentId,
 			StageType:    task.CurrentStage,
-			EventType:    vo.TaskEventFailed,
-			LogLevel:     vo.LogLevelError,
-			OperatorType: vo.OperatorTypeSystem,
+			EventType:    enum.TaskEventFailed,
+			LogLevel:     enum.LogLevelError,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "索引构建失败",
 			DetailJson:   string(failDetail),
 		}
@@ -1039,7 +868,7 @@ func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document
 func (d *AsyncProcessImpl) failTask(txCtx context.Context, task *entity.DocumentTask, errorMsg string) error {
 	return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 		ID:           task.ID,
-		TaskStatus:   vo.TaskStatusFailed,
+		TaskStatus:   enum.TaskStatusFailed,
 		CurrentStage: task.CurrentStage,
 		FinishTime:   utils.Pointer(time.Now()),
 		CostMillis:   time.Since(*task.StartTime).Milliseconds(),
@@ -1153,7 +982,7 @@ func (d *AsyncProcessImpl) readGraphRagBuildResult(task *entity.DocumentTask) *v
 // applyGraphFailureDisposition 应用图谱失败处置
 func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, document *entity.Document,
 	task *entity.DocumentTask, planId int64, result *vo.GraphRagBuildResult, cause error) {
-	failedStage := vo.TaskStageGraphRag
+	failedStage := enum.TaskStageGraphRag
 	if task.CurrentStage != 0 {
 		failedStage = task.CurrentStage
 	}
@@ -1163,19 +992,19 @@ func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, doc
 
 	markFailureTx := func(txCtx context.Context) error {
 		// 文档：索引构建失败
-		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: vo.IndexStatusBuildFailed}); err != nil {
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: enum.IndexStatusBuildFailed}); err != nil {
 			return err
 		}
 		// chunk：按任务 ID 批量将向量状态置为失败
 		if err := d.repo.UpdateChunkByTaskId(txCtx, &entity.DocumentChunk{
 			TaskId:          task.ID,
-			VectorStatus:    vo.VectorStatusVectorFailed,
-			VectorStoreType: vo.VectorStoreTypeMilvus,
+			VectorStatus:    enum.VectorStatusVectorFailed,
+			VectorStoreType: enum.VectorStoreTypeMilvus,
 		}); err != nil {
 			return err
 		}
 		// 标记当前计划所有步骤为失败
-		if err := d.repo.UpdateStepExecuteStatus(txCtx, planId, vo.StrategyExecuteStatusExecuteFailed); err != nil {
+		if err := d.repo.UpdateStepExecuteStatus(txCtx, planId, enum.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
 		// 通用任务失败收尾
@@ -1191,9 +1020,9 @@ func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, doc
 			TaskId:       task.ID,
 			DocumentId:   task.DocumentId,
 			StageType:    failedStage,
-			EventType:    vo.TaskEventFailed,
-			LogLevel:     vo.LogLevelError,
-			OperatorType: vo.OperatorTypeSystem,
+			EventType:    enum.TaskEventFailed,
+			LogLevel:     enum.LogLevelError,
+			OperatorType: enum.OperatorTypeSystem,
 			Content:      "GraphRAG 构建失败",
 			DetailJson:   string(failDetail),
 		}
@@ -1294,7 +1123,7 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 			// 执行类型化索引替换
 			if err := d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 				ID:           taskId,
-				CurrentStage: vo.TaskStageGraphTypedIndex,
+				CurrentStage: enum.TaskStageGraphTypedIndex,
 			}); err != nil {
 				panic(err)
 			}

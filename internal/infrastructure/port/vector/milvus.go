@@ -18,7 +18,7 @@ import (
 
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"
 	"github.com/swiftbit/know-agent/internal/svc"
 )

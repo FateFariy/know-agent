@@ -15,6 +15,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
@@ -75,6 +76,12 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 			return err
 		}
 		if err = d.DeleteStructureNodeByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteDocumentBlocksByDocumentId(ctx, documentId); err != nil {
+			return err
+		}
+		if err = d.DeleteArtifactsByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
 		if err = d.DeleteTaskLogByDocumentId(ctx, documentId); err != nil {
@@ -141,7 +148,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documen
 func (d *DocumentRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
 	var documents []*vo.KnowledgeDocument
 	query := d.dbWithContext(ctx).Model(&model.Document{}).
-		Where("index_status = ? AND last_index_task_id IS NOT NULL", vo.IndexStatusBuildSuccess)
+		Where("index_status = ? AND last_index_task_id IS NOT NULL", enum.IndexStatusBuildSuccess)
 
 	if len(documentIds) > 0 {
 		query = query.Where("id IN ?", documentIds)
@@ -508,4 +515,77 @@ func (d *DocumentRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 func (d *DocumentRepositoryImpl) DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error {
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.TopicDocumentRelation{}).Error
+}
+
+func (d *DocumentRepositoryImpl) InsertParsedArtifactBatch(ctx context.Context, artifacts []*entity.ParseArtifact) error {
+	if len(artifacts) == 0 {
+		return nil
+	}
+	return d.dbWithContext(ctx).Create(convert.ToParseArtifactModelList(artifacts)).Error
+}
+
+// SelectArtifactsByTask 根据文档ID和任务ID查询解析产物列表
+func (d *DocumentRepositoryImpl) SelectArtifactsByTask(ctx context.Context, documentId, taskId int64) ([]*entity.ParseArtifact, error) {
+	var artifacts []*entity.ParseArtifact
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParseArtifact{}).
+		Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Order("id ASC").
+		Find(&artifacts).Error; err != nil {
+		return nil, err
+	}
+	return artifacts, nil
+}
+
+// SelectArtifactObjectNamesByDocumentId 根据文档ID查询解析产物的对象名列表
+func (d *DocumentRepositoryImpl) SelectArtifactObjectNamesByDocumentId(ctx context.Context, documentId int64) ([]string, error) {
+	var names []string
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParseArtifact{}).
+		Where("document_id = ? AND object_name IS NOT NULL AND object_name != ''", documentId).
+		Distinct("object_name").
+		Pluck("object_name", &names).Error; err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+// DeleteArtifactsByTask 根据文档ID和任务ID删除解析产物
+func (d *DocumentRepositoryImpl) DeleteArtifactsByTask(ctx context.Context, documentId, taskId int64) error {
+	return d.dbWithContext(ctx).Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Delete(&model.DocumentParseArtifact{}).Error
+}
+
+// DeleteArtifactsByDocumentId 根据文档ID删除解析产物
+func (d *DocumentRepositoryImpl) DeleteArtifactsByDocumentId(ctx context.Context, documentId int64) error {
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParseArtifact{}).Error
+}
+
+// InsertDocumentBlockBatch 批量插入文档块
+func (d *DocumentRepositoryImpl) InsertDocumentBlockBatch(ctx context.Context, blocks []*entity.DocumentBlock) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentBlockModelList(blocks), 100).Error
+}
+
+// SelectDocumentBlocksByTask 根据文档ID和任务ID查询文档块列表
+func (d *DocumentRepositoryImpl) SelectDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentBlock, error) {
+	var blocks []*entity.DocumentBlock
+	if err := d.dbWithContext(ctx).Model(&model.DocumentBlock{}).
+		Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Order("block_no ASC, id ASC").
+		Find(&blocks).Error; err != nil {
+		return nil, err
+	}
+	return blocks, nil
+}
+
+// DeleteDocumentBlocksByTask 根据文档ID和任务ID删除文档块
+func (d *DocumentRepositoryImpl) DeleteDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) error {
+	return d.dbWithContext(ctx).Where("document_id = ? AND task_id = ?", documentId, taskId).
+		Delete(&model.DocumentBlock{}).Error
+}
+
+// DeleteDocumentBlocksByDocumentId 根据文档ID删除文档块
+func (d *DocumentRepositoryImpl) DeleteDocumentBlocksByDocumentId(ctx context.Context, documentId int64) error {
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentBlock{}).Error
 }

@@ -24,7 +24,7 @@ func NewStructureNodeManager(repo adapter.DocumentRepository) *StructureNodeMana
 
 // ReplaceDocumentNodes 替换文档结构节点：
 func (l *StructureNodeManageImpl) ReplaceDocumentNodes(ctx context.Context, documentId, parseTaskId int64,
-	candidates []*vo.DocumentStructureNodeCandidate) ([]*entity.DocumentStructureNode, error) {
+	candidates []*vo.StructureNode) ([]*entity.DocumentStructureNode, error) {
 	if documentId == 0 || parseTaskId == 0 || len(candidates) == 0 {
 		return nil, nil
 	}
@@ -35,17 +35,17 @@ func (l *StructureNodeManageImpl) ReplaceDocumentNodes(ctx context.Context, docu
 	}
 
 	// 过滤掉无效的候选节点
-	candidates = slice.Filter(candidates, func(index int, candidate *vo.DocumentStructureNodeCandidate) bool {
+	candidates = slice.Filter(candidates, func(index int, candidate *vo.StructureNode) bool {
 		return candidate != nil && candidate.NodeNo != 0
 	})
 
 	// 分配雪花ID，并建立 nodeNo -> id 映射，便于父子/兄弟关系回写
-	nodeIdMap := utils.SliceToMapBy(candidates, func(candidate *vo.DocumentStructureNodeCandidate) (int, int64) {
+	nodeIdMap := utils.SliceToMapBy(candidates, func(candidate *vo.StructureNode) (int, int64) {
 		return candidate.NodeNo, utils.GetSnowflakeNextID()
 	})
 
 	// 将候选节点转换为实体节点（回填分配后的ID、父节点ID、兄弟节点ID）
-	nodes := slice.Map(candidates, func(index int, candidate *vo.DocumentStructureNodeCandidate) *entity.DocumentStructureNode {
+	nodes := slice.Map(candidates, func(index int, candidate *vo.StructureNode) *entity.DocumentStructureNode {
 		return &entity.DocumentStructureNode{
 			ID:                nodeIdMap[candidate.NodeNo],
 			DocumentId:        documentId,

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 const embeddingBatch = 100 // 默认向量化批大小
@@ -32,17 +32,21 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) er
 		"chunkCount":          vectorSize,
 		"embeddingBatchSize":  embeddingBatch,
 		"embeddingBatchCount": vectorBatch,
-		"vectorStoreType":     vo.VectorStoreTypeMilvus,
+		"vectorStoreType":     enum.VectorStoreTypeMilvus,
 		"parentCount":         len(buildCtx.ParentBlocks),
 	}
 	// 记录"开始执行向量化"日志
 	markVectorStartTx := func(txCtx context.Context) error {
 		vectorStartDetail, _ := json.Marshal(detail)
 		vectorStartLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageVectorize, EventType: vo.TaskEventStart,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
-			Content: "开始执行向量化", DetailJson: string(vectorStartDetail),
+			TaskId:       buildCtx.TaskID,
+			DocumentId:   buildCtx.DocumentID,
+			StageType:    enum.TaskStageVectorize,
+			EventType:    enum.TaskEventStart,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
+			Content:      "开始执行向量化",
+			DetailJson:   string(vectorStartDetail),
 		}
 		return p.Repo.InsertTaskLog(txCtx, vectorStartLog)
 	}
@@ -68,8 +72,8 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) er
 		vectorEndDetail, _ := json.Marshal(detail)
 		vectorEndLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageVectorize, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageVectorize, EventType: enum.TaskEventComplete,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "向量化完成", DetailJson: string(vectorEndDetail),
 		}
 		return p.Repo.InsertTaskLog(txCtx, vectorEndLog)

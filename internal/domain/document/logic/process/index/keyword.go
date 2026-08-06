@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // KeywordIndexPhase 关键词索引阶段
@@ -28,15 +28,15 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 	// 标记开始关键词索引
 	markKeywordIndexTx := func(txCtx context.Context) error {
 		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: vo.TaskStageKeywordIndex,
+			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageKeywordIndex,
 		}); err != nil {
 			return err
 		}
 		keywordStartDetail, _ := json.Marshal(map[string]any{"chunkCount": vectorSize})
 		keywordStartLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageKeywordIndex, EventType: vo.TaskEventStart,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageKeywordIndex, EventType: enum.TaskEventStart,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "开始构建关键词索引", DetailJson: string(keywordStartDetail),
 		}
 		return p.Repo.InsertTaskLog(txCtx, keywordStartLog)
@@ -60,8 +60,8 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 		})
 		keywordEndLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageKeywordIndex, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageKeywordIndex, EventType: enum.TaskEventComplete,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "关键词索引完成", DetailJson: string(keywordEndDetail),
 		}
 		return p.Repo.InsertTaskLog(txCtx, keywordEndLog)

@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -48,8 +49,8 @@ func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPor
 // Upload 上传文档：完成文件上传、存储、文档记录创建及解析任务下发
 func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUpload, error) {
 	// 校验文件类型是否支持
-	fileType := vo.DetectFileType(header.Filename)
-	if fileType == vo.FileTypeUnknown {
+	fileType := enum.DetectFileType(header.Filename)
+	if fileType == enum.FileTypeUnknown {
 		return nil, errorx.ErrUnsupportedFileType.Format(fileType)
 	}
 
@@ -81,13 +82,13 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	document.FileType = fileType
 	document.MimeType = mimeType
 	document.FileSize = int64(len(fileBytes))
-	document.StorageType = vo.StorageTypeMINIO
+	document.StorageType = enum.StorageTypeMINIO
 	document.BucketName = storedObjectInfo.BucketName
 	document.ObjectName = storedObjectInfo.ObjectName
 	document.ObjectUrl = storedObjectInfo.ObjectUrl
-	document.ParseStatus = vo.ParseStatusParsing
-	document.StrategyStatus = vo.StrategyStatusWaitRecommend
-	document.IndexStatus = vo.IndexStatusWaitBuild
+	document.ParseStatus = enum.ParseStatusParsing
+	document.StrategyStatus = enum.StrategyStatusWaitRecommend
+	document.IndexStatus = enum.IndexStatusWaitBuild
 	document.KnowledgeScopeCode = strutil.Trim(document.KnowledgeScopeCode)
 	document.KnowledgeScopeName = strutil.Trim(document.KnowledgeScopeName)
 	document.BusinessCategory = strutil.Trim(document.BusinessCategory)
@@ -98,10 +99,10 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	task := &entity.DocumentTask{
 		ID:            taskId,
 		DocumentId:    documentId,
-		TaskType:      vo.TaskTypeParseRoute,
-		TaskStatus:    vo.TaskStatusNew,
-		CurrentStage:  vo.TaskStageFileUpload,
-		TriggerSource: utils.Ternary(document.OperatorId == 0, vo.TriggerSourceSystem, vo.TriggerSourceUser),
+		TaskType:      enum.TaskTypeParseRoute,
+		TaskStatus:    enum.TaskStatusNew,
+		CurrentStage:  enum.TaskStageFileUpload,
+		TriggerSource: utils.Ternary(document.OperatorId == 0, enum.TriggerSourceSystem, enum.TriggerSourceUser),
 	}
 
 	// 记录文件上传完成的任务日志
@@ -113,10 +114,10 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	taskLog := &entity.DocumentTaskLog{
 		TaskId:       taskId,
 		DocumentId:   documentId,
-		StageType:    vo.TaskStageFileUpload,
-		EventType:    vo.TaskEventComplete,
-		LogLevel:     vo.LogLevelInfo,
-		OperatorType: utils.Ternary(document.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+		StageType:    enum.TaskStageFileUpload,
+		EventType:    enum.TaskEventComplete,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: utils.Ternary(document.OperatorId == 0, enum.OperatorTypeSystem, enum.OperatorTypeUser),
 		OperatorId:   document.OperatorId,
 		Content:      "文件上传完成，已进入解析与策略推荐队列",
 		DetailJson:   string(detail),
@@ -209,7 +210,7 @@ func (d *LifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId
 // DeleteDocument 删除文档 todo 删除其他索引,实现关键词搜索、导航索引、知识路由索引、结构图投影
 func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
 	// 检查是否有活跃任务
-	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, 0, vo.TaskStatusNew, vo.TaskStatusRunning)
+	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, 0, enum.TaskStatusNew, enum.TaskStatusRunning)
 	if err != nil {
 		return "", err
 	}
@@ -257,7 +258,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	}
 
 	// 状态校验：文档必须完成解析
-	if document.ParseStatus != vo.ParseStatusParseSuccess {
+	if document.ParseStatus != enum.ParseStatusParseSuccess {
 		return nil, nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, "当前文档还未完成解析，不能确认策略。")
 	}
 
@@ -298,8 +299,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	}
 
 	// 提取标准化后的流水线类型列表
-	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeParent)
-	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, vo.PipelineTypeChild)
+	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, enum.PipelineTypeParent)
+	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, enum.PipelineTypeChild)
 	if len(normalizedParentTypeList) == 0 {
 		return nil, nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "父块流水线不能为空。")
 	}
@@ -308,8 +309,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	}
 
 	// 提取基础方案的流水线类型列表
-	baseParentTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeParent)
-	baseChildTypeList := d.extractPipelineTypes(baseStepList, vo.PipelineTypeChild)
+	baseParentTypeList := d.extractPipelineTypes(baseStepList, enum.PipelineTypeParent)
+	baseChildTypeList := d.extractPipelineTypes(baseStepList, enum.PipelineTypeChild)
 
 	// 判断是否发生了策略变更
 	distinctParentTypeList := stream.FromSlice(parentTypeList).Distinct().ToSlice()
@@ -317,7 +318,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	changed := !slice.Equal(baseParentTypeList, normalizedParentTypeList) || !slice.Equal(baseChildTypeList, normalizedChildTypeList)
 
 	// 查询最新解析任务信息
-	latestParseTask, err := d.repo.SelectLatestTask(ctx, document.ID, vo.TaskTypeParseRoute)
+	latestParseTask, err := d.repo.SelectLatestTask(ctx, document.ID, enum.TaskTypeParseRoute)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -327,7 +328,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		// 根据是否变更处理方案
 		if changed {
 			// 策略发生变更：废弃旧方案
-			if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: basePlan.ID, PlanStatus: vo.PlanStatusDiscarded}); err != nil {
+			if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{ID: basePlan.ID, PlanStatus: enum.PlanStatusDiscarded}); err != nil {
 				return err
 			}
 
@@ -342,8 +343,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				ID:              utils.GetSnowflakeNextID(),
 				DocumentId:      document.ID,
 				PlanVersion:     latestPlanVersion + 1,
-				PlanSource:      vo.PlanSourceUserAdjust,
-				PlanStatus:      vo.PlanStatusConfirmed,
+				PlanSource:      enum.PlanSourceUserAdjust,
+				PlanStatus:      enum.PlanStatusConfirmed,
 				StrategyCount:   len(normalizedStepList),
 				RecommendReason: basePlan.RecommendReason,
 				AdjustNote:      cmd.AdjustNote,
@@ -382,10 +383,10 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 					ID:           utils.GetSnowflakeNextID(),
 					TaskId:       latestParseTask.ID,
 					DocumentId:   document.ID,
-					StageType:    vo.TaskStageStrategyConfirm,
-					EventType:    vo.TaskEventUserAdjust,
-					LogLevel:     vo.LogLevelInfo,
-					OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+					StageType:    enum.TaskStageStrategyConfirm,
+					EventType:    enum.TaskEventUserAdjust,
+					LogLevel:     enum.LogLevelInfo,
+					OperatorType: utils.Ternary(cmd.OperatorId == 0, enum.OperatorTypeSystem, enum.OperatorTypeUser),
 					OperatorId:   cmd.OperatorId,
 					Content:      "用户调整了系统推荐策略。",
 					DetailJson:   string(detailJson),
@@ -399,8 +400,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 			// 策略未变更：更新基础方案状态
 			if err = d.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{
 				ID:            basePlan.ID,
-				PlanStatus:    vo.PlanStatusConfirmed,
-				PlanSource:    utils.Ternary(basePlan.PlanSource == 0, vo.PlanSourceSystemRecommend, basePlan.PlanSource),
+				PlanStatus:    enum.PlanStatusConfirmed,
+				PlanSource:    utils.Ternary(basePlan.PlanSource == 0, enum.PlanSourceSystemRecommend, basePlan.PlanSource),
 				AdjustNote:    cmd.AdjustNote,
 				ConfirmUserId: cmd.OperatorId,
 				ConfirmTime:   utils.Pointer(time.Now()),
@@ -410,7 +411,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		}
 
 		// 更新文档状态
-		document.StrategyStatus = vo.StrategyStatusConfirmed
+		document.StrategyStatus = enum.StrategyStatusConfirmed
 		document.FillEnumNames()
 
 		if latestParseTask != nil {
@@ -424,10 +425,10 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				ID:           utils.GetSnowflakeNextID(),
 				TaskId:       latestParseTask.ID,
 				DocumentId:   document.ID,
-				StageType:    vo.TaskStageStrategyConfirm,
-				EventType:    vo.TaskEventUserConfirm,
-				LogLevel:     vo.LogLevelInfo,
-				OperatorType: utils.Ternary(cmd.OperatorId == 0, vo.OperatorTypeSystem, vo.OperatorTypeUser),
+				StageType:    enum.TaskStageStrategyConfirm,
+				EventType:    enum.TaskEventUserConfirm,
+				LogLevel:     enum.LogLevelInfo,
+				OperatorType: utils.Ternary(cmd.OperatorId == 0, enum.OperatorTypeSystem, enum.OperatorTypeUser),
 				OperatorId:   cmd.OperatorId,
 				Content:      "用户确认了最终策略方案。",
 				DetailJson:   string(detailJson),
@@ -436,7 +437,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				return err
 			}
 			// 更新任务阶段
-			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: latestParseTask.ID, CurrentStage: vo.TaskStageStrategyConfirm}); err != nil {
+			if err = d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{ID: latestParseTask.ID, CurrentStage: enum.TaskStageStrategyConfirm}); err != nil {
 				return err
 			}
 		}
@@ -468,7 +469,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	}
 
 	// 状态校验：文档必须完成解析且策略已确认
-	if document.ParseStatus != vo.ParseStatusParseSuccess || document.StrategyStatus != vo.StrategyStatusConfirmed {
+	if document.ParseStatus != enum.ParseStatusParseSuccess || document.StrategyStatus != enum.StrategyStatusConfirmed {
 		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, `当前文档尚未完成"解析成功 + 策略确认"，不能构建索引`)
 	}
 
@@ -478,7 +479,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	}
 
 	// 并发控制：检查是否存在同类型的活跃任务，防止重复构建
-	runningTaskCount, err := d.repo.CountActiveTask(ctx, documentId, vo.TaskTypeBuildIndex, vo.TaskStatusNew, vo.TaskStatusRunning)
+	runningTaskCount, err := d.repo.CountActiveTask(ctx, documentId, enum.TaskTypeBuildIndex, enum.TaskStatusNew, enum.TaskStatusRunning)
 	if err != nil {
 		return nil, err
 	}
@@ -498,11 +499,11 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		ID:               taskId,
 		DocumentId:       documentId,
 		PlanId:           planId,
-		TaskType:         vo.TaskTypeBuildIndex,                                                       // 任务类型：索引构建
-		TaskStatus:       vo.TaskStatusNew,                                                            // 初始状态：新建
-		CurrentStage:     vo.TaskStageChunkExecute,                                                    // 当前阶段：切分执行
-		TriggerSource:    utils.Ternary(operatorId > 0, vo.TriggerSourceUser, vo.TriggerSourceSystem), // 判断触发来源
-		StrategySnapshot: plan.StrategySnapshot,                                                       // 策略快照，确保任务执行时策略不变
+		TaskType:         enum.TaskTypeBuildIndex,                                                         // 任务类型：索引构建
+		TaskStatus:       enum.TaskStatusNew,                                                              // 初始状态：新建
+		CurrentStage:     enum.TaskStageChunkExecute,                                                      // 当前阶段：切分执行
+		TriggerSource:    utils.Ternary(operatorId > 0, enum.TriggerSourceUser, enum.TriggerSourceSystem), // 判断触发来源
+		StrategySnapshot: plan.StrategySnapshot,                                                           // 策略快照，确保任务执行时策略不变
 	}
 
 	// 构建任务日志详情JSON
@@ -514,10 +515,10 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	taskLog := &entity.DocumentTaskLog{
 		TaskId:       taskId,
 		DocumentId:   documentId,
-		StageType:    vo.TaskStageChunkExecute,
-		EventType:    vo.TaskEventStart, // 事件类型：任务开始
-		LogLevel:     vo.LogLevelInfo,   // 日志级别：信息
-		OperatorType: utils.Ternary(operatorId > 0, vo.OperatorTypeUser, vo.OperatorTypeSystem),
+		StageType:    enum.TaskStageChunkExecute,
+		EventType:    enum.TaskEventStart, // 事件类型：任务开始
+		LogLevel:     enum.LogLevelInfo,   // 日志级别：信息
+		OperatorType: utils.Ternary(operatorId > 0, enum.OperatorTypeUser, enum.OperatorTypeSystem),
 		Content:      "索引构建任务已创建，等待异步执行",
 		DetailJson:   string(detail),
 	}
@@ -525,7 +526,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	// 事务性操作：更新文档状态、插入任务、插入任务日志
 	fn := func(txCtx context.Context) error {
 		// 更新文档状态为"构建中"
-		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: vo.IndexStatusBuilding}); err != nil {
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: documentId, IndexStatus: enum.IndexStatusBuilding}); err != nil {
 			return err
 		}
 		if err := d.repo.InsertTask(txCtx, task); err != nil {
@@ -547,9 +548,9 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	indexBuild := &vo.DocumentIndexBuild{
 		DocumentId:  documentId,
 		TaskId:      taskId,
-		TaskType:    vo.TaskTypeBuildIndex,
-		TaskStatus:  vo.TaskStatusNew,
-		IndexStatus: vo.IndexStatusBuilding,
+		TaskType:    enum.TaskTypeBuildIndex,
+		TaskStatus:  enum.TaskStatusNew,
+		IndexStatus: enum.IndexStatusBuilding,
 	}
 	indexBuild.FillEnumNames()
 
@@ -700,7 +701,7 @@ func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []
 func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, document *entity.Document) int64 {
 	taskId = utils.Ternary(taskId == 0, document.LastIndexTaskId, taskId)
 	if taskId == 0 {
-		task, err := d.repo.SelectLatestTask(ctx, document.ID, vo.TaskTypeBuildIndex)
+		task, err := d.repo.SelectLatestTask(ctx, document.ID, enum.TaskTypeBuildIndex)
 		if err != nil {
 			return 0
 		}
@@ -712,7 +713,7 @@ func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, d
 // extractPipelineTypes 提取流水线类型
 func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType string) []int {
 	result := slice.Filter(stepList, func(index int, item *entity.DocumentStrategyStep) bool {
-		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, vo.PipelineTypeChild))
+		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, enum.PipelineTypeChild))
 	})
 	slice.SortBy(result, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
 	return slice.Map(result, func(index int, item *entity.DocumentStrategyStep) int { return item.StrategyType })

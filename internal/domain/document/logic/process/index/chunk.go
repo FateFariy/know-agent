@@ -12,16 +12,17 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // ChunkingPhase 切块阶段：执行切块流水线、构建父子块实体、持久化
 type ChunkingPhase struct {
-	deps *PhaseDeps
+	*PhaseDeps
 }
 
 func NewChunkingPhase(deps *PhaseDeps) *ChunkingPhase {
-	return &ChunkingPhase{deps: deps}
+	return &ChunkingPhase{PhaseDeps: deps}
 }
 
 func (p *ChunkingPhase) Name() string {
@@ -58,14 +59,14 @@ func (p *ChunkingPhase) resumeFromCommittedGraph(ctx context.Context, buildCtx *
 // executeChunkingPipeline 执行切块流水线
 func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *BuildContext) error {
 	// 下载解析文本
-	parsedText, err := p.deps.Port.DownloadText(ctx, buildCtx.Document.ParseTextPath)
+	parsedText, err := p.Port.DownloadText(ctx, buildCtx.Document.ParseTextPath)
 	if err != nil {
 		return err
 	}
 
 	// 按步骤执行切块流水线
 	chunkStartedNanos := time.Now()
-	parentCandidates, err := p.deps.Coordinator.BuildParentBlocks(ctx, buildCtx.Document, buildCtx.PipelineSteps, parsedText)
+	parentCandidates, err := p.Coordinator.BuildParentBlocks(ctx, buildCtx.Document, buildCtx.PipelineSteps, parsedText)
 	if err != nil {
 		return err
 	}
@@ -76,7 +77,7 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 
 	// 事务性标记切块完成
 	markChunkCompleteTx := func(txCtx context.Context) error {
-		if err := p.deps.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.Plan.ID, vo.StrategyExecuteStatusExecuteSuccess); err != nil {
+		if err = p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.Plan.ID, enum.StrategyExecuteStatusExecuteSuccess); err != nil {
 			return err
 		}
 		chunkEndDetail, _ := json.Marshal(map[string]any{
@@ -86,18 +87,18 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 		})
 		chunkEndLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageChunkExecute, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageChunkExecute, EventType: enum.TaskEventComplete,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "切块执行完成", DetailJson: string(chunkEndDetail),
 		}
-		if err := p.deps.Repo.InsertTaskLog(txCtx, chunkEndLog); err != nil {
+		if err = p.Repo.InsertTaskLog(txCtx, chunkEndLog); err != nil {
 			return err
 		}
-		return p.deps.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: vo.TaskStageChunkPostProcess,
+		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageChunkPostProcess,
 		})
 	}
-	if err := p.deps.Repo.Do(ctx, markChunkCompleteTx); err != nil {
+	if err = p.Repo.Do(ctx, markChunkCompleteTx); err != nil {
 		return err
 	}
 
@@ -113,10 +114,10 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 
 	// 事务性批量落库
 	persistBlocksTx := func(txCtx context.Context) error {
-		if err := p.deps.Repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
+		if err = p.Repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
 			return err
 		}
-		if err := p.deps.Repo.InsertChunkBatch(txCtx, childChunks); err != nil {
+		if err = p.Repo.InsertChunkBatch(txCtx, childChunks); err != nil {
 			return err
 		}
 		chunkPostDetail, _ := json.Marshal(map[string]any{
@@ -126,18 +127,18 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 		})
 		chunkPostLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
-			StageType: vo.TaskStageChunkPostProcess, EventType: vo.TaskEventComplete,
-			LogLevel: vo.LogLevelInfo, OperatorType: vo.OperatorTypeSystem,
+			StageType: enum.TaskStageChunkPostProcess, EventType: enum.TaskEventComplete,
+			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "切块后处理完成", DetailJson: string(chunkPostDetail),
 		}
-		if err := p.deps.Repo.InsertTaskLog(txCtx, chunkPostLog); err != nil {
+		if err = p.Repo.InsertTaskLog(txCtx, chunkPostLog); err != nil {
 			return err
 		}
-		return p.deps.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: vo.TaskStageVectorize,
+		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageVectorize,
 		})
 	}
-	return p.deps.Repo.Do(ctx, persistBlocksTx)
+	return p.Repo.Do(ctx, persistBlocksTx)
 }
 
 // countChildCandidates 计算子块候选数
@@ -207,7 +208,7 @@ func (p *ChunkingPhase) buildParentChildEntities(documentId, taskId, planId int6
 					ChunkText:         child.Text,
 					CharCount:         utils.Len(child.Text),
 					TokenCount:        utils.EstimateTokens(child.Text),
-					VectorStatus:      vo.VectorStatusWaitVector,
+					VectorStatus:      enum.VectorStatusWaitVector,
 				})
 				parentBlock.ChildCount++
 			}

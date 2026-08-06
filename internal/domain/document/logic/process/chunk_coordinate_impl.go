@@ -21,6 +21,7 @@ import (
 	chunksemantic "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic"
 	chunkstructure "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/structure"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
 	errorx "github.com/swiftbit/know-agent/internal/error"
@@ -58,22 +59,22 @@ func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMode
 
 	registry := make(map[int]chunk.Chunker)
 	// 结构分块
-	registry[vo.StrategyTypeStructure] = chunkstructure.NewChunker()
+	registry[enum.StrategyTypeStructure] = chunkstructure.NewChunker()
 
 	// 递归分块
-	registry[vo.StrategyTypeRecursive] = chunkrecursive.NewChunker(
+	registry[enum.StrategyTypeRecursive] = chunkrecursive.NewChunker(
 		chunkrecursive.WithMaxChars(svcCtx.Config.Chunk.RecursiveMaxChars),
 		chunkrecursive.WithOverlapChars(svcCtx.Config.Chunk.RecursiveOverlapChars),
 	)
 
 	// 语义分块
-	registry[vo.StrategyTypeSemantic] = chunksemantic.NewChunker(
+	registry[enum.StrategyTypeSemantic] = chunksemantic.NewChunker(
 		chunksemantic.WithMinChars(svcCtx.Config.Chunk.SemanticMinChars),
 		chunksemantic.WithMaxChars(svcCtx.Config.Chunk.SemanticMaxChars),
 		chunksemantic.WithSimilarityThreshold(svcCtx.Config.Chunk.SemanticSimilarityThreshold),
 	)
 	// 大模型切块
-	registry[vo.StrategyTypeLLM] = chunkllm.NewChunker(chatModel, promptTemplate,
+	registry[enum.StrategyTypeLLM] = chunkllm.NewChunker(chatModel, promptTemplate,
 		chunkllm.WithLlmSplitPrompt(prompt.DocumentLlmSplit),
 	)
 
@@ -94,10 +95,10 @@ func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMode
 	}
 }
 
-// RecommendStrategy 根据文档分析结果推荐最优的父块-子块策略组合。
+// Recommend 根据文档分析结果推荐最优的父块-子块策略组合。
 // 整体思路：先通过若干判定函数分别评估结构/递归/语义/大模型切块的必要性，
 // 再按"父块优先保留天然大语义单元、子块围绕召回边界精细化"的原则拼接流水线。
-func (s *ChunkCoordinateImpl) RecommendStrategy(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
+func (s *ChunkCoordinateImpl) Recommend(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
 		return nil, fmt.Errorf("invaild value")
 	}
@@ -105,20 +106,20 @@ func (s *ChunkCoordinateImpl) RecommendStrategy(ctx context.Context, document *e
 	reasonList := make([]string, 0)
 
 	// 是否启用结构切块，启用条件：文件类型被识别 +（结构等级达到中等或标题数≥2）
-	structureRecommended := vo.FileTypeName(document.FileType) != "" &&
-		(analysisResult.StructureLevel >= vo.StructureLevelMedium || analysisResult.HeadingCount >= 2)
+	structureRecommended := enum.FileTypeName(document.FileType) != "" &&
+		(analysisResult.StructureLevel >= enum.StructureLevelMedium || analysisResult.HeadingCount >= 2)
 
 	// 是否启用递归切块，启用条件：文本总长度或最长段落长度 ≥ 递归窗口上限（需要控制单次块大小）
 	recursiveRecommended := max(analysisResult.CharCount, analysisResult.MaxParagraphLength) >= s.recursiveMaxChars
 
 	// 是否启用语义切块，启用条件：文本长度达标 + 内容质量中等以上 + 段落数≥3（保证语义断点有意义）
 	semanticRecommended := analysisResult.CharCount >= s.semanticMinChars &&
-		analysisResult.ContentQualityLevel >= vo.ContentQualityLevelMedium &&
+		analysisResult.ContentQualityLevel >= enum.ContentQualityLevelMedium &&
 		analysisResult.ParagraphCount >= 3
 
 	// 是否启用大模型智能切块，启用条件：允许低质量文档走 LLM + 内容质量为 Low + 文本长度达到最小语义窗口
 	llmRecommended := s.recommendLlmWhenLowQuality &&
-		analysisResult.ContentQualityLevel == vo.ContentQualityLevelLow &&
+		analysisResult.ContentQualityLevel == enum.ContentQualityLevelLow &&
 		analysisResult.CharCount >= s.semanticMinChars
 
 	// 构建父块策略流水线（结构优先，否则递归大窗口兜底）
@@ -127,13 +128,13 @@ func (s *ChunkCoordinateImpl) RecommendStrategy(ctx context.Context, document *e
 
 	if structureRecommended {
 		// 结构明显 → 父块以结构切块为主，保留天然章节边界
-		parentStrategyTypes = append(parentStrategyTypes, vo.StrategyTypeStructure)
-		parentReasonMap[vo.StrategyTypeStructure] = "检测到文档具有较明显的标题或章节结构，父块优先保留天然章节边界。"
+		parentStrategyTypes = append(parentStrategyTypes, enum.StrategyTypeStructure)
+		parentReasonMap[enum.StrategyTypeStructure] = "检测到文档具有较明显的标题或章节结构，父块优先保留天然章节边界。"
 		reasonList = append(reasonList, "父块流水线优先采用基于文档结构切块，保留回答阶段需要的大语义单元。")
 	} else {
 		// 结构不明显 → 用较大窗口的递归分块作为稳定回答单元
-		parentStrategyTypes = append(parentStrategyTypes, vo.StrategyTypeRecursive)
-		parentReasonMap[vo.StrategyTypeRecursive] = "未识别出稳定结构时，父块先使用较大粒度的递归分块作为稳定回答单元。"
+		parentStrategyTypes = append(parentStrategyTypes, enum.StrategyTypeRecursive)
+		parentReasonMap[enum.StrategyTypeRecursive] = "未识别出稳定结构时，父块先使用较大粒度的递归分块作为稳定回答单元。"
 		reasonList = append(reasonList, "父块流水线未命中明显结构信号，默认使用较大粒度递归分块作为回答单元。")
 	}
 
@@ -143,26 +144,26 @@ func (s *ChunkCoordinateImpl) RecommendStrategy(ctx context.Context, document *e
 
 	if llmRecommended {
 		// 低质量文档优先用大模型智能切块增强
-		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeLLM)
-		childReasonMap[vo.StrategyTypeLLM] = "文档质量偏低或结构识别不稳定，子块先使用大模型智能切块增强复杂场景。"
+		childStrategyTypes = append(childStrategyTypes, enum.StrategyTypeLLM)
+		childReasonMap[enum.StrategyTypeLLM] = "文档质量偏低或结构识别不稳定，子块先使用大模型智能切块增强复杂场景。"
 		reasonList = append(reasonList, "子块流水线追加大模型智能切块，处理低质量或结构不稳定文本。")
 	} else if semanticRecommended {
 		// 语义边界明确 → 优先用语义分块优化召回边界
-		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeSemantic)
-		childReasonMap[vo.StrategyTypeSemantic] = "文本主题边界相对明确，子块先使用语义分块优化召回边界。"
+		childStrategyTypes = append(childStrategyTypes, enum.StrategyTypeSemantic)
+		childReasonMap[enum.StrategyTypeSemantic] = "文本主题边界相对明确，子块先使用语义分块优化召回边界。"
 		reasonList = append(reasonList, "子块流水线优先采用语义分块，优化召回边界和主题完整性。")
 	}
 
 	// 递归分块作为子块兜底（长度控制或默认保底）
 	if recursiveRecommended || llmRecommended || len(childStrategyTypes) == 0 {
-		childStrategyTypes = append(childStrategyTypes, vo.StrategyTypeRecursive)
-		childReasonMap[vo.StrategyTypeRecursive] = "文档整体较长、存在超长段落，或需要在增强切块后追加长度兜底。"
+		childStrategyTypes = append(childStrategyTypes, enum.StrategyTypeRecursive)
+		childReasonMap[enum.StrategyTypeRecursive] = "文档整体较长、存在超长段落，或需要在增强切块后追加长度兜底。"
 		reasonList = append(reasonList, "子块流水线追加递归分块，控制召回单元长度并作为兜底。")
 	}
 
 	// 基于推荐的策略类型构建步骤草稿、拼接快照与理由
-	parentSteps := s.buildDraftSteps(vo.PipelineTypeParent, parentStrategyTypes, parentReasonMap)
-	childSteps := s.buildDraftSteps(vo.PipelineTypeChild, childStrategyTypes, childReasonMap)
+	parentSteps := s.buildDraftSteps(enum.PipelineTypeParent, parentStrategyTypes, parentReasonMap)
+	childSteps := s.buildDraftSteps(enum.PipelineTypeChild, childStrategyTypes, childReasonMap)
 
 	strategySnapshot := fmt.Sprintf("PARENT:%s;CHILD:%s", s.buildPipelineSnapshot(parentSteps), s.buildPipelineSnapshot(childSteps))
 
@@ -190,7 +191,7 @@ func (s *ChunkCoordinateImpl) NormalizeSteps(ctx context.Context, baseSteps []*e
 	// 按流水线+策略类型构建基础步骤映射（便于复用已存在的用户配置）
 	baseStepMap := make(map[string]map[int]*entity.DocumentStrategyStep)
 	for _, baseStep := range baseSteps {
-		pipelineType := utils.BlankToDefault(baseStep.PipelineType, vo.PipelineTypeChild)
+		pipelineType := utils.BlankToDefault(baseStep.PipelineType, enum.PipelineTypeChild)
 		if _, exists := baseStepMap[pipelineType]; !exists {
 			baseStepMap[pipelineType] = make(map[int]*entity.DocumentStrategyStep)
 		}
@@ -200,18 +201,18 @@ func (s *ChunkCoordinateImpl) NormalizeSteps(ctx context.Context, baseSteps []*e
 	normalizedStepList := make([]*entity.DocumentStrategyStep, 0)
 	// 生成父块标准化步骤
 	parentSteps := s.buildNormalizedSteps(
-		vo.PipelineTypeParent,
+		enum.PipelineTypeParent,
 		normalizedParentTypes,
-		baseStepMap[vo.PipelineTypeParent],
+		baseStepMap[enum.PipelineTypeParent],
 		documentId,
 	)
 	normalizedStepList = append(normalizedStepList, parentSteps...)
 
 	// 生成子块标准化步骤
 	childSteps := s.buildNormalizedSteps(
-		vo.PipelineTypeChild,
+		enum.PipelineTypeChild,
 		normalizedChildTypes,
-		baseStepMap[vo.PipelineTypeChild],
+		baseStepMap[enum.PipelineTypeChild],
 		documentId,
 	)
 	normalizedStepList = append(normalizedStepList, childSteps...)
@@ -223,8 +224,8 @@ func (s *ChunkCoordinateImpl) NormalizeSteps(ctx context.Context, baseSteps []*e
 func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *entity.Document,
 	steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
-	parentSteps := s.sortPipelineSteps(steps, vo.PipelineTypeParent)
-	childSteps := s.sortPipelineSteps(steps, vo.PipelineTypeChild)
+	parentSteps := s.sortPipelineSteps(steps, enum.PipelineTypeParent)
+	childSteps := s.sortPipelineSteps(steps, enum.PipelineTypeChild)
 	if len(parentSteps) == 0 {
 		return nil, errorx.ErrParentBlockMissing
 	}
@@ -288,7 +289,7 @@ func (s *ChunkCoordinateImpl) buildDraftSteps(pipelineType string, strategyTypes
 			PipelineType:    pipelineType,
 			StrategyType:    strategyType,
 			StrategyRole:    s.resolveRole(index, strategyType),
-			SourceType:      vo.StrategySourceTypeSystemRecommend,
+			SourceType:      enum.StrategySourceTypeSystemRecommend,
 			RecommendReason: utils.BlankToDefault(reasonMap[strategyType], "系统为当前流水线生成的推荐步骤。"),
 		}
 	})
@@ -297,7 +298,7 @@ func (s *ChunkCoordinateImpl) buildDraftSteps(pipelineType string, strategyTypes
 // normalizePipelineTypes 标准化流水线输入：过滤未知策略类型并去重
 func (s *ChunkCoordinateImpl) normalizePipelineTypes(strategyTypes []int) []int {
 	return stream.FromSlice(strategyTypes).
-		Filter(func(strategyType int) bool { return vo.StrategyTypeName(strategyType) != "" }).
+		Filter(func(strategyType int) bool { return enum.StrategyTypeName(strategyType) != "" }).
 		Distinct().ToSlice()
 }
 
@@ -312,12 +313,12 @@ func (s *ChunkCoordinateImpl) buildNormalizedSteps(pipelineType string, normaliz
 			StepNo:          index + 1,
 			StrategyType:    strategyType,
 			StrategyRole:    s.resolveRole(index, strategyType),
-			SourceType:      vo.StrategySourceTypeUserAdd,
-			ExecuteStatus:   vo.StrategyExecuteStatusWaitExecute,
+			SourceType:      enum.StrategySourceTypeUserAdd,
+			ExecuteStatus:   enum.StrategyExecuteStatusWaitExecute,
 			RecommendReason: "用户手动追加该策略。",
 		}
 		if baseStep != nil {
-			step.SourceType = vo.StrategySourceTypeUserKeep
+			step.SourceType = enum.StrategySourceTypeUserKeep
 			step.RecommendReason = baseStep.RecommendReason
 		}
 		return step
@@ -327,7 +328,7 @@ func (s *ChunkCoordinateImpl) buildNormalizedSteps(pipelineType string, normaliz
 // sortPipelineSteps 过滤属于指定流水线的步骤并按 StepNo 升序排列
 func (s *ChunkCoordinateImpl) sortPipelineSteps(steps []*entity.DocumentStrategyStep, pipelineType string) []*entity.DocumentStrategyStep {
 	filtered := slice.Filter(steps, func(index int, item *entity.DocumentStrategyStep) bool {
-		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, vo.PipelineTypeChild))
+		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, enum.PipelineTypeChild))
 	})
 	slice.SortBy(filtered, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
 	return filtered
@@ -344,18 +345,18 @@ func (s *ChunkCoordinateImpl) buildPipelineSnapshot(steps []*vo.DocumentStrategy
 // resolveRole 为指定步骤分配角色
 func (s *ChunkCoordinateImpl) resolveRole(index int, strategyType int) int {
 	if index == 0 {
-		return vo.StrategyRolePrimary
+		return enum.StrategyRolePrimary
 	}
-	if strategyType == vo.StrategyTypeRecursive {
-		return vo.StrategyRoleFallback
+	if strategyType == enum.StrategyTypeRecursive {
+		return enum.StrategyRoleFallback
 	}
-	if strategyType == vo.StrategyTypeSemantic {
-		return vo.StrategyRoleOptimize
+	if strategyType == enum.StrategyTypeSemantic {
+		return enum.StrategyRoleOptimize
 	}
-	if strategyType == vo.StrategyTypeLLM {
-		return vo.StrategyRoleEnhance
+	if strategyType == enum.StrategyTypeLLM {
+		return enum.StrategyRoleEnhance
 	}
-	return vo.StrategyRoleOptimize
+	return enum.StrategyRoleOptimize
 }
 
 // ---------------- 种子构建 ----------------
@@ -371,18 +372,18 @@ func (s *ChunkCoordinateImpl) buildParentSeedList(ctx context.Context, parsedTex
 				return structureSeeds
 			}
 
-			return s.executePipeline(ctx, structureSeeds, remainingSteps, vo.PipelineTypeParent)
+			return s.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeParent)
 		}
 	}
 
 	// 无结构步骤或节点 → 用整段文本作为父种子走完整流水线
 	originalSeed := &vo.ChunkCandidate{
 		Text:       parsedText,
-		SourceType: vo.ChunkSourceTypeOriginal,
+		SourceType: enum.ChunkSourceTypeOriginal,
 	}
 
 	// 执行父块流水线
-	return s.executePipeline(ctx, []*vo.ChunkCandidate{originalSeed}, parentSteps, vo.PipelineTypeParent)
+	return s.executePipeline(ctx, []*vo.ChunkCandidate{originalSeed}, parentSteps, enum.PipelineTypeParent)
 }
 
 // buildChildSeedList 为指定父种子构建子块种子列表，若步骤中含有结构切块且结构节点存在，优先按结构节点拆解子章节，否则克隆父种子再跑流水线
@@ -396,20 +397,20 @@ func (s *ChunkCoordinateImpl) buildChildSeedList(ctx context.Context, parentSeed
 			return structureSeeds
 		}
 
-		return s.executePipeline(ctx, structureSeeds, remainingSteps, vo.PipelineTypeChild)
+		return s.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeChild)
 	}
 
 	// 直接克隆父种子作为子块流水线的起点
 	clonedSeed := s.cloneChunkCandidate(parentSeed, parentSeed.Text)
 
 	// 执行子块流水线
-	return s.executePipeline(ctx, []*vo.ChunkCandidate{clonedSeed}, childSteps, vo.PipelineTypeChild)
+	return s.executePipeline(ctx, []*vo.ChunkCandidate{clonedSeed}, childSteps, enum.PipelineTypeChild)
 }
 
 // containsStructureStep 检查步骤列表中是否存在结构切块策略
 func (s *ChunkCoordinateImpl) containsStructureStep(steps []*entity.DocumentStrategyStep) bool {
 	for _, step := range steps {
-		if step.StrategyType == vo.StrategyTypeStructure {
+		if step.StrategyType == enum.StrategyTypeStructure {
 			return true
 		}
 	}
@@ -419,7 +420,7 @@ func (s *ChunkCoordinateImpl) containsStructureStep(steps []*entity.DocumentStra
 // stripStructureSteps 过滤掉结构切块步骤（结构切块已经在流水线前处理）
 func (s *ChunkCoordinateImpl) stripStructureSteps(steps []*entity.DocumentStrategyStep) []*entity.DocumentStrategyStep {
 	return slice.Filter(steps, func(index int, step *entity.DocumentStrategyStep) bool {
-		return step.StrategyType != vo.StrategyTypeStructure
+		return step.StrategyType != enum.StrategyTypeStructure
 	})
 }
 
@@ -437,7 +438,7 @@ func (s *ChunkCoordinateImpl) buildStructureParentSeeds(structureNodes []*entity
 	seeds := make([]*vo.ChunkCandidate, 0, len(structureNodes))
 	for _, node := range structureNodes {
 		if node.NodeType == vo.NodeTypeSection && s.isContentBearingSection(node, parentHasChildSection[node.ID]) {
-			seeds = append(seeds, s.newChunkCandidate(node, vo.ChunkSourceTypeOriginal))
+			seeds = append(seeds, s.newChunkCandidate(node, enum.ChunkSourceTypeOriginal))
 		}
 	}
 
@@ -462,7 +463,7 @@ func (s *ChunkCoordinateImpl) buildStructureChildSeeds(parentSeed *vo.ChunkCandi
 		if strutil.IsNotBlank(child.ContentText) {
 			// 仅保留结构化语义节点类型
 			if child.NodeType == vo.NodeTypeSection || child.NodeType == vo.NodeTypeStep || child.NodeType == vo.NodeTypeListItem {
-				seeds = append(seeds, s.newChunkCandidate(child, vo.ChunkSourceTypeOriginal))
+				seeds = append(seeds, s.newChunkCandidate(child, enum.ChunkSourceTypeOriginal))
 			}
 		}
 	}
@@ -504,7 +505,7 @@ func (s *ChunkCoordinateImpl) cloneChunkCandidate(original *vo.ChunkCandidate, t
 	if original == nil {
 		return &vo.ChunkCandidate{
 			Text:       text,
-			SourceType: vo.ChunkSourceTypeOriginal,
+			SourceType: enum.ChunkSourceTypeOriginal,
 		}
 	}
 	return &vo.ChunkCandidate{
@@ -523,7 +524,7 @@ func (s *ChunkCoordinateImpl) cloneParentBlockCandidate(source *vo.ParentBlockCa
 	if source == nil {
 		return &vo.ParentBlockCandidate{
 			Text:        text,
-			SourceType:  vo.ChunkSourceTypeOriginal,
+			SourceType:  enum.ChunkSourceTypeOriginal,
 			ChildChunks: append([]*vo.ChunkCandidate{}, childChunks...),
 		}
 	}
@@ -572,15 +573,15 @@ func (s *ChunkCoordinateImpl) executePipeline(ctx context.Context, inputSeeds []
 			}
 
 			var outputs []*chunk.TextBlock
-			if step.StrategyType == vo.StrategyTypeLLM {
+			if step.StrategyType == enum.StrategyTypeLLM {
 				// 大模型切块走专用调用（含递归拆分与回退语义）
 				outputs = s.applyLlmChunking(ctx, input, pipelineType, extraOpts...)
 			} else {
 				outputs, _ = strategy.Chunk(ctx, input, extraOpts...)
 			}
 			// 结构切块无产出时，使用递归策略兜底
-			if len(outputs) == 0 && step.StrategyType == vo.StrategyTypeStructure {
-				outputs, _ = s.registry[vo.StrategyTypeRecursive].Chunk(ctx, input, extraOpts...)
+			if len(outputs) == 0 && step.StrategyType == enum.StrategyTypeStructure {
+				outputs, _ = s.registry[enum.StrategyTypeRecursive].Chunk(ctx, input, extraOpts...)
 			}
 			for _, out := range outputs {
 				if strutil.IsNotBlank(out.Text) {
@@ -596,11 +597,11 @@ func (s *ChunkCoordinateImpl) executePipeline(ctx context.Context, inputSeeds []
 
 // buildPipelineOptions 根据流水线类型和策略类型生成额外的策略选项
 func (s *ChunkCoordinateImpl) buildPipelineOptions(strategyType int, pipelineType string) []chunk.Option {
-	if pipelineType != vo.PipelineTypeParent {
+	if pipelineType != enum.PipelineTypeParent {
 		return nil
 	}
 	switch strategyType {
-	case vo.StrategyTypeRecursive:
+	case enum.StrategyTypeRecursive:
 		// 递归：使用更大的 maxChars 和较小的重叠（同时确保 overlap < maxChars）
 		maxChars := ParentBlockMaxChars
 		overlap := min(ParentBlockOverlapChars, max(0, maxChars-1))
@@ -608,7 +609,7 @@ func (s *ChunkCoordinateImpl) buildPipelineOptions(strategyType int, pipelineTyp
 			chunkrecursive.WithMaxChars(maxChars),
 			chunkrecursive.WithOverlapChars(overlap),
 		}
-	case vo.StrategyTypeSemantic:
+	case enum.StrategyTypeSemantic:
 		// 语义：与配置/父块语义阈值取较大值，确保不被过度切分
 		maxChars := max(s.semanticMaxChars, ParentSemanticMaxChars)
 		minChars := max(s.semanticMinChars, ParentSemanticMinChars)
@@ -664,25 +665,25 @@ func (s *ChunkCoordinateImpl) applyLlmChunking(ctx context.Context, input *chunk
 	var err error
 	// LLM 未启用 → 直接使用语义切块
 	if !s.llmEnabled {
-		outputs, _ = s.registry[vo.StrategyTypeSemantic].Chunk(ctx, input, extraOpts...)
+		outputs, _ = s.registry[enum.StrategyTypeSemantic].Chunk(ctx, input, extraOpts...)
 		return outputs
 	}
 	// 输入过长 → 先以递归切块拆分到 LLM 上限
 	if utils.Len(input.Text) > s.llmMaxChars {
-		llmMaxChars := utils.Ternary(pipeType == vo.PipelineTypeParent, max(s.llmMaxChars, ParentBlockMaxChars), s.llmMaxChars)
-		outputs, _ = s.registry[vo.StrategyTypeRecursive].Chunk(ctx, input, chunkrecursive.WithOverlapChars(0), chunkrecursive.WithMaxChars(llmMaxChars))
+		llmMaxChars := utils.Ternary(pipeType == enum.PipelineTypeParent, max(s.llmMaxChars, ParentBlockMaxChars), s.llmMaxChars)
+		outputs, _ = s.registry[enum.StrategyTypeRecursive].Chunk(ctx, input, chunkrecursive.WithOverlapChars(0), chunkrecursive.WithMaxChars(llmMaxChars))
 	}
 
 	// 逐项调用 LLM 切块；失败/空产出回退到语义切块
 	resultList := make([]*chunk.TextBlock, 0, len(outputs))
 	for _, item := range outputs {
 		if strutil.IsNotBlank(item.Text) {
-			outputs, err = s.registry[vo.StrategyTypeLLM].Chunk(ctx, item)
+			outputs, err = s.registry[enum.StrategyTypeLLM].Chunk(ctx, item)
 			if err != nil {
 				logx.Warnf("大模型智能切块失败，回退到语义切块，err=%v", err)
 			}
 			if len(outputs) == 0 {
-				outputs, _ = s.registry[vo.StrategyTypeSemantic].Chunk(ctx, item, extraOpts...)
+				outputs, _ = s.registry[enum.StrategyTypeSemantic].Chunk(ctx, item, extraOpts...)
 			}
 			resultList = append(resultList, outputs...)
 		}

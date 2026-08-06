@@ -8,6 +8,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -26,12 +27,12 @@ func (p *ValidationPhase) Name() string {
 
 func (p *ValidationPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
 	// 前置检查：如果任务已成功或失败，跳过重复执行
-	if buildCtx.Task.TaskStatus == vo.TaskStatusSuccess {
+	if buildCtx.Task.TaskStatus == enum.TaskStatusSuccess {
 		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
 			buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID)
 		return nil // 已完成，直接返回
 	}
-	if buildCtx.Task.TaskStatus == vo.TaskStatusFailed {
+	if buildCtx.Task.TaskStatus == enum.TaskStatusFailed {
 		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
 			buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID)
 		return nil // 已失败，直接返回
@@ -67,7 +68,7 @@ func (p *ValidationPhase) readGraphRagBuildResult(task *entity.DocumentTask) *vo
 
 // applyGraphFailureDisposition 应用图谱失败处置
 func (p *ValidationPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *BuildContext, cause error) {
-	failedStage := vo.TaskStageGraphRag
+	failedStage := enum.TaskStageGraphRag
 	if buildCtx.Task.CurrentStage != 0 {
 		failedStage = buildCtx.Task.CurrentStage
 	}
@@ -78,15 +79,15 @@ func (p *ValidationPhase) applyGraphFailureDisposition(ctx context.Context, buil
 
 	markFailureTx := func(txCtx context.Context) error {
 		if err := p.Repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: buildCtx.Document.ID, IndexStatus: vo.IndexStatusBuildFailed,
+			ID: buildCtx.Document.ID, IndexStatus: enum.IndexStatusBuildFailed,
 		}); err != nil {
 			return err
 		}
-		if err := p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanID, vo.StrategyExecuteStatusExecuteFailed); err != nil {
+		if err := p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanID, enum.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
 		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.Task.ID, TaskStatus: vo.TaskStatusFailed, CurrentStage: failedStage,
+			ID: buildCtx.Task.ID, TaskStatus: enum.TaskStatusFailed, CurrentStage: failedStage,
 			FinishTime: utils.Pointer(time.Now()), CostMillis: time.Since(buildCtx.StartTime).Milliseconds(),
 			ErrorCode: utils.Pointer("TASK_FAILED"), ErrorMsg: utils.Pointer(errMsg),
 		})
