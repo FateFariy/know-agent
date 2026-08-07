@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
@@ -27,9 +28,21 @@ func (p *VectorizePhase) Name() string {
 }
 
 func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
+	if buildCtx.ResumeCommittedGraph {
+		logx.Infof("GraphRAG 已提交，跳过构建向量，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
+		return nil
+	}
+
+	task := &entity.DocumentTask{
+		ID:           buildCtx.TaskId,
+		CurrentStage: enum.TaskStageVectorize,
+	}
+	if err := p.repo.UpdateTaskById(ctx, task); err != nil {
+		return err
+	}
+
 	vectorSize := len(buildCtx.ChildChunks)
 	vectorBatch := (vectorSize + embeddingBatch - 1) / embeddingBatch
-
 	detail := map[string]any{
 		"chunkCount":          vectorSize,
 		"embeddingBatchSize":  embeddingBatch,
@@ -58,7 +71,7 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 	}
 
 	// 回写向量状态
-	if err := p.repo.UpdateBatchChunkById(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.repo.UpdateBatchChunkById(ctx, buildCtx.ChildChunks, "vector_id"); err != nil {
 		return err
 	}
 	// 记录"向量化完成"日志

@@ -4,7 +4,7 @@ import (
 	"github.com/google/wire"
 
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	executor2 "github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
@@ -58,14 +58,14 @@ var chatProviderSet = wire.NewSet(
 	channel.NewVectorRetrievalChannel,
 	strategy.NewSummaryCompressionStrategy,
 	wire.Bind(new(strategy.Memory), new(*strategy.SummaryCompressionStrategy)),
-	executor2.NewRagChatExecutor,
-	executor2.NewGraphOnlyExecutor,
-	executor2.NewGraphThenEvidenceExecutor,
-	executor2.NewClarificationExecutor,
+	executor.NewRagChatExecutor,
+	executor.NewGraphOnlyExecutor,
+	executor.NewGraphThenEvidenceExecutor,
+	executor.NewClarificationExecutor,
 	observability.NewConversationTraceRecorder,
 	NewExecutorRegistry,
 	NewRetrievalChannels,
-	wire.Bind(new(executor2.RagPromptAssembler), new(*rag.PromptAssembler)),
+	wire.Bind(new(executor.RagPromptAssembler), new(*rag.PromptAssembler)),
 )
 
 var documentProviderSet = wire.NewSet(
@@ -100,12 +100,12 @@ var knowledgeProviderSet = wire.NewSet(
 
 // NewExecutorRegistry 组合四种 executor 为执行器注册表。
 func NewExecutorRegistry(
-	rag *executor2.RagChatExecutor,
-	graphOnly *executor2.GraphOnlyExecutor,
-	graphThen *executor2.GraphThenEvidenceExecutor,
-	clarification *executor2.ClarificationExecutor,
-) *executor2.Registry {
-	return executor2.NewExecutorRegistry(rag, graphOnly, graphThen, clarification)
+	rag *executor.RagChatExecutor,
+	graphOnly *executor.GraphOnlyExecutor,
+	graphThen *executor.GraphThenEvidenceExecutor,
+	clarification *executor.ClarificationExecutor,
+) *executor.Registry {
+	return executor.NewExecutorRegistry(rag, graphOnly, graphThen, clarification)
 }
 
 // ProvideKnowledgeOptions 提供知识路由的可选项（目前为空），

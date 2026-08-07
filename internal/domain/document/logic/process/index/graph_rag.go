@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -14,11 +15,13 @@ import (
 
 // GraphRagPhase GraphRAG 构建阶段
 type GraphRagPhase struct {
-	*PhaseDeps
+	repo adapter.DocumentRepository
 }
 
-func NewGraphRagPhase(deps *PhaseDeps) *GraphRagPhase {
-	return &GraphRagPhase{deps}
+func NewGraphRagPhase(repo adapter.DocumentRepository) *GraphRagPhase {
+	return &GraphRagPhase{
+		repo: repo,
+	}
 }
 
 func (p *GraphRagPhase) Name() string {
@@ -34,31 +37,31 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		return p.finalizeGraphRag(ctx, buildCtx)
 	}
 
-	// ========== GraphRAG 构建阶段 ==========
-	markGraphRagStartTx := func(txCtx context.Context) error {
-		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageGraphRag,
-		}); err != nil {
-			return err
-		}
-		graphStartDetail, _ := json.Marshal(map[string]any{
-			"chunkCount":  vectorSize,
-			"parentCount": len(buildCtx.ParentBlocks),
-		})
-		graphStartLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageGraphRag, EventType: enum.TaskEventStart,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "开始构建 GraphRAG 实体关系图谱", DetailJson: string(graphStartDetail),
-		}
-		return p.Repo.InsertTaskLog(txCtx, graphStartLog)
+	task := &entity.DocumentTask{
+		ID:           buildCtx.TaskId,
+		CurrentStage: enum.TaskStageGraphRag,
 	}
-	if err := p.Repo.Do(ctx, markGraphRagStartTx); err != nil {
+	if err := p.repo.UpdateTaskById(ctx, task); err != nil {
 		return err
 	}
+	graphStartDetail, _ := json.Marshal(map[string]any{
+		"chunkCount":  vectorSize,
+		"parentCount": len(buildCtx.ParentBlocks),
+	})
+	graphStartLog := &entity.DocumentTaskLog{
+		TaskId:       buildCtx.TaskId,
+		DocumentId:   buildCtx.DocumentId,
+		StageType:    enum.TaskStageGraphRag,
+		EventType:    enum.TaskEventStart,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: enum.OperatorTypeSystem,
+		Content:      "开始构建 GraphRAG 实体关系图谱",
+		DetailJson:   string(graphStartDetail),
+	}
+	_ = p.repo.InsertTaskLog(ctx, graphStartLog)
 
 	// 执行 GraphRAG 构建
-	graphRagStartedNanos := time.Now()
+	graphRagStartTime := time.Now()
 	graphRagBuildResult, err := p.GraphRagBuilder.RebuildDocumentGraph(ctx, buildCtx.DocumentId, buildCtx.TaskId, buildCtx.ChildChunks)
 	if err != nil {
 		// 构建失败，使用已有的结果或创建新的失败结果
@@ -72,28 +75,26 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		return p.handleGraphRagBuildFailure(ctx, buildCtx, err)
 	}
 	buildCtx.GraphRagBuildResult = graphRagBuildResult
-	buildCtx.GraphRagCostMillis = time.Since(graphRagStartedNanos).Milliseconds()
-	logx.Infof("GraphRAG 构建阶段完成，documentId=%d, taskId=%d, entityCount=%d, relationCount=%d, costMillis=%d",
-		buildCtx.DocumentId, buildCtx.TaskId, graphRagBuildResult.EntityCount, graphRagBuildResult.RelationCount, buildCtx.GraphRagCostMillis)
 
 	// 记录构建完成日志
-	markGraphRagCompleteTx := func(txCtx context.Context) error {
-		graphEndDetail, _ := json.Marshal(map[string]any{
-			"entityCount":   graphRagBuildResult.EntityCount,
-			"relationCount": graphRagBuildResult.RelationCount,
-			"costMillis":    buildCtx.GraphRagCostMillis,
-		})
-		graphEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageGraphRag, EventType: enum.TaskEventComplete,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "GraphRAG 实体关系图谱构建完成", DetailJson: string(graphEndDetail),
-		}
-		return p.Repo.InsertTaskLog(txCtx, graphEndLog)
+	graphEndDetail, _ := json.Marshal(map[string]any{
+		"entityCount":    graphRagBuildResult.EntityCount,
+		"relationCount":  graphRagBuildResult.RelationCount,
+		"evidenceCount":  graphRagBuildResult.EvidenceCount,
+		"communityCount": graphRagBuildResult.CommunityCount,
+		"costMillis":     time.Since(graphRagStartTime).Milliseconds(),
+	})
+	graphEndLog := &entity.DocumentTaskLog{
+		TaskId:       buildCtx.TaskId,
+		DocumentId:   buildCtx.DocumentId,
+		StageType:    enum.TaskStageGraphRag,
+		EventType:    enum.TaskEventComplete,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: enum.OperatorTypeSystem,
+		Content:      "GraphRAG 实体关系图谱构建完成",
+		DetailJson:   string(graphEndDetail),
 	}
-	if err := p.Repo.Do(ctx, markGraphRagCompleteTx); err != nil {
-		return err
-	}
+	_ = p.repo.InsertTaskLog(ctx, graphEndLog)
 
 	// 最终化 GraphRAG 结果
 	return p.finalizeGraphRag(ctx, buildCtx)
@@ -103,7 +104,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *Context) error {
 	buildResult := buildCtx.GraphRagBuildResult
 	if buildResult == nil || buildResult.GraphPersistenceOutcome == "" {
-		return p.handleGraphRagBuildFailure(ctx, buildCtx, errors.New("GraphRAG build did not return an explicit save outcome."))
+		return p.handleGraphRagBuildFailure(ctx, buildCtx, errors.New("graphRAG build did not return an explicit save outcome"))
 	}
 
 	// 处理最终结果
@@ -120,10 +121,12 @@ func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *Context)
 
 	// 检查处置结果
 	if buildResult.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
-		if err := p.Repo.UpdateTaskById(ctx, &entity.DocumentTask{
-			ID: buildCtx.TaskId, TaskStatus: enum.TaskStatusRunning,
+		task := &entity.DocumentTask{
+			ID:           buildCtx.TaskId,
+			TaskStatus:   enum.TaskStatusRunning,
 			CurrentStage: enum.TaskStageGraphTypedIndex,
-		}); err != nil {
+		}
+		if err := p.repo.UpdateTaskById(ctx, task); err != nil {
 			return err
 		}
 		logx.Warnf("GraphRAG post-commit component requires repair; BUILD_INDEX remains RUNNING: documentId=%d, taskId=%d",
@@ -148,7 +151,7 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 		typedOutcome = vo.ComponentOutcomeNotApplicable
 	} else {
 		// TODO: 实现 listFrozenTypedChunks
-		existingTypedChunks := []*entity.DocumentChunk{} // 占位
+		var existingTypedChunks []*entity.DocumentChunk // 占位
 
 		existingTypedInterface := make([]vo.TypedChunk, len(existingTypedChunks))
 		for i, chunk := range existingTypedChunks {

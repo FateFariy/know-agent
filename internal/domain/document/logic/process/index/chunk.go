@@ -26,14 +26,39 @@ import (
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
+// 父块/子块切块常量
+const (
+	ParentBlockMaxChars     = 2200 // 父块最大字符数
+	ParentBlockOverlapChars = 180  // 父块重叠字符数
+	ParentSemanticMaxChars  = 1600 // 语义块最大字符数
+	ParentSemanticMinChars  = 480  // 语义块最小字符数
+)
+
 // ChunkingPhase 切块阶段：执行切块流水线、构建父子块实体、持久化
 type ChunkingPhase struct {
-	repo adapter.DocumentRepository
-	port *adapter.DocumentPort
+	repo     adapter.DocumentRepository
+	port     *adapter.DocumentPort
+	registry map[int]chunk.Chunker
+	option   *chunkingOption
 }
 
-func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *ChunkingPhase {
-	return &ChunkingPhase{repo: repo, port: port}
+// chunkingOption 切块配置项
+type chunkingOption struct {
+	semanticMaxChars int
+	semanticMinChars int
+	llmEnabled       bool
+	llmMaxChars      int
+}
+
+// NewChunkingPhase 创建切块阶段
+func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort,
+	registry map[int]chunk.Chunker, opt *chunkingOption) *ChunkingPhase {
+	return &ChunkingPhase{
+		repo:     repo,
+		port:     port,
+		registry: registry,
+		option:   opt,
+	}
 }
 
 func (p *ChunkingPhase) Name() string {
@@ -76,7 +101,7 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	}
 	// 按步骤执行切块流水线
 	chunkStartedNanos := time.Now()
-	parentCandidates, err := p.buildParentBlocks(ctx, buildCtx.Document, pipelineSteps, blocks)
+	parentCandidates, err := p.BuildParentBlocks(ctx, buildCtx.Document, pipelineSteps, blocks)
 	if err != nil {
 		return err
 	}
@@ -86,74 +111,6 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		buildCtx.DocumentId, buildCtx.TaskId, len(parentCandidates), p.countChildCandidates(parentCandidates), costMillis)
 
 	return nil
-}
-
-// executeChunkingPipeline 执行切块流水线
-func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *Context) error {
-	// 事务性标记切块完成
-	markChunkCompleteTx := func(txCtx context.Context) error {
-		if err := p.repo.UpdateStepExecuteStatus(txCtx, buildCtx.Plan.ID, enum.StrategyExecuteStatusExecuteSuccess); err != nil {
-			return err
-		}
-		chunkEndDetail, _ := json.Marshal(map[string]any{
-			"parentCount": len(parentCandidates),
-			"childCount":  p.countChildCandidates(parentCandidates),
-			"costMillis":  costMillis,
-		})
-		chunkEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageChunkExecute, EventType: enum.TaskEventComplete,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "切块执行完成", DetailJson: string(chunkEndDetail),
-		}
-		if err = p.repo.InsertTaskLog(txCtx, chunkEndLog); err != nil {
-			return err
-		}
-		return p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageChunkPostProcess,
-		})
-	}
-	if err = p.repo.Do(ctx, markChunkCompleteTx); err != nil {
-		return err
-	}
-
-	// 清理候选并构造持久化实体
-	processStartedNanos := time.Now()
-	finalCandidates := p.cleanupParentCandidates(parentCandidates)
-	parentBlocks, childChunks := p.buildParentChildEntities(buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId, finalCandidates)
-	buildCtx.ParentBlocks = parentBlocks
-	buildCtx.ChildChunks = childChunks
-	costMillis := time.Since(processStartedNanos).Milliseconds()
-	logx.Infof("切块后处理完成，documentId=%d, taskId=%d, parentCount=%d, childCount=%d, costMillis=%d",
-		buildCtx.DocumentId, buildCtx.TaskId, len(finalCandidates), p.countChildCandidates(finalCandidates), costMillis)
-
-	// 事务性批量落库
-	persistBlocksTx := func(txCtx context.Context) error {
-		if err = p.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
-			return err
-		}
-		if err = p.repo.InsertChunkBatch(txCtx, childChunks); err != nil {
-			return err
-		}
-		chunkPostDetail, _ := json.Marshal(map[string]any{
-			"parentCount": len(finalCandidates),
-			"childCount":  p.countChildCandidates(finalCandidates),
-			"costMillis":  costMillis,
-		})
-		chunkPostLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageChunkPostProcess, EventType: enum.TaskEventComplete,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "切块后处理完成", DetailJson: string(chunkPostDetail),
-		}
-		if err = p.repo.InsertTaskLog(txCtx, chunkPostLog); err != nil {
-			return err
-		}
-		return p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageVectorize,
-		})
-	}
-	return p.repo.Do(ctx, persistBlocksTx)
 }
 
 // countChildCandidates 计算子块候选数
@@ -235,7 +192,7 @@ func (p *ChunkingPhase) buildParentChildEntities(documentId, taskId, planId int6
 }
 
 // BuildParentBlocks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
-func (p *ChunkingPhase) buildParentBlocks(ctx context.Context, document *entity.Document,
+func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.Document,
 	steps []*entity.DocumentStrategyStep, blocks []*entity.DocumentBlock) ([]*vo.ParentBlockCandidate, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
 	parentSteps := p.sortPipelineSteps(steps, enum.PipelineTypeParent)
@@ -246,6 +203,7 @@ func (p *ChunkingPhase) buildParentBlocks(ctx context.Context, document *entity.
 	if len(childSteps) == 0 {
 		return nil, errorx.ErrChildBlockMissing
 	}
+
 	orderedBlocks := p.cleanupBlocks(blocks)
 	if len(orderedBlocks) == 0 {
 		return nil, errorx.ErrDocumentBlocksMissing
@@ -262,6 +220,14 @@ func (p *ChunkingPhase) buildParentBlocks(ctx context.Context, document *entity.
 			return nil, err
 		}
 		structureNodes = nodes
+	}
+
+	// 从文档存储中读取解析后的全文（用于兜底：结构节点不可用时直接以全文走流水线）
+	parsedText := ""
+	if document != nil && strutil.IsNotBlank(document.ParseTextPath) {
+		if text, err := p.port.DownloadText(ctx, document.ParseTextPath); err == nil {
+			parsedText = text
+		}
 	}
 
 	// 生成父块种子列表
@@ -613,8 +579,8 @@ func (p *ChunkingPhase) buildPipelineOptions(strategyType int, pipelineType stri
 		}
 	case enum.StrategyTypeSemantic:
 		// 语义：与配置/父块语义阈值取较大值，确保不被过度切分
-		maxChars := max(p.semanticMaxChars, ParentSemanticMaxChars)
-		minChars := max(p.semanticMinChars, ParentSemanticMinChars)
+		maxChars := max(p.option.semanticMaxChars, ParentSemanticMaxChars)
+		minChars := max(p.option.semanticMinChars, ParentSemanticMinChars)
 		return []chunk.Option{
 			chunksemantic.WithMaxChars(maxChars),
 			chunksemantic.WithMinChars(minChars),
@@ -666,13 +632,13 @@ func (p *ChunkingPhase) applyLlmChunking(ctx context.Context, input *chunk.TextB
 	var outputs []*chunk.TextBlock
 	var err error
 	// LLM 未启用 → 直接使用语义切块
-	if !p.llmEnabled {
+	if p.option == nil || !p.option.llmEnabled {
 		outputs, _ = p.registry[enum.StrategyTypeSemantic].Chunk(ctx, input, extraOpts...)
 		return outputs
 	}
 	// 输入过长 → 先以递归切块拆分到 LLM 上限
-	if utils.Len(input.Text) > p.llmMaxChars {
-		llmMaxChars := utils.Ternary(pipeType == enum.PipelineTypeParent, max(p.llmMaxChars, ParentBlockMaxChars), p.llmMaxChars)
+	if utils.Len(input.Text) > p.option.llmMaxChars {
+		llmMaxChars := utils.Ternary(pipeType == enum.PipelineTypeParent, max(p.option.llmMaxChars, ParentBlockMaxChars), p.option.llmMaxChars)
 		outputs, _ = p.registry[enum.StrategyTypeRecursive].Chunk(ctx, input, chunkrecursive.WithOverlapChars(0), chunkrecursive.WithMaxChars(llmMaxChars))
 	}
 
