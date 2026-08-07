@@ -75,8 +75,8 @@ func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, tas
 
 	// 构建上下文并执行责任链
 	parseCtx := &analysis.Context{
-		DocumentID: documentId,
-		TaskID:     taskId,
+		DocumentId: documentId,
+		TaskId:     taskId,
 		Document:   document,
 		Task:       task,
 		StartTime:  startTime,
@@ -121,9 +121,9 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 
 	// 构建上下文并执行责任链
 	buildCtx := &index.BuildContext{
-		DocumentID: documentId,
-		TaskID:     taskId,
-		PlanID:     planId,
+		DocumentId: documentId,
+		TaskId:     taskId,
+		PlanId:     planId,
 		Document:   document,
 		Task:       task,
 		Plan:       plan,

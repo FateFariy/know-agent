@@ -23,7 +23,7 @@ func (c *PhaseChain) Run(ctx context.Context, parseCtx *Context) (err error) {
 	for _, phase := range c.phases {
 		phaseName := phase.Name()
 		startTime := time.Now()
-		logx.Infof("[ParseChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, parseCtx.DocumentID, parseCtx.TaskID)
+		logx.Infof("[ParseChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, parseCtx.DocumentId, parseCtx.TaskId)
 
 		if err = phase.Execute(ctx, parseCtx); err != nil {
 			logx.Errorf("[ParseChain] 阶段 %s 执行失败: %v", phaseName, err)

@@ -26,16 +26,16 @@ func (p *PreparationPhase) Name() string {
 
 func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
 	logx.Infof("开始执行索引构建任务，documentId=%d, taskId=%d, planId=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID)
+		buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId)
 
 	// 查询策略步骤列表
-	pipelineSteps, err := p.Repo.SelectStepListByPlanId(ctx, buildCtx.PlanID)
+	pipelineSteps, err := p.Repo.SelectStepListByPlanId(ctx, buildCtx.PlanId)
 	if err != nil {
 		return err
 	}
 	buildCtx.PipelineSteps = pipelineSteps
 	logx.Infof("索引构建策略步骤读取完成，documentId=%d, taskId=%d, planId=%d, stepCount=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID, len(pipelineSteps))
+		buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId, len(pipelineSteps))
 
 	// 初始化时间
 	buildCtx.BuildStartedTime = time.Now()
@@ -52,8 +52,8 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *BuildContext) 
 		}
 		chunkStartDetail, _ := json.Marshal(map[string]any{"strategySnapshot": buildCtx.Plan.StrategySnapshot})
 		chunkStartLog := &entity.DocumentTaskLog{
-			TaskId:       buildCtx.TaskID,
-			DocumentId:   buildCtx.DocumentID,
+			TaskId:       buildCtx.TaskId,
+			DocumentId:   buildCtx.DocumentId,
 			StageType:    enum.TaskStageChunkExecute,
 			EventType:    enum.TaskEventStart,
 			LogLevel:     enum.LogLevelInfo,
@@ -65,7 +65,7 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *BuildContext) 
 			return err
 		}
 		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, TaskStatus: enum.TaskStatusRunning,
+			ID: buildCtx.TaskId, TaskStatus: enum.TaskStatusRunning,
 			CurrentStage: enum.TaskStageChunkExecute,
 			StartTime:    utils.Pointer(buildCtx.StartTime),
 		})

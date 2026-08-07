@@ -29,7 +29,7 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 	// 标记开始 RAPTOR 构建
 	markRaptorStartTx := func(txCtx context.Context) error {
 		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageRaptor,
+			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageRaptor,
 		}); err != nil {
 			return err
 		}
@@ -38,8 +38,8 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 			"parentCount": len(buildCtx.ParentBlocks),
 		})
 		raptorStartLog := &entity.DocumentTaskLog{
-			TaskId:       buildCtx.TaskID,
-			DocumentId:   buildCtx.DocumentID,
+			TaskId:       buildCtx.TaskId,
+			DocumentId:   buildCtx.DocumentId,
 			StageType:    enum.TaskStageRaptor,
 			EventType:    enum.TaskEventStart,
 			LogLevel:     enum.LogLevelInfo,
@@ -55,14 +55,14 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 
 	// 执行 RAPTOR 构建
 	raptorStartedNanos := time.Now()
-	raptorBuildResult, err := p.RaptorBuilder.RebuildDocumentTree(ctx, buildCtx.DocumentID, buildCtx.TaskID, buildCtx.ChildChunks)
+	raptorBuildResult, err := p.RaptorBuilder.RebuildDocumentTree(ctx, buildCtx.DocumentId, buildCtx.TaskId, buildCtx.ChildChunks)
 	if err != nil {
 		return err
 	}
 	buildCtx.RaptorBuildResult = raptorBuildResult
 	buildCtx.RaptorCostMillis = time.Since(raptorStartedNanos).Milliseconds()
 	logx.Infof("RAPTOR 构建阶段完成，documentId=%d, taskId=%d, nodeCount=%d, levelCount=%d, costMillis=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, raptorBuildResult.NodeCount, raptorBuildResult.LevelCount, buildCtx.RaptorCostMillis)
+		buildCtx.DocumentId, buildCtx.TaskId, raptorBuildResult.NodeCount, raptorBuildResult.LevelCount, buildCtx.RaptorCostMillis)
 
 	// 记录完成日志
 	markRaptorCompleteTx := func(txCtx context.Context) error {
@@ -73,7 +73,7 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error
 			"costMillis":  buildCtx.RaptorCostMillis,
 		})
 		raptorEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageRaptor, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "RAPTOR 层级摘要树构建完成", DetailJson: string(raptorEndDetail),

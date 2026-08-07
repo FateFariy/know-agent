@@ -28,13 +28,13 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 	// 标记开始关键词索引
 	markKeywordIndexTx := func(txCtx context.Context) error {
 		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageKeywordIndex,
+			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageKeywordIndex,
 		}); err != nil {
 			return err
 		}
 		keywordStartDetail, _ := json.Marshal(map[string]any{"chunkCount": vectorSize})
 		keywordStartLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageKeywordIndex, EventType: enum.TaskEventStart,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "开始构建关键词索引", DetailJson: string(keywordStartDetail),
@@ -59,7 +59,7 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 			"costMillis": buildCtx.KeywordCostMillis,
 		})
 		keywordEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageKeywordIndex, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "关键词索引完成", DetailJson: string(keywordEndDetail),

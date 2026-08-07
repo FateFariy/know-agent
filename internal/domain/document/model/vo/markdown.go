@@ -13,8 +13,8 @@ type MarkdownSyntax struct {
 // MarkdownNode Markdown语法节点
 type MarkdownNode struct {
 	Order        int         // 节点序号
-	NodeID       string      // 节点唯一标识
-	ParentNodeID string      // 父节点标识
+	NodeId       string      // 节点唯一标识
+	ParentNodeId string      // 父节点标识
 	NodeType     string      // 节点类型
 	Origin       string      // 节点来源
 	SourceSpan   *SourceSpan // 源文本位置范围

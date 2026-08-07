@@ -29,12 +29,12 @@ func (p *ValidationPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 	// 前置检查：如果任务已成功或失败，跳过重复执行
 	if buildCtx.Task.TaskStatus == enum.TaskStatusSuccess {
 		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
-			buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID)
+			buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId)
 		return nil // 已完成，直接返回
 	}
 	if buildCtx.Task.TaskStatus == enum.TaskStatusFailed {
 		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
-			buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID)
+			buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId)
 		return nil // 已失败，直接返回
 	}
 
@@ -83,7 +83,7 @@ func (p *ValidationPhase) applyGraphFailureDisposition(ctx context.Context, buil
 		}); err != nil {
 			return err
 		}
-		if err := p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanID, enum.StrategyExecuteStatusExecuteFailed); err != nil {
+		if err := p.Repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuteFailed); err != nil {
 			return err
 		}
 		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{

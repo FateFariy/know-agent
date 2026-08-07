@@ -228,13 +228,13 @@ type TableRepository interface {
 	InsertTable(ctx context.Context, table *entity.DocumentTable) error
 
 	// InsertTableColumnBatch 批量插入表格列
-	InsertTableColumnBatch(ctx context.Context, columns []*entity.DocumentTableColumn) error
+	InsertTableColumnBatch(ctx context.Context, columns []*entity.TableColumn) error
 
 	// InsertTableRowBatch 批量插入表格行
-	InsertTableRowBatch(ctx context.Context, rows []*entity.DocumentTableRow) error
+	InsertTableRowBatch(ctx context.Context, rows []*entity.TableRow) error
 
 	// InsertTableCellBatch 批量插入表格单元格
-	InsertTableCellBatch(ctx context.Context, cells []*entity.DocumentTableCell) error
+	InsertTableCellBatch(ctx context.Context, cells []*entity.TableCell) error
 
 	// SelectTableById 根据ID查询表格
 	SelectTableById(ctx context.Context, tableId int64) (*entity.DocumentTable, error)
@@ -243,13 +243,13 @@ type TableRepository interface {
 	SelectTablesByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentTable, error)
 
 	// SelectTableColumnsByTableId 根据表格ID查询列列表
-	SelectTableColumnsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableColumn, error)
+	SelectTableColumnsByTableId(ctx context.Context, tableId int64) ([]*entity.TableColumn, error)
 
 	// SelectTableRowsByTableId 根据表格ID查询行列表
-	SelectTableRowsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableRow, error)
+	SelectTableRowsByTableId(ctx context.Context, tableId int64) ([]*entity.TableRow, error)
 
 	// SelectTableCellsByTableId 根据表格ID查询单元格列表
-	SelectTableCellsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableCell, error)
+	SelectTableCellsByTableId(ctx context.Context, tableId int64) ([]*entity.TableCell, error)
 
 	// DeleteTableDetailByTableIds 根据表格ID列表删除表格列、行、单元格
 	DeleteTableDetailByTableIds(ctx context.Context, tableIds []int64) error

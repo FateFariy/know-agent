@@ -3,11 +3,11 @@ package entity
 // DocumentBlock 文档块实体
 type DocumentBlock struct {
 	ID                 int64      `gorm:"column:id"`                  // 主键ID
-	DocumentID         int64      `gorm:"column:document_id"`         // 文档ID
-	TaskID             int64      `gorm:"column:task_id"`             // 任务ID
+	DocumentId         int64      `gorm:"column:document_id"`         // 文档ID
+	TaskId             int64      `gorm:"column:task_id"`             // 任务ID
 	BlockNo            int        `gorm:"column:block_no"`            // 块序号
 	BlockType          string     `gorm:"column:block_type"`          // 块类型
-	ParentBlockID      int64      `gorm:"column:parent_block_id"`     // 父块ID
+	ParentBlockId      int64      `gorm:"column:parent_block_id"`     // 父块ID
 	SectionPath        string     `gorm:"column:section_path"`        // 章节路径
 	CanonicalPath      string     `gorm:"column:canonical_path"`      // 规范路径
 	PageNo             int        `gorm:"column:page_no"`             // 页码
@@ -25,4 +25,5 @@ type DocumentBlock struct {
 	TableRows          [][]string `gorm:"-"`                          // 表格行数据
 	ImageFileName      string     `gorm:"-"`                          // 图片文件名
 	ImageContentBase64 string     `gorm:"-"`                          // 图片Base64内容
+
 }

@@ -51,8 +51,8 @@ func (p *ParsePhase) Execute(ctx context.Context, parseCtx *Context) error {
 		"parserCostMillis":        time.Since(startTime).Milliseconds(),
 	})
 	parserResultLog := &entity.DocumentTaskLog{
-		TaskId:       parseCtx.TaskID,
-		DocumentId:   parseCtx.DocumentID,
+		TaskId:       parseCtx.TaskId,
+		DocumentId:   parseCtx.DocumentId,
 		StageType:    enum.TaskStageContentParse,
 		EventType:    enum.TaskEventComplete,
 		LogLevel:     enum.LogLevelInfo,

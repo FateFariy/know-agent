@@ -25,13 +25,13 @@ func NewDocumentPort(storage Storage, messageProducer MessageProducer, vector Ve
 
 type Storage interface {
 	// UploadOriginalFile 上传原始文件
-	UploadOriginalFile(ctx context.Context, documentID int64, fileName string, bytes []byte, contentType string) (*vo.StoredObjectInfo, error)
+	UploadOriginalFile(ctx context.Context, documentId int64, fileName string, bytes []byte, contentType string) (*vo.StoredObjectInfo, error)
 
 	// UploadParsedText 上传解析后的文本内容
-	UploadParsedText(ctx context.Context, documentID int64, parsedText string) (string, error)
+	UploadParsedText(ctx context.Context, documentId int64, parsedText string) (string, error)
 
 	// UploadParseArtifact 上传解析产物
-	UploadParseArtifact(ctx context.Context, documentID, taskID int64, name, contentType string, content []byte) (string, error)
+	UploadParseArtifact(ctx context.Context, documentId, taskId int64, name, contentType string, content []byte) (string, error)
 
 	// DownloadObject 下载二进制对象文件
 	DownloadObject(ctx context.Context, objectName string) ([]byte, error)

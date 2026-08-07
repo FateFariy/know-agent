@@ -11,17 +11,12 @@ import (
 
 // BuildContext 贯穿整个构建流程的上下文对象
 type BuildContext struct {
-	// 基础参数
-	DocumentID int64
-	TaskID     int64
-	PlanID     int64
-
-	// 实体对象
-	Document *entity.Document
-	Task     *entity.DocumentTask
-	Plan     *entity.DocumentStrategyPlan
-
-	// 业务数据
+	DocumentId           int64
+	TaskId               int64
+	PlanId               int64
+	Document             *entity.Document
+	Task                 *entity.DocumentTask
+	Plan                 *entity.DocumentStrategyPlan
 	StartTime            time.Time
 	BuildStartedTime     time.Time
 	PipelineSteps        []*entity.DocumentStrategyStep
@@ -33,14 +28,6 @@ type BuildContext struct {
 	RaptorBuildResult    *vo.RaptorBuildResult
 	GraphTypedChunkList  []vo.TypedChunk
 	ResumeCommittedGraph bool
-
-	// 统计耗时
-	ChunkCostMillis    int64
-	ProcessCostMillis  int64
-	VectorCostMillis   int64
-	KeywordCostMillis  int64
-	GraphRagCostMillis int64
-	RaptorCostMillis   int64
 }
 
 // Phase 索引构建阶段接口

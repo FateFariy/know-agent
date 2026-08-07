@@ -22,7 +22,7 @@ type StructureNode struct {
 type SyntaxProvenance struct {
 	SchemaVersion  string      // 语法模式版本
 	SourceHash     string      // 源文本哈希值
-	SyntaxNodeID   string      // 语法节点ID
+	SyntaxNodeId   string      // 语法节点ID
 	SyntaxNodeType string      // 语法节点类型
 	SourceOrigin   string      // 源文本来源
 	SourceSpan     *SourceSpan // 源文本位置范围

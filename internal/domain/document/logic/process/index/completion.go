@@ -31,20 +31,20 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
 		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageStoreComplete,
+			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageStoreComplete,
 		}); err != nil {
 			return err
 		}
 		// 方案状态标记为已执行
 		if err := p.Repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{
-			ID: buildCtx.PlanID, PlanStatus: enum.PlanStatusExecuted,
+			ID: buildCtx.PlanId, PlanStatus: enum.PlanStatusExecuted,
 		}); err != nil {
 			return err
 		}
 		// 文档索引状态更新为构建成功
 		if err := p.Repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: buildCtx.DocumentID, IndexStatus: enum.IndexStatusBuildSuccess,
-			LastIndexTaskId: buildCtx.TaskID,
+			ID: buildCtx.DocumentId, IndexStatus: enum.IndexStatusBuildSuccess,
+			LastIndexTaskId: buildCtx.TaskId,
 		}); err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 			"costMillis":           totalCostMillis,
 		})
 		buildCompleteLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageStoreComplete, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "索引构建完成", DetailJson: string(buildCompleteDetail),
@@ -81,7 +81,7 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 	}
 
 	logx.Infof("索引构建任务执行完成，documentId=%d, taskId=%d, planId=%d, parentCount=%d, chunkCount=%d, costMillis=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID,
+		buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId,
 		len(buildCtx.ParentBlocks), len(buildCtx.ChildChunks), totalCostMillis)
 	return nil
 }

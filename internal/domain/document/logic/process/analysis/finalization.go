@@ -38,7 +38,7 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 		if err != nil {
 			return err
 		}
-		parseCtx.PlanID = planId
+		parseCtx.PlanId = planId
 
 		// 更新文档：解析成功、策略已推荐、统计信息
 		structureNodeCount := len(parseCtx.StructureNodes)
@@ -53,7 +53,7 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			ParseTextPath:       parseCtx.ParsedTextPath,
 			ParseErrorMsg:       utils.Pointer(""),
 			CurrentPlanId:       planId,
-			LastParseTaskId:     parseCtx.TaskID,
+			LastParseTaskId:     parseCtx.TaskId,
 			StructureNodeCount:  structureNodeCount,
 		}
 		if err = p.repo.UpdateDocumentById(txCtx, updatedDoc); err != nil {
@@ -85,8 +85,8 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			"costMills":          time.Since(parseCtx.StartTime).Milliseconds(),
 		})
 		recommendLog := &entity.DocumentTaskLog{
-			TaskId:       parseCtx.TaskID,
-			DocumentId:   parseCtx.DocumentID,
+			TaskId:       parseCtx.TaskId,
+			DocumentId:   parseCtx.DocumentId,
 			StageType:    enum.TaskStageStrategyRoute,
 			EventType:    enum.TaskEventComplete,
 			LogLevel:     enum.LogLevelInfo,

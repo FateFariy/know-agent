@@ -23,7 +23,7 @@ func (c *PhaseChain) Run(ctx context.Context, buildCtx *BuildContext) error {
 	for _, phase := range c.phases {
 		phaseName := phase.Name()
 		startTime := time.Now()
-		logx.Infof("[PhaseChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, buildCtx.DocumentID, buildCtx.TaskID)
+		logx.Infof("[PhaseChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, buildCtx.DocumentId, buildCtx.TaskId)
 
 		if err := phase.Execute(ctx, buildCtx); err != nil {
 			logx.Errorf("[PhaseChain] 阶段 %s 执行失败: %v", phaseName, err)

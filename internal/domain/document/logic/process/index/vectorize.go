@@ -39,8 +39,8 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) er
 	markVectorStartTx := func(txCtx context.Context) error {
 		vectorStartDetail, _ := json.Marshal(detail)
 		vectorStartLog := &entity.DocumentTaskLog{
-			TaskId:       buildCtx.TaskID,
-			DocumentId:   buildCtx.DocumentID,
+			TaskId:       buildCtx.TaskId,
+			DocumentId:   buildCtx.DocumentId,
 			StageType:    enum.TaskStageVectorize,
 			EventType:    enum.TaskEventStart,
 			LogLevel:     enum.LogLevelInfo,
@@ -71,7 +71,7 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) er
 		detail["vectorCostMillis"] = buildCtx.VectorCostMillis
 		vectorEndDetail, _ := json.Marshal(detail)
 		vectorEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageVectorize, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "向量化完成", DetailJson: string(vectorEndDetail),

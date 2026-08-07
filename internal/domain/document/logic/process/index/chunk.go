@@ -52,7 +52,7 @@ func (p *ChunkingPhase) resumeFromCommittedGraph(ctx context.Context, buildCtx *
 	buildCtx.ChildChunks = []*entity.DocumentChunk{} // TODO: 实现 listFrozenSourceChunks
 	// graphRagBuildResult = repairCrossDocumentProjection(...)
 	logx.Infof("从已提交 GraphRAG outcome 恢复索引任务: documentId=%d, taskId=%d",
-		buildCtx.DocumentID, buildCtx.TaskID)
+		buildCtx.DocumentId, buildCtx.TaskId)
 	return nil
 }
 
@@ -71,9 +71,9 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 		return err
 	}
 	buildCtx.ParentCandidates = parentCandidates
-	buildCtx.ChunkCostMillis = time.Since(chunkStartedNanos).Milliseconds()
+	costMillis := time.Since(chunkStartedNanos).Milliseconds()
 	logx.Infof("切块流水线执行完成，documentId=%d, taskId=%d, parentCount=%d, childCount=%d, costMillis=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, len(parentCandidates), p.countChildCandidates(parentCandidates), buildCtx.ChunkCostMillis)
+		buildCtx.DocumentId, buildCtx.TaskId, len(parentCandidates), p.countChildCandidates(parentCandidates), costMillis)
 
 	// 事务性标记切块完成
 	markChunkCompleteTx := func(txCtx context.Context) error {
@@ -83,10 +83,10 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 		chunkEndDetail, _ := json.Marshal(map[string]any{
 			"parentCount": len(parentCandidates),
 			"childCount":  p.countChildCandidates(parentCandidates),
-			"costMillis":  buildCtx.ChunkCostMillis,
+			"costMillis":  costMillis,
 		})
 		chunkEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageChunkExecute, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "切块执行完成", DetailJson: string(chunkEndDetail),
@@ -95,7 +95,7 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 			return err
 		}
 		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageChunkPostProcess,
+			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageChunkPostProcess,
 		})
 	}
 	if err = p.Repo.Do(ctx, markChunkCompleteTx); err != nil {
@@ -105,12 +105,12 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 	// 清理候选并构造持久化实体
 	processStartedNanos := time.Now()
 	finalCandidates := p.cleanupParentCandidates(parentCandidates)
-	parentBlocks, childChunks := p.buildParentChildEntities(buildCtx.DocumentID, buildCtx.TaskID, buildCtx.PlanID, finalCandidates)
+	parentBlocks, childChunks := p.buildParentChildEntities(buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId, finalCandidates)
 	buildCtx.ParentBlocks = parentBlocks
 	buildCtx.ChildChunks = childChunks
-	buildCtx.ProcessCostMillis = time.Since(processStartedNanos).Milliseconds()
+	costMillis := time.Since(processStartedNanos).Milliseconds()
 	logx.Infof("切块后处理完成，documentId=%d, taskId=%d, parentCount=%d, childCount=%d, costMillis=%d",
-		buildCtx.DocumentID, buildCtx.TaskID, len(finalCandidates), p.countChildCandidates(finalCandidates), buildCtx.ProcessCostMillis)
+		buildCtx.DocumentId, buildCtx.TaskId, len(finalCandidates), p.countChildCandidates(finalCandidates), costMillis)
 
 	// 事务性批量落库
 	persistBlocksTx := func(txCtx context.Context) error {
@@ -123,10 +123,10 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 		chunkPostDetail, _ := json.Marshal(map[string]any{
 			"parentCount": len(finalCandidates),
 			"childCount":  p.countChildCandidates(finalCandidates),
-			"costMillis":  buildCtx.ProcessCostMillis,
+			"costMillis":  costMillis,
 		})
 		chunkPostLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskID, DocumentId: buildCtx.DocumentID,
+			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
 			StageType: enum.TaskStageChunkPostProcess, EventType: enum.TaskEventComplete,
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "切块后处理完成", DetailJson: string(chunkPostDetail),
@@ -135,7 +135,7 @@ func (p *ChunkingPhase) executeChunkingPipeline(ctx context.Context, buildCtx *B
 			return err
 		}
 		return p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskID, CurrentStage: enum.TaskStageVectorize,
+			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageVectorize,
 		})
 	}
 	return p.Repo.Do(ctx, persistBlocksTx)

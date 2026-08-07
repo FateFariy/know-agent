@@ -38,7 +38,7 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 
 	// 推进任务阶段到"策略路由"
 	if err = p.repo.UpdateTaskById(ctx, &entity.DocumentTask{
-		ID: parseCtx.TaskID, CurrentStage: enum.TaskStageStrategyRoute,
+		ID: parseCtx.TaskId, CurrentStage: enum.TaskStageStrategyRoute,
 	}); err != nil {
 		return
 	}
@@ -50,8 +50,8 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 		"tokenCount":         parseCtx.AnalysisResult.TokenCount,
 	})
 	strategyStartLog := &entity.DocumentTaskLog{
-		TaskId:       parseCtx.TaskID,
-		DocumentId:   parseCtx.DocumentID,
+		TaskId:       parseCtx.TaskId,
+		DocumentId:   parseCtx.DocumentId,
 		StageType:    enum.TaskStageStrategyRoute,
 		EventType:    enum.TaskEventStart,
 		LogLevel:     enum.LogLevelInfo,

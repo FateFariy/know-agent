@@ -28,7 +28,7 @@ func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) er
 	markParseStartTx := func(txCtx context.Context) error {
 		// 标记任务运行中
 		runningTask := &entity.DocumentTask{
-			ID:           parseCtx.TaskID,
+			ID:           parseCtx.TaskId,
 			TaskStatus:   enum.TaskStatusRunning,
 			CurrentStage: enum.TaskStageContentParse,
 			StartTime:    utils.Pointer(parseCtx.StartTime),
@@ -39,7 +39,7 @@ func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) er
 
 		// 标记文档解析中
 		document := &entity.Document{
-			ID:          parseCtx.DocumentID,
+			ID:          parseCtx.DocumentId,
 			ParseStatus: enum.ParseStatusParsing,
 		}
 		if err := p.repo.UpdateDocumentById(txCtx, document); err != nil {
@@ -53,8 +53,8 @@ func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) er
 			"fileName":   parseCtx.Document.OriginalFileName,
 		})
 		startLog := &entity.DocumentTaskLog{
-			TaskId:       parseCtx.TaskID,
-			DocumentId:   parseCtx.DocumentID,
+			TaskId:       parseCtx.TaskId,
+			DocumentId:   parseCtx.DocumentId,
 			StageType:    enum.TaskStageContentParse,
 			EventType:    enum.TaskEventStart,
 			LogLevel:     enum.LogLevelInfo,

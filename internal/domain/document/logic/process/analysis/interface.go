@@ -11,9 +11,9 @@ import (
 
 // Context 贯穿整个解析路由流程的上下文对象
 type Context struct {
-	DocumentID        int64
-	TaskID            int64
-	PlanID            int64
+	DocumentId        int64
+	TaskId            int64
+	PlanId            int64
 	Document          *entity.Document
 	Task              *entity.DocumentTask
 	StartTime         time.Time
