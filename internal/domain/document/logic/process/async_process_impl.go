@@ -120,7 +120,7 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	}()
 
 	// 构建上下文并执行责任链
-	buildCtx := &index.BuildContext{
+	buildCtx := &index.Context{
 		DocumentId: documentId,
 		TaskId:     taskId,
 		PlanId:     planId,
@@ -640,7 +640,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 }
 
 // todo 待实现
-func (d *AsyncProcessImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.DocumentStructureNode) error {
+func (d *AsyncProcessImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.StructureNode) error {
 	return nil
 }
 
@@ -1085,7 +1085,7 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 	buildResult *vo.GraphRagBuildResult, resumeCommittedGraph bool) *vo.GraphRagFinalization {
 
 	if buildResult == nil || buildResult.GraphPersistenceOutcome == "" {
-		panic(&vo.GraphRagBuildFailureException{Err: errors.New("GraphRAG build did not return an explicit persistence outcome.")})
+		panic(&vo.GraphRagBuildFailureException{Err: errors.New("GraphRAG build did not return an explicit save outcome.")})
 	}
 
 	var typedChunks []vo.TypedChunk

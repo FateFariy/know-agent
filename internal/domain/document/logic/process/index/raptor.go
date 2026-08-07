@@ -23,7 +23,7 @@ func (p *RaptorPhase) Name() string {
 	return "RAPTOR 构建阶段"
 }
 
-func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
+func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	vectorSize := len(buildCtx.ChildChunks)
 
 	// 标记开始 RAPTOR 构建

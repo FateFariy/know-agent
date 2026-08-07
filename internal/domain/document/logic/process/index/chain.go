@@ -19,7 +19,7 @@ func NewPhaseChain(phases []Phase) *PhaseChain {
 }
 
 // Run 执行责任链
-func (c *PhaseChain) Run(ctx context.Context, buildCtx *BuildContext) error {
+func (c *PhaseChain) Run(ctx context.Context, buildCtx *Context) error {
 	for _, phase := range c.phases {
 		phaseName := phase.Name()
 		startTime := time.Now()

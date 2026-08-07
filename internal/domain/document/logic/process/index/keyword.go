@@ -5,29 +5,31 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // KeywordIndexPhase 关键词索引阶段
 type KeywordIndexPhase struct {
-	*PhaseDeps
+	repo adapter.DocumentRepository
+	port *adapter.DocumentPort
 }
 
-func NewKeywordIndexPhase(deps *PhaseDeps) *KeywordIndexPhase {
-	return &KeywordIndexPhase{PhaseDeps: deps}
+func NewKeywordIndexPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *KeywordIndexPhase {
+	return &KeywordIndexPhase{repo: repo, port: port}
 }
 
 func (p *KeywordIndexPhase) Name() string {
 	return "关键词索引阶段"
 }
 
-func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
+func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	vectorSize := len(buildCtx.ChildChunks)
 
 	// 标记开始关键词索引
 	markKeywordIndexTx := func(txCtx context.Context) error {
-		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+		if err := p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageKeywordIndex,
 		}); err != nil {
 			return err
@@ -39,24 +41,23 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "开始构建关键词索引", DetailJson: string(keywordStartDetail),
 		}
-		return p.Repo.InsertTaskLog(txCtx, keywordStartLog)
+		return p.repo.InsertTaskLog(txCtx, keywordStartLog)
 	}
-	if err := p.Repo.Do(ctx, markKeywordIndexTx); err != nil {
+	if err := p.repo.Do(ctx, markKeywordIndexTx); err != nil {
 		return err
 	}
 
 	// 执行关键词索引构建
 	keywordStartedTime := time.Now()
-	if err := p.Port.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.port.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
-	buildCtx.KeywordCostMillis = time.Since(keywordStartedTime).Milliseconds()
 
 	// 标记完成
 	markKeywordCompleteTx := func(txCtx context.Context) error {
 		keywordEndDetail, _ := json.Marshal(map[string]any{
 			"chunkCount": vectorSize,
-			"costMillis": buildCtx.KeywordCostMillis,
+			"costMillis": time.Since(keywordStartedTime).Milliseconds(),
 		})
 		keywordEndLog := &entity.DocumentTaskLog{
 			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
@@ -64,7 +65,7 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *BuildContext)
 			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
 			Content: "关键词索引完成", DetailJson: string(keywordEndDetail),
 		}
-		return p.Repo.InsertTaskLog(txCtx, keywordEndLog)
+		return p.repo.InsertTaskLog(txCtx, keywordEndLog)
 	}
-	return p.Repo.Do(ctx, markKeywordCompleteTx)
+	return p.repo.Do(ctx, markKeywordCompleteTx)
 }

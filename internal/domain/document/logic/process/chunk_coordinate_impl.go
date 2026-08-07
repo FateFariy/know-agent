@@ -98,7 +98,7 @@ func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMode
 // Recommend 根据文档分析结果推荐最优的父块-子块策略组合。
 // 整体思路：先通过若干判定函数分别评估结构/递归/语义/大模型切块的必要性，
 // 再按"父块优先保留天然大语义单元、子块围绕召回边界精细化"的原则拼接流水线。
-func (s *ChunkCoordinateImpl) Recommend(ctx context.Context, document *entity.Document, analysisResult *vo.DocumentAnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
+func (s *ChunkCoordinateImpl) Recommend(ctx context.Context, document *entity.Document, analysisResult *vo.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
 		return nil, fmt.Errorf("invaild value")
 	}
@@ -234,7 +234,7 @@ func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *e
 	}
 
 	// 加载已解析的文档结构节点（用于结构切块策略）
-	var structureNodes []*entity.DocumentStructureNode
+	var structureNodes []*entity.StructureNode
 	if document != nil {
 		nodes, err := s.nodeManager.ListDocumentNodes(ctx, document.ID, document.LastParseTaskId)
 		if err != nil {
@@ -362,7 +362,7 @@ func (s *ChunkCoordinateImpl) resolveRole(index int, strategyType int) int {
 // ---------------- 种子构建 ----------------
 
 // buildParentSeedList 构建父块种子列表，若步骤中含有结构切块且结构节点存在，优先走结构路径；否则从原始文本构造单一父种子
-func (s *ChunkCoordinateImpl) buildParentSeedList(ctx context.Context, parsedText string, parentSteps []*entity.DocumentStrategyStep, structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
+func (s *ChunkCoordinateImpl) buildParentSeedList(ctx context.Context, parsedText string, parentSteps []*entity.DocumentStrategyStep, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
 	if s.containsStructureStep(parentSteps) && len(structureNodes) > 0 {
 		// 结构切块有节点可用 → 先产出章节级种子，再将剩余策略作为后续流水线
 		structureSeeds := s.buildStructureParentSeeds(structureNodes)
@@ -387,7 +387,7 @@ func (s *ChunkCoordinateImpl) buildParentSeedList(ctx context.Context, parsedTex
 }
 
 // buildChildSeedList 为指定父种子构建子块种子列表，若步骤中含有结构切块且结构节点存在，优先按结构节点拆解子章节，否则克隆父种子再跑流水线
-func (s *ChunkCoordinateImpl) buildChildSeedList(ctx context.Context, parentSeed *vo.ChunkCandidate, childSteps []*entity.DocumentStrategyStep, structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
+func (s *ChunkCoordinateImpl) buildChildSeedList(ctx context.Context, parentSeed *vo.ChunkCandidate, childSteps []*entity.DocumentStrategyStep, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
 	if s.containsStructureStep(childSteps) && parentSeed.StructureNodeId != 0 && len(structureNodes) > 0 {
 		// 基于父种子的节点 ID 收集子节点，再进入后续流水线
 		structureSeeds := s.buildStructureChildSeeds(parentSeed, structureNodes)
@@ -425,7 +425,7 @@ func (s *ChunkCoordinateImpl) stripStructureSteps(steps []*entity.DocumentStrate
 }
 
 // buildStructureParentSeeds 从结构节点中筛选"内容承载章节"生成父块种子，判定规则：含有子章节时需额外验证内容长度显著超过标题或出现换行
-func (s *ChunkCoordinateImpl) buildStructureParentSeeds(structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
+func (s *ChunkCoordinateImpl) buildStructureParentSeeds(structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
 	// 预计算：哪些节点拥有子章节（用于后续内容判定）
 	parentHasChildSection := make(map[int64]bool)
 	for _, node := range structureNodes {
@@ -447,9 +447,9 @@ func (s *ChunkCoordinateImpl) buildStructureParentSeeds(structureNodes []*entity
 
 // buildStructureChildSeeds 根据父种子的节点 ID 从结构节点中挑出其子节点作为子块种子。
 // 仅保留 SECTION / STEP / LIST_ITEM 三类有实际内容的子节点；否则回退到克隆父种子。
-func (s *ChunkCoordinateImpl) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, structureNodes []*entity.DocumentStructureNode) []*vo.ChunkCandidate {
+func (s *ChunkCoordinateImpl) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
 	// 按 ParentNodeId 索引结构节点，快速定位当前父种子的子节点集合
-	childrenByParent := make(map[int64][]*entity.DocumentStructureNode)
+	childrenByParent := make(map[int64][]*entity.StructureNode)
 	for _, node := range structureNodes {
 		if node.ParentNodeId != 0 {
 			childrenByParent[node.ParentNodeId] = append(childrenByParent[node.ParentNodeId], node)
@@ -477,7 +477,7 @@ func (s *ChunkCoordinateImpl) buildStructureChildSeeds(parentSeed *vo.ChunkCandi
 }
 
 // isContentBearingSection 判断该章节是否为"内容承载章节"，排除仅作为容器而没有实际文本的章节（如纯嵌套目录）
-func (s *ChunkCoordinateImpl) isContentBearingSection(node *entity.DocumentStructureNode, hasChildSection bool) bool {
+func (s *ChunkCoordinateImpl) isContentBearingSection(node *entity.StructureNode, hasChildSection bool) bool {
 	// 空内容直接排除
 	if strutil.IsBlank(node.ContentText) {
 		return false
@@ -692,7 +692,7 @@ func (s *ChunkCoordinateImpl) applyLlmChunking(ctx context.Context, input *chunk
 }
 
 // newChunkCandidate 由结构节点构造新的块候选（保留章节/路径/序号等元信息）
-func (s *ChunkCoordinateImpl) newChunkCandidate(node *entity.DocumentStructureNode, sourceType int) *vo.ChunkCandidate {
+func (s *ChunkCoordinateImpl) newChunkCandidate(node *entity.StructureNode, sourceType int) *vo.ChunkCandidate {
 	return &vo.ChunkCandidate{
 		SectionPath:       node.SectionPath,
 		StructureNodeId:   node.ID,

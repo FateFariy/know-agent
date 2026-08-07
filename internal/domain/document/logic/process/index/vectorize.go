@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
@@ -13,18 +14,19 @@ const embeddingBatch = 100 // 默认向量化批大小
 
 // VectorizePhase 向量化阶段：批量向量化并回写状态
 type VectorizePhase struct {
-	*PhaseDeps
+	repo adapter.DocumentRepository
+	port *adapter.DocumentPort
 }
 
-func NewVectorizePhase(deps *PhaseDeps) *VectorizePhase {
-	return &VectorizePhase{PhaseDeps: deps}
+func NewVectorizePhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *VectorizePhase {
+	return &VectorizePhase{repo: repo, port: port}
 }
 
 func (p *VectorizePhase) Name() string {
 	return "向量化阶段"
 }
 
-func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
+func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 	vectorSize := len(buildCtx.ChildChunks)
 	vectorBatch := (vectorSize + embeddingBatch - 1) / embeddingBatch
 
@@ -36,47 +38,45 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *BuildContext) er
 		"parentCount":         len(buildCtx.ParentBlocks),
 	}
 	// 记录"开始执行向量化"日志
-	markVectorStartTx := func(txCtx context.Context) error {
-		vectorStartDetail, _ := json.Marshal(detail)
-		vectorStartLog := &entity.DocumentTaskLog{
-			TaskId:       buildCtx.TaskId,
-			DocumentId:   buildCtx.DocumentId,
-			StageType:    enum.TaskStageVectorize,
-			EventType:    enum.TaskEventStart,
-			LogLevel:     enum.LogLevelInfo,
-			OperatorType: enum.OperatorTypeSystem,
-			Content:      "开始执行向量化",
-			DetailJson:   string(vectorStartDetail),
-		}
-		return p.Repo.InsertTaskLog(txCtx, vectorStartLog)
+	vectorStartDetail, _ := json.Marshal(detail)
+	vectorStartLog := &entity.DocumentTaskLog{
+		TaskId:       buildCtx.TaskId,
+		DocumentId:   buildCtx.DocumentId,
+		StageType:    enum.TaskStageVectorize,
+		EventType:    enum.TaskEventStart,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: enum.OperatorTypeSystem,
+		Content:      "开始执行向量化",
+		DetailJson:   string(vectorStartDetail),
 	}
-	if err := p.Repo.Do(ctx, markVectorStartTx); err != nil {
+	if err := p.repo.InsertTaskLog(ctx, vectorStartLog); err != nil {
 		return err
 	}
 
 	// 批量向量化
 	vectorStartedTime := time.Now()
-	if err := p.Port.BuildVectors(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.port.BuildVectors(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
-	buildCtx.VectorCostMillis = time.Since(vectorStartedTime).Milliseconds()
 
 	// 回写向量状态
-	if err := p.Repo.UpdateBatchChunkById(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.repo.UpdateBatchChunkById(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
-
 	// 记录"向量化完成"日志
-	markVectorCompleteTx := func(txCtx context.Context) error {
-		detail["vectorCostMillis"] = buildCtx.VectorCostMillis
-		vectorEndDetail, _ := json.Marshal(detail)
-		vectorEndLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageVectorize, EventType: enum.TaskEventComplete,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "向量化完成", DetailJson: string(vectorEndDetail),
-		}
-		return p.Repo.InsertTaskLog(txCtx, vectorEndLog)
+	detail["vectorCostMillis"] = time.Since(vectorStartedTime).Milliseconds()
+	vectorEndDetail, _ := json.Marshal(detail)
+	vectorEndLog := &entity.DocumentTaskLog{
+		TaskId:       buildCtx.TaskId,
+		DocumentId:   buildCtx.DocumentId,
+		StageType:    enum.TaskStageVectorize,
+		EventType:    enum.TaskEventComplete,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: enum.OperatorTypeSystem,
+		Content:      "向量化完成",
+		DetailJson:   string(vectorEndDetail),
 	}
-	return p.Repo.Do(ctx, markVectorCompleteTx)
+	_ = p.repo.InsertTaskLog(ctx, vectorEndLog)
+
+	return nil
 }

@@ -441,9 +441,8 @@ func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, bloc
 // ========== 结构节点相关 ==========
 
 // InsertStructureNodeBatch 批量插入结构节点
-func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error {
-	modelList := convert.ToDocumentStructureNodeModelList(nodes)
-	return d.dbWithContext(ctx).Create(&modelList).Error
+func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, nodes []*entity.StructureNode) error {
+	return d.dbWithContext(ctx).Create(convert.ToDocumentStructureNodeModelList(nodes)).Error
 }
 
 func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error {
@@ -455,16 +454,16 @@ func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, d
 	panic("implement me")
 }
 
-func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentStructureNode, error) {
-	var nodes []*entity.DocumentStructureNode
+func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.StructureNode, error) {
+	var nodes []*entity.StructureNode
 	err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
 		Where("document_id = ?", documentId).Order("id ASC").Find(&nodes).Error
 	return nodes, err
 }
 
 // SelectStructureNodeListByTask 根据文档ID和任务ID查询结构节点列表
-func (d *DocumentRepositoryImpl) SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentStructureNode, error) {
-	var nodes []*entity.DocumentStructureNode
+func (d *DocumentRepositoryImpl) SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.StructureNode, error) {
+	var nodes []*entity.StructureNode
 	if err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
 		Where("document_id = ? AND parse_task_id = ?", documentId, taskId).
 		Order("node_no ASC, id ASC").
@@ -489,10 +488,7 @@ func (d *DocumentRepositoryImpl) CountStructureNodes(ctx context.Context, docume
 
 // InsertProfile 插入文档属性
 func (d *DocumentRepositoryImpl) InsertProfile(ctx context.Context, profile *entity.DocumentProfile) error {
-	if profile == nil {
-		return nil
-	}
-	return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).Create(profile).Error
+	return d.dbWithContext(ctx).Model(&model.DocumentProfile{}).Create(convert.ToDocumentProfileModel(profile)).Error
 }
 
 // SelectProfileByDocumentId 根据文档ID查询文档属性

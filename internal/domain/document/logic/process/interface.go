@@ -39,11 +39,8 @@ type TextPreprocessor interface {
 
 // StructureNodeManager 结构节点管理器
 type StructureNodeManager interface {
-	// ReplaceDocumentNodes 替换文档结构节点：先按文档ID删除，再按候选节点批量插入
-	ReplaceDocumentNodes(ctx context.Context, documentId, parseTaskId int64, candidates []*vo.StructureNode) ([]*entity.DocumentStructureNode, error)
-
 	// ListDocumentNodes 查询文档结构节点列表
-	ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.DocumentStructureNode, error)
+	ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.StructureNode, error)
 
 	// DeleteByDocumentId 按文档ID删除所有结构节点
 	DeleteByDocumentId(ctx context.Context, documentId int64) error
@@ -51,7 +48,7 @@ type StructureNodeManager interface {
 
 // ProfileGenerator 文档画像生成器
 type ProfileGenerator interface {
-	Generate(ctx context.Context, documentId int64, analysisResult *vo.AnalysisResult, structureNodes []*entity.DocumentStructureNode) (*entity.DocumentProfile, error)
+	Generate(ctx context.Context, documentId int64, analysisResult *vo.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error)
 }
 
 // GraphRagBuilder GraphRAG 图谱构建器

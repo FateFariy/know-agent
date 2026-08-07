@@ -30,7 +30,7 @@ func (t *TableRepositoryImpl) InsertTable(ctx context.Context, table *entity.Doc
 }
 
 // InsertTableColumnBatch 批量插入表格列
-func (t *TableRepositoryImpl) InsertTableColumnBatch(ctx context.Context, columns []*entity.DocumentTableColumn) error {
+func (t *TableRepositoryImpl) InsertTableColumnBatch(ctx context.Context, columns []*entity.TableColumn) error {
 	if len(columns) == 0 {
 		return nil
 	}
@@ -38,7 +38,7 @@ func (t *TableRepositoryImpl) InsertTableColumnBatch(ctx context.Context, column
 }
 
 // InsertTableRowBatch 批量插入表格行
-func (t *TableRepositoryImpl) InsertTableRowBatch(ctx context.Context, rows []*entity.DocumentTableRow) error {
+func (t *TableRepositoryImpl) InsertTableRowBatch(ctx context.Context, rows []*entity.TableRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -46,7 +46,7 @@ func (t *TableRepositoryImpl) InsertTableRowBatch(ctx context.Context, rows []*e
 }
 
 // InsertTableCellBatch 批量插入表格单元格
-func (t *TableRepositoryImpl) InsertTableCellBatch(ctx context.Context, cells []*entity.DocumentTableCell) error {
+func (t *TableRepositoryImpl) InsertTableCellBatch(ctx context.Context, cells []*entity.TableCell) error {
 	if len(cells) == 0 {
 		return nil
 	}
@@ -75,8 +75,8 @@ func (t *TableRepositoryImpl) SelectTablesByTask(ctx context.Context, documentId
 }
 
 // SelectTableColumnsByTableId 根据表格ID查询列列表
-func (t *TableRepositoryImpl) SelectTableColumnsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableColumn, error) {
-	var columns []*entity.DocumentTableColumn
+func (t *TableRepositoryImpl) SelectTableColumnsByTableId(ctx context.Context, tableId int64) ([]*entity.TableColumn, error) {
+	var columns []*entity.TableColumn
 	if err := t.dbWithContext(ctx).Model(&model.DocumentTableColumn{}).
 		Where("table_id = ?", tableId).
 		Order("column_no ASC").
@@ -87,8 +87,8 @@ func (t *TableRepositoryImpl) SelectTableColumnsByTableId(ctx context.Context, t
 }
 
 // SelectTableRowsByTableId 根据表格ID查询行列表
-func (t *TableRepositoryImpl) SelectTableRowsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableRow, error) {
-	var rows []*entity.DocumentTableRow
+func (t *TableRepositoryImpl) SelectTableRowsByTableId(ctx context.Context, tableId int64) ([]*entity.TableRow, error) {
+	var rows []*entity.TableRow
 	if err := t.dbWithContext(ctx).Model(&model.DocumentTableRow{}).
 		Where("table_id = ?", tableId).
 		Order("row_no ASC").
@@ -99,8 +99,8 @@ func (t *TableRepositoryImpl) SelectTableRowsByTableId(ctx context.Context, tabl
 }
 
 // SelectTableCellsByTableId 根据表格ID查询单元格列表
-func (t *TableRepositoryImpl) SelectTableCellsByTableId(ctx context.Context, tableId int64) ([]*entity.DocumentTableCell, error) {
-	var cells []*entity.DocumentTableCell
+func (t *TableRepositoryImpl) SelectTableCellsByTableId(ctx context.Context, tableId int64) ([]*entity.TableCell, error) {
+	var cells []*entity.TableCell
 	if err := t.dbWithContext(ctx).Model(&model.DocumentTableCell{}).
 		Where("table_id = ?", tableId).
 		Order("row_no ASC, column_no ASC").
@@ -115,7 +115,7 @@ func (t *TableRepositoryImpl) DeleteTableDetailByTableIds(ctx context.Context, t
 	if len(tableIds) == 0 {
 		return nil
 	}
-	return t.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return t.withinTx(ctx, func(ctx context.Context, tx *gorm.DB) error {
 		if err := tx.Where("table_id IN ?", tableIds).
 			Delete(&model.DocumentTableCell{}).Error; err != nil {
 			return err
@@ -132,8 +132,8 @@ func (t *TableRepositoryImpl) DeleteTableDetailByTableIds(ctx context.Context, t
 // DeleteTablesByTask 根据文档ID和任务ID删除表格
 func (t *TableRepositoryImpl) DeleteTablesByTask(ctx context.Context, documentId, taskId int64) error {
 	var tableIds []int64
-	return t.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := t.dbWithContext(ctx).Model(&model.DocumentTable{}).
+	return t.withinTx(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		if err := tx.Model(&model.DocumentTable{}).
 			Where("document_id = ? AND task_id = ?", documentId, taskId).
 			Pluck("id", &tableIds).Error; err != nil {
 			return err
@@ -151,8 +151,8 @@ func (t *TableRepositoryImpl) DeleteTablesByTask(ctx context.Context, documentId
 // DeleteTablesByDocumentId 根据文档ID删除表格
 func (t *TableRepositoryImpl) DeleteTablesByDocumentId(ctx context.Context, documentId int64) error {
 	var tableIds []int64
-	return t.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := t.dbWithContext(ctx).Model(&model.DocumentTable{}).
+	return t.withinTx(ctx, func(ctx context.Context, tx *gorm.DB) error {
+		if err := tx.Model(&model.DocumentTable{}).
 			Where("document_id = ?", documentId).
 			Pluck("id", &tableIds).Error; err != nil {
 			return err

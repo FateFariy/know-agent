@@ -25,7 +25,7 @@ func (p *GraphRagPhase) Name() string {
 	return "GraphRAG 构建阶段"
 }
 
-func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
+func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	vectorSize := len(buildCtx.ChildChunks)
 
 	// 如果是从已提交 GraphRAG 恢复，跳过构建
@@ -100,10 +100,10 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *BuildContext) err
 }
 
 // finalizeGraphRag 最终化 GraphRAG 结果处理
-func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *BuildContext) error {
+func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *Context) error {
 	buildResult := buildCtx.GraphRagBuildResult
 	if buildResult == nil || buildResult.GraphPersistenceOutcome == "" {
-		return p.handleGraphRagBuildFailure(ctx, buildCtx, errors.New("GraphRAG build did not return an explicit persistence outcome."))
+		return p.handleGraphRagBuildFailure(ctx, buildCtx, errors.New("GraphRAG build did not return an explicit save outcome."))
 	}
 
 	// 处理最终结果
@@ -138,7 +138,7 @@ func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *BuildCon
 }
 
 // finalizeGraphRagOutcome 最终化 GraphRAG 结果
-func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *BuildContext,
+func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *Context,
 	buildResult *vo.GraphRagBuildResult) *vo.GraphRagFinalization {
 
 	var typedChunks []vo.TypedChunk
@@ -223,7 +223,7 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *B
 }
 
 // handleGraphRagBuildFailure 处理 GraphRAG 构建失败
-func (p *GraphRagPhase) handleGraphRagBuildFailure(ctx context.Context, buildCtx *BuildContext, cause error) error {
+func (p *GraphRagPhase) handleGraphRagBuildFailure(ctx context.Context, buildCtx *Context, cause error) error {
 	logx.Errorf("GraphRAG 构建异常: documentId=%d, taskId=%d, planId=%d, err=%v",
 		buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId, cause)
 
@@ -250,7 +250,7 @@ func (p *GraphRagPhase) handleGraphRagBuildFailure(ctx context.Context, buildCtx
 }
 
 // applyGraphFailureDisposition 应用图谱失败处置
-func (p *GraphRagPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *BuildContext,
+func (p *GraphRagPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *Context,
 	result *vo.GraphRagBuildResult, cause error) error {
 	document := buildCtx.Document
 	task := buildCtx.Task
@@ -302,7 +302,7 @@ func (p *GraphRagPhase) applyGraphFailureDisposition(ctx context.Context, buildC
 
 // withdrawPendingCrossDocumentProjection 撤回待处理的跨文档投影
 func (p *GraphRagPhase) withdrawPendingCrossDocumentProjection(ctx context.Context,
-	buildCtx *BuildContext, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
+	buildCtx *Context, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
 	if buildResult == nil ||
 		buildResult.CrossDocumentIndexOutcome != vo.ComponentOutcomeSuccess ||
 		buildCtx.Document == nil ||

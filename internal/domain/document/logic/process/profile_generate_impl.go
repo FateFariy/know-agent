@@ -39,7 +39,7 @@ func NewProfileGenerateImpl(repo adapter.DocumentRepository) *ProfileGenerateImp
 	return &ProfileGenerateImpl{repo: repo}
 }
 
-func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, analysisResult *vo.DocumentAnalysisResult, structureNodes []*entity.DocumentStructureNode) (*entity.DocumentProfile, error) {
+func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, analysisResult *vo.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error) {
 	if documentId == 0 {
 		return nil, errors.New("documentId 不能为空")
 	}
@@ -85,7 +85,7 @@ func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, an
 }
 
 // buildProfile 构建文档画像
-func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText string, structureNodes []*entity.DocumentStructureNode) *entity.DocumentProfile {
+func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText string, structureNodes []*entity.StructureNode) *entity.DocumentProfile {
 	sectionTitles := p.extractSectionTitles(structureNodes)
 	supportsItemLookup := false
 	for _, node := range structureNodes {
@@ -121,7 +121,7 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 }
 
 // buildDocumentMetadata 构建文档元数据
-func (p *ProfileGenerateImpl) buildDocumentMetadata(document *entity.Document, profile *entity.DocumentProfile, parsedText string, structureNodes []*entity.DocumentStructureNode) *entity.Document {
+func (p *ProfileGenerateImpl) buildDocumentMetadata(document *entity.Document, profile *entity.DocumentProfile, parsedText string, structureNodes []*entity.StructureNode) *entity.Document {
 	sectionTitles := p.extractSectionTitles(structureNodes)
 	combined := combinedText(document, parsedText, sectionTitles)
 	code := klvo.KnowledgeScopeCode(combined)
@@ -155,7 +155,7 @@ func (p *ProfileGenerateImpl) buildDocumentMetadata(document *entity.Document, p
 }
 
 // extractSectionTitles 提取章节标题（去重、取前 8 条）
-func (p *ProfileGenerateImpl) extractSectionTitles(structureNodes []*entity.DocumentStructureNode) []string {
+func (p *ProfileGenerateImpl) extractSectionTitles(structureNodes []*entity.StructureNode) []string {
 	if len(structureNodes) == 0 {
 		return nil
 	}

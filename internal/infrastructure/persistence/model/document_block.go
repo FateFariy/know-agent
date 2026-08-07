@@ -4,11 +4,11 @@ import "github.com/swiftbit/know-agent/common"
 
 type DocumentBlock struct {
 	common.Model
-	DocumentID        int64  `gorm:"column:document_id"`
-	TaskID            int64  `gorm:"column:task_id"`
+	DocumentId        int64  `gorm:"column:document_id"`
+	TaskId            int64  `gorm:"column:task_id"`
 	BlockNo           int    `gorm:"column:block_no"`
 	BlockType         string `gorm:"column:block_type"`
-	ParentBlockID     int64  `gorm:"column:parent_block_id"`
+	ParentBlockId     int64  `gorm:"column:parent_block_id"`
 	SectionPath       string `gorm:"column:section_path"`
 	CanonicalPath     string `gorm:"column:canonical_path"`
 	PageNo            int    `gorm:"column:page_no"`

@@ -14,6 +14,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
@@ -493,23 +494,42 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		return nil, err
 	}
 
+	// 获取源解析任务
+	sourceParseTaskId := document.LastParseTaskId
+	var sourceParseTask *entity.DocumentTask
+	if sourceParseTaskId > 0 {
+		sourceParseTask, err = d.repo.SelectTaskById(ctx, sourceParseTaskId)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// 校验源解析任务是否存在且已完成
+	if sourceParseTaskId <= 0 ||
+		sourceParseTask.DocumentId != documentId ||
+		sourceParseTask.TaskType != enum.TaskTypeParseRoute ||
+		sourceParseTask.TaskStatus != enum.TaskStatusSuccess {
+		return nil, common.NewBizError(errorx.ErrDocumentStatusInvalid.Code, "当前文档的解析任务不存在或未完成")
+	}
+
 	// 创建索引构建任务实体
 	taskId := utils.GetSnowflakeNextID()
 	task := &entity.DocumentTask{
-		ID:               taskId,
-		DocumentId:       documentId,
-		PlanId:           planId,
-		TaskType:         enum.TaskTypeBuildIndex,                                                         // 任务类型：索引构建
-		TaskStatus:       enum.TaskStatusNew,                                                              // 初始状态：新建
-		CurrentStage:     enum.TaskStageChunkExecute,                                                      // 当前阶段：切分执行
-		TriggerSource:    utils.Ternary(operatorId > 0, enum.TriggerSourceUser, enum.TriggerSourceSystem), // 判断触发来源
-		StrategySnapshot: plan.StrategySnapshot,                                                           // 策略快照，确保任务执行时策略不变
+		ID:                taskId,
+		DocumentId:        documentId,
+		PlanId:            planId,
+		SourceParseTaskId: sourceParseTaskId,
+		TaskType:          enum.TaskTypeBuildIndex,                                                         // 任务类型：索引构建
+		TaskStatus:        enum.TaskStatusNew,                                                              // 初始状态：新建
+		CurrentStage:      enum.TaskStageChunkExecute,                                                      // 当前阶段：切分执行
+		TriggerSource:     utils.Ternary(operatorId > 0, enum.TriggerSourceUser, enum.TriggerSourceSystem), // 判断触发来源
+		StrategySnapshot:  plan.StrategySnapshot,                                                           // 策略快照，确保任务执行时策略不变
 	}
 
 	// 构建任务日志详情JSON
 	detail, _ := json.Marshal(map[string]any{
-		"planId":           planId,
-		"strategySnapshot": plan.StrategySnapshot,
+		"planId":            planId,
+		"sourceParseTaskId": sourceParseTaskId,
+		"strategySnapshot":  plan.StrategySnapshot,
 	})
 	// 创建任务日志实体
 	taskLog := &entity.DocumentTaskLog{
@@ -538,12 +558,6 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		return nil, err
 	}
 
-	// 发送MQ消息触发异步索引构建
-	indexBuildMessage := vo.DocumentIndexBuildMessage{DocumentId: documentId, TaskId: taskId, PlanId: planId}
-	if err = d.port.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
-		return nil, err
-	}
-
 	// 组装返回结果，填充枚举名称便于前端展示
 	indexBuild := &vo.DocumentIndexBuild{
 		DocumentId:  documentId,
@@ -552,6 +566,18 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 		TaskStatus:  enum.TaskStatusNew,
 		IndexStatus: enum.IndexStatusBuilding,
 	}
+
+	// 发送MQ消息触发异步索引构建
+	indexBuildMessage := vo.DocumentIndexBuildMessage{DocumentId: documentId, TaskId: taskId, PlanId: planId}
+	if err = d.port.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
+		// 标记索引构建提交失败状态
+		if err = d.markIndexBuildSubmitFailed(ctx, documentId, taskId, operatorId, err); err != nil {
+			return nil, err
+		}
+		indexBuild.TaskStatus = enum.TaskStatusFailed
+		indexBuild.IndexStatus = enum.IndexStatusBuildFailed
+	}
+
 	indexBuild.FillEnumNames()
 
 	return indexBuild, nil
@@ -695,6 +721,48 @@ func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, docum
 // QueryParentBlocks 查询父块列表
 func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentBlock, error) {
 	return d.repo.SelectParentBlockListByIds(ctx, parentIds)
+}
+
+// markIndexBuildSubmitFailed 标记索引构建提交失败状态
+func (d *LifecycleLogicImpl) markIndexBuildSubmitFailed(ctx context.Context, documentId, taskId, operatorId int64, err error) error {
+	logx.Errorf("索引构建消息投递失败，已标记任务失败，documentId=%d, taskId=%d, err=%v", documentId, taskId, err)
+	fn := func(txCtx context.Context) error {
+		task := &entity.DocumentTask{
+			ID:         taskId,
+			TaskStatus: enum.TaskStatusFailed,
+			FinishTime: utils.Pointer(time.Now()),
+			ErrorCode:  utils.Pointer("INDEX_BUILD_SUBMIT_FAILED"),
+			ErrorMsg:   utils.Pointer(err.Error()),
+		}
+		if ferr := d.repo.UpdateTaskById(ctx, task); ferr != nil {
+			return ferr
+		}
+
+		document := &entity.Document{
+			ID:          documentId,
+			IndexStatus: enum.IndexStatusBuildFailed,
+		}
+		if ferr := d.repo.UpdateDocumentById(ctx, document); ferr != nil {
+			return ferr
+		}
+
+		detailJson, _ := json.Marshal(map[string]interface{}{
+			"error": err.Error(),
+		})
+		log := &entity.DocumentTaskLog{
+			TaskId:       taskId,
+			DocumentId:   documentId,
+			StageType:    enum.TaskStageChunkExecute,
+			EventType:    enum.TaskEventFailed,
+			LogLevel:     enum.LogLevelError,
+			OperatorType: utils.Ternary(operatorId > 0, enum.OperatorTypeUser, enum.OperatorTypeSystem),
+			OperatorId:   operatorId,
+			Content:      "索引构建后台任务提交失败，未进入切块执行。",
+			DetailJson:   string(detailJson),
+		}
+		return d.repo.InsertTaskLog(ctx, log)
+	}
+	return d.repo.Do(ctx, fn)
 }
 
 // getChunkTaskId 获取文档块任务ID

@@ -7,43 +7,46 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // CompletionPhase 完成阶段：事务性更新任务/方案/文档状态
 type CompletionPhase struct {
-	*PhaseDeps
+	repo adapter.DocumentRepository
 }
 
-func NewCompletionPhase(deps *PhaseDeps) *CompletionPhase {
-	return &CompletionPhase{PhaseDeps: deps}
+func NewCompletionPhase(repo adapter.DocumentRepository) *CompletionPhase {
+	return &CompletionPhase{repo: repo}
 }
 
 func (p *CompletionPhase) Name() string {
 	return "完成阶段"
 }
 
-func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) error {
+func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	totalCostMillis := time.Since(buildCtx.BuildStartedTime).Milliseconds()
 
 	// 事务性最终状态更新
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
-		if err := p.Repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+		if err := p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageStoreComplete,
 		}); err != nil {
 			return err
 		}
 		// 方案状态标记为已执行
-		if err := p.Repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{
-			ID: buildCtx.PlanId, PlanStatus: enum.PlanStatusExecuted,
+		if err := p.repo.UpdatePlanById(txCtx, &entity.DocumentStrategyPlan{
+			ID:         buildCtx.PlanId,
+			PlanStatus: enum.PlanStatusExecuted,
 		}); err != nil {
 			return err
 		}
 		// 文档索引状态更新为构建成功
-		if err := p.Repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: buildCtx.DocumentId, IndexStatus: enum.IndexStatusBuildSuccess,
+		if err := p.repo.UpdateDocumentById(txCtx, &entity.Document{
+			ID:              buildCtx.DocumentId,
+			IndexStatus:     enum.IndexStatusBuildSuccess,
 			LastIndexTaskId: buildCtx.TaskId,
 		}); err != nil {
 			return err
@@ -58,7 +61,7 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 			ErrorCode:    utils.Pointer(""),
 			ErrorMsg:     utils.Pointer(""),
 		}
-		if err := p.Repo.UpdateTaskById(ctx, completeTask); err != nil {
+		if err := p.repo.UpdateTaskById(ctx, completeTask); err != nil {
 			return err
 		}
 		// 索引构建完成日志
@@ -69,14 +72,18 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *BuildContext) e
 			"costMillis":           totalCostMillis,
 		})
 		buildCompleteLog := &entity.DocumentTaskLog{
-			TaskId: buildCtx.TaskId, DocumentId: buildCtx.DocumentId,
-			StageType: enum.TaskStageStoreComplete, EventType: enum.TaskEventComplete,
-			LogLevel: enum.LogLevelInfo, OperatorType: enum.OperatorTypeSystem,
-			Content: "索引构建完成", DetailJson: string(buildCompleteDetail),
+			TaskId:       buildCtx.TaskId,
+			DocumentId:   buildCtx.DocumentId,
+			StageType:    enum.TaskStageStoreComplete,
+			EventType:    enum.TaskEventComplete,
+			LogLevel:     enum.LogLevelInfo,
+			OperatorType: enum.OperatorTypeSystem,
+			Content:      "索引构建完成",
+			DetailJson:   string(buildCompleteDetail),
 		}
-		return p.Repo.InsertTaskLog(txCtx, buildCompleteLog)
+		return p.repo.InsertTaskLog(txCtx, buildCompleteLog)
 	}
-	if err := p.Repo.Do(ctx, finalizeTx); err != nil {
+	if err := p.repo.Do(ctx, finalizeTx); err != nil {
 		return err
 	}
 

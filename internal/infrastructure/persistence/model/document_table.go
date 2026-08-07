@@ -4,9 +4,9 @@ import "github.com/swiftbit/know-agent/common"
 
 type DocumentTable struct {
 	common.Model
-	DocumentID   int64  `gorm:"column:document_id"`
-	TaskID       int64  `gorm:"column:task_id"`
-	BlockID      int64  `gorm:"column:block_id"`
+	DocumentId   int64  `gorm:"column:document_id"`
+	TaskId       int64  `gorm:"column:task_id"`
+	BlockId      int64  `gorm:"column:block_id"`
 	TableNo      int    `gorm:"column:table_no"`
 	SectionPath  string `gorm:"column:section_path"`
 	PageNo       int    `gorm:"column:page_no"`

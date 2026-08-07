@@ -34,3 +34,17 @@ func (t *transactionManager) dbWithContext(ctx context.Context) *gorm.DB {
 	}
 	return t.db.WithContext(ctx)
 }
+
+// withinTx 执行事务回调 fn，若上下文内无事务则开启新事务
+func (t *transactionManager) withinTx(ctx context.Context, fn func(ctx context.Context, tx *gorm.DB) error) error {
+	if v := ctx.Value(transactionCtxKey); v != nil {
+		if tx, ok := v.(*gorm.DB); ok {
+			tx = tx.WithContext(ctx)
+			return fn(ctx, tx)
+		}
+	}
+	return t.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txCtx := context.WithValue(ctx, transactionCtxKey, tx)
+		return fn(txCtx, tx)
+	})
+}
