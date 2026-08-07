@@ -20,4 +20,6 @@ type DocumentParentBlock struct {
 	ChildCount        int    `gorm:"column:child_count;type:int"`             // 子节点数
 	StartChunkNo      int    `gorm:"column:start_chunk_no;type:int"`          // 起始块号
 	EndChunkNo        int    `gorm:"column:end_chunk_no;type:int"`            // 结束块号
+	PageRange         string `gorm:"column:page_range;type:varchar(255)"`     // 页码范围
+	SourceBlockIds    string `gorm:"column:source_block_ids"`                 // 源块ID列表
 }
