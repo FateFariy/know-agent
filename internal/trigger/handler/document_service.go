@@ -77,6 +77,7 @@ func (d *DocumentService) QueryStrategyPlan(ctx context.Context, req *document.Q
 	return resp, nil
 }
 
+// ConfirmStrategy 确认策略
 func (d *DocumentService) ConfirmStrategy(ctx context.Context, req *document.ConfirmStrategyReq) (*document.ConfirmStrategyResp, error) {
 	plan, doc, err := d.lifeCycleLogic.ConfirmStrategy(ctx, convert.FromConfirmStrategyReq(req))
 	if err != nil {

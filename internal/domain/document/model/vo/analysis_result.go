@@ -20,7 +20,7 @@ type AnalysisResult struct {
 	ParserFailedReason    string                  // 解析失败原因
 	ParserTraceMetadata   map[string]interface{}  // 解析追踪元数据
 	MarkdownSyntax        *MarkdownSyntax         // Markdown语法分析结果
-	StructureNodes        []*StructureNode        // 文档结构节点列表
+	StructureNodes        []*entity.StructureNode // 文档结构节点列表
 	TableCandidates       []*TableCandidate       // 表格候选列表
 	ParseArtifacts        []*entity.ParseArtifact // 解析产物列表
 	Blocks                []*entity.DocumentBlock // 内容块列表

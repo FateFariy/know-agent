@@ -23,6 +23,10 @@ func (p *InitializationPhase) Name() string {
 	return "初始化阶段"
 }
 
+func (p *InitializationPhase) Order() int {
+	return 0
+}
+
 func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) error {
 	// 事务性标记任务运行中 + 文档解析中，并写入"开始解析"日志
 	markParseStartTx := func(txCtx context.Context) error {

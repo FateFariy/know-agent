@@ -45,7 +45,7 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 
 	// 写入"开始分析解析结果并生成推荐策略"日志
 	strategyStartDetail, _ := json.Marshal(map[string]any{
-		"structureNodeCount": len(parseCtx.StructureNodes),
+		"structureNodeCount": len(parseCtx.SaveCtx.StructureNodes),
 		"charCount":          parseCtx.AnalysisResult.CharCount,
 		"tokenCount":         parseCtx.AnalysisResult.TokenCount,
 	})

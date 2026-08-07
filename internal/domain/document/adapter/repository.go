@@ -143,7 +143,7 @@ type DocumentRepository interface {
 	// ========== 结构节点相关 ==========
 
 	// InsertStructureNodeBatch 批量插入结构节点
-	InsertStructureNodeBatch(ctx context.Context, nodes []*entity.DocumentStructureNode) error
+	InsertStructureNodeBatch(ctx context.Context, nodes []*entity.StructureNode) error
 
 	// DeleteStructureNodeByDocumentId 根据文档ID删除结构节点
 	DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error
@@ -152,10 +152,10 @@ type DocumentRepository interface {
 	DeleteStructureNodeBatch(ctx context.Context, documentId int64, nodeIds []int64) error
 
 	// SelectStructureNodeListByDocumentId 根据文档ID查询结构节点列表
-	SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.DocumentStructureNode, error)
+	SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.StructureNode, error)
 
 	// SelectStructureNodeListByTask 根据文档ID和任务ID查询结构节点列表
-	SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentStructureNode, error)
+	SelectStructureNodeListByTask(ctx context.Context, documentId, taskId int64) ([]*entity.StructureNode, error)
 
 	// CountStructureNodes 统计结构节点数量
 	CountStructureNodes(ctx context.Context, documentId, taskId int64) (int64, error)

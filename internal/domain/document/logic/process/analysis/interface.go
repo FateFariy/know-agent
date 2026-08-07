@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis/save"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -19,9 +20,8 @@ type Context struct {
 	StartTime         time.Time
 	RawFileBytes      []byte
 	AnalysisResult    *vo.AnalysisResult
-	ParsedTextPath    string
-	StructureNodes    []*entity.DocumentStructureNode
 	StrategyPlanDraft *vo.DocumentStrategyPlanDraft
+	SaveCtx           *save.Context
 }
 
 // Phase 解析路由阶段接口

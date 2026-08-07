@@ -52,7 +52,7 @@ func (p *ProfileLogicImpl) RegenerateProfile(ctx context.Context, documentId int
 	if err != nil {
 		return nil, err
 	}
-	analysisResult := &vo.DocumentAnalysisResult{ParsedText: parsedText}
+	analysisResult := &vo.AnalysisResult{ParsedText: parsedText}
 	return p.gen.Generate(ctx, documentId, analysisResult, structureNodes)
 }
 

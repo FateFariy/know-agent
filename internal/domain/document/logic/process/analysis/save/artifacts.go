@@ -1,4 +1,4 @@
-package analysis
+package save
 
 import (
 	"context"
@@ -16,35 +16,30 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-// UploadPhase 上传阶段：上传解析后的纯文本到对象存储
-type UploadPhase struct {
+type ArtifactPersistPhase struct {
 	repo      adapter.DocumentRepository
 	tableRepo adapter.TableRepository
 	port      *adapter.DocumentPort
 }
 
-func NewUploadPhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *UploadPhase {
-	return &UploadPhase{
+func (p *ArtifactPersistPhase) Name() string {
+	return "解析产物保存阶段"
+}
+
+func (p *ArtifactPersistPhase) Execute(ctx context.Context, saveCtx *Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewArtifactPersistPhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *ArtifactPersistPhase {
+	return &ArtifactPersistPhase{
 		repo:      repo,
 		tableRepo: tableRepo,
 		port:      port,
 	}
 }
 
-func (p *UploadPhase) Name() string {
-	return "上传阶段"
-}
-
-func (p *UploadPhase) Execute(ctx context.Context, parseCtx *Context) error {
-	parsedTextPath, err := p.port.UploadParsedText(ctx, parseCtx.DocumentId, parseCtx.AnalysisResult.ParsedText)
-	if err != nil {
-		return err
-	}
-	parseCtx.ParsedTextPath = parsedTextPath
-	return nil
-}
-
-func (p *UploadPhase) saveParseArtifactsAndBlocks(ctx context.Context, documentId, taskId int64, analysisResult *vo.AnalysisResult) error {
+func (p *ArtifactPersistPhase) saveParseArtifactsAndBlocks(ctx context.Context, documentId, taskId int64, analysisResult *vo.AnalysisResult) error {
 	artifacts, err := p.buildParseArtifactEntities(ctx, documentId, taskId, analysisResult.ParseArtifacts)
 	if err != nil {
 		return err
@@ -87,7 +82,7 @@ func (p *UploadPhase) saveParseArtifactsAndBlocks(ctx context.Context, documentI
 	return p.repo.Do(ctx, txFn)
 }
 
-func (p *UploadPhase) buildParseArtifactEntities(ctx context.Context, documentId, taskId int64,
+func (p *ArtifactPersistPhase) buildParseArtifactEntities(ctx context.Context, documentId, taskId int64,
 	candidates []*entity.ParseArtifact) ([]*entity.ParseArtifact, error) {
 	if len(candidates) == 0 {
 		return candidates, nil
@@ -128,7 +123,7 @@ func (p *UploadPhase) buildParseArtifactEntities(ctx context.Context, documentId
 	return artifacts, nil
 }
 
-func (p *UploadPhase) buildDocumentBlockEntities(ctx context.Context, documentId, taskId int64,
+func (p *ArtifactPersistPhase) buildDocumentBlockEntities(ctx context.Context, documentId, taskId int64,
 	candidates []*entity.DocumentBlock) ([]*entity.DocumentBlock, error) {
 	if len(candidates) == 0 {
 		return candidates, nil
@@ -166,7 +161,7 @@ func (p *UploadPhase) buildDocumentBlockEntities(ctx context.Context, documentId
 	return blocks, nil
 }
 
-//func (p *UploadPhase) buildTableEntities(ctx context.Context, documentId, taskId int64,
+//func (p *ArtifactPersistPhase) buildTableEntities(ctx context.Context, documentId, taskId int64,
 //	blocks []*entity.DocumentBlock, candidates []*vo.TableCandidate) ([]*entity.DocumentTable, error) {
 //	if len(candidates) == 0 {
 //		return nil, nil

@@ -41,7 +41,7 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 		parseCtx.PlanId = planId
 
 		// 更新文档：解析成功、策略已推荐、统计信息
-		structureNodeCount := len(parseCtx.StructureNodes)
+		structureNodeCount := len(parseCtx.SaveCtx.StructureNodes)
 		updatedDoc := &entity.Document{
 			ID:                  document.ID,
 			ParseStatus:         enum.ParseStatusParseSuccess,
@@ -50,7 +50,7 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			TokenCount:          parseCtx.AnalysisResult.TokenCount,
 			StructureLevel:      parseCtx.AnalysisResult.StructureLevel,
 			ContentQualityLevel: parseCtx.AnalysisResult.ContentQualityLevel,
-			ParseTextPath:       parseCtx.ParsedTextPath,
+			ParseTextPath:       parseCtx.SaveCtx.ParsedTextPath,
 			ParseErrorMsg:       utils.Pointer(""),
 			CurrentPlanId:       planId,
 			LastParseTaskId:     parseCtx.TaskId,
