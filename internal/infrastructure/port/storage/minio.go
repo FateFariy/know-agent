@@ -35,8 +35,8 @@ func NewMinioStorage(svcCtx *svc.ServiceContext) *MinioStorage {
 }
 
 // UploadOriginalFile 上传原始文件
-func (s *MinioStorage) UploadOriginalFile(ctx context.Context, documentID int64, fileName string, bytes []byte, contentType string) (*vo.StoredObjectInfo, error) {
-	objectName := fmt.Sprintf("%s/%d/%d-%s", s.Config.ObjectPrefix, documentID, time.Now().Unix(), fileName)
+func (s *MinioStorage) UploadOriginalFile(ctx context.Context, documentId int64, fileName string, bytes []byte, contentType string) (*vo.StoredObjectInfo, error) {
+	objectName := fmt.Sprintf("%s/%d/%d-%s", s.Config.ObjectPrefix, documentId, time.Now().Unix(), fileName)
 	if err := s.upload(ctx, objectName, bytes, contentType); err != nil {
 		return nil, err
 	}
@@ -44,8 +44,8 @@ func (s *MinioStorage) UploadOriginalFile(ctx context.Context, documentID int64,
 }
 
 // UploadParsedText 上传解析后的文本
-func (s *MinioStorage) UploadParsedText(ctx context.Context, documentID int64, parsedText string) (string, error) {
-	objectName := fmt.Sprintf("%s/%d/%d.txt", s.Config.ParsedTextPrefix, documentID, time.Now().Unix())
+func (s *MinioStorage) UploadParsedText(ctx context.Context, documentId int64, parsedText string) (string, error) {
+	objectName := fmt.Sprintf("%s/%d/%d.txt", s.Config.ParsedTextPrefix, documentId, time.Now().Unix())
 	if err := s.upload(ctx, objectName, []byte(parsedText), "text/plain;charset=UTF-8"); err != nil {
 		return "", err
 	}
@@ -53,11 +53,11 @@ func (s *MinioStorage) UploadParsedText(ctx context.Context, documentID int64, p
 }
 
 // UploadParseArtifact 上传解析产物
-func (s *MinioStorage) UploadParseArtifact(ctx context.Context, documentID, taskID int64, name, contentType string, content []byte) (string, error) {
+func (s *MinioStorage) UploadParseArtifact(ctx context.Context, documentId, taskId int64, name, contentType string, content []byte) (string, error) {
 	safeFileName := utils.BlankToDefault(name, "artifact.bin")
 	safeFileName = strings.ReplaceAll(safeFileName, "/", "-")
 	safeFileName = strings.ReplaceAll(safeFileName, "\\", "-")
-	objectName := fmt.Sprintf("%s/%d/%d/%d-%s", s.Config.ParseArtifactPrefix, documentID, taskID, time.Now().UnixMilli(), safeFileName)
+	objectName := fmt.Sprintf("%s/%d/%d/%d-%s", s.Config.ParseArtifactPrefix, documentId, taskId, time.Now().UnixMilli(), safeFileName)
 	if err := s.upload(ctx, objectName, content, contentType); err != nil {
 		return "", err
 	}

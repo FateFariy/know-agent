@@ -57,4 +57,30 @@ type KnowledgeRepository interface {
 
 	// SelectKnowledgeRouteTracePage 分页查询路由跟踪记录
 	SelectKnowledgeRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error)
+
+	// ========== 知识库配置相关 ==========
+
+	// InsertKnowledgeConfig 插入知识库配置
+	InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) error
+
+	// UpdateKnowledgeConfigById 根据ID更新知识库配置
+	UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeConfig) error
+
+	// DeleteKnowledgeConfigById 根据ID删除知识库配置
+	DeleteKnowledgeConfigById(ctx context.Context, id int64) error
+
+	// SelectKnowledgeConfigById 根据ID查询知识库配置
+	SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeConfig, error)
+
+	// SelectKnowledgeConfigs 查询所有知识库配置
+	SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error)
+
+	// SelectKnowledgeConfigByIds 根据ID列表查询知识库配置
+	SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error)
+
+	// SelectKnowledgeConfigByBaseName 根据名称查询知识库配置
+	SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeConfig, error)
+
+	// ClearOtherDefaults 清除其他知识库的默认标记
+	ClearOtherDefaults(ctx context.Context, currentId int64) error
 }

@@ -138,3 +138,12 @@ func EstimateTokens(content string) int {
 func Len(str string) int {
 	return utf8.RuneCountInString(str)
 }
+
+func FirstNonBlank(strs ...string) string {
+	for _, str := range strs {
+		if strutil.IsNotBlank(str) {
+			return str
+		}
+	}
+	return ""
+}

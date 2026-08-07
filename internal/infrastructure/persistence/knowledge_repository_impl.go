@@ -11,6 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -180,4 +181,79 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Cont
 		return nil, 0, err
 	}
 	return list, total, nil
+}
+
+// ========== 知识库配置相关 ==========
+
+// InsertKnowledgeConfig 插入知识库配置
+func (k *KnowledgeRepositoryImpl) InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) error {
+	return k.dbWithContext(ctx).Create(convert.ToKnowledgeConfigModel(config)).Error
+}
+
+// UpdateKnowledgeConfigById 根据ID更新知识库配置
+func (k *KnowledgeRepositoryImpl) UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeConfig) error {
+	return k.dbWithContext(ctx).Model(&model.KnowledgeConfig{}).
+		Where("id = ?", config.ID).
+		Updates(convert.ToKnowledgeConfigModel(config)).Error
+}
+
+// DeleteKnowledgeConfigById 根据ID删除知识库配置
+func (k *KnowledgeRepositoryImpl) DeleteKnowledgeConfigById(ctx context.Context, id int64) error {
+	return k.dbWithContext(ctx).Delete(&model.KnowledgeConfig{}, id).Error
+}
+
+// SelectKnowledgeConfigById 根据ID查询知识库配置
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeConfig, error) {
+	var config *model.KnowledgeConfig
+	if err := k.dbWithContext(ctx).Where("id = ?", id).First(&config).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorx.ErrKnowledgeConfigNotFound.Format(id)
+		}
+		return nil, err
+	}
+	return convert.ToKnowledgeConfigEntity(config), nil
+}
+
+// SelectKnowledgeConfigs 查询所有知识库配置
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error) {
+	var configs []*model.KnowledgeConfig
+	if err := k.dbWithContext(ctx).
+		Order("sort_order ASC, id ASC").
+		Find(&configs).Error; err != nil {
+		return nil, err
+	}
+	return convert.ToKnowledgeConfigEntities(configs), nil
+}
+
+// SelectKnowledgeConfigByIds 根据ID列表查询知识库配置
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var configs []*model.KnowledgeConfig
+	if err := k.dbWithContext(ctx).
+		Where("id IN ?", ids).
+		Order("sort_order ASC, id ASC").
+		Find(&configs).Error; err != nil {
+		return nil, err
+	}
+	return convert.ToKnowledgeConfigEntities(configs), nil
+}
+
+// SelectKnowledgeConfigByBaseName 根据名称查询知识库配置
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeConfig, error) {
+	var config entity.KnowledgeConfig
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeConfig{}).
+		Where("base_name = ?", baseName).
+		First(&config).Error; err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// ClearOtherDefaults 清除其他知识库的默认标记
+func (k *KnowledgeRepositoryImpl) ClearOtherDefaults(ctx context.Context, currentId int64) error {
+	return k.dbWithContext(ctx).Model(&model.KnowledgeConfig{}).
+		Where("id != ? AND is_default = ?", currentId, 1).
+		Update("is_default", 0).Error
 }

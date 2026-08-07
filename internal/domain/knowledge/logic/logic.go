@@ -38,3 +38,27 @@ type KnowledgeLogic interface {
 	// QueryRouteTracePage 分页查询知识路由追踪
 	QueryRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error)
 }
+
+// KnowledgeConfigLogic 知识库配置服务
+type KnowledgeConfigLogic interface {
+	// SaveKnowledgeConfig 保存/更新知识库配置（ID=0 时插入，否则更新）
+	SaveKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error)
+
+	// DeleteKnowledgeConfig 删除知识库配置（软删除）
+	DeleteKnowledgeConfig(ctx context.Context, id int64) (bool, error)
+
+	// ListKnowledgeConfigs 查询所有知识库配置列表
+	ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error)
+
+	// GetKnowledgeConfig 根据ID查询知识库配置详情
+	GetKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error)
+
+	// UpdateKnowledgeConfigSetting 更新知识库配置（仅更新配置JSON字段）
+	UpdateKnowledgeConfigSetting(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error)
+
+	// ListEnabledKnowledgeConfigs 查询所有启用的知识库配置
+	ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error)
+
+	// ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
+	ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error)
+}

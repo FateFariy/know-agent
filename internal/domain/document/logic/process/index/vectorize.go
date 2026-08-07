@@ -49,9 +49,7 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 		Content:      "开始执行向量化",
 		DetailJson:   string(vectorStartDetail),
 	}
-	if err := p.repo.InsertTaskLog(ctx, vectorStartLog); err != nil {
-		return err
-	}
+	_ = p.repo.InsertTaskLog(ctx, vectorStartLog)
 
 	// 批量向量化
 	vectorStartedTime := time.Now()

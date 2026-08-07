@@ -19,7 +19,7 @@ import (
 )
 
 type rerankFullResp struct {
-	RequestID string        `json:"request_id"`
+	RequestId string        `json:"request_id"`
 	Output    *rerankOutput `json:"output,omitempty"`
 	Results   []rerankItem  `json:"results,omitempty"`
 	Usage     rerankUsage   `json:"usage"`

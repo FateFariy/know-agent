@@ -4,6 +4,7 @@
 package convert
 
 import (
+	"encoding/json"
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
@@ -15,6 +16,7 @@ import (
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
+	datatypes "gorm.io/datatypes"
 	"time"
 )
 
@@ -532,11 +534,11 @@ func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
 	if source != nil {
 		var modelDocumentBlock model.DocumentBlock
 		modelDocumentBlock.Model = entityDocumentBlockToCommonModel((*source))
-		modelDocumentBlock.DocumentID = (*source).DocumentID
-		modelDocumentBlock.TaskID = (*source).TaskID
+		modelDocumentBlock.DocumentId = (*source).DocumentId
+		modelDocumentBlock.TaskId = (*source).TaskId
 		modelDocumentBlock.BlockNo = (*source).BlockNo
 		modelDocumentBlock.BlockType = (*source).BlockType
-		modelDocumentBlock.ParentBlockID = (*source).ParentBlockID
+		modelDocumentBlock.ParentBlockId = (*source).ParentBlockId
 		modelDocumentBlock.SectionPath = (*source).SectionPath
 		modelDocumentBlock.CanonicalPath = (*source).CanonicalPath
 		modelDocumentBlock.PageNo = (*source).PageNo
@@ -845,11 +847,11 @@ func ToDocumentStrategyStepModelList(source []*entity1.DocumentStrategyStep) []*
 	}
 	return pModelDocumentStrategyStepList
 }
-func ToDocumentStructureNodeModel(source *entity1.DocumentStructureNode) *model.DocumentStructureNode {
+func ToDocumentStructureNodeModel(source *entity1.StructureNode) *model.DocumentStructureNode {
 	var pModelDocumentStructureNode *model.DocumentStructureNode
 	if source != nil {
 		var modelDocumentStructureNode model.DocumentStructureNode
-		modelDocumentStructureNode.Model = entityDocumentStructureNodeToCommonModel((*source))
+		modelDocumentStructureNode.Model = entityStructureNodeToCommonModel((*source))
 		modelDocumentStructureNode.DocumentId = (*source).DocumentId
 		modelDocumentStructureNode.ParseTaskId = (*source).ParseTaskId
 		modelDocumentStructureNode.NodeNo = (*source).NodeNo
@@ -865,11 +867,22 @@ func ToDocumentStructureNodeModel(source *entity1.DocumentStructureNode) *model.
 		modelDocumentStructureNode.SectionPath = (*source).SectionPath
 		modelDocumentStructureNode.ContentText = (*source).ContentText
 		modelDocumentStructureNode.ItemIndex = (*source).ItemIndex
+		modelDocumentStructureNode.SyntaxSchemaVersion = (*source).SyntaxSchemaVersion
+		modelDocumentStructureNode.SyntaxSourceSha256 = (*source).SyntaxSourceSha256
+		modelDocumentStructureNode.SyntaxNodeId = (*source).SyntaxNodeId
+		modelDocumentStructureNode.SyntaxNodeType = (*source).SyntaxNodeType
+		modelDocumentStructureNode.SyntaxSourceOrigin = (*source).SyntaxSourceOrigin
+		modelDocumentStructureNode.SourceStartByte = (*source).SourceStartByte
+		modelDocumentStructureNode.SourceEndByte = (*source).SourceEndByte
+		modelDocumentStructureNode.SourceStartLine = (*source).SourceStartLine
+		modelDocumentStructureNode.SourceStartColumn = (*source).SourceStartColumn
+		modelDocumentStructureNode.SourceEndLine = (*source).SourceEndLine
+		modelDocumentStructureNode.SourceEndColumn = (*source).SourceEndColumn
 		pModelDocumentStructureNode = &modelDocumentStructureNode
 	}
 	return pModelDocumentStructureNode
 }
-func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) []*model.DocumentStructureNode {
+func ToDocumentStructureNodeModelList(source []*entity1.StructureNode) []*model.DocumentStructureNode {
 	var pModelDocumentStructureNodeList []*model.DocumentStructureNode
 	if source != nil {
 		pModelDocumentStructureNodeList = make([]*model.DocumentStructureNode, len(source))
@@ -879,16 +892,16 @@ func ToDocumentStructureNodeModelList(source []*entity1.DocumentStructureNode) [
 	}
 	return pModelDocumentStructureNodeList
 }
-func ToDocumentTableCellModel(source *entity1.DocumentTableCell) *model.DocumentTableCell {
+func ToDocumentTableCellModel(source *entity1.TableCell) *model.DocumentTableCell {
 	var pModelDocumentTableCell *model.DocumentTableCell
 	if source != nil {
 		var modelDocumentTableCell model.DocumentTableCell
-		modelDocumentTableCell.Model = entityDocumentTableCellToCommonModel((*source))
-		modelDocumentTableCell.DocumentID = (*source).DocumentID
-		modelDocumentTableCell.TaskID = (*source).TaskID
-		modelDocumentTableCell.TableID = (*source).TableID
-		modelDocumentTableCell.RowID = (*source).RowID
-		modelDocumentTableCell.ColumnID = (*source).ColumnID
+		modelDocumentTableCell.Model = entityTableCellToCommonModel((*source))
+		modelDocumentTableCell.DocumentId = (*source).DocumentId
+		modelDocumentTableCell.TaskId = (*source).TaskId
+		modelDocumentTableCell.TableId = (*source).TableId
+		modelDocumentTableCell.RowId = (*source).RowId
+		modelDocumentTableCell.ColumnId = (*source).ColumnId
 		modelDocumentTableCell.RowNo = (*source).RowNo
 		modelDocumentTableCell.ColumnNo = (*source).ColumnNo
 		modelDocumentTableCell.CellText = (*source).CellText
@@ -902,7 +915,7 @@ func ToDocumentTableCellModel(source *entity1.DocumentTableCell) *model.Document
 	}
 	return pModelDocumentTableCell
 }
-func ToDocumentTableCellModelList(source []*entity1.DocumentTableCell) []*model.DocumentTableCell {
+func ToDocumentTableCellModelList(source []*entity1.TableCell) []*model.DocumentTableCell {
 	var pModelDocumentTableCellList []*model.DocumentTableCell
 	if source != nil {
 		pModelDocumentTableCellList = make([]*model.DocumentTableCell, len(source))
@@ -912,14 +925,14 @@ func ToDocumentTableCellModelList(source []*entity1.DocumentTableCell) []*model.
 	}
 	return pModelDocumentTableCellList
 }
-func ToDocumentTableColumnModel(source *entity1.DocumentTableColumn) *model.DocumentTableColumn {
+func ToDocumentTableColumnModel(source *entity1.TableColumn) *model.DocumentTableColumn {
 	var pModelDocumentTableColumn *model.DocumentTableColumn
 	if source != nil {
 		var modelDocumentTableColumn model.DocumentTableColumn
-		modelDocumentTableColumn.Model = entityDocumentTableColumnToCommonModel((*source))
-		modelDocumentTableColumn.DocumentID = (*source).DocumentID
-		modelDocumentTableColumn.TaskID = (*source).TaskID
-		modelDocumentTableColumn.TableID = (*source).TableID
+		modelDocumentTableColumn.Model = entityTableColumnToCommonModel((*source))
+		modelDocumentTableColumn.DocumentId = (*source).DocumentId
+		modelDocumentTableColumn.TaskId = (*source).TaskId
+		modelDocumentTableColumn.TableId = (*source).TableId
 		modelDocumentTableColumn.ColumnNo = (*source).ColumnNo
 		modelDocumentTableColumn.ColumnName = (*source).ColumnName
 		modelDocumentTableColumn.NormalizedName = (*source).NormalizedName
@@ -928,7 +941,7 @@ func ToDocumentTableColumnModel(source *entity1.DocumentTableColumn) *model.Docu
 	}
 	return pModelDocumentTableColumn
 }
-func ToDocumentTableColumnModelList(source []*entity1.DocumentTableColumn) []*model.DocumentTableColumn {
+func ToDocumentTableColumnModelList(source []*entity1.TableColumn) []*model.DocumentTableColumn {
 	var pModelDocumentTableColumnList []*model.DocumentTableColumn
 	if source != nil {
 		pModelDocumentTableColumnList = make([]*model.DocumentTableColumn, len(source))
@@ -943,9 +956,9 @@ func ToDocumentTableModel(source *entity1.DocumentTable) *model.DocumentTable {
 	if source != nil {
 		var modelDocumentTable model.DocumentTable
 		modelDocumentTable.Model = entityDocumentTableToCommonModel((*source))
-		modelDocumentTable.DocumentID = (*source).DocumentID
-		modelDocumentTable.TaskID = (*source).TaskID
-		modelDocumentTable.BlockID = (*source).BlockID
+		modelDocumentTable.DocumentId = (*source).DocumentId
+		modelDocumentTable.TaskId = (*source).TaskId
+		modelDocumentTable.BlockId = (*source).BlockId
 		modelDocumentTable.TableNo = (*source).TableNo
 		modelDocumentTable.SectionPath = (*source).SectionPath
 		modelDocumentTable.PageNo = (*source).PageNo
@@ -970,21 +983,21 @@ func ToDocumentTableModelList(source []*entity1.DocumentTable) []*model.Document
 	}
 	return pModelDocumentTableList
 }
-func ToDocumentTableRowModel(source *entity1.DocumentTableRow) *model.DocumentTableRow {
+func ToDocumentTableRowModel(source *entity1.TableRow) *model.DocumentTableRow {
 	var pModelDocumentTableRow *model.DocumentTableRow
 	if source != nil {
 		var modelDocumentTableRow model.DocumentTableRow
-		modelDocumentTableRow.Model = entityDocumentTableRowToCommonModel((*source))
-		modelDocumentTableRow.DocumentID = (*source).DocumentID
-		modelDocumentTableRow.TaskID = (*source).TaskID
-		modelDocumentTableRow.TableID = (*source).TableID
+		modelDocumentTableRow.Model = entityTableRowToCommonModel((*source))
+		modelDocumentTableRow.DocumentId = (*source).DocumentId
+		modelDocumentTableRow.TaskId = (*source).TaskId
+		modelDocumentTableRow.TableId = (*source).TableId
 		modelDocumentTableRow.RowNo = (*source).RowNo
 		modelDocumentTableRow.RowText = (*source).RowText
 		pModelDocumentTableRow = &modelDocumentTableRow
 	}
 	return pModelDocumentTableRow
 }
-func ToDocumentTableRowModelList(source []*entity1.DocumentTableRow) []*model.DocumentTableRow {
+func ToDocumentTableRowModelList(source []*entity1.TableRow) []*model.DocumentTableRow {
 	var pModelDocumentTableRowList []*model.DocumentTableRow
 	if source != nil {
 		pModelDocumentTableRowList = make([]*model.DocumentTableRow, len(source))
@@ -1019,6 +1032,7 @@ func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 		modelDocumentTask.Model = entityDocumentTaskToCommonModel((*source))
 		modelDocumentTask.DocumentId = (*source).DocumentId
 		modelDocumentTask.PlanId = (*source).PlanId
+		modelDocumentTask.SourceParseTaskId = (*source).SourceParseTaskId
 		modelDocumentTask.TaskType = (*source).TaskType
 		modelDocumentTask.TaskStatus = (*source).TaskStatus
 		modelDocumentTask.CurrentStage = (*source).CurrentStage
@@ -1050,8 +1064,8 @@ func ToParseArtifactModel(source *entity1.ParseArtifact) *model.DocumentParseArt
 	if source != nil {
 		var modelDocumentParseArtifact model.DocumentParseArtifact
 		modelDocumentParseArtifact.Model = entityParseArtifactToCommonModel((*source))
-		modelDocumentParseArtifact.DocumentID = (*source).DocumentID
-		modelDocumentParseArtifact.TaskID = (*source).TaskID
+		modelDocumentParseArtifact.DocumentId = (*source).DocumentId
+		modelDocumentParseArtifact.TaskId = (*source).TaskId
 		modelDocumentParseArtifact.ArtifactType = (*source).ArtifactType
 		modelDocumentParseArtifact.ObjectName = (*source).ObjectName
 		modelDocumentParseArtifact.ContentHash = (*source).ContentHash
@@ -1180,26 +1194,6 @@ func entityDocumentStrategyStepToCommonModel(source entity1.DocumentStrategyStep
 	commonModel.ID = source.ID
 	return commonModel
 }
-func entityDocumentStructureNodeToCommonModel(source entity1.DocumentStructureNode) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentTableCellToCommonModel(source entity1.DocumentTableCell) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentTableColumnToCommonModel(source entity1.DocumentTableColumn) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentTableRowToCommonModel(source entity1.DocumentTableRow) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
 func entityDocumentTableToCommonModel(source entity1.DocumentTable) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
@@ -1221,6 +1215,26 @@ func entityDocumentToCommonModel(source entity1.Document) common.Model {
 	return commonModel
 }
 func entityParseArtifactToCommonModel(source entity1.ParseArtifact) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityStructureNodeToCommonModel(source entity1.StructureNode) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityTableCellToCommonModel(source entity1.TableCell) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityTableColumnToCommonModel(source entity1.TableColumn) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityTableRowToCommonModel(source entity1.TableRow) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
@@ -1398,6 +1412,62 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 		pEntityKnowledgeTopicNode = &entityKnowledgeTopicNode
 	}
 	return pEntityKnowledgeTopicNode
+}
+func ToKnowledgeConfigEntities(source []*model.KnowledgeConfig) []*entity2.KnowledgeConfig {
+	var pEntityKnowledgeConfigList []*entity2.KnowledgeConfig
+	if source != nil {
+		pEntityKnowledgeConfigList = make([]*entity2.KnowledgeConfig, len(source))
+		for i := 0; i < len(source); i++ {
+			pEntityKnowledgeConfigList[i] = ToKnowledgeConfigEntity(source[i])
+		}
+	}
+	return pEntityKnowledgeConfigList
+}
+func ToKnowledgeConfigEntity(source *model.KnowledgeConfig) *entity2.KnowledgeConfig {
+	var pEntityKnowledgeConfig *entity2.KnowledgeConfig
+	if source != nil {
+		var entityKnowledgeConfig entity2.KnowledgeConfig
+		entityKnowledgeConfig.ID = (*source).Model.ID
+		entityKnowledgeConfig.BaseName = NormalizeString((*source).BaseName)
+		entityKnowledgeConfig.Description = NormalizeString((*source).Description)
+		entityKnowledgeConfig.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		entityKnowledgeConfig.RetrievalConfigJson = datatypesJSONToJsonRawMessage((*source).RetrievalConfigJson)
+		entityKnowledgeConfig.GraphRagConfigJson = datatypesJSONToJsonRawMessage((*source).GraphRagConfigJson)
+		entityKnowledgeConfig.RaptorConfigJson = datatypesJSONToJsonRawMessage((*source).RaptorConfigJson)
+		entityKnowledgeConfig.MetadataFilterJson = datatypesJSONToJsonRawMessage((*source).MetadataFilterJson)
+		entityKnowledgeConfig.IsDefault = (*source).IsDefault
+		entityKnowledgeConfig.SortOrder = (*source).SortOrder
+		pEntityKnowledgeConfig = &entityKnowledgeConfig
+	}
+	return pEntityKnowledgeConfig
+}
+func ToKnowledgeConfigModel(source *entity2.KnowledgeConfig) *model.KnowledgeConfig {
+	var pModelKnowledgeConfig *model.KnowledgeConfig
+	if source != nil {
+		var modelKnowledgeConfig model.KnowledgeConfig
+		modelKnowledgeConfig.Model = entityKnowledgeConfigToCommonModel((*source))
+		modelKnowledgeConfig.BaseName = NormalizeString((*source).BaseName)
+		modelKnowledgeConfig.Description = NormalizeString((*source).Description)
+		modelKnowledgeConfig.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		modelKnowledgeConfig.RetrievalConfigJson = jsonRawMessageToDatatypesJSON((*source).RetrievalConfigJson)
+		modelKnowledgeConfig.GraphRagConfigJson = jsonRawMessageToDatatypesJSON((*source).GraphRagConfigJson)
+		modelKnowledgeConfig.RaptorConfigJson = jsonRawMessageToDatatypesJSON((*source).RaptorConfigJson)
+		modelKnowledgeConfig.MetadataFilterJson = jsonRawMessageToDatatypesJSON((*source).MetadataFilterJson)
+		modelKnowledgeConfig.IsDefault = (*source).IsDefault
+		modelKnowledgeConfig.SortOrder = (*source).SortOrder
+		pModelKnowledgeConfig = &modelKnowledgeConfig
+	}
+	return pModelKnowledgeConfig
+}
+func ToKnowledgeConfigModelList(source []*entity2.KnowledgeConfig) []*model.KnowledgeConfig {
+	var pModelKnowledgeConfigList []*model.KnowledgeConfig
+	if source != nil {
+		pModelKnowledgeConfigList = make([]*model.KnowledgeConfig, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelKnowledgeConfigList[i] = ToKnowledgeConfigModel(source[i])
+		}
+	}
+	return pModelKnowledgeConfigList
 }
 func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
 	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem
@@ -1583,6 +1653,21 @@ func ToTopicDocumentRelationRespList(source []*entity2.KnowledgeTopicDocumentRel
 	}
 	return pKnowledgeTopicDocumentRelationRespList
 }
+func datatypesJSONToJsonRawMessage(source datatypes.JSON) json.RawMessage {
+	var jsonRawMessage json.RawMessage
+	if source != nil {
+		jsonRawMessage = make(json.RawMessage, len(source))
+		for i := 0; i < len(source); i++ {
+			jsonRawMessage[i] = source[i]
+		}
+	}
+	return jsonRawMessage
+}
+func entityKnowledgeConfigToCommonModel(source entity2.KnowledgeConfig) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
 func entityKnowledgeRouteTraceToCommonModel(source entity2.KnowledgeRouteTrace) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
@@ -1602,4 +1687,14 @@ func entityKnowledgeTopicNodeToCommonModel(source entity2.KnowledgeTopicNode) co
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
+}
+func jsonRawMessageToDatatypesJSON(source json.RawMessage) datatypes.JSON {
+	var datatypesJSON datatypes.JSON
+	if source != nil {
+		datatypesJSON = make(datatypes.JSON, len(source))
+		for i := 0; i < len(source); i++ {
+			datatypesJSON[i] = source[i]
+		}
+	}
+	return datatypesJSON
 }

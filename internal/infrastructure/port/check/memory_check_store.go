@@ -18,18 +18,18 @@ func NewMemoryCheckPointStore() *MemoryCheckPointStore {
 
 var _ checkpoint.Store = (*MemoryCheckPointStore)(nil)
 
-func (m *MemoryCheckPointStore) Get(ctx context.Context, checkPointID string) ([]byte, bool, error) {
+func (m *MemoryCheckPointStore) Get(ctx context.Context, checkPointId string) ([]byte, bool, error) {
 	return nil, false, nil
 }
 
-func (m *MemoryCheckPointStore) Set(ctx context.Context, checkPointID string, checkPoint []byte) error {
+func (m *MemoryCheckPointStore) Set(ctx context.Context, checkPointId string, checkPoint []byte) error {
 	return nil
 }
 
-func (m *MemoryCheckPointStore) Count(ctx context.Context, checkPointID string) (int, error) {
+func (m *MemoryCheckPointStore) Count(ctx context.Context, checkPointId string) (int, error) {
 	return 0, nil
 }
 
-func (m *MemoryCheckPointStore) Delete(ctx context.Context, checkPointID string) (int, error) {
+func (m *MemoryCheckPointStore) Delete(ctx context.Context, checkPointId string) (int, error) {
 	return 0, nil
 }
