@@ -24,13 +24,13 @@ type DocumentBlock struct {
 	CanonicalPath      string     `gorm:"column:canonical_path"`      // 规范路径
 	PageNo             int        `gorm:"column:page_no"`             // 页码
 	PageRange          string     `gorm:"column:page_range"`          // 页码范围
-	BboxJSON           string     `gorm:"column:bbox_json"`           // 边界框 JSON
+	BboxJson           string     `gorm:"column:bbox_json"`           // 边界框 JSON
 	Text               string     `gorm:"column:text"`                // 文本内容
 	ContentWithWeight  string     `gorm:"column:content_with_weight"` // 带权重的内容
 	TableHTML          string     `gorm:"column:table_html"`          // 表格 HTML
 	ImageObjectName    string     `gorm:"column:image_object_name"`   // 图片对象名
 	ImageCaption       string     `gorm:"column:image_caption"`       // 图片说明
-	MetadataJSON       string     `gorm:"column:metadata_json"`       // 元数据 JSON
+	MetadataJson       string     `gorm:"column:metadata_json"`       // 元数据 JSON
 	ParentBlockNo      int        `gorm:"-"`                          // 父块编号
 	BoundingBoxJSON    string     `gorm:"-"`                          // 边界框JSON
 	TableRows          [][]string `gorm:"-"`                          // 表格行数据
@@ -70,6 +70,21 @@ func (b *DocumentBlock) RenderBlockContent() string {
 
 func (b *DocumentBlock) IsTitleBlock() bool {
 	return utils.EqualsIgnoreCase(b.BlockType, "TITLE")
+}
+
+func (b *DocumentBlock) ResolveTitle(sectionPath string) string {
+	blocks := DocumentBlocks{b}
+	return blocks.ResolveTitle(sectionPath)
+}
+
+func (b *DocumentBlock) ResolveChunkType() string {
+	blocks := DocumentBlocks{b}
+	return blocks.ResolveChunkType()
+}
+
+func (b *DocumentBlock) Ids() string {
+	blocks := DocumentBlocks{b}
+	return blocks.Ids()
 }
 
 type DocumentBlocks []*DocumentBlock

@@ -233,13 +233,13 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 
 	// 检查是否需要从已提交 GraphRAG 结果恢复
 	resumeCommittedGraph := d.isCommittedGraph(graphRagBuildResult)
-	var parentCandidates []*vo.ParentBlockCandidate
+	var parentCandidates []*vo.ParentChunkCandidate
 	var childChunks []*entity.DocumentChunk
-	var parentBlocks []*entity.DocumentParentBlock
+	var parentBlocks []*entity.DocumentParentChunk
 
 	if resumeCommittedGraph {
 		// 从已提交的 GraphRAG outcome 恢复
-		parentBlocks = []*entity.DocumentParentBlock{}
+		parentBlocks = []*entity.DocumentParentChunk{}
 		childChunks, err = d.listFrozenSourceChunks(ctx, documentId, taskId)
 		if err != nil {
 			panic(err)
@@ -710,15 +710,15 @@ func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *
 //   - 子块的 ChunkNo 在函数内全局递增
 //   - 任何父块至少会得到 1 个兜底子块（由上层 BuildParentBlocks 保证）
 func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId int64,
-	candidates []*vo.ParentBlockCandidate) ([]*entity.DocumentParentBlock, []*entity.DocumentChunk) {
+	candidates []*vo.ParentChunkCandidate) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
 
-	parentBlocks := make([]*entity.DocumentParentBlock, 0, len(candidates))
+	parentBlocks := make([]*entity.DocumentParentChunk, 0, len(candidates))
 	chunks := make([]*entity.DocumentChunk, 0)
 
 	// 全局子块编号：从 0 开始，遇到有效子块时递增并写入 ChunkNo
 	globalChunkNo := 0
 	for parentIdx, candidate := range candidates {
-		parentBlock := &entity.DocumentParentBlock{
+		parentBlock := &entity.DocumentParentChunk{
 			ID:                utils.GetSnowflakeNextID(),
 			DocumentId:        documentId,
 			TaskId:            taskId,
@@ -745,7 +745,7 @@ func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId i
 					DocumentId:        documentId,
 					TaskId:            taskId,
 					PlanId:            planId,
-					ParentBlockId:     parentBlock.ID,
+					ParentChunkId:     parentBlock.ID,
 					ChunkNo:           globalChunkNo,
 					SourceType:        child.SourceType,
 					SectionPath:       utils.BlankToDefault(child.SectionPath, candidate.SectionPath),
@@ -878,7 +878,7 @@ func (d *AsyncProcessImpl) failTask(txCtx context.Context, task *entity.Document
 }
 
 // countChildCandidates 计算子块候选数
-func (d *AsyncProcessImpl) countChildCandidates(parentBlockCandidateList []*vo.ParentBlockCandidate) int {
+func (d *AsyncProcessImpl) countChildCandidates(parentBlockCandidateList []*vo.ParentChunkCandidate) int {
 	count := 0
 	for _, candidate := range parentBlockCandidateList {
 		for _, child := range candidate.ChildChunks {
@@ -891,8 +891,8 @@ func (d *AsyncProcessImpl) countChildCandidates(parentBlockCandidateList []*vo.P
 }
 
 // cleanupParentCandidates 过滤"文本为空"或"无子块"的父块候选
-func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
-	return slice.Filter(candidates, func(_ int, item *vo.ParentBlockCandidate) bool {
+func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentChunkCandidate) []*vo.ParentChunkCandidate {
+	return slice.Filter(candidates, func(_ int, item *vo.ParentChunkCandidate) bool {
 		fn := func(child *vo.ChunkCandidate) bool { return child != nil && strutil.IsNotBlank(child.Text) }
 		return item != nil && strutil.IsNotBlank(item.Text) && slices.ContainsFunc(item.ChildChunks, fn)
 	})

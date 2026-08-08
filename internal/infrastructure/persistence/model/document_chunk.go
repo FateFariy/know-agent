@@ -7,7 +7,7 @@ type DocumentChunk struct {
 	DocumentId        int64  `gorm:"column:document_id;type:bigint"`       // 文档ID
 	TaskId            int64  `gorm:"column:task_id;type:bigint"`           // 任务ID
 	PlanId            int64  `gorm:"column:plan_id;type:bigint"`           // 计划ID
-	ParentBlockId     int64  `gorm:"column:parent_block_id;type:bigint"`   // 父块ID
+	ParentChunkId     int64  `gorm:"column:parent_chunk_id;type:bigint"`   // 父块ID
 	ChunkNo           int    `gorm:"column:chunk_no;type:int"`             // 块序号
 	SourceType        int    `gorm:"column:source_type;type:int"`          // 来源类型
 	SectionPath       string `gorm:"column:section_path;type:text"`        // 章节路径

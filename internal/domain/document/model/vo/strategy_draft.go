@@ -6,7 +6,6 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // DocumentStrategyPlanDraft 策略方案草稿
@@ -42,40 +41,12 @@ type ChunkCandidate struct {
 	Questions         string // 问题
 	PageNo            int    // 页码
 	PageRange         string // 页码范围
-	BboxJSON          string // 边界框JSON
+	BboxJson          string // 边界框JSON
 	SourceBlockIds    string // 源块ID列表
 }
 
-func CopyChunkCandidate(original *ChunkCandidate, text string) *ChunkCandidate {
-	text = strutil.Trim(text)
-	if original == nil {
-		return &ChunkCandidate{
-			Text:       text,
-			SourceType: enum.ChunkSourceTypeOriginal,
-		}
-	}
-	return &ChunkCandidate{
-		SectionPath:       original.SectionPath,
-		StructureNodeId:   original.StructureNodeId,
-		StructureNodeType: original.StructureNodeType,
-		CanonicalPath:     original.CanonicalPath,
-		ItemIndex:         original.ItemIndex,
-		Text:              text,
-		SourceType:        original.SourceType,
-		ContentWithWeight: "",
-		ChunkType:         original.ChunkType,
-		Title:             original.Title,
-		Keywords:          "",
-		Questions:         "",
-		PageNo:            0,
-		PageRange:         "",
-		BboxJSON:          "",
-		SourceBlockIds:    "",
-	}
-}
-
-// ParentBlockCandidate 父块候选
-type ParentBlockCandidate struct {
+// ParentChunkCandidate 父块候选
+type ParentChunkCandidate struct {
 	SectionPath       string            // 章节路径
 	StructureNodeId   int64             // 结构体节点ID
 	StructureNodeType int               // 结构体节点类型
@@ -83,7 +54,34 @@ type ParentBlockCandidate struct {
 	ItemIndex         int               // 项目索引
 	Text              string            // 文本内容
 	SourceType        int               // 来源类型
+	PageRange         string            // 页码范围
+	SourceBlockIds    string            // 源ID列表
 	ChildChunks       []*ChunkCandidate // 子块列表
+}
+
+type ParentChunkCandidates []*ParentChunkCandidate
+
+// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
+func (b ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
+	seen := make(map[string]struct{})
+	result := make(ParentChunkCandidates, 0, len(b))
+	for _, block := range b {
+		if block == nil {
+			continue
+		}
+
+		trim := strutil.Trim(block.Text)
+		if trim != "" {
+			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, block.ItemIndex, trim)
+			if _, ok := seen[uniqueKey]; !ok {
+				seen[uniqueKey] = struct{}{}
+				result = append(result, block)
+			}
+		}
+	}
+
+	return result
 }
 
 type ChunkCandidates []*ChunkCandidate
@@ -103,7 +101,7 @@ func (c ChunkCandidates) CleanupAndUnique() ChunkCandidates {
 			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
 			if _, ok := seen[uniqueKey]; !ok {
 				seen[uniqueKey] = struct{}{}
-				result = append(result, CopyChunkCandidate(candidate, trim))
+				result = append(result, candidate)
 			}
 		}
 	}

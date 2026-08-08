@@ -222,7 +222,7 @@ func (s *ChunkCoordinateImpl) NormalizeSteps(ctx context.Context, baseSteps []*e
 
 // BuildParentBlocks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
 func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *entity.Document,
-	steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error) {
+	steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentChunkCandidate, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
 	parentSteps := s.sortPipelineSteps(steps, enum.PipelineTypeParent)
 	childSteps := s.sortPipelineSteps(steps, enum.PipelineTypeChild)
@@ -247,7 +247,7 @@ func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *e
 	parentSeedList := s.buildParentSeedList(ctx, parsedText, parentSteps, structureNodes)
 
 	// 为每个父块种子派生其子块；无子块时以父块本身兜底
-	parentBlockList := make([]*vo.ParentBlockCandidate, 0)
+	parentBlockList := make([]*vo.ParentChunkCandidate, 0)
 	for _, parentSeed := range s.cleanupChunkList(parentSeedList) {
 		if parentSeed != nil && strutil.IsNotBlank(parentSeed.Text) {
 			childSeedList := s.buildChildSeedList(ctx, parentSeed, childSteps, structureNodes)
@@ -261,7 +261,7 @@ func (s *ChunkCoordinateImpl) BuildParentBlocks(ctx context.Context, document *e
 				}
 			}
 
-			parentBlock := &vo.ParentBlockCandidate{
+			parentBlock := &vo.ParentChunkCandidate{
 				SectionPath:       parentSeed.SectionPath,
 				StructureNodeId:   parentSeed.StructureNodeId,
 				StructureNodeType: parentSeed.StructureNodeType,
@@ -519,16 +519,16 @@ func (s *ChunkCoordinateImpl) cloneChunkCandidate(original *vo.ChunkCandidate, t
 	}
 }
 
-// cloneParentBlockCandidate 克隆 ParentBlockCandidate
-func (s *ChunkCoordinateImpl) cloneParentBlockCandidate(source *vo.ParentBlockCandidate, childChunks []*vo.ChunkCandidate, text string) *vo.ParentBlockCandidate {
+// cloneParentBlockCandidate 克隆 ParentChunkCandidate
+func (s *ChunkCoordinateImpl) cloneParentBlockCandidate(source *vo.ParentChunkCandidate, childChunks []*vo.ChunkCandidate, text string) *vo.ParentChunkCandidate {
 	if source == nil {
-		return &vo.ParentBlockCandidate{
+		return &vo.ParentChunkCandidate{
 			Text:        text,
 			SourceType:  enum.ChunkSourceTypeOriginal,
 			ChildChunks: append([]*vo.ChunkCandidate{}, childChunks...),
 		}
 	}
-	return &vo.ParentBlockCandidate{
+	return &vo.ParentChunkCandidate{
 		SectionPath:       source.SectionPath,
 		StructureNodeId:   source.StructureNodeId,
 		StructureNodeType: source.StructureNodeType,
@@ -639,8 +639,8 @@ func (s *ChunkCoordinateImpl) cleanupChunkList(chunks []*vo.ChunkCandidate) []*v
 }
 
 // cleanupParentBlockList 清理父块列表：规则与子块一致，path+itemIndex+trim 去重
-func (s *ChunkCoordinateImpl) cleanupParentBlockList(blocks []*vo.ParentBlockCandidate) []*vo.ParentBlockCandidate {
-	result := make(map[string]*vo.ParentBlockCandidate)
+func (s *ChunkCoordinateImpl) cleanupParentBlockList(blocks []*vo.ParentChunkCandidate) []*vo.ParentChunkCandidate {
+	result := make(map[string]*vo.ParentChunkCandidate)
 	for _, block := range blocks {
 		if block != nil && strutil.IsNotBlank(block.Text) {
 			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)

@@ -11,11 +11,11 @@ type DocumentChunkDetail struct {
 	TaskId        int64
 	PlanId        int64
 	Chunk         *entity.DocumentChunk
-	ParentBlock   *entity.DocumentParentBlock
+	ParentBlock   *entity.DocumentParentChunk
 	SiblingChunks []*entity.DocumentChunk
 }
 
-func (d *DocumentChunkDetail) FillParentInfo(parentBlock *entity.DocumentParentBlock) {
+func (d *DocumentChunkDetail) FillParentInfo(parentBlock *entity.DocumentParentChunk) {
 	if parentBlock != nil {
 		d.ParentBlock = parentBlock
 		d.ParentBlock.FillEnumName()

@@ -398,26 +398,26 @@ func (d *DocumentRepositoryImpl) SelectChunkListByParentBlockId(ctx context.Cont
 
 // ========== 父块相关 ==========
 
-func (d *DocumentRepositoryImpl) InsertParentBlock(ctx context.Context, block *entity.DocumentParentBlock) error {
+func (d *DocumentRepositoryImpl) InsertParentBlock(ctx context.Context, block *entity.DocumentParentChunk) error {
 	return d.dbWithContext(ctx).Create(convert.ToDocumentParentBlockModel(block)).Error
 }
 
-func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentBlock) error {
+func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentChunk) error {
 	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentParentBlockModelList(blocks), 100).Error
 }
 
 // DeleteParentBlockByDocumentId 根据文档ID删除父块
 func (d *DocumentRepositoryImpl) DeleteParentBlockByDocumentId(ctx context.Context, documentId int64) error {
-	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentBlock{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentChunk{}).Error
 }
 
 // SelectParentBlockListByIds 根据父块ID列表查询父块列表
-func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentBlock, error) {
+func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentChunk, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	var parentBlocks []*entity.DocumentParentBlock
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).
+	var parentBlocks []*entity.DocumentParentChunk
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParentChunk{}).
 		Where("id IN ?", ids).
 		Order("parent_no ASC").
 		Find(&parentBlocks).Error; err != nil {
@@ -427,9 +427,9 @@ func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context,
 }
 
 // SelectParentBlockById 根据父块ID查询父块详情
-func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentBlock, error) {
-	parentBlock := &entity.DocumentParentBlock{ID: blockId, DocumentId: documentId, TaskId: taskId}
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParentBlock{}).Where(parentBlock).First(parentBlock).Error; err != nil {
+func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentChunk, error) {
+	parentBlock := &entity.DocumentParentChunk{ID: blockId, DocumentId: documentId, TaskId: taskId}
+	if err := d.dbWithContext(ctx).Model(&model.DocumentParentChunk{}).Where(parentBlock).First(parentBlock).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, common.NewBizError(errorx.ErrDocumentNotFound.Code, "父块详情不存在")
 		}

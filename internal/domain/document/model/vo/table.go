@@ -6,7 +6,7 @@ type TableCandidate struct {
 	SectionPath     string                 // 章节路径
 	PageNo          int                    // 页码
 	PageRange       string                 // 页码范围
-	BoundingBoxJSON string                 // 边界框JSON
+	BoundingBoxJson string                 // 边界框JSON
 	TableHTML       string                 // 表格HTML内容
 	TitleHint       string                 // 标题提示
 	ProjectionOwner string                 // 投影所有者
@@ -39,7 +39,7 @@ type TableCell struct {
 	SourceRowNo     int            // 源行号
 	SourceColumnNo  int            // 源列号
 	SourceCellRef   string         // 源单元格引用
-	BoundingBoxJSON string         // 边界框JSON
+	BoundingBoxJson string         // 边界框JSON
 	SyntaxNodeId    string         // 语法节点ID
 	SourceSpan      *SourceSpan    // 源文本位置范围
 	SourceMetadata  map[string]any // 源元数据

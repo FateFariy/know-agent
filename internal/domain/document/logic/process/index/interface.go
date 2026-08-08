@@ -19,9 +19,9 @@ type Context struct {
 	StartTime            time.Time
 	BuildStartedTime     time.Time
 	PipelineSteps        []*entity.DocumentStrategyStep
-	ParentCandidates     []*vo.ParentBlockCandidate
+	ParentCandidates     []*vo.ParentChunkCandidate
 	ChildChunks          []*entity.DocumentChunk
-	ParentBlocks         []*entity.DocumentParentBlock
+	ParentBlocks         []*entity.DocumentParentChunk
 	GraphRagBuildResult  *vo.GraphRagBuildResult
 	GraphFinalization    *vo.GraphRagFinalization
 	RaptorBuildResult    *vo.RaptorBuildResult

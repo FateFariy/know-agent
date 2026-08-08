@@ -59,7 +59,7 @@ func (p *PreparationPhase) isCommittedGraph(result *vo.GraphRagBuildResult) bool
 
 // resumeFromCommittedGraph 从已提交的 GraphRAG outcome 恢复
 func (p *PreparationPhase) resumeFromCommittedGraph(ctx context.Context, buildCtx *Context) error {
-	buildCtx.ParentBlocks = []*entity.DocumentParentBlock{}
+	buildCtx.ParentBlocks = []*entity.DocumentParentChunk{}
 	buildCtx.ChildChunks = []*entity.DocumentChunk{} // TODO: 实现 listFrozenSourceChunks
 	// graphRagBuildResult = repairCrossDocumentProjection(...)
 	logx.Infof("从已提交 GraphRAG outcome 恢复索引任务: documentId=%d, taskId=%d",

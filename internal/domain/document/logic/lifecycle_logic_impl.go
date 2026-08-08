@@ -614,7 +614,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 	}
 
 	// 提取所有文档块的父块ID列表
-	parentBlockIds := slice.Map(chunkList, func(index int, item *entity.DocumentChunk) int64 { return item.ParentBlockId })
+	parentBlockIds := slice.Map(chunkList, func(index int, item *entity.DocumentChunk) int64 { return item.ParentChunkId })
 
 	// 批量查询父块信息
 	parentBlockList, err := d.repo.SelectParentBlockListByIds(ctx, parentBlockIds)
@@ -624,11 +624,11 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 
 	// 构建父块ID到父块对象的映射
 	parentBlockMap := utils.SliceToMapBy(parentBlockList,
-		func(item *entity.DocumentParentBlock) (int64, *entity.DocumentParentBlock) { return item.ID, item })
+		func(item *entity.DocumentParentChunk) (int64, *entity.DocumentParentChunk) { return item.ID, item })
 
 	// 填充每个文档块的父块信息和枚举名称
 	slice.ForEach(chunkList, func(index int, item *entity.DocumentChunk) {
-		item.FillParentInfo(parentBlockMap[item.ParentBlockId])
+		item.FillParentInfo(parentBlockMap[item.ParentChunkId])
 		item.FillEnumName()
 	})
 
@@ -666,14 +666,14 @@ func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, docum
 	}
 
 	// 查询父块信息和兄弟块列表（如果有父块）
-	var parentBlock *entity.DocumentParentBlock
+	var parentBlock *entity.DocumentParentChunk
 	var siblingChunkList []*entity.DocumentChunk
-	if chunk.ParentBlockId > 0 {
-		parentBlock, err = d.repo.SelectParentBlockById(ctx, chunk.ParentBlockId, document.ID, effectiveTaskId)
+	if chunk.ParentChunkId > 0 {
+		parentBlock, err = d.repo.SelectParentBlockById(ctx, chunk.ParentChunkId, document.ID, effectiveTaskId)
 		if err != nil {
 			return nil, err
 		}
-		siblingChunkList, err = d.repo.SelectChunkListByParentBlockId(ctx, document.ID, effectiveTaskId, chunk.ParentBlockId)
+		siblingChunkList, err = d.repo.SelectChunkListByParentBlockId(ctx, document.ID, effectiveTaskId, chunk.ParentChunkId)
 		if err != nil {
 			return nil, err
 		}
@@ -719,7 +719,7 @@ func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, docum
 }
 
 // QueryParentBlocks 查询父块列表
-func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentBlock, error) {
+func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error) {
 	return d.repo.SelectParentBlockListByIds(ctx, parentIds)
 }
 

@@ -4,8 +4,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-// DocumentParentBlock 文档父块实体
-type DocumentParentBlock struct {
+// DocumentParentChunk 文档父块实体
+type DocumentParentChunk struct {
 	ID                int64  `gorm:"column:id"`                  // 主键ID
 	DocumentId        int64  `gorm:"column:document_id"`         // 文档ID
 	TaskId            int64  `gorm:"column:task_id"`             // 任务ID
@@ -23,34 +23,11 @@ type DocumentParentBlock struct {
 	ChildCount        int    `gorm:"column:child_count"`         // 子块数量
 	StartChunkNo      int    `gorm:"column:start_chunk_no"`      // 起始块序号
 	EndChunkNo        int    `gorm:"column:end_chunk_no"`        // 结束块序号
+	PageRange         string `gorm:"column:page_range"`          // 页码范围
+	SourceBlockIds    string `gorm:"column:source_block_ids"`    // 源块ID列表
 	SourceTypeName    string `gorm:"-"`                          // 来源类型名称
 }
 
-func (d *DocumentParentBlock) FillEnumName() {
+func (d *DocumentParentChunk) FillEnumName() {
 	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }
-
-//type DocumentParentBlocks []*DocumentParentBlock
-//
-//// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
-//func (b DocumentParentBlocks) CleanupAndUnique() DocumentParentBlocks {
-//	seen := make(map[string]struct{})
-//	result := make(DocumentParentBlocks, 0, len(b))
-//	for _, block := range b {
-//		if block == nil {
-//			continue
-//		}
-//
-//		trim := strutil.Trim(block.Text)
-//		if trim != "" {
-//			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)
-//			uniqueKey := fmt.Sprintf("%s||%d||%s", path, block.ItemIndex, trim)
-//			if _, ok := seen[uniqueKey]; !ok {
-//				seen[uniqueKey] = struct{}{}
-//				result = append(result, CopyChunkCandidate(block, trim))
-//			}
-//		}
-//	}
-//
-//	return result
-//}

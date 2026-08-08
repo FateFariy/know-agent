@@ -2,7 +2,7 @@ package model
 
 import "github.com/swiftbit/know-agent/common"
 
-type DocumentParentBlock struct {
+type DocumentParentChunk struct {
 	common.Model
 	DocumentId        int64  `gorm:"column:document_id;type:bigint"`          // 文档ID
 	TaskId            int64  `gorm:"column:task_id;type:bigint"`              // 任务ID

@@ -126,19 +126,19 @@ type DocumentRepository interface {
 	// ========== 父块相关 ==========
 
 	// InsertParentBlock 插入父块
-	InsertParentBlock(ctx context.Context, block *entity.DocumentParentBlock) error
+	InsertParentBlock(ctx context.Context, block *entity.DocumentParentChunk) error
 
 	// InsertParentBlockBatch 批量插入父块
-	InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentBlock) error
+	InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentChunk) error
 
 	// DeleteParentBlockByDocumentId 根据文档ID删除父块
 	DeleteParentBlockByDocumentId(ctx context.Context, documentId int64) error
 
 	// SelectParentBlockListByIds 根据ID列表查询父块
-	SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentBlock, error)
+	SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentChunk, error)
 
 	// SelectParentBlockById 根据ID查询父块
-	SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentBlock, error)
+	SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentChunk, error)
 
 	// ========== 结构节点相关 ==========
 

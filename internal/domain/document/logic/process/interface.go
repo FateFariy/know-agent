@@ -28,7 +28,7 @@ type ChunkCoordinator interface {
 
 	// BuildParentBlocks 构建父子块结构
 	BuildParentBlocks(ctx context.Context, document *entity.Document,
-		steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentBlockCandidate, error)
+		steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentChunkCandidate, error)
 }
 
 // TextPreprocessor 文本预处理器
