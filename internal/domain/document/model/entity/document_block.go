@@ -1,8 +1,10 @@
 package entity
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -66,19 +68,73 @@ func (b *DocumentBlock) RenderBlockContent() string {
 	return text
 }
 
-func (b *DocumentBlock) RenderBlockWeightedContent() string {
-	if b.ContentWithWeight != "" {
-		return b.ContentWithWeight
-	}
-	text := b.RenderBlockContent()
-
-}
-
 func (b *DocumentBlock) IsTitleBlock() bool {
 	return utils.EqualsIgnoreCase(b.BlockType, "TITLE")
 }
 
 type DocumentBlocks []*DocumentBlock
+
+func (b DocumentBlocks) FirstPageNo() int {
+	for _, block := range b {
+		pageNo := block.PageNo
+		if pageNo > 0 {
+			return pageNo
+		}
+	}
+	return 0
+}
+
+func (b DocumentBlocks) PageRange() string {
+	// 提取有效页码并去重
+	pageSet := make(map[int]bool, len(b))
+	pages := make([]int, 0, len(b))
+	for _, block := range b {
+		if pn := block.PageNo; pn > 0 && !pageSet[pn] {
+			pageSet[pn] = true
+			pages = append(pages, pn)
+		}
+	}
+
+	// 若存在有效页码，则排序并计算范围
+	if len(pages) > 0 {
+		slices.Sort(pages)
+
+		first, last := pages[0], pages[len(pages)-1]
+		if first == last {
+			return strconv.Itoa(first)
+		}
+		return fmt.Sprintf("%d-%d", first, last)
+	}
+
+	// 回退逻辑：使用块自带的 pageRange
+	for _, block := range b {
+		if r := strings.TrimSpace(block.PageRange); r != "" {
+			return r
+		}
+	}
+	return ""
+}
+
+func (b DocumentBlocks) Ids() string {
+	seen := make(map[int64]struct{})
+	var builder strings.Builder
+	count := 0
+	builder.WriteString("[")
+	for _, block := range b {
+		id := block.ID
+		_, exists := seen[id]
+		if id > 0 && !exists {
+			seen[id] = struct{}{}
+			if count > 0 {
+				builder.WriteString(",")
+			}
+			builder.WriteString(strconv.FormatInt(id, 10))
+			count++
+		}
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
 
 func (b DocumentBlocks) CanonicalPaths() []string {
 	result := make([]string, 0, len(b))
@@ -122,8 +178,8 @@ func (b DocumentBlocks) JoinBlockTexts() string {
 	var builder strings.Builder
 	first := true
 	for _, block := range b {
-		content := block.RenderBlockContent()
-		if strings.TrimSpace(content) == "" {
+		content := strings.TrimSpace(block.RenderBlockContent())
+		if content == "" {
 			continue
 		}
 

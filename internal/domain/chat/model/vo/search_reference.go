@@ -92,9 +92,9 @@ func (r *SearchReference) UniqueKey() string {
 func (r *SearchReference) ReferenceSummary(suffix string) string {
 	title := utils.BlankToDefault(r.DocumentName, r.Title)
 	path := utils.BlankToDefault(r.SectionPath, r.Url)
-	refID := utils.BlankToDefault(r.ReferenceId, "-")
+	refId := utils.BlankToDefault(r.ReferenceId, "-")
 	if strutil.IsBlank(path) {
-		return "[" + refID + "] " + title + " | " + suffix
+		return "[" + refId + "] " + title + " | " + suffix
 	}
-	return "[" + refID + "] " + title + " | " + path + " | " + suffix
+	return "[" + refId + "] " + title + " | " + path + " | " + suffix
 }

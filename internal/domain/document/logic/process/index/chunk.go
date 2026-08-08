@@ -731,6 +731,32 @@ func (p *ChunkingPhase) buildBlockWindowParentSeeds(blocks entity.DocumentBlocks
 
 var re = regexp.MustCompile(`[>/|]`)
 
+func (p *ChunkingPhase) renderBlockWeightedContent(block *entity.DocumentBlock) string {
+	if block == nil {
+		return ""
+	}
+	space := strings.TrimSpace(block.ContentWithWeight)
+	if space != "" {
+		return space
+	}
+	text := block.RenderBlockContent()
+	title := block.ResolveTitle(block.CanonicalPath)
+
+}
+
+func (p *ChunkingPhase) joinBlockWeightedContents(blocks entity.DocumentBlocks) string {
+	var contents []string
+
+	for _, block := range blocks {
+		content := strings.TrimSpace(p.renderBlockWeightedContent(block))
+		if content != "" {
+			contents = append(contents, content)
+		}
+	}
+
+	return strings.Join(contents, "\n\n")
+}
+
 func (p *ChunkingPhase) buildKeywords(title, sectionPath, text string) []string {
 	keywords := make([]string, 0, 12)
 	seen := make(map[string]bool, 12)
@@ -792,6 +818,68 @@ func (p *ChunkingPhase) buildQuestions(title, chunkType string, keywords []strin
 	return string(data)
 }
 
+// buildContentWithWeight 构建带权重的富文本内容, 将标题、章节路径、块类型、关键词、问题及正文按固定格式组装
+func (p *ChunkingPhase) buildContentWithWeight(text, sectionPath, title, chunkType, keywords, questions, parserWeightedContent string) string {
+	var parts []string
+
+	// 标题部分
+	if trimmed := strings.TrimSpace(title); trimmed != "" {
+		parts = append(parts, "[TITLE]\n"+trimmed)
+	}
+
+	// 章节路径部分
+	if trimmed := strings.TrimSpace(sectionPath); trimmed != "" {
+		parts = append(parts, "[SECTION]\n"+trimmed)
+	}
+
+	// 块类型部分
+	if trimmed := strings.TrimSpace(chunkType); trimmed != "" {
+		parts = append(parts, "[CHUNK_TYPE]\n"+trimmed)
+	}
+
+	jsonArrayToDisplayText := func(jsonArray string) string {
+		results := make([]string, 0)
+		if err := json.Unmarshal([]byte(jsonArray), &results); err != nil {
+			displayText := strings.Replace(jsonArray, "\"", "", -1)
+			displayText = strings.TrimPrefix(displayText, "[")
+			displayText = strings.TrimSuffix(displayText, "]")
+			results = strings.Split(displayText, ",")
+		}
+		j := 0
+		for i := range results {
+			space := strings.TrimSpace(results[i])
+			if space == "" {
+				continue
+			}
+			results[j] = space
+			j++
+		}
+		return strings.Join(results[:j], ";")
+	}
+
+	// 关键词部分（JSON数组转可读文本）
+	if keywordText := jsonArrayToDisplayText(keywords); keywordText != "" {
+		parts = append(parts, "[KEYWORDS]\n"+keywordText)
+	}
+
+	// 问题部分（JSON数组转可读文本）
+	if questionText := jsonArrayToDisplayText(questions); questionText != "" {
+		parts = append(parts, "[QUESTIONS]\n"+questionText)
+	}
+
+	// 正文内容部分（优先使用解析器生成的加权内容）
+	weightedBody := strings.TrimSpace(parserWeightedContent)
+	if weightedBody == "" {
+		weightedBody = strings.TrimSpace(text)
+	}
+	if weightedBody != "" {
+		parts = append(parts, "[CONTENT]\n"+weightedBody)
+	}
+
+	// 用双换行符连接所有部分并修剪首尾空白
+	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+}
+
 func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.StructureNodes) *vo.ChunkCandidate {
 	sectionPath := blocks.CommonSectionPath()
 	canonicalPath := utils.FirstNonBlank(blocks.CanonicalPaths()...)
@@ -805,6 +893,7 @@ func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.
 
 	candidate := &vo.ChunkCandidate{
 		SectionPath:       sectionPath,
+		CanonicalPath:     canonicalPath,
 		Text:              text,
 		SourceType:        enum.ChunkSourceTypeOriginal,
 		ContentWithWeight: "",
@@ -812,15 +901,18 @@ func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.
 		Title:             title,
 		Keywords:          string(keywordJson),
 		Questions:         questions,
-		PageNo:            0,
-		PageRange:         "",
-		BboxJson:          "",
-		SourceBlockIds:    "",
+		PageNo:            blocks.FirstPageNo(),
+		PageRange:         blocks.PageRange(),
+		SourceBlockIds:    blocks.Ids(),
 	}
 	if node != nil {
 		candidate.StructureNodeId = node.ID
 		candidate.StructureNodeType = node.NodeType
 		candidate.ItemIndex = node.ItemIndex
+		candidate.CanonicalPath = utils.BlankToDefault(node.CanonicalPath, canonicalPath)
+	}
+	if len(blocks) > 0 {
+		candidate.BboxJSON = blocks[0].BboxJSON
 	}
 
 	return candidate

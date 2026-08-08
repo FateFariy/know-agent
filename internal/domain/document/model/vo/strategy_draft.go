@@ -42,7 +42,7 @@ type ChunkCandidate struct {
 	Questions         string // 问题
 	PageNo            int    // 页码
 	PageRange         string // 页码范围
-	BboxJson          string // 边界框JSON
+	BboxJSON          string // 边界框JSON
 	SourceBlockIds    string // 源块ID列表
 }
 
@@ -69,7 +69,7 @@ func CopyChunkCandidate(original *ChunkCandidate, text string) *ChunkCandidate {
 		Questions:         "",
 		PageNo:            0,
 		PageRange:         "",
-		BboxJson:          "",
+		BboxJSON:          "",
 		SourceBlockIds:    "",
 	}
 }
