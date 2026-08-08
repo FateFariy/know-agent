@@ -2,7 +2,15 @@ package chunk
 
 import (
 	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
+
+type Input struct {
+	Blocks entity.DocumentBlocks
+	Nodes  []*entity.StructureNode
+}
 
 // Chunker 文本分块器
 type Chunker interface {
@@ -10,7 +18,7 @@ type Chunker interface {
 	Name() string
 
 	// Chunk 将一段输入文本切分为多个文本块
-	Chunk(ctx context.Context, input *TextBlock, opts ...Option) ([]*TextBlock, error)
+	Chunk(ctx context.Context, input *Input, opts ...Option) ([]*vo.ChunkCandidate, error)
 }
 
 // Option 配置策略的函数选项
@@ -42,23 +50,4 @@ func GetSpecificOptions[T any](base *T, opts ...Option) *T {
 	}
 
 	return base
-}
-
-// TextBlock 文本块通用实体
-type TextBlock struct {
-	SectionPath   string // 文本所属章节路径，例如 "1.1.2"
-	CanonicalPath string // 文本唯一标准层级路径，例如 "1.1.2.1"
-	ItemIndex     int    // 原始文档片段在来源列表中的下标索引
-	Text          string // 原始/切分后文本内容
-	SourceType    int    // 来源类型
-}
-
-func (t *TextBlock) CloneWithText(text string) *TextBlock {
-	return &TextBlock{
-		SectionPath:   t.SectionPath,
-		CanonicalPath: t.CanonicalPath,
-		ItemIndex:     t.ItemIndex,
-		Text:          text,
-		SourceType:    t.SourceType,
-	}
 }

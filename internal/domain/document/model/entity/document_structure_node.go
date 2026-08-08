@@ -1,5 +1,7 @@
 package entity
 
+import "github.com/duke-git/lancet/v2/strutil"
+
 // StructureNode 文档结构节点实体
 type StructureNode struct {
 	ID                int64  `gorm:"column:id"`                   // 节点ID
@@ -53,4 +55,23 @@ type SyntaxProvenance struct {
 	SyntaxNodeType string      // 语法节点类型
 	SourceOrigin   string      // 源文本来源
 	SourceSpan     *SourceSpan // 源文本位置范围
+}
+
+type StructureNodes []*StructureNode
+
+func (n StructureNodes) FindNodeByPath(sectionPath, canonicalPath string) *StructureNode {
+	if len(n) == 0 {
+		return nil
+	}
+	sectionPath = strutil.Trim(sectionPath)
+	canonicalPath = strutil.Trim(canonicalPath)
+	for _, node := range n {
+		if canonicalPath != "" && strutil.Trim(node.CanonicalPath) == canonicalPath {
+			return node
+		}
+		if sectionPath != "" && (strutil.Trim(node.SectionPath) == sectionPath || strutil.Trim(node.Title) == sectionPath) {
+			return node
+		}
+	}
+	return nil
 }

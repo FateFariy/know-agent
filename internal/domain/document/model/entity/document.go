@@ -38,6 +38,8 @@ type Document struct {
 	LastParseTaskId      int64     `gorm:"column:last_parse_task_id"`    // 上一次解析任务ID
 	StructureNodeCount   int       `gorm:"column:structure_node_count"`  // 结构化节点数
 	LastIndexTaskId      int64     `gorm:"column:last_index_task_id"`    // 上一次索引任务ID
+	KnowledgeBaseId      int64     `gorm:"column:knowledge_base_id"`     // 知识库ID
+	KnowledgeBaseName    string    `gorm:"column:knowledge_base_name"`   // 知识库名称
 	CreateTime           time.Time `gorm:"column:create_time"`           // 创建时间
 	UpdateTime           time.Time `gorm:"column:update_time"`           // 更新时间
 	OperatorId           int64     `gorm:"-"`                            // 操作人ID

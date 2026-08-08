@@ -61,3 +61,8 @@ type VectorIndexer interface {
 	// DeleteByDocumentId 根据文档ID删除
 	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
+
+type Tokenizer interface {
+	// SegmentWords 返回词文本列表，适用于搜索索引等场景
+	SegmentWords(text string) []string
+}

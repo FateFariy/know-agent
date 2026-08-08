@@ -36,3 +36,7 @@ type Phase interface {
 	// Execute 执行阶段
 	Execute(ctx context.Context, buildCtx *Context) error
 }
+
+type IndexingConfigResolver interface {
+	Resolve(ctx context.Context, document *entity.Document) *vo.IndexingOptions
+}

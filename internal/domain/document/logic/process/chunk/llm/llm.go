@@ -3,12 +3,12 @@ package llm
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 const (
@@ -29,20 +29,6 @@ type Chunker struct {
 	opt      *options
 }
 
-type options struct {
-	llmSplitPrompt string
-}
-
-// WithLlmSplitPrompt 设置LLM分块提示词
-func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
-		if llmSplitPrompt == "" {
-			llmSplitPrompt = documentLlmSplit
-		}
-		o.llmSplitPrompt = llmSplitPrompt
-	})
-}
-
 // NewChunker 创建大模型智能分块器
 func NewChunker(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Chunker {
 	return &Chunker{
@@ -60,7 +46,7 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行大模型智能分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.TextBlock, opts ...chunk.Option) ([]*chunk.TextBlock, error) {
+func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*vo.ChunkCandidate, error) {
 	if input == nil || strutil.Trim(input.Text) == "" {
 		return nil, nil
 	}

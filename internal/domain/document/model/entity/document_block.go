@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -62,4 +64,135 @@ func (b *DocumentBlock) RenderBlockContent() string {
 	}
 
 	return text
+}
+
+func (b *DocumentBlock) RenderBlockWeightedContent() string {
+	if b.ContentWithWeight != "" {
+		return b.ContentWithWeight
+	}
+	text := b.RenderBlockContent()
+
+}
+
+func (b *DocumentBlock) IsTitleBlock() bool {
+	return utils.EqualsIgnoreCase(b.BlockType, "TITLE")
+}
+
+type DocumentBlocks []*DocumentBlock
+
+func (b DocumentBlocks) CanonicalPaths() []string {
+	result := make([]string, 0, len(b))
+	for _, block := range b {
+		result = append(result, block.CanonicalPath)
+	}
+	return result
+}
+
+func (b DocumentBlocks) ResolveTitle(sectionPath string) string {
+	normalizeTitle := func(title string) string {
+		normalized := strings.TrimSpace(title)
+		for strings.HasPrefix(normalized, "#") {
+			normalized = strings.TrimSpace(normalized[1:])
+		}
+		return normalized
+	}
+	for _, block := range b {
+		if block.IsTitleBlock() && strutil.IsNotBlank(block.Text) {
+			return normalizeTitle(block.Text)
+		}
+	}
+
+	sectionPath = strings.TrimSpace(sectionPath)
+	if sectionPath == "" {
+		return ""
+	}
+
+	re := regexp.MustCompile(`[>/|]`)
+	parts := re.Split(sectionPath, -1)
+	for i := len(parts) - 1; i >= 0; i-- {
+		segment := strings.TrimSpace(parts[i])
+		if segment != "" {
+			return normalizeTitle(segment)
+		}
+	}
+	return normalizeTitle(sectionPath)
+}
+
+func (b DocumentBlocks) JoinBlockTexts() string {
+	var builder strings.Builder
+	first := true
+	for _, block := range b {
+		content := block.RenderBlockContent()
+		if strings.TrimSpace(content) == "" {
+			continue
+		}
+
+		if !first {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString(content)
+		first = false
+	}
+
+	return builder.String()
+}
+
+func (b DocumentBlocks) CleanupAndSort() DocumentBlocks {
+	if len(b) == 0 {
+		return nil
+	}
+	predicate := func(item *DocumentBlock) bool {
+		return item != nil && item.HasBlockContent()
+	}
+	result := make(DocumentBlocks, 0, len(b))
+	for _, block := range b {
+		if predicate(block) {
+			result = append(result, block)
+		}
+	}
+	less := func(a, b *DocumentBlock) int {
+		if a.BlockNo == 0 {
+			return 1
+		} else if a.BlockNo != b.BlockNo {
+			return a.BlockNo - b.BlockNo
+		}
+		return int(a.ID - b.ID)
+	}
+	slices.SortFunc(result, less)
+	return result
+}
+
+func (b DocumentBlocks) ResolveChunkType() string {
+	seen := make(map[string]struct{})
+	var blockTypes []string
+
+	for _, block := range b {
+		blockType := strutil.Trim(block.BlockType)
+		if blockType == "" {
+			continue
+		}
+		upperType := strings.ToUpper(blockType)
+		if _, exists := seen[upperType]; !exists {
+			seen[upperType] = struct{}{}
+			blockTypes = append(blockTypes, upperType)
+		}
+	}
+
+	if len(blockTypes) == 0 {
+		return "TEXT"
+	}
+	if len(blockTypes) == 1 {
+		return blockTypes[0]
+	}
+	return "MIXED"
+}
+
+func (b DocumentBlocks) CommonSectionPath() string {
+	for _, block := range b {
+		trimmed := strings.TrimSpace(block.SectionPath)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

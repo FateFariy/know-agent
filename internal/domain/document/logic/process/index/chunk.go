@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/duke-git/lancet/v2/slice"
-	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -36,28 +37,22 @@ const (
 
 // ChunkingPhase 切块阶段：执行切块流水线、构建父子块实体、持久化
 type ChunkingPhase struct {
-	repo     adapter.DocumentRepository
-	port     *adapter.DocumentPort
-	registry map[int]chunk.Chunker
-	option   *chunkingOption
-}
-
-// chunkingOption 切块配置项
-type chunkingOption struct {
-	semanticMaxChars int
-	semanticMinChars int
-	llmEnabled       bool
-	llmMaxChars      int
+	repo      adapter.DocumentRepository
+	port      *adapter.DocumentPort
+	registry  map[int]chunk.Chunker
+	resolver  IndexingConfigResolver
+	tokenizer adapter.Tokenizer
 }
 
 // NewChunkingPhase 创建切块阶段
 func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort,
-	registry map[int]chunk.Chunker, opt *chunkingOption) *ChunkingPhase {
+	registry map[int]chunk.Chunker, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingPhase {
 	return &ChunkingPhase{
-		repo:     repo,
-		port:     port,
-		registry: registry,
-		option:   opt,
+		repo:      repo,
+		port:      port,
+		registry:  registry,
+		resolver:  resolver,
+		tokenizer: tokenizer,
 	}
 }
 
@@ -193,10 +188,10 @@ func (p *ChunkingPhase) buildParentChildEntities(documentId, taskId, planId int6
 
 // BuildParentBlocks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
 func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.Document,
-	steps []*entity.DocumentStrategyStep, blocks []*entity.DocumentBlock) ([]*vo.ParentBlockCandidate, error) {
+	steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) ([]*vo.ParentBlockCandidate, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
-	parentSteps := p.sortPipelineSteps(steps, enum.PipelineTypeParent)
-	childSteps := p.sortPipelineSteps(steps, enum.PipelineTypeChild)
+	parentSteps := steps.SortPipelineSteps(enum.PipelineTypeParent)
+	childSteps := steps.SortPipelineSteps(enum.PipelineTypeChild)
 	if len(parentSteps) == 0 {
 		return nil, errorx.ErrParentBlockMissing
 	}
@@ -204,7 +199,7 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 		return nil, errorx.ErrChildBlockMissing
 	}
 
-	orderedBlocks := p.cleanupBlocks(blocks)
+	orderedBlocks := blocks.CleanupAndSort()
 	if len(orderedBlocks) == 0 {
 		return nil, errorx.ErrDocumentBlocksMissing
 	}
@@ -213,13 +208,13 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 	})
 
 	// 加载已解析的文档结构节点（用于结构切块策略）
-	var structureNodes []*entity.StructureNode
+	var nodes []*entity.StructureNode
+	var err error
 	if document != nil {
-		nodes, err := p.repo.SelectStructureNodeListByTask(ctx, document.ID, document.LastParseTaskId)
+		nodes, err = p.repo.SelectStructureNodeListByTask(ctx, document.ID, document.LastParseTaskId)
 		if err != nil {
 			return nil, err
 		}
-		structureNodes = nodes
 	}
 
 	// 从文档存储中读取解析后的全文（用于兜底：结构节点不可用时直接以全文走流水线）
@@ -229,22 +224,23 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 			parsedText = text
 		}
 	}
+	options := p.resolver.Resolve(ctx, document)
 
 	// 生成父块种子列表
-	parentSeedList := p.buildParentSeedList(ctx, parsedText, parentSteps, structureNodes)
+	parentSeedList := p.buildParentSeedList(ctx, blocks, parentSteps, nodes, options)
 
 	// 为每个父块种子派生其子块；无子块时以父块本身兜底
 	parentBlockList := make([]*vo.ParentBlockCandidate, 0)
-	for _, parentSeed := range p.cleanupChunkList(parentSeedList) {
+	for _, parentSeed := range parentSeedList.CleanupAndUnique() {
 		if parentSeed != nil && strutil.IsNotBlank(parentSeed.Text) {
-			childSeedList := p.buildChildSeedList(ctx, parentSeed, childSteps, structureNodes)
+			childSeedList := p.buildChildSeedList(ctx, parentSeed, childSteps, nodes)
 			finalChildren := p.cleanupChunkList(childSeedList)
 
 			trim := strutil.Trim(parentSeed.Text)
 			if len(finalChildren) == 0 {
 				// 兜底策略：子块流水线无产出 → 使用父块本身作为唯一子块
-				finalChildren = []*vo.ChunkCandidate{
-					p.cloneChunkCandidate(parentSeed, trim),
+				finalChildren = vo.ChunkCandidates{
+					vo.CopyChunkCandidate(parentSeed, trim),
 				}
 			}
 
@@ -266,23 +262,6 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 	// 对父块进行去重与清理后返回
 	return p.cleanupParentBlockList(parentBlockList), nil
 }
-func (p *ChunkingPhase) cleanupBlocks(blocks []*entity.DocumentBlock) []*entity.DocumentBlock {
-	if len(blocks) == 0 {
-		return nil
-	}
-	less := func(a, b *entity.DocumentBlock) bool {
-		if a.BlockNo == 0 {
-			return false
-		} else if a.BlockNo != b.BlockNo {
-			return a.BlockNo < b.BlockNo
-		}
-		return a.ID < b.ID
-	}
-	predicate := func(item *entity.DocumentBlock) bool {
-		return item != nil && item.HasBlockContent()
-	}
-	return stream.FromSlice(blocks).Filter(predicate).Sorted(less).ToSlice()
-}
 
 // ---------------- 草稿/标准化 ----------------
 
@@ -299,14 +278,7 @@ func (p *ChunkingPhase) buildDraftSteps(pipelineType string, strategyTypes []int
 	})
 }
 
-// sortPipelineSteps 过滤属于指定流水线的步骤并按 StepNo 升序排列
-func (p *ChunkingPhase) sortPipelineSteps(steps []*entity.DocumentStrategyStep, pipelineType string) []*entity.DocumentStrategyStep {
-	filtered := slice.Filter(steps, func(index int, item *entity.DocumentStrategyStep) bool {
-		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, enum.PipelineTypeChild))
-	})
-	slice.SortBy(filtered, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
-	return filtered
-}
+// sortPipelineSteps
 
 // resolveRole 为指定步骤分配角色
 func (p *ChunkingPhase) resolveRole(index int, strategyType int) int {
@@ -328,83 +300,80 @@ func (p *ChunkingPhase) resolveRole(index int, strategyType int) int {
 // ---------------- 种子构建 ----------------
 
 // buildParentSeedList 构建父块种子列表，若步骤中含有结构切块且结构节点存在，优先走结构路径；否则从原始文本构造单一父种子
-func (p *ChunkingPhase) buildParentSeedList(ctx context.Context, parsedText string,
-	parentSteps []*entity.DocumentStrategyStep, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
-	if p.containsStructureStep(parentSteps) && len(structureNodes) > 0 {
+func (p *ChunkingPhase) buildParentSeedList(ctx context.Context, blocks entity.DocumentBlocks, parentSteps entity.DocumentStrategySteps,
+	nodes []*entity.StructureNode, options *vo.IndexingOptions) vo.ChunkCandidates {
+	if parentSteps.Contains(enum.StrategyTypeStructure) {
 		// 结构切块有节点可用 → 先产出章节级种子，再将剩余策略作为后续流水线
-		structureSeeds := p.buildStructureParentSeeds(structureNodes)
-		if len(structureSeeds) != 0 {
-			remainingSteps := p.stripStructureSteps(parentSteps)
-			if len(remainingSteps) == 0 {
-				return structureSeeds
-			}
+		structureSeeds := p.buildBlockSectionParentSeeds(blocks, nodes, options)
+		remainingSteps := parentSteps.DeleteStep(enum.StrategyTypeStructure)
 
-			return p.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeParent)
-		}
-	}
-
-	// 无结构步骤或节点 → 用整段文本作为父种子走完整流水线
-	originalSeed := &vo.ChunkCandidate{
-		Text:       parsedText,
-		SourceType: enum.ChunkSourceTypeOriginal,
-	}
-
-	// 执行父块流水线
-	return p.executePipeline(ctx, []*vo.ChunkCandidate{originalSeed}, parentSteps, enum.PipelineTypeParent)
-}
-
-// buildChildSeedList 为指定父种子构建子块种子列表，若步骤中含有结构切块且结构节点存在，优先按结构节点拆解子章节，否则克隆父种子再跑流水线
-func (p *ChunkingPhase) buildChildSeedList(ctx context.Context, parentSeed *vo.ChunkCandidate,
-	childSteps []*entity.DocumentStrategyStep, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
-	if p.containsStructureStep(childSteps) && parentSeed.StructureNodeId != 0 && len(structureNodes) > 0 {
-		// 基于父种子的节点 ID 收集子节点，再进入后续流水线
-		structureSeeds := p.buildStructureChildSeeds(parentSeed, structureNodes)
-
-		remainingSteps := p.stripStructureSteps(childSteps)
 		if len(remainingSteps) == 0 {
 			return structureSeeds
 		}
 
-		return p.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeChild)
+		return p.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeParent, options)
+
+	}
+
+	maxChars := options.ResolveRecursiveMaxChars(enum.PipelineTypeParent)
+	parentSeeds := p.buildBlockWindowParentSeeds(blocks, nodes, maxChars)
+	remainingSteps := parentSteps.DeleteStep(enum.StrategyTypeRecursive)
+
+	if len(remainingSteps) == 0 {
+		return parentSeeds
+	}
+
+	// 执行父块流水线
+	return p.executePipeline(ctx, parentSeeds, parentSteps, enum.PipelineTypeParent, options)
+}
+
+// buildChildSeedList 为指定父种子构建子块种子列表，若步骤中含有结构切块且结构节点存在，优先按结构节点拆解子章节，否则克隆父种子再跑流水线
+func (p *ChunkingPhase) buildChildSeedList(ctx context.Context, parentSeed *vo.ChunkCandidate,
+	childSteps entity.DocumentStrategySteps, structureNodes []*entity.StructureNode) vo.ChunkCandidates {
+	if childSteps.Contains(enum.StrategyTypeStructure) && parentSeed.StructureNodeId != 0 && len(structureNodes) > 0 {
+		// 基于父种子的节点 ID 收集子节点，再进入后续流水线
+		structureSeeds := p.buildStructureChildSeeds(parentSeed, structureNodes)
+
+		remainingSteps := childSteps.DeleteStep(enum.StrategyTypeStructure)
+		if len(remainingSteps) == 0 {
+			return structureSeeds
+		}
+
+		return p.executePipeline(ctx, structureSeeds, remainingSteps, enum.PipelineTypeChild, nil)
 	}
 
 	// 直接克隆父种子作为子块流水线的起点
-	clonedSeed := p.cloneChunkCandidate(parentSeed, parentSeed.Text)
+	clonedSeed := vo.CopyChunkCandidate(parentSeed, parentSeed.Text)
 
 	// 执行子块流水线
-	return p.executePipeline(ctx, []*vo.ChunkCandidate{clonedSeed}, childSteps, enum.PipelineTypeChild)
+	return p.executePipeline(ctx, vo.ChunkCandidates{clonedSeed}, childSteps, enum.PipelineTypeChild, nil)
 }
 
-// containsStructureStep 检查步骤列表中是否存在结构切块策略
-func (p *ChunkingPhase) containsStructureStep(steps []*entity.DocumentStrategyStep) bool {
-	for _, step := range steps {
-		if step.StrategyType == enum.StrategyTypeStructure {
-			return true
+// buildBlockSectionParentSeeds 从结构节点中筛选"内容承载章节"生成父块种子，判定规则：含有子章节时需额外验证内容长度显著超过标题或出现换行
+func (p *ChunkingPhase) buildBlockSectionParentSeeds(blocks entity.DocumentBlocks, nodes []*entity.StructureNode,
+	options *vo.IndexingOptions) vo.ChunkCandidates {
+	seeds := make(vo.ChunkCandidates, 0)
+	currentGroup := make(entity.DocumentBlocks, 0)
+	currentSectionKey := ""
+	for _, block := range blocks {
+		sectionKey := strutil.Trim(block.SectionPath)
+		sectionChanged := len(currentGroup) > 0 && currentSectionKey != sectionKey
+		startsNewTitleSection := block.IsTitleBlock() && sectionChanged
+
+		if sectionChanged || startsNewTitleSection {
+			p.appendParentSeedsFromBlockGroup(currentGroup, nodes, options)
+			currentGroup = make([]SuperAgentDocumentBlock, 0)
 		}
-	}
-	return false
-}
 
-// stripStructureSteps 过滤掉结构切块步骤（结构切块已经在流水线前处理）
-func (p *ChunkingPhase) stripStructureSteps(steps []*entity.DocumentStrategyStep) []*entity.DocumentStrategyStep {
-	return slice.Filter(steps, func(index int, step *entity.DocumentStrategyStep) bool {
-		return step.StrategyType != enum.StrategyTypeStructure
-	})
-}
-
-// buildStructureParentSeeds 从结构节点中筛选"内容承载章节"生成父块种子，判定规则：含有子章节时需额外验证内容长度显著超过标题或出现换行
-func (p *ChunkingPhase) buildStructureParentSeeds(structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
-	// 预计算：哪些节点拥有子章节（用于后续内容判定）
-	parentHasChildSection := make(map[int64]bool)
-	for _, node := range structureNodes {
-		if node.ParentNodeId != 0 && node.NodeType == vo.NodeTypeSection {
-			parentHasChildSection[node.ParentNodeId] = true
+		if len(currentGroup) == 0 {
+			currentSectionKey = sectionKey
 		}
+		currentGroup = append(currentGroup, block)
 	}
 
 	// 产出章节种子（仅保留"有实质内容"的章节）
-	seeds := make([]*vo.ChunkCandidate, 0, len(structureNodes))
-	for _, node := range structureNodes {
+	seeds := make(vo.ChunkCandidates, 0, len(nodes))
+	for _, node := range nodes {
 		if node.NodeType == vo.NodeTypeSection && p.isContentBearingSection(node, parentHasChildSection[node.ID]) {
 			seeds = append(seeds, p.newChunkCandidate(node, enum.ChunkSourceTypeOriginal))
 		}
@@ -413,9 +382,44 @@ func (p *ChunkingPhase) buildStructureParentSeeds(structureNodes []*entity.Struc
 	return seeds
 }
 
+func (p *ChunkingPhase) buildBlockSectionParentSeeds(
+	ctx context.Context,
+	documentBlocks []SuperAgentDocumentBlock,
+	structureNodes []SuperAgentDocumentStructureNode,
+	indexingOptions KnowledgeBaseIndexingOptions,
+) []ChunkCandidate {
+
+	seeds := make([]ChunkCandidate, 0)
+	currentGroup := make([]SuperAgentDocumentBlock, 0)
+	currentSectionKey := ""
+
+	for _, block := range documentBlocks {
+		sectionKey := p.sectionKey(ctx, block)
+		sectionChanged := len(currentGroup) > 0 && currentSectionKey != sectionKey
+		startsNewTitleSection := p.isTitleBlock(ctx, block) && sectionChanged
+
+		if sectionChanged || startsNewTitleSection {
+			p.appendParentSeedsFromBlockGroup(ctx, seeds, currentGroup, structureNodes, indexingOptions)
+			currentGroup = make([]SuperAgentDocumentBlock, 0)
+		}
+
+		if len(currentGroup) == 0 {
+			currentSectionKey = sectionKey
+		}
+		currentGroup = append(currentGroup, block)
+	}
+
+	p.appendParentSeedsFromBlockGroup(ctx, seeds, currentGroup, structureNodes, indexingOptions)
+
+	if len(seeds) == 0 {
+		return p.buildBlockWindowParentSeeds(ctx, p.resolveRecursiveMaxChars(ctx, DocumentStrategyPipelineTypeEnum_PARENT, indexingOptions), documentBlocks)
+	}
+	return seeds
+}
+
 // buildStructureChildSeeds 根据父种子的节点 ID 从结构节点中挑出其子节点作为子块种子。
 // 仅保留 SECTION / STEP / LIST_ITEM 三类有实际内容的子节点；否则回退到克隆父种子。
-func (p *ChunkingPhase) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, structureNodes []*entity.StructureNode) []*vo.ChunkCandidate {
+func (p *ChunkingPhase) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, structureNodes []*entity.StructureNode) vo.ChunkCandidates {
 	// 按 ParentNodeId 索引结构节点，快速定位当前父种子的子节点集合
 	childrenByParent := make(map[int64][]*entity.StructureNode)
 	for _, node := range structureNodes {
@@ -424,7 +428,7 @@ func (p *ChunkingPhase) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, 
 		}
 	}
 
-	seeds := make([]*vo.ChunkCandidate, 0)
+	seeds := make(vo.ChunkCandidates, 0)
 	children := childrenByParent[parentSeed.StructureNodeId]
 
 	for _, child := range children {
@@ -441,7 +445,7 @@ func (p *ChunkingPhase) buildStructureChildSeeds(parentSeed *vo.ChunkCandidate, 
 	}
 
 	// 回退：无合适子节点时将父种子本身克隆为唯一子块
-	return []*vo.ChunkCandidate{p.cloneChunkCandidate(parentSeed, parentSeed.Text)}
+	return vo.ChunkCandidates{vo.CopyChunkCandidate(parentSeed, parentSeed.Text)}
 }
 
 // isContentBearingSection 判断该章节是否为"内容承载章节"，排除仅作为容器而没有实际文本的章节（如纯嵌套目录）
@@ -468,32 +472,13 @@ func (p *ChunkingPhase) isContentBearingSection(node *entity.StructureNode, hasC
 	return utils.Len(content) > utils.Len(headingText)+16 || strings.Contains(content, "\n")
 }
 
-// cloneChunkCandidate 克隆 ChunkCandidate；可替换文本字段，其他元信息保留
-func (p *ChunkingPhase) cloneChunkCandidate(original *vo.ChunkCandidate, text string) *vo.ChunkCandidate {
-	if original == nil {
-		return &vo.ChunkCandidate{
-			Text:       text,
-			SourceType: enum.ChunkSourceTypeOriginal,
-		}
-	}
-	return &vo.ChunkCandidate{
-		SectionPath:       original.SectionPath,
-		StructureNodeId:   original.StructureNodeId,
-		StructureNodeType: original.StructureNodeType,
-		CanonicalPath:     original.CanonicalPath,
-		ItemIndex:         original.ItemIndex,
-		Text:              text,
-		SourceType:        original.SourceType,
-	}
-}
-
 // cloneParentBlockCandidate 克隆 ParentBlockCandidate
-func (p *ChunkingPhase) cloneParentBlockCandidate(source *vo.ParentBlockCandidate, childChunks []*vo.ChunkCandidate, text string) *vo.ParentBlockCandidate {
+func (p *ChunkingPhase) cloneParentBlockCandidate(source *vo.ParentBlockCandidate, childChunks vo.ChunkCandidates, text string) *vo.ParentBlockCandidate {
 	if source == nil {
 		return &vo.ParentBlockCandidate{
 			Text:        text,
 			SourceType:  enum.ChunkSourceTypeOriginal,
-			ChildChunks: append([]*vo.ChunkCandidate{}, childChunks...),
+			ChildChunks: append(vo.ChunkCandidates{}, childChunks...),
 		}
 	}
 	return &vo.ParentBlockCandidate{
@@ -504,16 +489,16 @@ func (p *ChunkingPhase) cloneParentBlockCandidate(source *vo.ParentBlockCandidat
 		ItemIndex:         source.ItemIndex,
 		Text:              text,
 		SourceType:        source.SourceType,
-		ChildChunks:       append([]*vo.ChunkCandidate{}, childChunks...),
+		ChildChunks:       append(vo.ChunkCandidates{}, childChunks...),
 	}
 }
 
 // ---------------- 流水线调度 ----------------
 
 // executePipeline 按步骤顺序调度分块策略，当前步骤的输出作为下一步骤的输入
-func (p *ChunkingPhase) executePipeline(ctx context.Context, inputSeeds []*vo.ChunkCandidate, steps []*entity.DocumentStrategyStep, pipelineType string) []*vo.ChunkCandidate {
-	// 初次清理：去除空文本和重复项
-	currentChunks := p.cleanupChunkList(inputSeeds)
+func (p *ChunkingPhase) executePipeline(ctx context.Context, seeds vo.ChunkCandidates, steps entity.DocumentStrategySteps, pipelineType string, options *vo.IndexingOptions) vo.ChunkCandidates {
+	// 去除空文本和重复项
+	currentChunks := seeds.CleanupAndUnique()
 	if len(currentChunks) == 0 {
 		return currentChunks
 	}
@@ -527,7 +512,7 @@ func (p *ChunkingPhase) executePipeline(ctx context.Context, inputSeeds []*vo.Ch
 		// 根据策略类型与流水线类型生成额外选项（父块流水线会使用较大窗口）
 		extraOpts := p.buildPipelineOptions(step.StrategyType, pipelineType)
 
-		nextChunks := make([]*vo.ChunkCandidate, 0, len(currentChunks))
+		nextChunks := make(vo.ChunkCandidates, 0, len(currentChunks))
 		for _, candidate := range currentChunks {
 			if candidate == nil || strutil.IsBlank(candidate.Text) {
 				continue
@@ -553,13 +538,57 @@ func (p *ChunkingPhase) executePipeline(ctx context.Context, inputSeeds []*vo.Ch
 			}
 			for _, out := range outputs {
 				if strutil.IsNotBlank(out.Text) {
-					nextChunks = append(nextChunks, p.cloneChunkCandidate(candidate, out.Text))
+					nextChunks = append(nextChunks, vo.CopyChunkCandidate(candidate, out.Text))
 				}
 			}
 		}
 		// 每步结束后清理，避免中间产物污染下游
 		currentChunks = p.cleanupChunkList(nextChunks)
 	}
+	return p.cleanupChunkList(currentChunks)
+}
+
+func (p *ChunkingPhase) executePipeline(
+	sourceList []*ChunkCandidate,
+	orderedSteps []*SuperAgentDocumentStrategyStep,
+	pipelineType DocumentStrategyPipelineTypeEnum,
+	indexingOptions *KnowledgeBaseIndexingOptions,
+) []*ChunkCandidate {
+	// 初始清理：过滤无效候选块
+	currentChunks := p.cleanupChunkList(sourceList)
+
+	// 按顺序执行每个策略步骤
+	for _, step := range orderedSteps {
+		strategyType := DocumentStrategyTypeEnumGetRc(step.GetStrategyType())
+		if strategyType == nil {
+			continue
+		}
+
+		// 根据策略类型分发处理
+		switch *strategyType {
+		case STRUCTURE:
+			// 结构策略：保持原样，不做分块处理
+			// 结构策略通常用于保留文档的原始层级关系
+			currentChunks = currentChunks
+		case RECURSIVE:
+			// 递归策略：基于字符/词边界进行递归拆分
+			currentChunks = p.applyRecursiveChunking(currentChunks, pipelineType, indexingOptions)
+		case SEMANTIC:
+			// 语义策略：基于 embedding 相似度进行语义边界分割
+			currentChunks = p.applySemanticChunking(currentChunks, pipelineType, indexingOptions)
+		case LLM:
+			// LLM策略：使用大语言模型进行智能分块
+			currentChunks = p.applyLlmChunking(currentChunks, pipelineType, indexingOptions)
+		default:
+			// 未知策略：保持原样
+			currentChunks = currentChunks
+		}
+
+		// 每步处理后清理，移除空块或非法块
+		currentChunks = p.cleanupChunkList(currentChunks)
+	}
+
+	// 最终清理并返回结果
 	return p.cleanupChunkList(currentChunks)
 }
 
@@ -588,22 +617,6 @@ func (p *ChunkingPhase) buildPipelineOptions(strategyType int, pipelineType stri
 	default:
 		return nil
 	}
-}
-
-// cleanupChunkList 清理 ChunkCandidate 列表：过滤空文本并按 路径+序号+文本 去重
-func (p *ChunkingPhase) cleanupChunkList(chunks []*vo.ChunkCandidate) []*vo.ChunkCandidate {
-	result := make(map[string]*vo.ChunkCandidate)
-	for _, candidate := range chunks {
-		if candidate != nil && strutil.IsNotBlank(candidate.Text) {
-			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
-			trim := strutil.Trim(candidate.Text)
-			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
-			if _, ok := result[uniqueKey]; !ok {
-				result[uniqueKey] = p.cloneChunkCandidate(candidate, trim)
-			}
-		}
-	}
-	return maputil.Values(result)
 }
 
 // cleanupParentBlockList 清理父块列表：规则与子块一致，path+itemIndex+trim 去重
@@ -670,4 +683,145 @@ func (p *ChunkingPhase) newChunkCandidate(node *entity.StructureNode, sourceType
 		Text:              node.ContentText,
 		SourceType:        sourceType,
 	}
+}
+
+func (p *ChunkingPhase) buildBlockWindowParentSeeds(blocks entity.DocumentBlocks, nodes []*entity.StructureNode, maxChars int) vo.ChunkCandidates {
+	seeds := make(vo.ChunkCandidates, 0)
+	currentBlocks := make(entity.DocumentBlocks, 0)
+	currentChars := 0
+	for _, block := range blocks {
+		blockText := block.RenderBlockContent()
+		if strings.TrimSpace(blockText) == "" {
+			continue
+		}
+
+		// 处理超长块：递归拆分
+		if utils.Len(blockText) > maxChars {
+			if len(currentBlocks) > 0 {
+				seeds = append(seeds, p.toParentSeed(currentBlocks, nodes))
+			}
+			currentBlocks = make(entity.DocumentBlocks, 0)
+			currentChars = 0
+
+			// 递归拆分超长文本
+			for _, splitText := range p.recursiveSplit(blockText, maxChars, 0) {
+				seeds = append(seeds, p.toSplitBlockSeed(block, splitText, nodes))
+			}
+			continue
+		}
+
+		// 检查窗口是否已满（考虑块间分隔符长度）
+		if len(currentBlocks) > 0 && currentChars+utf8.RuneCountInString(blockText)+2 > maxChars {
+			seeds = append(seeds, p.toParentSeed(currentBlocks, nodes))
+			currentBlocks = make(entity.DocumentBlocks, 0)
+			currentChars = 0
+		}
+
+		currentBlocks = append(currentBlocks, block)
+		currentChars += utils.Len(blockText) + 2
+	}
+
+	// 处理剩余块
+	if len(currentBlocks) > 0 {
+		seeds = append(seeds, p.toParentSeed(currentBlocks, nodes))
+	}
+
+	return seeds
+}
+
+var re = regexp.MustCompile(`[>/|]`)
+
+func (p *ChunkingPhase) buildKeywords(title, sectionPath, text string) []string {
+	keywords := make([]string, 0, 12)
+	seen := make(map[string]bool, 12)
+	add := func(words ...string) {
+		for i := 0; i < len(words) && len(keywords) < 12; i++ {
+			word := strutil.Trim(words[i])
+			if utils.Len(word) >= 2 && !seen[word] {
+				seen[word] = true
+				keywords = append(keywords, word)
+			}
+		}
+	}
+	add(title)
+	if strings.TrimSpace(sectionPath) != "" {
+		add(re.Split(sectionPath, -1)...)
+	}
+	words := p.tokenizer.SegmentWords(text)
+	add(words...)
+
+	return keywords
+}
+
+// buildQuestions 构建面向检索的问答对, 基于标题、块类型和关键词生成假设性问题
+func (p *ChunkingPhase) buildQuestions(title, chunkType string, keywords []string) string {
+	seen := make(map[string]bool, 4)
+	questions := make([]string, 0, 4)
+	add := func(question string) {
+		if !seen[question] && len(questions) < 4 {
+			seen[question] = true
+			questions = append(questions, question)
+		}
+	}
+
+	// 确定主题词：优先使用标题，否则取关键词列表的第一个
+	topic := strings.TrimSpace(title)
+	if topic == "" {
+		if len(keywords) > 0 {
+			topic = keywords[0]
+		}
+	}
+
+	// 基于主题生成通用问题
+	if topic != "" {
+		add("关于" + topic + "的核心内容是什么？")
+		add(topic + "有哪些要求或注意事项？")
+	}
+
+	// 基于块类型生成特定问题
+	upperType := strings.ToUpper(chunkType)
+	if upperType == "TABLE" {
+		add("这个表格说明了什么？")
+	}
+	if upperType == "IMAGE" || upperType == "FIGURE" {
+		add("这张图片说明了什么？")
+	}
+
+	data, _ := json.Marshal(questions)
+
+	return string(data)
+}
+
+func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.StructureNodes) *vo.ChunkCandidate {
+	sectionPath := blocks.CommonSectionPath()
+	canonicalPath := utils.FirstNonBlank(blocks.CanonicalPaths()...)
+	node := nodes.FindNodeByPath(sectionPath, canonicalPath)
+	text := blocks.JoinBlockTexts()
+	title := blocks.ResolveTitle(canonicalPath)
+	chunkType := blocks.ResolveChunkType()
+	keywords := p.buildKeywords(title, canonicalPath, text)
+	questions := p.buildQuestions(title, chunkType, keywords)
+	keywordJson, _ := json.Marshal(keywords)
+
+	candidate := &vo.ChunkCandidate{
+		SectionPath:       sectionPath,
+		Text:              text,
+		SourceType:        enum.ChunkSourceTypeOriginal,
+		ContentWithWeight: "",
+		ChunkType:         chunkType,
+		Title:             title,
+		Keywords:          string(keywordJson),
+		Questions:         questions,
+		PageNo:            0,
+		PageRange:         "",
+		BboxJson:          "",
+		SourceBlockIds:    "",
+	}
+	if node != nil {
+		candidate.StructureNodeId = node.ID
+		candidate.StructureNodeType = node.NodeType
+		candidate.ItemIndex = node.ItemIndex
+	}
+
+	return candidate
 }

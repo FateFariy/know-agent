@@ -29,3 +29,28 @@ type DocumentParentBlock struct {
 func (d *DocumentParentBlock) FillEnumName() {
 	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }
+
+//type DocumentParentBlocks []*DocumentParentBlock
+//
+//// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
+//func (b DocumentParentBlocks) CleanupAndUnique() DocumentParentBlocks {
+//	seen := make(map[string]struct{})
+//	result := make(DocumentParentBlocks, 0, len(b))
+//	for _, block := range b {
+//		if block == nil {
+//			continue
+//		}
+//
+//		trim := strutil.Trim(block.Text)
+//		if trim != "" {
+//			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)
+//			uniqueKey := fmt.Sprintf("%s||%d||%s", path, block.ItemIndex, trim)
+//			if _, ok := seen[uniqueKey]; !ok {
+//				seen[uniqueKey] = struct{}{}
+//				result = append(result, CopyChunkCandidate(block, trim))
+//			}
+//		}
+//	}
+//
+//	return result
+//}

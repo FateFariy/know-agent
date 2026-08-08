@@ -96,3 +96,46 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 	d.StrategySnapshot = strings.Join(strategyTypes, ",")
 	d.Steps = steps
 }
+
+type DocumentStrategySteps []*DocumentStrategyStep
+
+// SortPipelineSteps 过滤属于指定流水线的步骤并按 StepNo 升序排列
+func (s DocumentStrategySteps) SortPipelineSteps(pipelineType string) DocumentStrategySteps {
+	filtered := make(DocumentStrategySteps, 0, len(s))
+	for _, step := range s {
+		toDefault := utils.BlankToDefault(step.PipelineType, enum.PipelineTypeChild)
+		if utils.EqualsIgnoreCase(pipelineType, toDefault) {
+			filtered = append(filtered, step)
+		}
+	}
+	less := func(a, b *DocumentStrategyStep) int { return a.StepNo - b.StepNo }
+	slices.SortFunc(filtered, less)
+	return filtered
+}
+
+// DeleteStep 删除指定策略类型的步骤
+func (s DocumentStrategySteps) DeleteStep(strategyType int) DocumentStrategySteps {
+	if len(s) == 0 {
+		return nil
+	}
+	filtered := make(DocumentStrategySteps, 0, len(s))
+	for _, step := range s {
+		if step.StrategyType != strategyType {
+			filtered = append(filtered, step)
+		}
+	}
+	return filtered
+}
+
+// Contains 检查步骤列表中是否包含指定策略类型的步骤
+func (s DocumentStrategySteps) Contains(strategyType int) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, step := range s {
+		if step.StrategyType == strategyType {
+			return true
+		}
+	}
+	return false
+}
