@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/duke-git/lancet/v2/strutil"
 )
@@ -35,7 +36,7 @@ func (s *JaccardSimilarity) extractTokens(text string) map[string]bool {
 		tokenSet[m] = true
 	}
 	for _, r := range text {
-		if r >= 0x4e00 && r <= 0x9fa5 {
+		if unicode.Is(unicode.Han, r) {
 			tokenSet[string(r)] = true
 		}
 	}

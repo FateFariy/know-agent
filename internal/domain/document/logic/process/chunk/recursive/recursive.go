@@ -8,7 +8,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 const (
@@ -36,8 +35,9 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行递归分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*vo.ChunkCandidate, error) {
-	if input == nil || strutil.Trim(input.Text) == "" {
+func (s *Chunker) Chunk(_ context.Context, input string, opts ...chunk.Option) ([]string, error) {
+	text := strings.TrimSpace(input)
+	if text == "" {
 		return nil, nil
 	}
 
@@ -45,17 +45,16 @@ func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.O
 	opt := chunk.GetSpecificOptions(s.opt, opts...)
 
 	// 先按优先级切分为若干原始块
-	rawChunks := s.split(input.Text, opt.maxChars, opt.overlapChars)
-
-	result := make([]*vo.ChunkCandidate, 0, len(rawChunks))
-	for _, text := range rawChunks {
-		trimmed := strutil.Trim(text)
-		if trimmed == "" {
-			continue
+	rawChunks := s.split(text, opt.maxChars, opt.overlapChars)
+	i := 0
+	for _, chunkText := range rawChunks {
+		trimmed := strutil.Trim(chunkText)
+		if trimmed != "" {
+			rawChunks[i] = trimmed
+			i++
 		}
-		result = append(result, input.CloneWithText(trimmed))
 	}
-	return result, nil
+	return rawChunks[:i], nil
 }
 
 // split 递归切分主入口

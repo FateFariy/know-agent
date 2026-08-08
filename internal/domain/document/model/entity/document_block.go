@@ -162,9 +162,7 @@ func (b DocumentBlocks) CanonicalPaths() []string {
 func (b DocumentBlocks) ResolveTitle(sectionPath string) string {
 	normalizeTitle := func(title string) string {
 		normalized := strings.TrimSpace(title)
-		for strings.HasPrefix(normalized, "#") {
-			normalized = strings.TrimSpace(normalized[1:])
-		}
+		strings.TrimLeft(normalized, "#")
 		return normalized
 	}
 	for _, block := range b {

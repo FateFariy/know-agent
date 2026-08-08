@@ -2,15 +2,7 @@ package chunk
 
 import (
 	"context"
-
-	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
-
-type Input struct {
-	Blocks entity.DocumentBlocks
-	Nodes  []*entity.StructureNode
-}
 
 // Chunker 文本分块器
 type Chunker interface {
@@ -18,7 +10,7 @@ type Chunker interface {
 	Name() string
 
 	// Chunk 将一段输入文本切分为多个文本块
-	Chunk(ctx context.Context, input *Input, opts ...Option) ([]*vo.ChunkCandidate, error)
+	Chunk(ctx context.Context, input string, opts ...Option) ([]string, error)
 }
 
 // Option 配置策略的函数选项

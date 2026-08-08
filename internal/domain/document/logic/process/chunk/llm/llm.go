@@ -2,13 +2,13 @@ package llm
 
 import (
 	"context"
+	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 const (
@@ -46,15 +46,16 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行大模型智能分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*vo.ChunkCandidate, error) {
-	if input == nil || strutil.Trim(input.Text) == "" {
+func (s *Chunker) Chunk(ctx context.Context, input string, opts ...chunk.Option) ([]string, error) {
+	text := strings.TrimSpace(input)
+	if text == "" {
 		return nil, nil
 	}
 
 	opt := chunk.GetSpecificOptions(s.opt, opts...)
 
-	sourceTextList := []string{strutil.Trim(input.Text)}
-	resultList := make([]*chunk.TextBlock, 0, len(sourceTextList))
+	sourceTextList := []string{strutil.Trim(text)}
+	resultList := make([]string, 0, len(sourceTextList))
 	for _, sourceText := range sourceTextList {
 		chunks, err := s.split(ctx, opt.llmSplitPrompt, sourceText)
 		if err != nil {
@@ -65,7 +66,7 @@ func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.O
 			if trimmed == "" {
 				continue
 			}
-			resultList = append(resultList, input.CloneWithText(trimmed))
+			resultList = append(resultList, trimmed)
 		}
 	}
 	return resultList, nil

@@ -9,7 +9,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic/similarity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 const (
@@ -39,25 +38,25 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行语义分块
-func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.Option) ([]*vo.ChunkCandidate, error) {
-	if input == nil || strutil.Trim(input.Text) == "" {
+func (s *Chunker) Chunk(ctx context.Context, input string, opts ...chunk.Option) ([]string, error) {
+	text := strings.TrimSpace(input)
+	if text == "" {
 		return nil, nil
 	}
-
 	opt := chunk.GetSpecificOptions(s.opt, opts...)
 
 	// 文本较短时保持原样，避免过碎
-	if utils.Len(input.Text) <= opt.minChars {
-		return []*chunk.TextBlock{input}, nil
+	if utils.Len(text) <= opt.minChars {
+		return []string{text}, nil
 	}
 
 	// 按句子分块
-	sentenceList := chunk.SplitSentences(input.Text)
+	sentenceList := chunk.SplitSentences(text)
 	if len(sentenceList) <= 1 {
-		return []*chunk.TextBlock{input}, nil
+		return []string{text}, nil
 	}
 
-	resultList := make([]*chunk.TextBlock, 0, len(sentenceList))
+	resultList := make([]string, 0, len(sentenceList))
 	currentText := strings.Builder{}
 	for _, sentence := range sentenceList {
 		currentLen := utils.Len(currentText.String())
@@ -78,17 +77,16 @@ func (s *Chunker) Chunk(ctx context.Context, input *chunk.Input, opts ...chunk.O
 		if currentLen > 0 && (exceedMaxChars || semanticBreak) {
 			trimmed := strutil.Trim(currentText.String())
 			if trimmed != "" {
-				resultList = append(resultList, input.CloneWithText(trimmed))
+				resultList = append(resultList, trimmed)
 			}
 			currentText.Reset()
 		}
-
 		currentText.WriteString(sentence)
 	}
 
 	// 输出最后一块
 	if remaining := strutil.Trim(currentText.String()); remaining != "" {
-		resultList = append(resultList, input.CloneWithText(remaining))
+		resultList = append(resultList, remaining)
 	}
 
 	return resultList, nil

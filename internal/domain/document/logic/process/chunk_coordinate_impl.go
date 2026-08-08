@@ -58,8 +58,6 @@ func NewChunkCoordinateImpl(svcCtx *svc.ServiceContext, chatModel model.ChatMode
 	promptTemplate prompt.Renderer, nodeManager StructureNodeManager) *ChunkCoordinateImpl {
 
 	registry := make(map[int]chunk.Chunker)
-	// 结构分块
-	registry[enum.StrategyTypeStructure] = chunkstructure.NewChunker()
 
 	// 递归分块
 	registry[enum.StrategyTypeRecursive] = chunkrecursive.NewChunker(

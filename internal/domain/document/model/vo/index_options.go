@@ -40,13 +40,13 @@ func (o *IndexingOptions) ResolveRecursiveOverlap(pipelineType enum.PipelineType
 	return min(o.Chunk.ChildRecursiveOverlapChars, max(0, maxChars-1))
 }
 
-// // ResolveLlmMaxChars 解析LLM最大字符数
-// func (o *IndexingOptions) ResolveLlmMaxChars(pipelineType enum.PipelineType) int {
-// 	if pipelineType == enum.PipelineTypeParent {
-// 		return o.Chunk.ParentBlockMaxChars
-// 	}
-// 	return o.Chunk.ChildRecursiveMaxChars
-// }
+// ResolveLlmMaxChars 解析LLM最大字符数
+func (o *IndexingOptions) ResolveLlmMaxChars(pipelineType enum.PipelineType) int {
+	if pipelineType == enum.PipelineTypeParent {
+		return o.Chunk.ParentBlockMaxChars
+	}
+	return o.Chunk.ChildRecursiveMaxChars
+}
 
 type ChunkOptions struct {
 	ChildRecursiveMaxChars           int     `json:"childRecursiveMaxChars"`
