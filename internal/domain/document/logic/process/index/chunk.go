@@ -221,7 +221,7 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 				}
 			}
 
-			parentBlock := &vo.ParentChunkCandidate{
+			parentChunks = append(parentChunks, &vo.ParentChunkCandidate{
 				SectionPath:       parentSeed.SectionPath,
 				StructureNodeId:   parentSeed.StructureNodeId,
 				StructureNodeType: parentSeed.StructureNodeType,
@@ -232,9 +232,7 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 				ItemIndex:         parentSeed.ItemIndex,
 				PageRange:         parentSeed.PageRange,
 				SourceBlockIds:    parentSeed.SourceBlockIds,
-			}
-
-			parentChunks = append(parentChunks, parentBlock)
+			})
 		}
 	}
 

@@ -644,66 +644,6 @@ func (d *AsyncProcessImpl) syncNavigationArtifacts(ctx context.Context, document
 	return nil
 }
 
-// persistRecommendation 持久化策略推荐结果：写入方案 + 批量写入父/子流水线步骤 + 推进任务阶段
-func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *entity.Document,
-	task *entity.DocumentTask, planDraft *vo.DocumentStrategyPlanDraft) (int64, error) {
-	// 分配计划 ID 并读取当前最新版本号（用于版本自增）
-	planId := utils.GetSnowflakeNextID()
-	latestVersion, err := d.repo.SelectLatestPlanVersion(ctx, document.ID)
-	if err != nil {
-		return 0, err
-	}
-
-	// 构造并插入计划主体
-	strategyPlan := &entity.DocumentStrategyPlan{
-		ID:               planId,
-		DocumentId:       document.ID,
-		PlanVersion:      latestVersion + 1,
-		PlanSource:       enum.PlanSourceSystemRecommend,
-		PlanStatus:       enum.PlanStatusWaitConfirm,
-		StrategyCount:    len(planDraft.ParentSteps) + len(planDraft.ChildSteps),
-		StrategySnapshot: planDraft.StrategySnapshot,
-		RecommendReason:  planDraft.RecommendReason,
-	}
-	if err = d.repo.InsertPlan(ctx, strategyPlan); err != nil {
-		return 0, err
-	}
-
-	// 按流水线类型将草稿步骤批量转成实体并落库
-	insertPipelineSteps := func(drafts []*vo.DocumentStrategyStepDraft, pipelineType string) {
-		steps := make([]*entity.DocumentStrategyStep, 0, len(drafts))
-		for orderIdx, draft := range drafts {
-			steps = append(steps, &entity.DocumentStrategyStep{
-				ID:              utils.GetSnowflakeNextID(),
-				PlanId:          planId,
-				DocumentId:      document.ID,
-				PipelineType:    pipelineType,
-				StepNo:          orderIdx + 1,
-				StrategyType:    draft.StrategyType,
-				StrategyRole:    draft.StrategyRole,
-				SourceType:      draft.SourceType,
-				ExecuteStatus:   enum.StrategyExecuteStatusWaitExecute,
-				RecommendReason: draft.RecommendReason,
-			})
-		}
-		if err = d.repo.InsertStepBatch(ctx, steps); err != nil {
-			logx.Warnf("插入步骤失败: planId=%d, pipelineType=%s, err=%v", planId, pipelineType, err)
-		}
-	}
-
-	// 顺序写入父块与子块流水线步骤
-	insertPipelineSteps(planDraft.ParentSteps, enum.PipelineTypeParent)
-	insertPipelineSteps(planDraft.ChildSteps, enum.PipelineTypeChild)
-
-	// 推进任务阶段到"策略路由"
-	task.CurrentStage = enum.TaskStageStrategyRoute
-	if err = d.repo.UpdateTaskById(ctx, task); err != nil {
-		return 0, err
-	}
-
-	return planId, nil
-}
-
 // buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
 // 关键信息：
 //   - 每个父块维护 StartChunkNo / EndChunkNo（用于快速定位其覆盖的子块区间）

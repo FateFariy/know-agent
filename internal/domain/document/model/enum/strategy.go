@@ -137,6 +137,23 @@ func StrategyRoleName(role StrategyRole) string {
 	}
 }
 
+// ResolveRole 为指定步骤分配角色
+func ResolveRole(index int, strategyType int) int {
+	if index == 0 {
+		return StrategyRolePrimary
+	}
+	if strategyType == StrategyTypeRecursive {
+		return StrategyRoleFallback
+	}
+	if strategyType == StrategyTypeSemantic {
+		return StrategyRoleOptimize
+	}
+	if strategyType == StrategyTypeLLM {
+		return StrategyRoleEnhance
+	}
+	return StrategyRoleOptimize
+}
+
 // ============================================================
 // StrategySourceType 策略来源类型
 // ============================================================

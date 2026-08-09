@@ -2,6 +2,8 @@ package vo
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
@@ -57,6 +59,16 @@ type ParentChunkCandidate struct {
 	PageRange         string            // 页码范围
 	SourceBlockIds    string            // 源ID列表
 	ChildChunks       []*ChunkCandidate // 子块列表
+}
+
+type DocumentStrategyStepDrafts []*DocumentStrategyStepDraft
+
+func (d DocumentStrategyStepDrafts) PipelineSnapshot() string {
+	steps := make([]string, 0, len(d))
+	for _, step := range d {
+		steps = append(steps, strconv.Itoa(step.StrategyType))
+	}
+	return strings.Join(steps, ",")
 }
 
 type ParentChunkCandidates []*ParentChunkCandidate

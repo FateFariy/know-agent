@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -74,6 +75,9 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			return err
 		}
 
+		// 写入解析 trace metadata
+		p.persistParserTraceMetadata(txCtx, parseCtx.TaskId, parseCtx.AnalysisResult)
+
 		// 写入"系统已生成推荐策略"日志
 		recommendDetail, _ := json.Marshal(map[string]any{
 			"planId":             planId,
@@ -94,7 +98,8 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 			Content:      "系统已生成推荐策略",
 			DetailJson:   string(recommendDetail),
 		}
-		return p.repo.InsertTaskLog(txCtx, recommendLog)
+		_ = p.repo.InsertTaskLog(txCtx, recommendLog)
+		return nil
 	}
 	return p.repo.Do(ctx, finalizeTx)
 }
@@ -134,6 +139,50 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 	}
 
 	return planId, nil
+}
+
+// persistParserTraceMetadata 持久化解析器 Trace 元数据
+func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *vo.AnalysisResult) {
+	if taskID == 0 || analysisResult == nil || len(analysisResult.ParserTraceMetadata) == 0 {
+		return
+	}
+
+	persistedTask, _ := p.repo.SelectTaskById(ctx, taskID)
+	if persistedTask == nil {
+		return
+	}
+	extJSON := p.readTaskExtJson(persistedTask.ExtJson)
+	extJSON["parserTraceMetadata"] = analysisResult.ParserTraceMetadata
+	newExtBytes, err := json.Marshal(extJSON)
+	if err != nil {
+		logx.Warnf("写入解析 trace metadata 失败，taskId=%d: %v", taskID, err)
+		return
+	}
+
+	update := &entity.DocumentTask{
+		ID:      taskID,
+		ExtJson: string(newExtBytes),
+	}
+	if err = p.repo.UpdateTaskById(ctx, update); err != nil {
+		logx.Warnf("更新解析 trace metadata 失败，taskId=%d: %v", taskID, err)
+		return
+	}
+}
+
+// readTaskExtJson 读取并解析任务的扩展 JSON 字段
+func (p *FinalizationPhase) readTaskExtJson(extJson string) map[string]any {
+	if extJson == "" {
+		return make(map[string]any)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal([]byte(extJson), &result); err != nil {
+		// 兼容旧数据：解析失败时保留原始字符串
+		legacy := make(map[string]any)
+		legacy["legacyExtJson"] = extJson
+		return legacy
+	}
+	return result
 }
 
 func (p *FinalizationPhase) convertStepDraftsToEntities(planId int64, document *entity.Document, pipelineType enum.PipelineType, draft *vo.DocumentStrategyPlanDraft) []*entity.DocumentStrategyStep {

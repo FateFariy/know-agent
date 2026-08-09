@@ -20,6 +20,7 @@ const (
 	FileTypeTXT
 	FileTypeMD
 	FileTypeHTML
+	FileTypeXLSX
 )
 
 func DetectFileType(fileName string) FileType {
@@ -36,6 +37,8 @@ func DetectFileType(fileName string) FileType {
 		return FileTypeMD
 	case "html", "htm":
 		return FileTypeHTML
+	case "xlsx":
+		return FileTypeXLSX
 	default:
 		return FileTypeUnknown
 	}
@@ -55,6 +58,8 @@ func FileTypeName(fileType FileType) string {
 		return "MD"
 	case FileTypeHTML:
 		return "HTML"
+	case FileTypeXLSX:
+		return "XLSX"
 	default:
 		return ""
 	}

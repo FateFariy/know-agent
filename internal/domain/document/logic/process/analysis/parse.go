@@ -60,5 +60,7 @@ func (p *ParsePhase) Execute(ctx context.Context, parseCtx *Context) error {
 		Content:      fmt.Sprintf("解析器返回结果，结构候选 %d 个。", structureCandidateCount),
 		DetailJson:   string(parserResultDetail),
 	}
-	return p.repo.InsertTaskLog(ctx, parserResultLog)
+	_ = p.repo.InsertTaskLog(ctx, parserResultLog)
+
+	return nil
 }

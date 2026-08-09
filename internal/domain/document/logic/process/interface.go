@@ -25,10 +25,6 @@ type ChunkCoordinator interface {
 	// NormalizeSteps 标准化策略步骤
 	NormalizeSteps(ctx context.Context, baseSteps []*entity.DocumentStrategyStep,
 		parentStrategyTypes []int, childStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error)
-
-	// BuildParentBlocks 构建父子块结构
-	BuildParentBlocks(ctx context.Context, document *entity.Document,
-		steps []*entity.DocumentStrategyStep, parsedText string) ([]*vo.ParentChunkCandidate, error)
 }
 
 // TextPreprocessor 文本预处理器

@@ -66,7 +66,8 @@ func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) er
 			Content:      "开始解析文档内容，文档类型：" + enum.FileTypeName(parseCtx.Document.FileType),
 			DetailJson:   string(detail),
 		}
-		return p.repo.InsertTaskLog(txCtx, startLog)
+		_ = p.repo.InsertTaskLog(txCtx, startLog)
+		return nil
 	}
 	return p.repo.Do(ctx, markParseStartTx)
 }

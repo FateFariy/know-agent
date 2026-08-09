@@ -42,3 +42,7 @@ type TextProcessor interface {
 	// Process 文本预处理
 	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.AnalysisResult, error)
 }
+
+type IndexingConfigResolver interface {
+	Resolve(ctx context.Context, document *entity.Document) *vo.IndexingOptions
+}
