@@ -28,14 +28,18 @@ func (p *InitializationPhase) Order() int {
 }
 
 func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) error {
+	parseCtx.Task.TaskStatus = enum.TaskStatusRunning
+	parseCtx.Task.CurrentStage = enum.TaskStageContentParse
+	parseCtx.Task.StartTime = utils.Pointer(parseCtx.StartTime)
+
 	// 事务性标记任务运行中 + 文档解析中，并写入"开始解析"日志
 	markParseStartTx := func(txCtx context.Context) error {
 		// 标记任务运行中
 		runningTask := &entity.DocumentTask{
-			ID:           parseCtx.TaskId,
-			TaskStatus:   enum.TaskStatusRunning,
-			CurrentStage: enum.TaskStageContentParse,
-			StartTime:    utils.Pointer(parseCtx.StartTime),
+			ID:           parseCtx.Task.ID,
+			TaskStatus:   parseCtx.Task.TaskStatus,
+			CurrentStage: parseCtx.Task.CurrentStage,
+			StartTime:    parseCtx.Task.StartTime,
 		}
 		if err := p.repo.UpdateTaskById(txCtx, runningTask); err != nil {
 			return err

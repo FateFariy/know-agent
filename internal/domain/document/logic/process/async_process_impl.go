@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -727,13 +728,17 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 	parseFailTx := func(txCtx context.Context) error {
 		// 文档：标记为解析失败，并保留失败原因
 		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{
-			ID: document.ID, ParseStatus: enum.ParseStatusParseFailed, ParseErrorMsg: utils.Pointer(errorMsg),
+			ID:            document.ID,
+			ParseStatus:   enum.ParseStatusParseFailed,
+			ParseErrorMsg: utils.Pointer(errorMsg),
 		}); err != nil {
 			return err
 		}
 		// 任务：标记为失败并停留在 CONTENT_PARSE
 		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: task.ID, TaskStatus: enum.TaskStatusFailed, CurrentStage: enum.TaskStageContentParse,
+			ID:           task.ID,
+			TaskStatus:   enum.TaskStatusFailed,
+			CurrentStage: enum.TaskStageContentParse,
 		}); err != nil {
 			return err
 		}
@@ -742,7 +747,13 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 			return err
 		}
 		// 写入失败事件日志
-		failDetail, _ := json.Marshal(map[string]any{"error": errorMsg})
+		stageName := enum.TaskStageName(task.CurrentStage)
+		failDetail, _ := json.Marshal(map[string]any{
+			"error":            errorMsg,
+			"currentStage":     task.CurrentStage,
+			"currentStageName": stageName,
+			"costMillis":       task.CostMillis,
+		})
 		failLog := &entity.DocumentTaskLog{
 			TaskId:       task.ID,
 			DocumentId:   task.DocumentId,
@@ -750,10 +761,11 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 			EventType:    enum.TaskEventFailed,
 			LogLevel:     enum.LogLevelError,
 			OperatorType: enum.OperatorTypeSystem,
-			Content:      "文档解析失败",
+			Content:      fmt.Sprintf("文档解析失败，当前阶段：%s,耗时：%dms", stageName, task.CostMillis),
 			DetailJson:   string(failDetail),
 		}
-		return d.repo.InsertTaskLog(txCtx, failLog)
+		_ = d.repo.InsertTaskLog(txCtx, failLog)
+		return nil
 	}
 	if err := d.repo.Do(ctx, parseFailTx); err != nil {
 		logx.Warnf("解析失败时收尾失败: taskId=%d, err=%v", task.ID, err)
@@ -806,14 +818,21 @@ func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document
 
 // failTask 标记任务失败
 func (d *AsyncProcessImpl) failTask(txCtx context.Context, task *entity.DocumentTask, errorMsg string) error {
+	task.TaskStatus = enum.TaskStatusFailed
+	task.FinishTime = utils.Pointer(time.Now())
+	task.ErrorCode = utils.Pointer("TASK_FAILED")
+	task.ErrorMsg = utils.Pointer(errorMsg)
+	if task.StartTime == nil {
+		task.CostMillis = time.Since(*task.StartTime).Milliseconds()
+	}
 	return d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 		ID:           task.ID,
-		TaskStatus:   enum.TaskStatusFailed,
+		TaskStatus:   task.TaskStatus,
 		CurrentStage: task.CurrentStage,
-		FinishTime:   utils.Pointer(time.Now()),
-		CostMillis:   time.Since(*task.StartTime).Milliseconds(),
-		ErrorCode:    utils.Pointer("TASK_FAILED"),
-		ErrorMsg:     utils.Pointer(errorMsg),
+		FinishTime:   task.FinishTime,
+		ErrorCode:    task.ErrorCode,
+		ErrorMsg:     task.ErrorMsg,
+		CostMillis:   task.CostMillis,
 	})
 }
 

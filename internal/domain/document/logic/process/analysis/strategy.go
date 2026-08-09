@@ -47,16 +47,19 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 			callbacks.OnError(ctx, err)
 		}
 	}()
+	parseCtx.Task.CurrentStage = enum.TaskStageStrategyRoute
 
 	// 推进任务阶段到"策略路由"
 	if err = p.repo.UpdateTaskById(ctx, &entity.DocumentTask{
-		ID: parseCtx.TaskId, CurrentStage: enum.TaskStageStrategyRoute,
+		ID:           parseCtx.Task.ID,
+		CurrentStage: parseCtx.Task.CurrentStage,
 	}); err != nil {
 		return
 	}
 
 	// 写入"开始分析解析结果并生成推荐策略"日志
 	strategyStartDetail, _ := json.Marshal(map[string]any{
+		"blockCount":         len(parseCtx.AnalysisResult.Blocks),
 		"structureNodeCount": len(parseCtx.SaveCtx.StructureNodes),
 		"charCount":          parseCtx.AnalysisResult.CharCount,
 		"tokenCount":         parseCtx.AnalysisResult.TokenCount,
@@ -73,7 +76,7 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 	}
 	_ = p.repo.InsertTaskLog(ctx, strategyStartLog)
 
-	// 调用策略推荐器生成推荐方案
+	// 生成推荐方案
 	planDraft, err := p.recommend(ctx, parseCtx.Document, parseCtx.AnalysisResult)
 	if err != nil {
 		return

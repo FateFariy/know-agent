@@ -2,12 +2,15 @@ package analysis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis/save"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // Save 保存阶段子任务接口
@@ -18,12 +21,14 @@ type Save interface {
 
 // SavePhase 保存阶段：按顺序执行文本上传、产物持久化、结构节点持久化等子阶段
 type SavePhase struct {
+	repo   adapter.DocumentRepository
 	phases []Save
 }
 
 // NewSavePhase 创建保存阶段
 func NewSavePhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *SavePhase {
 	return &SavePhase{
+		repo: repo,
 		phases: []Save{
 			save.NewParsedTextUploadPhase(port),
 			save.NewArtifactPersistPhase(repo, tableRepo, port),
@@ -63,6 +68,25 @@ func (p *SavePhase) Execute(ctx context.Context, parseCtx *Context) error {
 	}
 
 	parseCtx.SaveCtx = saveCtx
+
+	detail, _ := json.Marshal(map[string]any{
+		"parsedTextPath":     saveCtx.ParsedTextPath,
+		"artifactCount":      len(saveCtx.AnalysisResult.ParseArtifacts),
+		"blockCount":         len(saveCtx.AnalysisResult.Blocks),
+		"structureNodeCount": len(saveCtx.AnalysisResult.StructureNodes),
+	})
+
+	saveLog := &entity.DocumentTaskLog{
+		TaskId:       parseCtx.Task.ID,
+		DocumentId:   parseCtx.DocumentId,
+		StageType:    enum.TaskStageContentParse,
+		EventType:    enum.TaskEventComplete,
+		LogLevel:     enum.LogLevelInfo,
+		OperatorType: enum.OperatorTypeSystem,
+		Content:      "解析产物入库完成，已保存 parsed text、artifact、block、structure 和文档画像。",
+		DetailJson:   string(detail),
+	}
+	_ = p.repo.InsertTaskLog(ctx, saveLog)
 
 	return nil
 }
