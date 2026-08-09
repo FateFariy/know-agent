@@ -1,4 +1,4 @@
-package vo
+package shared
 
 // TableCandidate 表格候选
 type TableCandidate struct {

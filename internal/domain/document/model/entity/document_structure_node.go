@@ -37,26 +37,6 @@ type StructureNode struct {
 	NextSiblingNodeNo   int    `gorm:"-"`                            // 后继兄弟节点序号
 }
 
-// SourceSpan 源文本位置范围
-type SourceSpan struct {
-	StartByte   int // 起始字节位置
-	EndByte     int // 结束字节位置
-	StartLine   int // 起始行号
-	StartColumn int // 起始列号
-	EndLine     int // 结束行号
-	EndColumn   int // 结束列号
-}
-
-// SyntaxProvenance 语法来源信息
-type SyntaxProvenance struct {
-	SchemaVersion  string      // 语法模式版本
-	SourceHash     string      // 源文本哈希值
-	SyntaxNodeId   string      // 语法节点ID
-	SyntaxNodeType string      // 语法节点类型
-	SourceOrigin   string      // 源文本来源
-	SourceSpan     *SourceSpan // 源文本位置范围
-}
-
 type StructureNodes []*StructureNode
 
 func (n StructureNodes) FindNodeByPath(sectionPath, canonicalPath string) *StructureNode {

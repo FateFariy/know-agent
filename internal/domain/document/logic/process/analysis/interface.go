@@ -6,6 +6,7 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis/save"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
@@ -19,7 +20,7 @@ type Context struct {
 	Task              *entity.DocumentTask
 	StartTime         time.Time
 	RawFileBytes      []byte
-	AnalysisResult    *vo.AnalysisResult
+	AnalysisResult    *aggregate.AnalysisResult
 	StrategyPlanDraft *vo.DocumentStrategyPlanDraft
 	SaveCtx           *save.Context
 }
@@ -34,13 +35,13 @@ type Phase interface {
 
 // StrategyRecommender 策略推荐器接口
 type StrategyRecommender interface {
-	Recommend(ctx context.Context, document *entity.Document, analysisResult *vo.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
+	Recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
 }
 
 // TextProcessor 文本处理器
 type TextProcessor interface {
 	// Process 文本预处理
-	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.AnalysisResult, error)
+	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error)
 }
 
 type IndexingConfigResolver interface {

@@ -12,7 +12,7 @@ import (
 // LifecycleLogic 生命周期逻辑接口
 type LifecycleLogic interface {
 	// Upload 上传文档
-	Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, doc *entity.Document) (*vo.DocumentUpload, error)
+	Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*entity.Document, int64, error)
 
 	// QueryDocumentPage 分页查询文档列表
 	QueryDocumentPage(ctx context.Context, pageNo, pageSize int, keyword string) ([]*entity.Document, int64, error)

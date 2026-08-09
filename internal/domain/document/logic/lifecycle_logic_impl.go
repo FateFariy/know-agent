@@ -48,11 +48,11 @@ func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPor
 }
 
 // Upload 上传文档：完成文件上传、存储、文档记录创建及解析任务下发
-func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*vo.DocumentUpload, error) {
+func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader, document *entity.Document) (*entity.Document, int64, error) {
 	// 校验文件类型是否支持
 	fileType := enum.DetectFileType(header.Filename)
 	if fileType == enum.FileTypeUnknown {
-		return nil, errorx.ErrUnsupportedFileType.Format(fileType)
+		return nil, 0, errorx.ErrUnsupportedFileType.Format(fileType)
 	}
 
 	// 读取文件前512字节用于MIME类型检测
@@ -64,7 +64,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	// 读取完整文件内容
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
-		return nil, errorx.ErrEmptyFileContent.Format(err.Error())
+		return nil, 0, errorx.ErrEmptyFileContent.Format(err.Error())
 	}
 
 	// 生成全局唯一文档ID
@@ -73,7 +73,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	// 上传原文件至MinIO存储
 	storedObjectInfo, err := d.port.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, mimeType)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// 填充文档实体字段
@@ -135,24 +135,17 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 		return d.repo.InsertTaskLog(txCtx, taskLog)
 	}
 	if err = d.repo.Do(ctx, insertTx); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// 发送解析消息至MQ，触发后续解析流程
 	parseMessage := vo.DocumentParseRouteMessage{DocumentId: documentId, TaskId: taskId}
 	if err = d.port.Send(ctx, d.parseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// 返回上传结果
-	return &vo.DocumentUpload{
-		DocumentId:     documentId,
-		TaskId:         taskId,
-		DocumentName:   document.DocumentName,
-		ParseStatus:    document.ParseStatus,
-		StrategyStatus: document.StrategyStatus,
-		IndexStatus:    document.IndexStatus,
-	}, nil
+	return document, taskId, nil
 }
 
 // QueryDocumentPage 分页查询文档列表（含最新任务信息）

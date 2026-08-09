@@ -7,8 +7,8 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // ProfileLogicImpl 文档画像逻辑实现
@@ -52,7 +52,7 @@ func (p *ProfileLogicImpl) RegenerateProfile(ctx context.Context, documentId int
 	if err != nil {
 		return nil, err
 	}
-	analysisResult := &vo.AnalysisResult{ParsedText: parsedText}
+	analysisResult := &aggregate.AnalysisResult{ParsedText: parsedText}
 	return p.gen.Generate(ctx, documentId, analysisResult, structureNodes)
 }
 

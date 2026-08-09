@@ -1,10 +1,12 @@
 package vo
 
-import "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+import (
+	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
+)
 
 // StructureNode 文档结构节点
 type StructureNode struct {
-	NodeNumber            int                      // 节点编号
+	NodeNo                int                      // 节点编号
 	NodeType              int                      // 节点类型
 	ParentNodeNumber      int                      // 父节点编号
 	PreviousSiblingNumber int                      // 前序兄弟节点编号
@@ -17,5 +19,5 @@ type StructureNode struct {
 	SectionPath           string                   // 章节路径
 	ContentText           string                   // 节点内容文本
 	ItemIndex             int                      // 项目索引
-	SyntaxProvenance      *entity.SyntaxProvenance // 语法来源信息
+	SyntaxProvenance      *shared.SyntaxProvenance // 语法来源信息
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/support"
@@ -47,7 +48,7 @@ func NewTextPreprocessImpl(registry *parse.Registry, signalExtractor *transform.
 }
 
 // Process 处理文档并返回分析结果，包括文本提取、清理、结构分析和质量评估，用于后续切块决策
-func (p *TextPreprocessImpl) Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.AnalysisResult, error) {
+func (p *TextPreprocessImpl) Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error) {
 	// 解析文本
 	parser := p.registry.Get(fileType)
 	parsedText, err := parser.Parse(ctx, []byte(rawText))
@@ -78,7 +79,7 @@ func (p *TextPreprocessImpl) Process(ctx context.Context, documentTitle, rawText
 	contentQualityLevel := p.evaluateContentQuality(cleanedText)
 
 	// 返回文档分析结果
-	return &vo.AnalysisResult{
+	return &aggregate.AnalysisResult{
 		ParsedText:          cleanedText,
 		CharCount:           len(cleanedText),
 		TokenCount:          tokenCount,

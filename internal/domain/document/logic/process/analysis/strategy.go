@@ -11,6 +11,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -91,7 +92,7 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 // Recommend 根据文档分析结果推荐最优的父块-子块策略组合。
 // 整体思路：先通过若干判定函数分别评估结构/递归/语义/大模型切块的必要性，
 // 再按"父块优先保留天然大语义单元、子块围绕召回边界精细化"的原则拼接流水线。
-func (p *StrategyPhase) recommend(ctx context.Context, document *entity.Document, analysisResult *vo.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
+func (p *StrategyPhase) recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
 		return nil, fmt.Errorf("invaild value")
 	}

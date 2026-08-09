@@ -13,6 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -39,7 +40,7 @@ func NewProfileGenerateImpl(repo adapter.DocumentRepository) *ProfileGenerateImp
 	return &ProfileGenerateImpl{repo: repo}
 }
 
-func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, analysisResult *vo.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error) {
+func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, analysisResult *aggregate.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error) {
 	if documentId == 0 {
 		return nil, errors.New("documentId 不能为空")
 	}

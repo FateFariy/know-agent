@@ -12,8 +12,8 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 type ArtifactPersistPhase struct {
@@ -39,7 +39,7 @@ func NewArtifactPersistPhase(repo adapter.DocumentRepository, tableRepo adapter.
 	}
 }
 
-func (p *ArtifactPersistPhase) saveParseArtifactsAndBlocks(ctx context.Context, documentId, taskId int64, analysisResult *vo.AnalysisResult) error {
+func (p *ArtifactPersistPhase) saveParseArtifactsAndBlocks(ctx context.Context, documentId, taskId int64, analysisResult *aggregate.AnalysisResult) error {
 	artifacts, err := p.buildParseArtifactEntities(ctx, documentId, taskId, analysisResult.ParseArtifacts)
 	if err != nil {
 		return err

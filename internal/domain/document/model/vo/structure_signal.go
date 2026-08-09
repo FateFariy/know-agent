@@ -127,7 +127,7 @@ func (d *DocumentStructureNodeDraft) AppendLine(line string) {
 
 func (d *DocumentStructureNodeDraft) ToCandidate() *StructureNode {
 	return &StructureNode{
-		NodeNumber:            d.NodeNo,
+		NodeNo:                d.NodeNo,
 		NodeType:              d.NodeType,
 		ParentNodeNumber:      d.ParentNodeNo,
 		PreviousSiblingNumber: d.PrevSiblingNodeNo,

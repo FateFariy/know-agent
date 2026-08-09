@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
@@ -20,7 +21,7 @@ type AsyncProcessor interface {
 // ChunkCoordinator 分块协调器
 type ChunkCoordinator interface {
 	// Recommend 推荐策略方案
-	Recommend(ctx context.Context, document *entity.Document, analysisResult *vo.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
+	Recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
 
 	// NormalizeSteps 标准化策略步骤
 	NormalizeSteps(ctx context.Context, baseSteps []*entity.DocumentStrategyStep,
@@ -30,7 +31,7 @@ type ChunkCoordinator interface {
 // TextPreprocessor 文本预处理器
 type TextPreprocessor interface {
 	// Process 文本预处理
-	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*vo.AnalysisResult, error)
+	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error)
 }
 
 // StructureNodeManager 结构节点管理器
@@ -44,7 +45,7 @@ type StructureNodeManager interface {
 
 // ProfileGenerator 文档画像生成器
 type ProfileGenerator interface {
-	Generate(ctx context.Context, documentId int64, analysisResult *vo.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error)
+	Generate(ctx context.Context, documentId int64, analysisResult *aggregate.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error)
 }
 
 // GraphRagBuilder GraphRAG 图谱构建器

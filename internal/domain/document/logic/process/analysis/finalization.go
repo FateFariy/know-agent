@@ -8,6 +8,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -144,7 +145,7 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 }
 
 // persistParserTraceMetadata 持久化解析器 Trace 元数据
-func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *vo.AnalysisResult) {
+func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *aggregate.AnalysisResult) {
 	if taskID == 0 || analysisResult == nil || len(analysisResult.ParserTraceMetadata) == 0 {
 		return
 	}
