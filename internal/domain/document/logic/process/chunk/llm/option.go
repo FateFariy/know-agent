@@ -4,6 +4,7 @@ import "github.com/swiftbit/know-agent/internal/domain/document/logic/process/ch
 
 type options struct {
 	llmSplitPrompt string
+	llmMaxChars    int
 	enabled        bool
 }
 
@@ -14,6 +15,15 @@ func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
 			llmSplitPrompt = documentLlmSplit
 		}
 		o.llmSplitPrompt = llmSplitPrompt
+	})
+}
+
+func WithLlmMaxChars(llmMaxChars int) chunk.Option {
+	return chunk.WrapSpecificOptFn(func(o *options) {
+		if llmMaxChars <= 50 {
+			llmMaxChars = defaultLLMMaxChars
+		}
+		o.llmMaxChars = llmMaxChars
 	})
 }
 

@@ -45,7 +45,7 @@ func (o *IndexingOptions) ResolveLlmMaxChars(pipelineType enum.PipelineType) int
 	if pipelineType == enum.PipelineTypeParent {
 		return o.Chunk.ParentBlockMaxChars
 	}
-	return o.Chunk.ChildRecursiveMaxChars
+	return 0
 }
 
 type ChunkOptions struct {

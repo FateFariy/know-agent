@@ -62,26 +62,38 @@ type ParentChunkCandidate struct {
 type ParentChunkCandidates []*ParentChunkCandidate
 
 // CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
-func (b ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
+func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
 	seen := make(map[string]struct{})
-	result := make(ParentChunkCandidates, 0, len(b))
-	for _, block := range b {
-		if block == nil {
+	result := make(ParentChunkCandidates, 0, len(p))
+	for _, candidate := range p {
+		if candidate == nil {
 			continue
 		}
 
-		trim := strutil.Trim(block.Text)
+		trim := strutil.Trim(candidate.Text)
 		if trim != "" {
-			path := utils.BlankToDefault(block.CanonicalPath, block.SectionPath)
-			uniqueKey := fmt.Sprintf("%s||%d||%s", path, block.ItemIndex, trim)
+			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
 			if _, ok := seen[uniqueKey]; !ok {
 				seen[uniqueKey] = struct{}{}
-				result = append(result, block)
+				result = append(result, candidate)
 			}
 		}
 	}
 
 	return result
+}
+
+func (p ParentChunkCandidates) CountChildCandidates() int {
+	count := 0
+	for _, candidate := range p {
+		for _, child := range candidate.ChildChunks {
+			if child != nil && strutil.IsNotBlank(child.Text) {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 type ChunkCandidates []*ChunkCandidate

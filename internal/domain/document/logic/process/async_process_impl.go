@@ -708,7 +708,7 @@ func (d *AsyncProcessImpl) persistRecommendation(ctx context.Context, document *
 // 关键信息：
 //   - 每个父块维护 StartChunkNo / EndChunkNo（用于快速定位其覆盖的子块区间）
 //   - 子块的 ChunkNo 在函数内全局递增
-//   - 任何父块至少会得到 1 个兜底子块（由上层 BuildParentBlocks 保证）
+//   - 任何父块至少会得到 1 个兜底子块（由上层 buildParentBlocks 保证）
 func (d *AsyncProcessImpl) buildParentChildEntities(documentId, taskId, planId int64,
 	candidates []*vo.ParentChunkCandidate) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
 

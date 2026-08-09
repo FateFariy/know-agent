@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
@@ -9,11 +10,13 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
 )
 
 const (
-	Name             = "LLM"                //  名称
-	documentLlmSplit = "document-llm-split" // 提示词模板名称
+	Name               = "LLM"                //  名称
+	documentLlmSplit   = "document-llm-split" // 提示词模板名称
+	defaultLLMMaxChars = 3500                 // 默认大模型最大字符数
 )
 
 // PromptRenderer 负责将 sourceText 渲染为大模型提示词
@@ -24,9 +27,10 @@ type PromptRenderer interface {
 
 // Chunker 大模型智能分块器
 type Chunker struct {
-	model    model.ChatModel
-	renderer PromptRenderer
-	opt      *options
+	model     model.ChatModel
+	renderer  PromptRenderer
+	recursive *recursive.Chunker
+	opt       *options
 }
 
 // NewChunker 创建大模型智能分块器
@@ -34,9 +38,14 @@ func NewChunker(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Op
 	return &Chunker{
 		opt: chunk.GetSpecificOptions(&options{
 			llmSplitPrompt: documentLlmSplit,
+			llmMaxChars:    defaultLLMMaxChars,
 		}, opts...),
 		model:    model,
 		renderer: renderer,
+		recursive: recursive.NewChunker(
+			recursive.WithOverlapChars(0),
+			recursive.WithMaxChars(defaultLLMMaxChars),
+		),
 	}
 }
 
@@ -54,7 +63,18 @@ func (s *Chunker) Chunk(ctx context.Context, input string, opts ...chunk.Option)
 
 	opt := chunk.GetSpecificOptions(s.opt, opts...)
 
-	sourceTextList := []string{strutil.Trim(text)}
+	if !opt.enabled || s.model == nil {
+		return nil, errors.New("大模型文本分块器已禁用或者模型为空")
+	}
+
+	// 输入过长 → 先以递归切块拆分到 LLM 上限
+	var sourceTextList []string
+	if utils.Len(text) > opt.llmMaxChars {
+		sourceTextList, _ = s.recursive.Chunk(ctx, input, recursive.WithOverlapChars(0), recursive.WithMaxChars(opt.llmMaxChars))
+	} else {
+		sourceTextList = []string{text}
+	}
+
 	resultList := make([]string, 0, len(sourceTextList))
 	for _, sourceText := range sourceTextList {
 		chunks, err := s.split(ctx, opt.llmSplitPrompt, sourceText)

@@ -231,6 +231,16 @@ func (b DocumentBlocks) CleanupAndSort() DocumentBlocks {
 	return result
 }
 
+func (b DocumentBlocks) ToMap() map[int64]*DocumentBlock {
+	result := make(map[int64]*DocumentBlock)
+	for _, block := range b {
+		if block != nil {
+			result[block.ID] = block
+		}
+	}
+	return result
+}
+
 func (b DocumentBlocks) ResolveChunkType() string {
 	seen := make(map[string]struct{})
 	var blockTypes []string
