@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"regexp"
 	"strings"
 	"time"
 
@@ -374,24 +373,15 @@ func (p *ChunkingPhase) cloneChunkCandidate(original *vo.ChunkCandidate, text st
 			SourceType: enum.ChunkSourceTypeOriginal,
 		}
 	}
-	keywords := strings.TrimSpace(original.Keywords)
-	if keywords == "" {
-		keywords = p.buildKeywords(original.Title, original.SectionPath, text)
-	}
-	questions := strings.TrimSpace(original.Questions)
-	if questions == "" {
-		questions = p.buildQuestions(original.Title, original.ChunkType, keywords)
-	}
-
-	contentWithWeight := original.ContentWithWeight
-	if text != strings.TrimSpace(original.Text) || original.ContentWithWeight == "" {
-		contentWithWeight = p.buildContentWithWeight(text, original.SectionPath, original.Title, original.ChunkType, keywords, questions, "")
-	}
 	candidate := *original
 	candidate.Text = text
-	candidate.Keywords = keywords
-	candidate.Questions = questions
-	candidate.ContentWithWeight = contentWithWeight
+	if text != strings.TrimSpace(original.Text) {
+		keywords := candidate.ExtractKeywords(p.tokenizer)
+		candidate.Keywords = marshal(keywords)
+		candidate.Questions = marshal(candidate.ExtractQuestions(keywords))
+		candidate.ContentWithWeight = candidate.ExtractContentWithWeight(keywords, "")
+	}
+
 	return &candidate
 }
 
@@ -469,27 +459,11 @@ func (p *ChunkingPhase) buildPipelineOptions(options *vo.IndexingOptions, strate
 	}
 }
 
-func (p *ChunkingPhase) renderBlockWeightedContent(block *entity.DocumentBlock) string {
-	if block == nil {
-		return ""
-	}
-	space := strings.TrimSpace(block.ContentWithWeight)
-	if space != "" {
-		return space
-	}
-	text := block.RenderBlockContent()
-	title := block.ResolveTitle(block.CanonicalPath)
-	chunkType := block.ResolveChunkType()
-	keywords := p.buildKeywords(title, block.SectionPath, text)
-	questions := p.buildQuestions(title, chunkType, keywords)
-	return p.buildContentWithWeight(text, block.SectionPath, title, chunkType, keywords, questions, "")
-}
-
 func (p *ChunkingPhase) joinBlockWeightedContents(blocks entity.DocumentBlocks) string {
 	var contents []string
-
 	for _, block := range blocks {
-		content := strings.TrimSpace(p.renderBlockWeightedContent(block))
+		keywords := block.ExtractKeywords(p.tokenizer)
+		content := block.RenderBlockWeightedContent(keywords)
 		if content != "" {
 			contents = append(contents, content)
 		}
@@ -498,139 +472,21 @@ func (p *ChunkingPhase) joinBlockWeightedContents(blocks entity.DocumentBlocks) 
 	return strings.Join(contents, "\n\n")
 }
 
-var re = regexp.MustCompile(`[>/|]`)
-
-func (p *ChunkingPhase) buildKeywords(title, sectionPath, text string) string {
-	keywords := make([]string, 0, 12)
-	seen := make(map[string]bool, 12)
-	add := func(words ...string) {
-		for i := 0; i < len(words) && len(keywords) < 12; i++ {
-			word := strutil.Trim(words[i])
-			if utils.Len(word) >= 2 && !seen[word] {
-				seen[word] = true
-				keywords = append(keywords, word)
-			}
-		}
-	}
-	add(title)
-	if strings.TrimSpace(sectionPath) != "" {
-		add(re.Split(sectionPath, -1)...)
-	}
-	words := p.tokenizer.SegmentWords(text)
-	add(words...)
-	data, _ := json.Marshal(keywords)
-
-	return string(data)
-}
-
-// buildQuestions 构建面向检索的问答对, 基于标题、块类型和关键词生成假设性问题
-func (p *ChunkingPhase) buildQuestions(title, chunkType, keywords string) string {
-	seen := make(map[string]bool, 4)
-	questions := make([]string, 0, 4)
-	add := func(question string) {
-		if !seen[question] && len(questions) < 4 {
-			seen[question] = true
-			questions = append(questions, question)
-		}
-	}
-
-	// 确定主题词：优先使用标题，否则取关键词列表的第一个
-	keywordSlice := parseJsonArray(keywords)
-	topic := strings.TrimSpace(title)
-	if topic == "" {
-		if len(keywordSlice) > 0 {
-			topic = keywordSlice[0]
-		}
-	}
-
-	// 基于主题生成通用问题
-	if topic != "" {
-		add("关于" + topic + "的核心内容是什么？")
-		add(topic + "有哪些要求或注意事项？")
-	}
-
-	// 基于块类型生成特定问题
-	upperType := strings.ToUpper(chunkType)
-	if upperType == "TABLE" {
-		add("这个表格说明了什么？")
-	}
-	if upperType == "IMAGE" || upperType == "FIGURE" {
-		add("这张图片说明了什么？")
-	}
-
-	data, _ := json.Marshal(questions)
-
-	return string(data)
-}
-
-// buildContentWithWeight 构建带权重的富文本内容, 将标题、章节路径、块类型、关键词、问题及正文按固定格式组装
-func (p *ChunkingPhase) buildContentWithWeight(text, sectionPath, title, chunkType, keywords, questions, parserWeightedContent string) string {
-	var parts []string
-
-	// 标题部分
-	if trimmed := strings.TrimSpace(title); trimmed != "" {
-		parts = append(parts, "[TITLE]\n"+trimmed)
-	}
-
-	// 章节路径部分
-	if trimmed := strings.TrimSpace(sectionPath); trimmed != "" {
-		parts = append(parts, "[SECTION]\n"+trimmed)
-	}
-
-	// 块类型部分
-	if trimmed := strings.TrimSpace(chunkType); trimmed != "" {
-		parts = append(parts, "[CHUNK_TYPE]\n"+trimmed)
-	}
-
-	jsonArrayToDisplayText := func(jsonArray string) string {
-		array := parseJsonArray(jsonArray)
-		return strings.Join(array, ";")
-	}
-
-	// 关键词部分（JSON数组转可读文本）
-	if keywordText := jsonArrayToDisplayText(keywords); keywordText != "" {
-		parts = append(parts, "[KEYWORDS]\n"+keywordText)
-	}
-
-	// 问题部分（JSON数组转可读文本）
-	if questionText := jsonArrayToDisplayText(questions); questionText != "" {
-		parts = append(parts, "[QUESTIONS]\n"+questionText)
-	}
-
-	// 正文内容部分（优先使用解析器生成的加权内容）
-	weightedBody := strings.TrimSpace(parserWeightedContent)
-	if weightedBody == "" {
-		weightedBody = strings.TrimSpace(text)
-	}
-	if weightedBody != "" {
-		parts = append(parts, "[CONTENT]\n"+weightedBody)
-	}
-
-	// 用双换行符连接所有部分并修剪首尾空白
-	return strings.TrimSpace(strings.Join(parts, "\n\n"))
-}
-
 func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.StructureNodes) *vo.ChunkCandidate {
 	sectionPath := blocks.CommonSectionPath()
 	canonicalPath := utils.FirstNonBlank(blocks.CanonicalPaths()...)
 	node := nodes.FindNodeByPath(sectionPath, canonicalPath)
-	text := blocks.JoinBlockTexts()
-	title := blocks.ResolveTitle(canonicalPath)
-	chunkType := blocks.ResolveChunkType()
-	keywords := p.buildKeywords(title, canonicalPath, text)
-	questions := p.buildQuestions(title, chunkType, keywords)
-	keywordJson, _ := json.Marshal(keywords)
-
+	keywords := blocks.ExtractKeywords(p.tokenizer)
 	candidate := &vo.ChunkCandidate{
 		SectionPath:       sectionPath,
 		CanonicalPath:     canonicalPath,
-		Text:              text,
+		Text:              blocks.JoinBlockTexts(),
 		SourceType:        enum.ChunkSourceTypeOriginal,
-		ContentWithWeight: "",
-		ChunkType:         chunkType,
-		Title:             title,
-		Keywords:          string(keywordJson),
-		Questions:         questions,
+		ContentWithWeight: blocks.ExtractContentWithWeight(keywords, p.joinBlockWeightedContents(blocks)),
+		ChunkType:         blocks.ResolveChunkType(),
+		Title:             blocks.ResolveTitle(sectionPath),
+		Keywords:          marshal(keywords),
+		Questions:         marshal(blocks.ExtractQuestions(keywords)),
 		PageNo:            blocks.FirstPageNo(),
 		PageRange:         blocks.PageRange(),
 		SourceBlockIds:    blocks.Ids(),
@@ -650,28 +506,23 @@ func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.
 
 // toSplitBlockSeed 处理超长文档块被递归拆分后的单个子块
 func (p *ChunkingPhase) toSplitBlockSeed(block *entity.DocumentBlock, nodes entity.StructureNodes, splitText string) *vo.ChunkCandidate {
-	sectionPath := block.SectionPath
-	canonicalPath := block.CanonicalPath
-	node := nodes.FindNodeByPath(sectionPath, canonicalPath)
-	title := block.ResolveTitle(sectionPath)
-	chunkType := block.ResolveChunkType()
-	keywords := p.buildKeywords(title, sectionPath, splitText)
-	questions := p.buildQuestions(title, chunkType, keywords)
-	contentWithWeight := p.buildContentWithWeight(splitText, sectionPath, title, chunkType, keywords, questions, "")
+	clone := block.CloneWithText(splitText)
+	node := nodes.FindNodeByPath(clone.SectionPath, clone.CanonicalPath)
+	keywords := clone.ExtractKeywords(p.tokenizer)
 	candidate := &vo.ChunkCandidate{
-		SectionPath:       sectionPath,
-		CanonicalPath:     canonicalPath,
-		Text:              splitText,
+		SectionPath:       clone.SectionPath,
+		CanonicalPath:     clone.CanonicalPath,
+		Text:              clone.Text,
 		SourceType:        enum.ChunkSourceTypeOriginal,
-		ContentWithWeight: contentWithWeight,
-		ChunkType:         chunkType,
-		Title:             title,
-		Keywords:          keywords,
-		Questions:         questions,
-		PageNo:            block.PageNo,
-		PageRange:         block.PageRange,
-		BboxJson:          block.BboxJson,
-		SourceBlockIds:    block.Ids(),
+		ContentWithWeight: clone.ExtractContentWithWeight(keywords, ""),
+		ChunkType:         clone.ResolveChunkType(),
+		Title:             clone.ResolveTitle(),
+		Keywords:          marshal(keywords),
+		Questions:         marshal(clone.ExtractQuestions(keywords)),
+		PageNo:            clone.PageNo,
+		PageRange:         clone.PageRange,
+		BboxJson:          clone.BboxJson,
+		SourceBlockIds:    clone.Ids(),
 	}
 
 	// 如果找到结构节点，覆盖相关字段
@@ -679,7 +530,7 @@ func (p *ChunkingPhase) toSplitBlockSeed(block *entity.DocumentBlock, nodes enti
 		candidate.StructureNodeId = node.ID
 		candidate.StructureNodeType = node.NodeType
 		candidate.ItemIndex = node.ItemIndex
-		candidate.CanonicalPath = utils.BlankToDefault(node.CanonicalPath, canonicalPath)
+		candidate.CanonicalPath = utils.BlankToDefault(node.CanonicalPath, clone.CanonicalPath)
 	}
 
 	return candidate
@@ -687,24 +538,18 @@ func (p *ChunkingPhase) toSplitBlockSeed(block *entity.DocumentBlock, nodes enti
 
 // ToBlockChunkCandidate 将文档块转换为ChunkCandidate
 func (p *ChunkingPhase) toBlockChunkCandidate(block *entity.DocumentBlock) *vo.ChunkCandidate {
-	text := block.RenderBlockContent()
-	sectionPath := block.SectionPath
-	title := block.ResolveTitle(sectionPath)
-	chunkType := block.ResolveChunkType()
-	keywords := p.buildKeywords(title, sectionPath, text)
-	questions := p.buildQuestions(title, chunkType, keywords)
-	weightedContent := p.renderBlockWeightedContent(block)
-	contentWithWeight := p.buildContentWithWeight(text, sectionPath, title, chunkType, keywords, questions, weightedContent)
+	keywords := block.ExtractKeywords(p.tokenizer)
+	questions := block.ExtractQuestions(keywords)
 	return &vo.ChunkCandidate{
-		SectionPath:       sectionPath,
+		SectionPath:       block.SectionPath,
 		CanonicalPath:     block.CanonicalPath,
-		Text:              text,
-		ContentWithWeight: contentWithWeight,
-		ChunkType:         chunkType,
-		Title:             title,
-		Keywords:          keywords,
-		Questions:         questions,
+		Text:              block.RenderBlockContent(),
 		SourceType:        enum.ChunkSourceTypeOriginal,
+		ContentWithWeight: block.ExtractContentWithWeight(keywords, block.RenderBlockWeightedContent(keywords)),
+		ChunkType:         block.ResolveChunkType(),
+		Title:             block.ResolveTitle(),
+		Keywords:          marshal(keywords),
+		Questions:         marshal(questions),
 		PageNo:            block.PageNo,
 		PageRange:         block.PageRange,
 		BboxJson:          block.BboxJson,
@@ -733,4 +578,9 @@ func parseJsonArray(jsonArray string) []string {
 		j++
 	}
 	return results[:j]
+}
+
+func marshal(v any) string {
+	bytes, _ := json.Marshal(v)
+	return string(bytes)
 }

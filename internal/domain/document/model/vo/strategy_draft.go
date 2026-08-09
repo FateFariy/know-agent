@@ -8,6 +8,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
 
 // DocumentStrategyPlanDraft 策略方案草稿
@@ -45,6 +46,31 @@ type ChunkCandidate struct {
 	PageRange         string // 页码范围
 	BboxJson          string // 边界框JSON
 	SourceBlockIds    string // 源块ID列表
+}
+
+func (c *ChunkCandidate) ExtractKeywords(tokenizer shared.Tokenizer) []string {
+	if c == nil {
+		return nil
+	}
+	seed := shared.NewKeywordSeed(c.Title, c.SectionPath, c.Text)
+	return seed.Build(tokenizer)
+}
+
+func (c *ChunkCandidate) ExtractQuestions(keywords []string) []string {
+	if c == nil {
+		return nil
+	}
+	seed := shared.NewQuestionSeed(c.Title, c.ChunkType, keywords)
+	return seed.Build()
+}
+
+func (c *ChunkCandidate) ExtractContentWithWeight(keywords []string, parserWeightedContent string) string {
+	if c == nil {
+		return ""
+	}
+	questions := c.ExtractQuestions(keywords)
+	seed := shared.NewRichContentSeed(c.Text, c.SectionPath, c.Title, c.ChunkType, parserWeightedContent, keywords, questions)
+	return seed.Build()
 }
 
 // ParentChunkCandidate 父块候选

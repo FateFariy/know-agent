@@ -10,6 +10,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
 
 // DocumentBlock 文档块实体
@@ -40,10 +41,13 @@ type DocumentBlock struct {
 
 // HasBlockContent 检查块是否有内容
 func (b *DocumentBlock) HasBlockContent() bool {
-	return strings.TrimSpace(b.RenderBlockContent()) != ""
+	return b != nil && strings.TrimSpace(b.RenderBlockContent()) != ""
 }
 
 func (b *DocumentBlock) RenderBlockContent() string {
+	if b == nil {
+		return ""
+	}
 	text := utils.FirstNonBlank(b.Text, b.ImageCaption, b.TableHTML)
 	if strutil.Trim(text) == "" {
 		return ""
@@ -69,22 +73,79 @@ func (b *DocumentBlock) RenderBlockContent() string {
 }
 
 func (b *DocumentBlock) IsTitleBlock() bool {
-	return utils.EqualsIgnoreCase(b.BlockType, "TITLE")
+	return b != nil && utils.EqualsIgnoreCase(b.BlockType, "TITLE")
 }
 
-func (b *DocumentBlock) ResolveTitle(sectionPath string) string {
+func (b *DocumentBlock) ResolveTitle() string {
+	if b == nil {
+		return ""
+	}
 	blocks := DocumentBlocks{b}
-	return blocks.ResolveTitle(sectionPath)
+	return blocks.ResolveTitle(b.SectionPath)
 }
 
 func (b *DocumentBlock) ResolveChunkType() string {
+	if b == nil {
+		return ""
+	}
 	blocks := DocumentBlocks{b}
 	return blocks.ResolveChunkType()
 }
 
 func (b *DocumentBlock) Ids() string {
+	if b == nil {
+		return ""
+	}
 	blocks := DocumentBlocks{b}
 	return blocks.Ids()
+}
+
+func (b *DocumentBlock) ExtractKeywords(tokenizer shared.Tokenizer) []string {
+	if b == nil {
+		return nil
+	}
+	seed := shared.NewKeywordSeed(b.ResolveTitle(), b.SectionPath, b.RenderBlockContent())
+	return seed.Build(tokenizer)
+}
+
+func (b *DocumentBlock) ExtractQuestions(keywords []string) []string {
+	if b == nil {
+		return nil
+	}
+	seed := shared.NewQuestionSeed(b.ResolveTitle(), b.ResolveChunkType(), keywords)
+	return seed.Build()
+}
+
+func (b *DocumentBlock) ExtractContentWithWeight(keywords []string, parserWeightedContent string) string {
+	if b == nil {
+		return ""
+	}
+	text := b.RenderBlockContent()
+	title := b.ResolveTitle()
+	chunkType := b.ResolveChunkType()
+	questions := b.ExtractQuestions(keywords)
+	seed := shared.NewRichContentSeed(text, b.SectionPath, title, chunkType, parserWeightedContent, keywords, questions)
+	return seed.Build()
+}
+
+func (b *DocumentBlock) RenderBlockWeightedContent(keywords []string) string {
+	if b == nil {
+		return ""
+	}
+	contentWithWeight := strings.TrimSpace(b.ContentWithWeight)
+	if contentWithWeight != "" {
+		return contentWithWeight
+	}
+	return b.ExtractContentWithWeight(keywords, "")
+}
+
+func (b *DocumentBlock) CloneWithText(text string) *DocumentBlock {
+	if b == nil {
+		return nil
+	}
+	clone := *b
+	clone.Text = text
+	return &clone
 }
 
 type DocumentBlocks []*DocumentBlock
@@ -100,6 +161,38 @@ func (b DocumentBlocks) FirstPageNo() int {
 		}
 	}
 	return 0
+}
+
+func (b DocumentBlocks) ExtractKeywords(tokenizer shared.Tokenizer) []string {
+	if len(b) == 0 {
+		return nil
+	}
+	sectionPath := b.CommonSectionPath()
+	text := b.JoinBlockTexts()
+	title := b.ResolveTitle(sectionPath)
+	seed := shared.NewKeywordSeed(title, sectionPath, text)
+	return seed.Build(tokenizer)
+}
+
+func (b DocumentBlocks) ExtractQuestions(keywords []string) []string {
+	if len(b) == 0 {
+		return nil
+	}
+	title := b.ResolveTitle(b.CommonSectionPath())
+	seed := shared.NewQuestionSeed(title, b.ResolveChunkType(), keywords)
+	return seed.Build()
+}
+
+func (b DocumentBlocks) ExtractContentWithWeight(keywords []string, parserWeightedContent string) string {
+	if len(b) == 0 {
+		return ""
+	}
+	text := b.JoinBlockTexts()
+	title := b.ResolveTitle(b.CommonSectionPath())
+	chunkType := b.ResolveChunkType()
+	questions := b.ExtractQuestions(keywords)
+	seed := shared.NewRichContentSeed(text, b.CommonSectionPath(), title, chunkType, parserWeightedContent, keywords, questions)
+	return seed.Build()
 }
 
 func (b DocumentBlocks) PageRange() string {
@@ -302,3 +395,17 @@ func (b DocumentBlocks) CommonSectionPath() string {
 	}
 	return ""
 }
+
+// func (b DocumentBlocks) BuildKeywords(tokenizer shared.Tokenizer) []string {
+// 	return shared.NewKeywordSeed(
+// 		b.ResolveCommonTitle(""),
+// 		b.CommonSectionPath(),
+// 		b.JoinBlockTexts(),
+// 	).Build(tokenizer)
+// }
+
+// func (b *DocumentBlock) BuildQuestions(keywords []string) []string {
+// 	title := b.ResolveTitle(b.CanonicalPath)
+// 	chunkType := b.ResolveChunkType()
+// 	return shared.NewQuestionSeed(title, chunkType, keywords).Build()
+// }
