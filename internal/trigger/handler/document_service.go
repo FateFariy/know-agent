@@ -30,8 +30,18 @@ func NewDocumentService(lifeCycleLogic logic.LifecycleLogic, profileLogic logic.
 // UploadDocument 上传文档
 func (d *DocumentService) UploadDocument(ctx context.Context, file multipart.File, header *multipart.FileHeader, req *document.UploadDocumentReq) (*document.UploadDocumentResp, error) {
 	doc := convert.FromUploadDocumentReq(req)
-	documentUpload, err := d.lifeCycleLogic.Upload(ctx, file, header, doc)
-	return convert.ToUploadDocumentResp(documentUpload), err
+	doc, taskId, err := d.lifeCycleLogic.Upload(ctx, file, header, doc)
+	if err != nil {
+		return nil, err
+	}
+	return &document.UploadDocumentResp{
+		DocumentId:     utils.Int64ToString(doc.ID),
+		DocumentName:   doc.DocumentName,
+		IndexStatus:    doc.IndexStatus,
+		ParseStatus:    doc.ParseStatus,
+		StrategyStatus: doc.StrategyStatus,
+		TaskId:         utils.Int64ToString(taskId),
+	}, nil
 }
 
 // QueryDocumentPage 查询文档分页列表

@@ -1,6 +1,16 @@
 package index
 
-import "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+import (
+	"context"
+
+	"github.com/duke-git/lancet/v2/strutil"
+
+	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+)
 
 type ChunkPostPhase struct {
 	repo adapter.DocumentRepository

@@ -83,7 +83,7 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	}
 	_ = p.repo.InsertTaskLog(ctx, chunkStartLog)
 
-	if err := p.repo.UpdateStepExecuteStatus(ctx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuting); err != nil {
+	if err = p.repo.UpdateStepExecuteStatus(ctx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuting); err != nil {
 		return err
 	}
 
@@ -124,8 +124,8 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.Document,
 	steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) (vo.ParentChunkCandidates, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
-	parentSteps := steps.SortPipelineSteps(enum.PipelineTypeParent)
-	childSteps := steps.SortPipelineSteps(enum.PipelineTypeChild)
+	parentSteps := steps.FilterByPipelineSorted(enum.PipelineTypeParent)
+	childSteps := steps.FilterByPipelineSorted(enum.PipelineTypeChild)
 	if len(parentSteps) == 0 {
 		return nil, errorx.ErrParentBlockMissing
 	}
@@ -203,7 +203,7 @@ func (p *ChunkingPhase) buildParentSeedList(ctx context.Context, blocks entity.D
 	}
 
 	maxChars := options.ResolveRecursiveMaxChars(enum.PipelineTypeParent)
-	parentSeeds := p.buildBlockWindowParentSeeds(blocks, nodes, maxChars)
+	parentSeeds := p.buildBlockWindowParentSeeds(blocks, nil, maxChars)
 	remainingSteps := parentSteps.DeleteStep(enum.StrategyTypeRecursive)
 
 	if len(remainingSteps) == 0 {
@@ -253,6 +253,9 @@ func (p *ChunkingPhase) buildBlockSectionParentSeeds(blocks entity.DocumentBlock
 
 	// 遍历所有块，按章节路径分组
 	for _, block := range blocks {
+		if block == nil {
+			continue
+		}
 		sectionKey := strings.TrimSpace(block.SectionPath)
 		sectionChanged := len(currentGroup) > 0 && currentSectionKey != sectionKey
 
@@ -283,7 +286,7 @@ func (p *ChunkingPhase) buildBlockSectionParentSeeds(blocks entity.DocumentBlock
 
 // buildBlockChildSeeds 构建父块对应的子块种子列表，根据父块的源块ID列表，从blockMap中提取对应的文档块，生成独立的子块候选对象
 func (p *ChunkingPhase) buildBlockChildSeeds(parentSeed *vo.ChunkCandidate, blockMap map[int64]*entity.DocumentBlock) vo.ChunkCandidates {
-	if parentSeed == nil || blockMap == nil || len(blockMap) == 0 {
+	if parentSeed == nil || len(blockMap) == 0 {
 		return nil
 	}
 	// 解析父块中的源块ID列表
@@ -459,22 +462,10 @@ func (p *ChunkingPhase) buildPipelineOptions(options *vo.IndexingOptions, strate
 	}
 }
 
-func (p *ChunkingPhase) joinBlockWeightedContents(blocks entity.DocumentBlocks) string {
-	var contents []string
-	for _, block := range blocks {
-		keywords := block.ExtractKeywords(p.tokenizer)
-		content := block.RenderBlockWeightedContent(keywords)
-		if content != "" {
-			contents = append(contents, content)
-		}
-	}
-
-	return strings.Join(contents, "\n\n")
-}
-
+// toParentSeed 从文档块列表创建父块候选
 func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.StructureNodes) *vo.ChunkCandidate {
-	sectionPath := blocks.CommonSectionPath()
-	canonicalPath := utils.FirstNonBlank(blocks.CanonicalPaths()...)
+	sectionPath := blocks.FirstBlankSectionPath()
+	canonicalPath := blocks.FirstBlankCanonicalPath()
 	node := nodes.FindNodeByPath(sectionPath, canonicalPath)
 	keywords := blocks.ExtractKeywords(p.tokenizer)
 	candidate := &vo.ChunkCandidate{
@@ -482,7 +473,7 @@ func (p *ChunkingPhase) toParentSeed(blocks entity.DocumentBlocks, nodes entity.
 		CanonicalPath:     canonicalPath,
 		Text:              blocks.JoinBlockTexts(),
 		SourceType:        enum.ChunkSourceTypeOriginal,
-		ContentWithWeight: blocks.ExtractContentWithWeight(keywords, p.joinBlockWeightedContents(blocks)),
+		ContentWithWeight: blocks.ExtractContentWithWeight(keywords, blocks.JoinBlockWeightedContents(p.tokenizer)),
 		ChunkType:         blocks.ResolveChunkType(),
 		Title:             blocks.ResolveTitle(sectionPath),
 		Keywords:          marshal(keywords),
@@ -555,29 +546,6 @@ func (p *ChunkingPhase) toBlockChunkCandidate(block *entity.DocumentBlock) *vo.C
 		BboxJson:          block.BboxJson,
 		SourceBlockIds:    block.Ids(),
 	}
-}
-
-func parseJsonArray(jsonArray string) []string {
-	if jsonArray == "" {
-		return nil
-	}
-	results := make([]string, 0)
-	if err := json.Unmarshal([]byte(jsonArray), &results); err != nil {
-		displayText := strings.Replace(jsonArray, "\"", "", -1)
-		displayText = strings.TrimPrefix(displayText, "[")
-		displayText = strings.TrimSuffix(displayText, "]")
-		results = strings.Split(displayText, ",")
-	}
-	j := 0
-	for i := range results {
-		space := strings.TrimSpace(results[i])
-		if space == "" {
-			continue
-		}
-		results[j] = space
-		j++
-	}
-	return results[:j]
 }
 
 func marshal(v any) string {

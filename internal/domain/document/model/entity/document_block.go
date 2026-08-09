@@ -167,7 +167,7 @@ func (b DocumentBlocks) ExtractKeywords(tokenizer shared.Tokenizer) []string {
 	if len(b) == 0 {
 		return nil
 	}
-	sectionPath := b.CommonSectionPath()
+	sectionPath := b.FirstBlankSectionPath()
 	text := b.JoinBlockTexts()
 	title := b.ResolveTitle(sectionPath)
 	seed := shared.NewKeywordSeed(title, sectionPath, text)
@@ -178,7 +178,7 @@ func (b DocumentBlocks) ExtractQuestions(keywords []string) []string {
 	if len(b) == 0 {
 		return nil
 	}
-	title := b.ResolveTitle(b.CommonSectionPath())
+	title := b.ResolveTitle(b.FirstBlankSectionPath())
 	seed := shared.NewQuestionSeed(title, b.ResolveChunkType(), keywords)
 	return seed.Build()
 }
@@ -188,11 +188,24 @@ func (b DocumentBlocks) ExtractContentWithWeight(keywords []string, parserWeight
 		return ""
 	}
 	text := b.JoinBlockTexts()
-	title := b.ResolveTitle(b.CommonSectionPath())
+	title := b.ResolveTitle(b.FirstBlankSectionPath())
 	chunkType := b.ResolveChunkType()
 	questions := b.ExtractQuestions(keywords)
-	seed := shared.NewRichContentSeed(text, b.CommonSectionPath(), title, chunkType, parserWeightedContent, keywords, questions)
+	seed := shared.NewRichContentSeed(text, b.FirstBlankSectionPath(), title, chunkType, parserWeightedContent, keywords, questions)
 	return seed.Build()
+}
+
+func (b DocumentBlocks) JoinBlockWeightedContents(tokenizer shared.Tokenizer) string {
+	var contents []string
+	for _, block := range b {
+		keywords := block.ExtractKeywords(tokenizer)
+		content := block.RenderBlockWeightedContent(keywords)
+		if content != "" {
+			contents = append(contents, content)
+		}
+	}
+
+	return strings.Join(contents, "\n\n")
 }
 
 func (b DocumentBlocks) PageRange() string {
@@ -242,8 +255,7 @@ func (b DocumentBlocks) Ids() string {
 			continue
 		}
 		id := block.ID
-		_, exists := seen[id]
-		if id > 0 && !exists {
+		if _, exists := seen[id]; id > 0 && !exists {
 			seen[id] = struct{}{}
 			if count > 0 {
 				builder.WriteString(",")
@@ -256,22 +268,23 @@ func (b DocumentBlocks) Ids() string {
 	return builder.String()
 }
 
-func (b DocumentBlocks) CanonicalPaths() []string {
-	result := make([]string, 0, len(b))
+func (b DocumentBlocks) FirstBlankCanonicalPath() string {
 	for _, block := range b {
 		if block == nil {
 			continue
 		}
-		result = append(result, block.CanonicalPath)
+		space := strings.TrimSpace(block.CanonicalPath)
+		if space != "" {
+			return space
+		}
 	}
-	return result
+	return ""
 }
 
 func (b DocumentBlocks) ResolveTitle(sectionPath string) string {
 	normalizeTitle := func(title string) string {
 		normalized := strings.TrimSpace(title)
-		strings.TrimLeft(normalized, "#")
-		return normalized
+		return strings.TrimLeft(normalized, "#")
 	}
 	for _, block := range b {
 		if block != nil && block.IsTitleBlock() && strutil.IsNotBlank(block.Text) {
@@ -326,9 +339,6 @@ func (b DocumentBlocks) CleanupAndSort() DocumentBlocks {
 	}
 	result := make(DocumentBlocks, 0, len(b))
 	for _, block := range b {
-		if block == nil {
-			continue
-		}
 		if predicate(block) {
 			result = append(result, block)
 		}
@@ -383,7 +393,7 @@ func (b DocumentBlocks) ResolveChunkType() string {
 	return "MIXED"
 }
 
-func (b DocumentBlocks) CommonSectionPath() string {
+func (b DocumentBlocks) FirstBlankSectionPath() string {
 	for _, block := range b {
 		if block == nil {
 			continue
@@ -395,17 +405,3 @@ func (b DocumentBlocks) CommonSectionPath() string {
 	}
 	return ""
 }
-
-// func (b DocumentBlocks) BuildKeywords(tokenizer shared.Tokenizer) []string {
-// 	return shared.NewKeywordSeed(
-// 		b.ResolveCommonTitle(""),
-// 		b.CommonSectionPath(),
-// 		b.JoinBlockTexts(),
-// 	).Build(tokenizer)
-// }
-
-// func (b *DocumentBlock) BuildQuestions(keywords []string) []string {
-// 	title := b.ResolveTitle(b.CanonicalPath)
-// 	chunkType := b.ResolveChunkType()
-// 	return shared.NewQuestionSeed(title, chunkType, keywords).Build()
-// }

@@ -117,8 +117,8 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 
 type DocumentStrategySteps []*DocumentStrategyStep
 
-// SortPipelineSteps 过滤属于指定流水线的步骤并按 StepNo 升序排列
-func (s DocumentStrategySteps) SortPipelineSteps(pipelineType string) DocumentStrategySteps {
+// FilterByPipelineSorted 过滤属于指定流水线的步骤并按 StepNo 升序排列
+func (s DocumentStrategySteps) FilterByPipelineSorted(pipelineType string) DocumentStrategySteps {
 	filtered := make(DocumentStrategySteps, 0, len(s))
 	for _, step := range s {
 		if step == nil {
@@ -141,6 +141,9 @@ func (s DocumentStrategySteps) DeleteStep(strategyType int) DocumentStrategyStep
 	}
 	filtered := make(DocumentStrategySteps, 0, len(s))
 	for _, step := range s {
+		if step == nil {
+			continue
+		}
 		if step.StrategyType != strategyType {
 			filtered = append(filtered, step)
 		}
@@ -154,6 +157,9 @@ func (s DocumentStrategySteps) Contains(strategyType int) bool {
 		return false
 	}
 	for _, step := range s {
+		if step == nil {
+			continue
+		}
 		if step.StrategyType == strategyType {
 			return true
 		}

@@ -100,6 +100,31 @@ func (d DocumentStrategyStepDrafts) PipelineSnapshot() string {
 	return strings.Join(steps, ",")
 }
 
+type ChunkCandidates []*ChunkCandidate
+
+// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
+func (c ChunkCandidates) CleanupAndUnique() ChunkCandidates {
+	seen := make(map[string]struct{})
+	result := make(ChunkCandidates, 0, len(c))
+	for _, candidate := range c {
+		if candidate == nil {
+			continue
+		}
+
+		candidate.Text = strutil.Trim(candidate.Text)
+		if candidate.Text != "" {
+			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, candidate.Text)
+			if _, ok := seen[uniqueKey]; !ok {
+				seen[uniqueKey] = struct{}{}
+				result = append(result, candidate)
+			}
+		}
+	}
+
+	return result
+}
+
 type ParentChunkCandidates []*ParentChunkCandidate
 
 // CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
@@ -114,10 +139,10 @@ func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
 			continue
 		}
 
-		trim := strutil.Trim(candidate.Text)
-		if trim != "" {
+		candidate.Text = strutil.Trim(candidate.Text)
+		if candidate.Text != "" {
 			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
-			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
+			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, candidate.Text)
 			if _, ok := seen[uniqueKey]; !ok {
 				seen[uniqueKey] = struct{}{}
 				result = append(result, candidate)
@@ -138,29 +163,4 @@ func (p ParentChunkCandidates) CountChildCandidates() int {
 		}
 	}
 	return count
-}
-
-type ChunkCandidates []*ChunkCandidate
-
-// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
-func (c ChunkCandidates) CleanupAndUnique() ChunkCandidates {
-	seen := make(map[string]struct{})
-	result := make(ChunkCandidates, 0, len(c))
-	for _, candidate := range c {
-		if candidate == nil {
-			continue
-		}
-
-		trim := strutil.Trim(candidate.Text)
-		if trim != "" {
-			path := utils.BlankToDefault(candidate.CanonicalPath, candidate.SectionPath)
-			uniqueKey := fmt.Sprintf("%s||%d||%s", path, candidate.ItemIndex, trim)
-			if _, ok := seen[uniqueKey]; !ok {
-				seen[uniqueKey] = struct{}{}
-				result = append(result, candidate)
-			}
-		}
-	}
-
-	return result
 }

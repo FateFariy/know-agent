@@ -438,6 +438,18 @@ func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, bloc
 	return parentBlock, nil
 }
 
+// SelectChunks 根据条件查询块列表
+func (d *DocumentRepositoryImpl) SelectChunks(ctx context.Context, where map[string]any) ([]*entity.DocumentChunk, error) {
+	var chunks []*entity.DocumentChunk
+	if err := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).
+		Where(where).
+		Order("chunk_no ASC, id ASC").
+		Find(&chunks).Error; err != nil {
+		return nil, err
+	}
+	return chunks, nil
+}
+
 // ========== 结构节点相关 ==========
 
 // InsertStructureNodeBatch 批量插入结构节点

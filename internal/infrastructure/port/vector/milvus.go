@@ -80,7 +80,7 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 					cvo.MetaDocumentId:        chunk.DocumentId,
 					cvo.MetaTaskId:            chunk.TaskId,
 					cvo.MetaPlanId:            chunk.PlanId,
-					cvo.MetaParentBlockId:     chunk.ParentBlockId,
+					cvo.MetaParentBlockId:     chunk.ParentChunkId,
 					cvo.MetaChunkNo:           int32(chunk.ChunkNo),
 					cvo.MetaSourceType:        int32(chunk.SourceType),
 					cvo.MetaSectionPath:       chunk.SectionPath,

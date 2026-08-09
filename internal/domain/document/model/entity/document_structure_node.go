@@ -45,7 +45,13 @@ func (n StructureNodes) FindNodeByPath(sectionPath, canonicalPath string) *Struc
 	}
 	sectionPath = strutil.Trim(sectionPath)
 	canonicalPath = strutil.Trim(canonicalPath)
+	if sectionPath == "" && canonicalPath == "" {
+		return nil
+	}
 	for _, node := range n {
+		if node == nil {
+			continue
+		}
 		if canonicalPath != "" && strutil.Trim(node.CanonicalPath) == canonicalPath {
 			return node
 		}
