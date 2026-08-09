@@ -543,13 +543,13 @@ func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
 		modelDocumentBlock.CanonicalPath = (*source).CanonicalPath
 		modelDocumentBlock.PageNo = (*source).PageNo
 		modelDocumentBlock.PageRange = (*source).PageRange
-		modelDocumentBlock.BboxJSON = (*source).BboxJSON
+		modelDocumentBlock.BboxJson = (*source).BboxJson
 		modelDocumentBlock.Text = (*source).Text
 		modelDocumentBlock.ContentWithWeight = (*source).ContentWithWeight
 		modelDocumentBlock.TableHTML = (*source).TableHTML
 		modelDocumentBlock.ImageObjectName = (*source).ImageObjectName
 		modelDocumentBlock.ImageCaption = (*source).ImageCaption
-		modelDocumentBlock.MetadataJSON = (*source).MetadataJSON
+		modelDocumentBlock.MetadataJson = (*source).MetadataJson
 		pModelDocumentBlock = &modelDocumentBlock
 	}
 	return pModelDocumentBlock
@@ -582,7 +582,7 @@ func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
 		modelDocumentChunk.DocumentId = (*source).DocumentId
 		modelDocumentChunk.TaskId = (*source).TaskId
 		modelDocumentChunk.PlanId = (*source).PlanId
-		modelDocumentChunk.ParentBlockId = (*source).ParentBlockId
+		modelDocumentChunk.ParentChunkId = (*source).ParentChunkId
 		modelDocumentChunk.ChunkNo = (*source).ChunkNo
 		modelDocumentChunk.SourceType = (*source).SourceType
 		modelDocumentChunk.SectionPath = (*source).SectionPath
@@ -596,6 +596,15 @@ func ToDocumentChunkModel(source *entity1.DocumentChunk) *model.DocumentChunk {
 		modelDocumentChunk.VectorStatus = (*source).VectorStatus
 		modelDocumentChunk.VectorStoreType = (*source).VectorStoreType
 		modelDocumentChunk.VectorId = (*source).VectorId
+		modelDocumentChunk.ContentWithWeight = (*source).ContentWithWeight
+		modelDocumentChunk.ChunkType = (*source).ChunkType
+		modelDocumentChunk.Title = (*source).Title
+		modelDocumentChunk.Keywords = (*source).Keywords
+		modelDocumentChunk.Questions = (*source).Questions
+		modelDocumentChunk.PageNo = (*source).PageNo
+		modelDocumentChunk.PageRange = (*source).PageRange
+		modelDocumentChunk.BboxJson = (*source).BboxJson
+		modelDocumentChunk.SourceBlockIds = (*source).SourceBlockIds
 		pModelDocumentChunk = &modelDocumentChunk
 	}
 	return pModelDocumentChunk
@@ -680,11 +689,11 @@ func ToDocumentModel(source *entity1.Document) *model.Document {
 		modelDocument.StructureLevel = (*source).StructureLevel
 		modelDocument.ContentQualityLevel = (*source).ContentQualityLevel
 		modelDocument.ParseTextPath = (*source).ParseTextPath
-		modelDocument.ParseErrorMsg = (*source).ParseErrorMsg
-		modelDocument.KnowledgeScopeCode = (*source).KnowledgeScopeCode
-		modelDocument.KnowledgeScopeName = (*source).KnowledgeScopeName
-		modelDocument.BusinessCategory = (*source).BusinessCategory
-		modelDocument.DocumentTags = (*source).DocumentTags
+		if (*source).ParseErrorMsg != nil {
+			modelDocument.ParseErrorMsg = *(*source).ParseErrorMsg
+		}
+		modelDocument.KnowledgeBaseId = (*source).KnowledgeBaseId
+		modelDocument.KnowledgeBaseName = (*source).KnowledgeBaseName
 		modelDocument.CurrentPlanId = (*source).CurrentPlanId
 		modelDocument.LastParseTaskId = (*source).LastParseTaskId
 		modelDocument.StructureNodeCount = (*source).StructureNodeCount
@@ -693,62 +702,42 @@ func ToDocumentModel(source *entity1.Document) *model.Document {
 	}
 	return pModelDocument
 }
-func ToDocumentParentBlockModel(source *entity1.DocumentParentBlock) *model.DocumentParentBlock {
-	var pModelDocumentParentBlock *model.DocumentParentBlock
+func ToDocumentParentBlockModel(source *entity1.DocumentParentChunk) *model.DocumentParentChunk {
+	var pModelDocumentParentChunk *model.DocumentParentChunk
 	if source != nil {
-		var modelDocumentParentBlock model.DocumentParentBlock
-		modelDocumentParentBlock.Model = entityDocumentParentBlockToCommonModel((*source))
-		modelDocumentParentBlock.DocumentId = (*source).DocumentId
-		modelDocumentParentBlock.TaskId = (*source).TaskId
-		modelDocumentParentBlock.PlanId = (*source).PlanId
-		modelDocumentParentBlock.ParentNo = (*source).ParentNo
-		modelDocumentParentBlock.SourceType = (*source).SourceType
-		modelDocumentParentBlock.SectionPath = (*source).SectionPath
-		modelDocumentParentBlock.StructureNodeId = (*source).StructureNodeId
-		modelDocumentParentBlock.StructureNodeType = (*source).StructureNodeType
-		modelDocumentParentBlock.CanonicalPath = (*source).CanonicalPath
-		modelDocumentParentBlock.ItemIndex = (*source).ItemIndex
-		modelDocumentParentBlock.ParentText = (*source).ParentText
-		modelDocumentParentBlock.CharCount = (*source).CharCount
-		modelDocumentParentBlock.TokenCount = (*source).TokenCount
-		modelDocumentParentBlock.ChildCount = (*source).ChildCount
-		modelDocumentParentBlock.StartChunkNo = (*source).StartChunkNo
-		modelDocumentParentBlock.EndChunkNo = (*source).EndChunkNo
-		pModelDocumentParentBlock = &modelDocumentParentBlock
+		var modelDocumentParentChunk model.DocumentParentChunk
+		modelDocumentParentChunk.Model = entityDocumentParentChunkToCommonModel((*source))
+		modelDocumentParentChunk.DocumentId = (*source).DocumentId
+		modelDocumentParentChunk.TaskId = (*source).TaskId
+		modelDocumentParentChunk.PlanId = (*source).PlanId
+		modelDocumentParentChunk.ParentNo = (*source).ParentNo
+		modelDocumentParentChunk.SourceType = (*source).SourceType
+		modelDocumentParentChunk.SectionPath = (*source).SectionPath
+		modelDocumentParentChunk.StructureNodeId = (*source).StructureNodeId
+		modelDocumentParentChunk.StructureNodeType = (*source).StructureNodeType
+		modelDocumentParentChunk.CanonicalPath = (*source).CanonicalPath
+		modelDocumentParentChunk.ItemIndex = (*source).ItemIndex
+		modelDocumentParentChunk.ParentText = (*source).ParentText
+		modelDocumentParentChunk.CharCount = (*source).CharCount
+		modelDocumentParentChunk.TokenCount = (*source).TokenCount
+		modelDocumentParentChunk.ChildCount = (*source).ChildCount
+		modelDocumentParentChunk.StartChunkNo = (*source).StartChunkNo
+		modelDocumentParentChunk.EndChunkNo = (*source).EndChunkNo
+		modelDocumentParentChunk.PageRange = (*source).PageRange
+		modelDocumentParentChunk.SourceBlockIds = (*source).SourceBlockIds
+		pModelDocumentParentChunk = &modelDocumentParentChunk
 	}
-	return pModelDocumentParentBlock
+	return pModelDocumentParentChunk
 }
-func ToDocumentParentBlockModelList(source []*entity1.DocumentParentBlock) []*model.DocumentParentBlock {
-	var pModelDocumentParentBlockList []*model.DocumentParentBlock
+func ToDocumentParentBlockModelList(source []*entity1.DocumentParentChunk) []*model.DocumentParentChunk {
+	var pModelDocumentParentChunkList []*model.DocumentParentChunk
 	if source != nil {
-		pModelDocumentParentBlockList = make([]*model.DocumentParentBlock, len(source))
+		pModelDocumentParentChunkList = make([]*model.DocumentParentChunk, len(source))
 		for i := 0; i < len(source); i++ {
-			pModelDocumentParentBlockList[i] = ToDocumentParentBlockModel(source[i])
+			pModelDocumentParentChunkList[i] = ToDocumentParentBlockModel(source[i])
 		}
 	}
-	return pModelDocumentParentBlockList
-}
-func ToDocumentProfileModel(source *entity1.DocumentProfile) *model.DocumentProfile {
-	var pModelDocumentProfile *model.DocumentProfile
-	if source != nil {
-		var modelDocumentProfile model.DocumentProfile
-		modelDocumentProfile.Model = entityDocumentProfileToCommonModel((*source))
-		modelDocumentProfile.DocumentId = (*source).DocumentId
-		modelDocumentProfile.ProfileVersion = (*source).ProfileVersion
-		modelDocumentProfile.DocumentSummary = (*source).DocumentSummary
-		modelDocumentProfile.DocumentType = (*source).DocumentType
-		modelDocumentProfile.CoreTopics = (*source).CoreTopics
-		modelDocumentProfile.ExampleQuestions = (*source).ExampleQuestions
-		modelDocumentProfile.GraphFriendly = (*source).GraphFriendly
-		modelDocumentProfile.SupportsGraphOutline = (*source).SupportsGraphOutline
-		modelDocumentProfile.SupportsItemLookup = (*source).SupportsItemLookup
-		modelDocumentProfile.SupportsGraphAssist = (*source).SupportsGraphAssist
-		modelDocumentProfile.ProfileSource = (*source).ProfileSource
-		modelDocumentProfile.ProfileStatus = (*source).ProfileStatus
-		modelDocumentProfile.ErrorMsg = (*source).ErrorMsg
-		pModelDocumentProfile = &modelDocumentProfile
-	}
-	return pModelDocumentProfile
+	return pModelDocumentParentChunkList
 }
 func ToDocumentProfileResp(source *entity1.DocumentProfile) *document.DocumentProfileResp {
 	var pDocumentDocumentProfileResp *document.DocumentProfileResp
@@ -824,8 +813,8 @@ func ToDocumentStrategyStepModel(source *entity1.DocumentStrategyStep) *model.Do
 	if source != nil {
 		var modelDocumentStrategyStep model.DocumentStrategyStep
 		modelDocumentStrategyStep.Model = entityDocumentStrategyStepToCommonModel((*source))
-		modelDocumentStrategyStep.DocumentId = (*source).DocumentId
 		modelDocumentStrategyStep.PlanId = (*source).PlanId
+		modelDocumentStrategyStep.DocumentId = (*source).DocumentId
 		modelDocumentStrategyStep.StepNo = (*source).StepNo
 		modelDocumentStrategyStep.PipelineType = (*source).PipelineType
 		modelDocumentStrategyStep.StrategyType = (*source).StrategyType
@@ -909,8 +898,6 @@ func ToDocumentTableCellModel(source *entity1.TableCell) *model.DocumentTableCel
 		modelDocumentTableCell.SourceRowNo = (*source).SourceRowNo
 		modelDocumentTableCell.SourceColumnNo = (*source).SourceColumnNo
 		modelDocumentTableCell.SourceCellRef = (*source).SourceCellRef
-		modelDocumentTableCell.BboxJSON = (*source).BboxJSON
-		modelDocumentTableCell.MetadataJSON = (*source).MetadataJSON
 		pModelDocumentTableCell = &modelDocumentTableCell
 	}
 	return pModelDocumentTableCell
@@ -967,8 +954,6 @@ func ToDocumentTableModel(source *entity1.DocumentTable) *model.DocumentTable {
 		modelDocumentTable.Title = (*source).Title
 		modelDocumentTable.RowCount = (*source).RowCount
 		modelDocumentTable.ColumnCount = (*source).ColumnCount
-		modelDocumentTable.TableHTML = (*source).TableHTML
-		modelDocumentTable.MetadataJSON = (*source).MetadataJSON
 		pModelDocumentTable = &modelDocumentTable
 	}
 	return pModelDocumentTable
@@ -1093,7 +1078,7 @@ func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *docu
 		documentQueryDocumentChunkDetailResp.TaskId = Int64ToString((*source).TaskId)
 		documentQueryDocumentChunkDetailResp.PlanId = Int64ToString((*source).PlanId)
 		documentQueryDocumentChunkDetailResp.Chunk = pEntityDocumentChunkToPDocumentDocumentChunkItem((*source).Chunk)
-		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentBlockToPDocumentDocumentParentBlockItem((*source).ParentBlock)
+		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem((*source).ParentBlock)
 		documentQueryDocumentChunkDetailResp.SiblingChunks = ToDocumentChunkItemList((*source).SiblingChunks)
 		pDocumentQueryDocumentChunkDetailResp = &documentQueryDocumentChunkDetailResp
 	}
@@ -1174,12 +1159,7 @@ func entityDocumentChunkToCommonModel(source entity1.DocumentChunk) common.Model
 	commonModel.ID = source.ID
 	return commonModel
 }
-func entityDocumentParentBlockToCommonModel(source entity1.DocumentParentBlock) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityDocumentProfileToCommonModel(source entity1.DocumentProfile) common.Model {
+func entityDocumentParentChunkToCommonModel(source entity1.DocumentParentChunk) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
@@ -1254,7 +1234,6 @@ func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentCh
 	if source != nil {
 		var documentDocumentChunkItem document.DocumentChunkItem
 		documentDocumentChunkItem.ID = Int64ToString((*source).ID)
-		documentDocumentChunkItem.ParentBlockId = Int64ToString((*source).ParentBlockId)
 		documentDocumentChunkItem.ParentBlockNo = (*source).ParentBlockNo
 		documentDocumentChunkItem.ParentChildCount = (*source).ParentChildCount
 		documentDocumentChunkItem.ParentStartChunkNo = (*source).ParentStartChunkNo
@@ -1272,7 +1251,7 @@ func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentCh
 	}
 	return pDocumentDocumentChunkItem
 }
-func pEntityDocumentParentBlockToPDocumentDocumentParentBlockItem(source *entity1.DocumentParentBlock) *document.DocumentParentBlockItem {
+func pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem(source *entity1.DocumentParentChunk) *document.DocumentParentBlockItem {
 	var pDocumentDocumentParentBlockItem *document.DocumentParentBlockItem
 	if source != nil {
 		var documentDocumentParentBlockItem document.DocumentParentBlockItem
@@ -1528,9 +1507,7 @@ func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.Knowle
 	if source != nil {
 		var modelKnowledgeScopeNode model.KnowledgeScopeNode
 		modelKnowledgeScopeNode.Model = entityKnowledgeScopeNodeToCommonModel((*source))
-		modelKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
 		modelKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
-		modelKnowledgeScopeNode.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
 		modelKnowledgeScopeNode.Description = NormalizeString((*source).Description)
 		modelKnowledgeScopeNode.Aliases = NormalizeString((*source).Aliases)
 		modelKnowledgeScopeNode.Examples = NormalizeString((*source).Examples)
@@ -1584,9 +1561,7 @@ func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.Knowle
 	if source != nil {
 		var modelKnowledgeTopicNode model.KnowledgeTopicNode
 		modelKnowledgeTopicNode.Model = entityKnowledgeTopicNodeToCommonModel((*source))
-		modelKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
 		modelKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
-		modelKnowledgeTopicNode.ScopeCode = NormalizeString((*source).ScopeCode)
 		modelKnowledgeTopicNode.Description = NormalizeString((*source).Description)
 		modelKnowledgeTopicNode.Aliases = NormalizeString((*source).Aliases)
 		modelKnowledgeTopicNode.Examples = NormalizeString((*source).Examples)

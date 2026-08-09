@@ -31,6 +31,8 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 	planDraft := parseCtx.StrategyPlanDraft
 	document := parseCtx.Document
 	task := parseCtx.Task
+	task.TaskStatus = enum.TaskStatusSuccess
+	task.CurrentStage = enum.TaskStageStrategyRoute
 
 	// 事务性持久化策略方案 → 更新文档状态 → 收尾任务 → 写入日志
 	finalizeTx := func(txCtx context.Context) error {

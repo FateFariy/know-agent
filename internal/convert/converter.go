@@ -43,7 +43,7 @@ type DocumentConverter interface {
 	// goverter:map . Model
 	ToDocumentModel(src *den.Document) *model.Document
 	// goverter:map . Model
-	ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
+	//ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
 	// goverter:map . Model
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
 	// goverter:map . Model
@@ -60,8 +60,8 @@ type DocumentConverter interface {
 	ToDocumentChunkModel(src *den.DocumentChunk) *model.DocumentChunk
 	ToDocumentChunkModelList(src []*den.DocumentChunk) []*model.DocumentChunk
 	// goverter:map . Model
-	ToDocumentParentBlockModel(src *den.DocumentParentBlock) *model.DocumentParentBlock
-	ToDocumentParentBlockModelList(src []*den.DocumentParentBlock) []*model.DocumentParentBlock
+	ToDocumentParentBlockModel(src *den.DocumentParentChunk) *model.DocumentParentChunk
+	ToDocumentParentBlockModelList(src []*den.DocumentParentChunk) []*model.DocumentParentChunk
 	// // goverter:map . Model
 	// ToDocumentTableCandidateModel(src *den.DocumentTableCandidate) *model.DocumentTableCandidate
 	// ToDocumentTableCandidateModelList(src []*den.DocumentTableCandidate) []*model.DocumentTableCandidate

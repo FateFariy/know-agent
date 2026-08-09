@@ -92,8 +92,7 @@ func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, tas
 	return nil
 }
 
-// HandleIndexBuild 执行索引构建主流程（使用责任链模式）：
-// 验证 → 准备 → 切块 → 向量化 → 关键词索引 → GraphRAG → RAPTOR → 完成
+// HandleIndexBuild 执行索引构建主流程（使用责任链模式）：准备 → 切块 → 向量化 → 关键词索引 → GraphRAG → RAPTOR → 完成
 func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) (err error) {
 	// 加载任务相关实体
 	task, err := d.repo.SelectTaskById(ctx, taskId)
@@ -109,8 +108,29 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		return err
 	}
 
-	// 记录起始时间；defer recover 统一捕获 panic 为失败状态
+	// 前置检查：如果任务已成功或失败，跳过重复执行
+	if task.TaskStatus == enum.TaskStatusSuccess {
+		logx.Infof("索引构建任务已成功，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
+			documentId, taskId, planId)
+		return nil // 已完成，直接返回
+	}
+	if task.TaskStatus == enum.TaskStatusFailed {
+		logx.Infof("索引构建任务已失败，跳过重复执行，documentId=%d, taskId=%d, planId=%d",
+			documentId, taskId, planId)
+		return nil // 已失败，直接返回
+	}
+
 	startTime := time.Now()
+
+	// 读取已有的 GraphRAG 构建结果（用于断点恢复）
+	graphRagBuildResult := task.ReadGraphRagBuildResult()
+
+	// 检查是否需要直接失败
+	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
+		return nil // 直接失败，无需继续执行
+	}
+
 	defer func() {
 		if v := recover(); v != nil {
 			var panicErr *vo.GraphRagBuildFailureException
@@ -640,11 +660,6 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 	return nil
 }
 
-// todo 待实现
-func (d *AsyncProcessImpl) syncNavigationArtifacts(ctx context.Context, documentId, parseTaskId int64, structureNodes []*entity.StructureNode) error {
-	return nil
-}
-
 // buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
 // 关键信息：
 //   - 每个父块维护 StartChunkNo / EndChunkNo（用于快速定位其覆盖的子块区间）
@@ -725,6 +740,9 @@ func (d *AsyncProcessImpl) finishTaskSuccess(ctx context.Context, task *entity.D
 // handleParseFailure 异步任务"解析路由"阶段失败时的统一收尾流程：先记录错误日志，再在事务内将文档状态、任务状态、失败详情与失败日志一次落库。
 func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *entity.Document, task *entity.DocumentTask, errorMsg string) {
 	logx.Errorf("异步解析文档失败，documentId=%d, taskId=%d, exception=%v", document.ID, task.ID, errorMsg)
+	task.CurrentStage = utils.DefaultIfZero(task.CurrentStage, enum.TaskStageContentParse)
+	task.TaskStatus = enum.TaskStatusFailed
+
 	parseFailTx := func(txCtx context.Context) error {
 		// 文档：标记为解析失败，并保留失败原因
 		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{
@@ -738,7 +756,7 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 		if err := d.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
 			ID:           task.ID,
 			TaskStatus:   enum.TaskStatusFailed,
-			CurrentStage: enum.TaskStageContentParse,
+			CurrentStage: task.CurrentStage,
 		}); err != nil {
 			return err
 		}
@@ -757,7 +775,7 @@ func (d *AsyncProcessImpl) handleParseFailure(ctx context.Context, document *ent
 		failLog := &entity.DocumentTaskLog{
 			TaskId:       task.ID,
 			DocumentId:   task.DocumentId,
-			StageType:    enum.TaskStageContentParse,
+			StageType:    task.CurrentStage,
 			EventType:    enum.TaskEventFailed,
 			LogLevel:     enum.LogLevelError,
 			OperatorType: enum.OperatorTypeSystem,
@@ -829,6 +847,7 @@ func (d *AsyncProcessImpl) failTask(txCtx context.Context, task *entity.Document
 		ID:           task.ID,
 		TaskStatus:   task.TaskStatus,
 		CurrentStage: task.CurrentStage,
+		StartTime:    task.StartTime,
 		FinishTime:   task.FinishTime,
 		ErrorCode:    task.ErrorCode,
 		ErrorMsg:     task.ErrorMsg,
@@ -866,99 +885,25 @@ func (d *AsyncProcessImpl) isCommittedGraph(result *vo.GraphRagBuildResult) bool
 	return result != nil && result.KgCommitted && result.GraphPersistenceOutcome != "" && result.GraphPersistenceOutcome != vo.GraphPersistenceOutcomeFailed
 }
 
-// readGraphRagBuildResult 从任务扩展 JSON 读取 GraphRAG 构建结果
-func (d *AsyncProcessImpl) readGraphRagBuildResult(task *entity.DocumentTask) *vo.GraphRagBuildResult {
-	if task == nil || strutil.IsBlank(task.ExtJson) {
-		return nil
-	}
-	var state map[string]any
-	if err := json.Unmarshal([]byte(task.ExtJson), &state); err != nil {
-		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", task.ID, err)
-		return nil
-	}
-	rawState, ok := state["graphRagBuild"]
-	if !ok {
-		return nil
-	}
-	stateMap, ok := rawState.(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	result := &vo.GraphRagBuildResult{}
-	if v, ok := stateMap["entityCount"].(float64); ok {
-		result.EntityCount = int(v)
-	}
-	if v, ok := stateMap["relationCount"].(float64); ok {
-		result.RelationCount = int(v)
-	}
-	if v, ok := stateMap["evidenceCount"].(float64); ok {
-		result.EvidenceCount = int(v)
-	}
-	if v, ok := stateMap["communityCount"].(float64); ok {
-		result.CommunityCount = int(v)
-	}
-	if v, ok := stateMap["graphPersistenceOutcome"].(string); ok {
-		result.GraphPersistenceOutcome = vo.GraphPersistenceOutcome(v)
-	}
-	if v, ok := stateMap["graphPersistenceReason"].(string); ok {
-		result.GraphPersistenceReason = v
-	}
-	if v, ok := stateMap["kgCommitted"].(bool); ok {
-		result.KgCommitted = v
-	}
-	if v, ok := stateMap["typedIndexOutcome"].(string); ok {
-		result.TypedIndexOutcome = vo.ComponentOutcome(v)
-	}
-	if v, ok := stateMap["crossDocumentIndexOutcome"].(string); ok {
-		result.CrossDocumentIndexOutcome = vo.ComponentOutcome(v)
-	}
-	if v, ok := stateMap["derivedIndexOutcome"].(string); ok {
-		result.DerivedIndexOutcome = vo.DerivedIndexOutcome(v)
-	}
-	if v, ok := stateMap["observationProjectionOutcome"].(string); ok {
-		result.ObservationProjectionOutcome = vo.ObservationProjectionOutcome(v)
-	}
-	if v, ok := stateMap["outerTaskDisposition"].(string); ok {
-		result.OuterTaskDisposition = vo.OuterTaskDisposition(v)
-	}
-	if v, ok := stateMap["pythonInvocationOutcome"].(string); ok {
-		result.PythonInvocationOutcome = vo.InvocationOutcome(v)
-	}
-	if v, ok := stateMap["advisorInvocationOutcome"].(string); ok {
-		result.AdvisorInvocationOutcome = vo.InvocationOutcome(v)
-	}
-	if v, ok := stateMap["attempt"].(float64); ok {
-		result.Attempt = int(v)
-	}
-	if v, ok := stateMap["maxAttempts"].(float64); ok {
-		result.MaxAttempts = int(v)
-	}
-
-	return result
-}
-
 // applyGraphFailureDisposition 应用图谱失败处置
 func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, document *entity.Document,
 	task *entity.DocumentTask, planId int64, result *vo.GraphRagBuildResult, cause error) {
-	failedStage := enum.TaskStageGraphRag
-	if task.CurrentStage != 0 {
-		failedStage = task.CurrentStage
-	}
+
+	task.CurrentStage = utils.DefaultIfZero(task.CurrentStage, enum.TaskStageGraphRag)
 	if cause == nil {
-		cause = &vo.GraphRagBuildFailureException{Result: result}
+		msg := "GraphRAG build failed."
+		if result != nil && result.GraphPersistenceReason != "" {
+			msg = result.GraphPersistenceReason
+		}
+		cause = errors.New(msg)
 	}
 
 	markFailureTx := func(txCtx context.Context) error {
 		// 文档：索引构建失败
-		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: enum.IndexStatusBuildFailed}); err != nil {
-			return err
-		}
-		// chunk：按任务 ID 批量将向量状态置为失败
-		if err := d.repo.UpdateChunkByTaskId(txCtx, &entity.DocumentChunk{
-			TaskId:          task.ID,
-			VectorStatus:    enum.VectorStatusVectorFailed,
-			VectorStoreType: enum.VectorStoreTypeMilvus,
+		document.IndexStatus = enum.IndexStatusBuildFailed
+		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{
+			ID:          document.ID,
+			IndexStatus: document.IndexStatus,
 		}); err != nil {
 			return err
 		}
@@ -967,25 +912,7 @@ func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, doc
 			return err
 		}
 		// 通用任务失败收尾
-		if err := d.failTask(txCtx, task, cause.Error()); err != nil {
-			return err
-		}
-		// 写入失败事件日志
-		failDetail, _ := json.Marshal(map[string]any{
-			"error":        cause.Error(),
-			"currentStage": failedStage,
-		})
-		failLog := &entity.DocumentTaskLog{
-			TaskId:       task.ID,
-			DocumentId:   task.DocumentId,
-			StageType:    failedStage,
-			EventType:    enum.TaskEventFailed,
-			LogLevel:     enum.LogLevelError,
-			OperatorType: enum.OperatorTypeSystem,
-			Content:      "GraphRAG 构建失败",
-			DetailJson:   string(failDetail),
-		}
-		return d.repo.InsertTaskLog(txCtx, failLog)
+		return d.failTask(txCtx, task, cause.Error())
 	}
 	if err := d.repo.Do(ctx, markFailureTx); err != nil {
 		logx.Warnf("图谱失败时收尾失败: taskId=%d, err=%v", task.ID, err)

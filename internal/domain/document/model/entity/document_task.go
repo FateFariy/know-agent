@@ -1,11 +1,15 @@
 package entity
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // DocumentTask 文档任务实体
@@ -32,11 +36,83 @@ type DocumentTask struct {
 	Logs              []*DocumentTaskLog `gorm:"-"`                           // 日志
 }
 
-func (d *DocumentTask) FillEnumNames() {
-	d.TaskTypeName = enum.TaskTypeName(d.TaskType)
-	d.TaskStatusName = enum.TaskStatusName(d.TaskStatus)
-	d.CurrentStageName = enum.TaskStageName(d.CurrentStage)
-	slice.ForEach(d.Logs, func(index int, log *DocumentTaskLog) {
+func (t *DocumentTask) FillEnumNames() {
+	t.TaskTypeName = enum.TaskTypeName(t.TaskType)
+	t.TaskStatusName = enum.TaskStatusName(t.TaskStatus)
+	t.CurrentStageName = enum.TaskStageName(t.CurrentStage)
+	slice.ForEach(t.Logs, func(index int, log *DocumentTaskLog) {
 		log.FillEnumNames()
 	})
+}
+
+// ReadGraphRagBuildResult 从任务扩展 JSON 读取 GraphRAG 构建结果
+func (t *DocumentTask) ReadGraphRagBuildResult() *vo.GraphRagBuildResult {
+	if strutil.IsBlank(t.ExtJson) {
+		return nil
+	}
+	var state map[string]any
+	if err := json.Unmarshal([]byte(t.ExtJson), &state); err != nil {
+		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%t, message=%v", t.ID, err)
+		return nil
+	}
+	rawState, ok := state["graphRagBuild"]
+	if !ok {
+		return nil
+	}
+	stateMap, ok := rawState.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	result := &vo.GraphRagBuildResult{}
+	if v, ok := stateMap["entityCount"].(float64); ok {
+		result.EntityCount = int(v)
+	}
+	if v, ok := stateMap["relationCount"].(float64); ok {
+		result.RelationCount = int(v)
+	}
+	if v, ok := stateMap["evidenceCount"].(float64); ok {
+		result.EvidenceCount = int(v)
+	}
+	if v, ok := stateMap["communityCount"].(float64); ok {
+		result.CommunityCount = int(v)
+	}
+	if v, ok := stateMap["graphPersistenceOutcome"].(string); ok {
+		result.GraphPersistenceOutcome = vo.GraphPersistenceOutcome(v)
+	}
+	if v, ok := stateMap["graphPersistenceReason"].(string); ok {
+		result.GraphPersistenceReason = v
+	}
+	if v, ok := stateMap["kgCommitted"].(bool); ok {
+		result.KgCommitted = v
+	}
+	if v, ok := stateMap["typedIndexOutcome"].(string); ok {
+		result.TypedIndexOutcome = vo.ComponentOutcome(v)
+	}
+	if v, ok := stateMap["crossDocumentIndexOutcome"].(string); ok {
+		result.CrossDocumentIndexOutcome = vo.ComponentOutcome(v)
+	}
+	if v, ok := stateMap["derivedIndexOutcome"].(string); ok {
+		result.DerivedIndexOutcome = vo.DerivedIndexOutcome(v)
+	}
+	if v, ok := stateMap["observationProjectionOutcome"].(string); ok {
+		result.ObservationProjectionOutcome = vo.ObservationProjectionOutcome(v)
+	}
+	if v, ok := stateMap["outerTaskDisposition"].(string); ok {
+		result.OuterTaskDisposition = vo.OuterTaskDisposition(v)
+	}
+	if v, ok := stateMap["pythonInvocationOutcome"].(string); ok {
+		result.PythonInvocationOutcome = vo.InvocationOutcome(v)
+	}
+	if v, ok := stateMap["advisorInvocationOutcome"].(string); ok {
+		result.AdvisorInvocationOutcome = vo.InvocationOutcome(v)
+	}
+	if v, ok := stateMap["attempt"].(float64); ok {
+		result.Attempt = int(v)
+	}
+	if v, ok := stateMap["maxAttempts"].(float64); ok {
+		result.MaxAttempts = int(v)
+	}
+
+	return result
 }

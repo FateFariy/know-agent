@@ -3,6 +3,7 @@ package index
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -30,6 +31,10 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error
 	if sourceParseTaskId > 0 {
 		return errors.New("索引任务缺少有效且已冻结的源解析任务")
 	}
+	buildCtx.Task.CurrentStage = enum.TaskStageChunkExecute
+	buildCtx.Task.TaskStatus = enum.TaskStatusRunning
+	buildCtx.Task.StartTime = utils.Pointer(buildCtx.StartTime)
+
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
 		document := &entity.Document{
@@ -89,4 +94,55 @@ func (p *PreparationPhase) requireSourceParseTaskId(ctx context.Context, buildCt
 		return 0
 	}
 	return sourceParseTask.ID
+}
+
+// readGraphRagBuildResult 从任务扩展 JSON 读取 GraphRAG 构建结果
+func (p *PreparationPhase) readGraphRagBuildResult(task *entity.DocumentTask) *vo.GraphRagBuildResult {
+	if task == nil || task.ExtJson == "" {
+		return nil
+	}
+	var wrapper struct {
+		GraphRagBuild *vo.GraphRagBuildResult `json:"graphRagBuild"`
+	}
+	if err := json.Unmarshal([]byte(task.ExtJson), &wrapper); err != nil {
+		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", task.ID, err)
+		return nil
+	}
+
+	return wrapper.GraphRagBuild
+}
+
+// applyGraphFailureDisposition 应用图谱失败处置
+func (p *PreparationPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *Context, cause error) {
+	failedStage := enum.TaskStageGraphRag
+	if buildCtx.Task.CurrentStage != 0 {
+		failedStage = buildCtx.Task.CurrentStage
+	}
+	errMsg := "Graph build failed"
+	if cause != nil {
+		errMsg = utils.BlankToDefault(cause.Error(), "Graph build failed")
+	}
+
+	markFailureTx := func(txCtx context.Context) error {
+		if err := p.repo.UpdateDocumentById(txCtx, &entity.Document{
+			ID: buildCtx.DocumentId, IndexStatus: enum.IndexStatusBuildFailed,
+		}); err != nil {
+			return err
+		}
+		if err := p.repo.UpdateStepExecuteStatus(txCtx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuteFailed); err != nil {
+			return err
+		}
+		return p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
+			ID:           buildCtx.TaskId,
+			TaskStatus:   enum.TaskStatusFailed,
+			CurrentStage: failedStage,
+			FinishTime:   utils.Pointer(time.Now()),
+			CostMillis:   time.Since(buildCtx.StartTime).Milliseconds(),
+			ErrorCode:    utils.Pointer("TASK_FAILED"),
+			ErrorMsg:     utils.Pointer(errMsg),
+		})
+	}
+	if err := p.repo.Do(ctx, markFailureTx); err != nil {
+		logx.Warnf("图谱失败时收尾失败: taskId=%d, err=%v", buildCtx.Task.ID, err)
+	}
 }
