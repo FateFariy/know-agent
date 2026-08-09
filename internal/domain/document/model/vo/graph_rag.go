@@ -28,8 +28,24 @@ type GraphRagBuildResult struct {
 
 // isCommittedGraph 检查图谱是否已提交
 func (p *GraphRagBuildResult) IsCommittedGraph() bool {
-	return p.KgCommitted && p.GraphPersistenceOutcome != "" &&
+	return p != nil && p.KgCommitted && p.GraphPersistenceOutcome != "" &&
 		p.GraphPersistenceOutcome != enum.GraphPersistenceOutcomeFailed
+}
+
+// ResultAttempt 结果尝试次数
+func (p *GraphRagBuildResult) ResultAttempt() int {
+	if p == nil {
+		return 0
+	}
+	return max(0, p.Attempt)
+}
+
+// ResultMaxAttempts 结果最大尝试次数
+func (p *GraphRagBuildResult) ResultMaxAttempts() int {
+	if p == nil || p.MaxAttempts == 0 {
+		return max(1, p.ResultAttempt())
+	}
+	return max(1, p.MaxAttempts)
 }
 
 // TypedChunk 类型化块接口

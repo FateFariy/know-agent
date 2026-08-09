@@ -10,7 +10,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
 // PreparationPhase 准备阶段：加载策略步骤、推进任务状态
@@ -35,6 +34,9 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error
 	buildCtx.Task.TaskStatus = enum.TaskStatusRunning
 	buildCtx.Task.StartTime = utils.Pointer(buildCtx.StartTime)
 
+	buildCtx.GraphRagBuildResult = buildCtx.Task.ReadGraphRagBuildResult()
+	buildCtx.ResumeCommittedGraph = buildCtx.GraphRagBuildResult.IsCommittedGraph()
+
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {
 		document := &entity.Document{
@@ -52,20 +54,7 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error
 		}
 		return p.repo.UpdateTaskById(txCtx, task)
 	}
-	if err := p.repo.Do(ctx, markBuildingTx); err != nil {
-		return err
-	}
-	return nil
-}
-
-// resumeFromCommittedGraph 从已提交的 GraphRAG outcome 恢复
-func (p *PreparationPhase) resumeFromCommittedGraph(ctx context.Context, buildCtx *Context) error {
-	buildCtx.ParentBlocks = []*entity.DocumentParentChunk{}
-	buildCtx.ChildChunks = []*entity.DocumentChunk{} // TODO: 实现 listFrozenSourceChunks
-	// graphRagBuildResult = repairCrossDocumentProjection(...)
-	logx.Infof("从已提交 GraphRAG outcome 恢复索引任务: documentId=%d, taskId=%d",
-		buildCtx.DocumentId, buildCtx.TaskId)
-	return nil
+	return p.repo.Do(ctx, markBuildingTx)
 }
 
 // requireSourceParseTaskId 获取源解析任务 ID
@@ -90,22 +79,6 @@ func (p *PreparationPhase) requireSourceParseTaskId(ctx context.Context, buildCt
 		return 0
 	}
 	return sourceParseTask.ID
-}
-
-// readGraphRagBuildResult 从任务扩展 JSON 读取 GraphRAG 构建结果
-func (p *PreparationPhase) readGraphRagBuildResult(task *entity.DocumentTask) *vo.GraphRagBuildResult {
-	if task == nil || task.ExtJson == "" {
-		return nil
-	}
-	var wrapper struct {
-		GraphRagBuild *vo.GraphRagBuildResult `json:"graphRagBuild"`
-	}
-	if err := json.Unmarshal([]byte(task.ExtJson), &wrapper); err != nil {
-		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", task.ID, err)
-		return nil
-	}
-
-	return wrapper.GraphRagBuild
 }
 
 // applyGraphFailureDisposition 应用图谱失败处置

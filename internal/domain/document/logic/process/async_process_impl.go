@@ -880,11 +880,6 @@ func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentChunkC
 // GraphRAG 辅助方法
 // ============================================================
 
-// isCommittedGraph 检查图谱是否已提交
-func (d *AsyncProcessImpl) isCommittedGraph(result *vo.GraphRagBuildResult) bool {
-	return result != nil && result.KgCommitted && result.GraphPersistenceOutcome != "" && result.GraphPersistenceOutcome != enum.GraphPersistenceOutcomeFailed
-}
-
 // applyGraphFailureDisposition 应用图谱失败处置
 func (d *AsyncProcessImpl) applyGraphFailureDisposition(ctx context.Context, document *entity.Document,
 	task *entity.DocumentTask, planId int64, result *vo.GraphRagBuildResult, cause error) {
@@ -951,12 +946,6 @@ func (d *AsyncProcessImpl) handleGraphRagBuildFailure(ctx context.Context, docum
 	}
 
 	d.applyGraphFailureDisposition(ctx, document, task, plan.ID, terminalResult, exception)
-}
-
-// listFrozenSourceChunks 列出已冻结的源块（用于断点恢复）
-func (d *AsyncProcessImpl) listFrozenSourceChunks(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentChunk, error) {
-	// TODO: 实现从数据库查询非 GRAPH_RAG 来源的 chunk
-	return []*entity.DocumentChunk{}, nil
 }
 
 // listFrozenTypedChunks 列出已冻结的类型化块
@@ -1056,20 +1045,6 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 	}
 
 	return &vo.GraphRagFinalization{Result: candidate, TypedChunks: typedChunks}
-}
-
-// repairCrossDocumentProjection 修复跨文档投影
-func (d *AsyncProcessImpl) repairCrossDocumentProjection(ctx context.Context, document *entity.Document,
-	documentId, taskId int64, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
-	alreadyActive := document != nil && document.LastIndexTaskId == taskId
-	if alreadyActive && buildResult.CrossDocumentIndexOutcome == enum.ComponentOutcomeSuccess {
-		return buildResult
-	}
-	if err := d.crossDocumentIndexer.RebuildAll(ctx, documentId, taskId); err != nil {
-		logx.Warnf("GraphRAG cross-document repair failed: documentId=%d, taskId=%d, message=%v", documentId, taskId, err)
-		return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeFailed)
-	}
-	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeSuccess)
 }
 
 // withdrawPendingCrossDocumentProjection 撤回待处理的跨文档投影

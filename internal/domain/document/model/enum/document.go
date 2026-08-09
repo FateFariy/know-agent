@@ -177,6 +177,7 @@ type DocumentChunkSourceType = int
 const (
 	ChunkSourceTypeOriginal DocumentChunkSourceType = iota + 1 // 原文切块
 	ChunkSourceTypeEnriched                                    // 后处理补全文本
+	ChunkSourceTypeGraphRAG                                    // GraphRAG 派生证据
 )
 
 func DocumentChunkSourceTypeName(sourceType DocumentChunkSourceType) string {
@@ -185,6 +186,8 @@ func DocumentChunkSourceTypeName(sourceType DocumentChunkSourceType) string {
 		return "原文切块"
 	case ChunkSourceTypeEnriched:
 		return "后处理补全文本"
+	case ChunkSourceTypeGraphRAG:
+		return "GraphRAG 派生证据"
 	default:
 		return "未知"
 	}

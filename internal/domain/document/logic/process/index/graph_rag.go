@@ -33,7 +33,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 如果是从已提交 GraphRAG 恢复，跳过构建
 	if buildCtx.ResumeCommittedGraph {
-		logx.Infof("GraphRAG 已提交，跳过构建，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
+		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过构建，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
 		return p.finalizeGraphRag(ctx, buildCtx)
 	}
 

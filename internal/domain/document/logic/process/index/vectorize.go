@@ -29,7 +29,7 @@ func (p *VectorizePhase) Name() string {
 
 func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 	if buildCtx.ResumeCommittedGraph {
-		logx.Infof("GraphRAG 已提交，跳过构建向量，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
+		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过构建向量，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
 		return nil
 	}
 

@@ -51,8 +51,26 @@ func (p *ChunkingPhase) Name() string {
 func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	// 检查是否需要从已提交 GraphRAG 结果恢复
 	if buildCtx.ResumeCommittedGraph {
+		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过切块流水线: documentId=%d, taskId=%d",
+			buildCtx.DocumentId, buildCtx.TaskId)
 		return nil
 	}
+
+	// 查询结构化解析 blocks
+	blocks, err := p.repo.SelectDocumentBlocksByTask(ctx, buildCtx.DocumentId, buildCtx.Task.SourceParseTaskId)
+	if err != nil {
+		return err
+	}
+	if len(blocks) == 0 {
+		return errors.New("当前文档没有结构化解析 blocks，无法执行 Parent/Child 切块。")
+	}
+
+	// 查询策略步骤列表
+	pipelineSteps, err := p.repo.SelectStepListByPlanId(ctx, buildCtx.PlanId)
+	if err != nil {
+		return err
+	}
+
 	chunkStartDetail, _ := json.Marshal(map[string]any{"strategySnapshot": buildCtx.Plan.StrategySnapshot})
 	chunkStartLog := &entity.DocumentTaskLog{
 		TaskId:       buildCtx.TaskId,
@@ -69,27 +87,15 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	if err := p.repo.UpdateStepExecuteStatus(ctx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuting); err != nil {
 		return err
 	}
-	blocks, err := p.repo.SelectDocumentBlocksByTask(ctx, buildCtx.DocumentId, buildCtx.TaskId)
-	if err != nil {
-		return err
-	}
-	if len(blocks) == 0 {
-		return errors.New("当前文档没有结构化解析 blocks，无法执行 Parent/Child 切块。")
-	}
 
-	// 查询策略步骤列表
-	pipelineSteps, err := p.repo.SelectStepListByPlanId(ctx, buildCtx.PlanId)
-	if err != nil {
-		return err
-	}
 	// 按步骤执行切块流水线
-	chunkStartedNanos := time.Now()
+	chunkStartTime := time.Now()
 	parentCandidates, err := p.BuildParentBlocks(ctx, buildCtx.Document, pipelineSteps, blocks)
 	if err != nil {
 		return err
 	}
 	buildCtx.ParentCandidates = parentCandidates
-	costMillis := time.Since(chunkStartedNanos).Milliseconds()
+	costMillis := time.Since(chunkStartTime).Milliseconds()
 
 	if err = p.repo.UpdateStepExecuteStatus(ctx, buildCtx.PlanId, enum.StrategyExecuteStatusExecuteSuccess); err != nil {
 		return err
@@ -113,63 +119,6 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	_ = p.repo.InsertTaskLog(ctx, chunkEndLog)
 
 	return nil
-}
-
-// buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
-func (p *ChunkingPhase) buildParentChildEntities(documentId, taskId, planId int64,
-	candidates vo.ParentChunkCandidates) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
-
-	parentBlocks := make([]*entity.DocumentParentChunk, 0, len(candidates))
-	chunks := make([]*entity.DocumentChunk, 0)
-
-	globalChunkNo := 0
-	for parentIdx, candidate := range candidates {
-		parentBlock := &entity.DocumentParentChunk{
-			ID:                utils.GetSnowflakeNextID(),
-			DocumentId:        documentId,
-			TaskId:            taskId,
-			PlanId:            planId,
-			ParentNo:          parentIdx + 1,
-			SourceType:        candidate.SourceType,
-			SectionPath:       candidate.SectionPath,
-			StructureNodeId:   candidate.StructureNodeId,
-			StructureNodeType: candidate.StructureNodeType,
-			CanonicalPath:     candidate.CanonicalPath,
-			ItemIndex:         candidate.ItemIndex,
-			ParentText:        candidate.Text,
-			CharCount:         utils.Len(candidate.Text),
-			TokenCount:        utils.EstimateTokens(candidate.Text),
-			StartChunkNo:      globalChunkNo,
-		}
-
-		for _, child := range candidate.ChildChunks {
-			if child != nil && strutil.IsNotBlank(child.Text) {
-				globalChunkNo++
-				chunks = append(chunks, &entity.DocumentChunk{
-					ID:                utils.GetSnowflakeNextID(),
-					DocumentId:        documentId,
-					TaskId:            taskId,
-					PlanId:            planId,
-					ParentChunkId:     parentBlock.ID,
-					ChunkNo:           globalChunkNo,
-					SourceType:        child.SourceType,
-					SectionPath:       utils.BlankToDefault(child.SectionPath, candidate.SectionPath),
-					StructureNodeId:   child.StructureNodeId,
-					StructureNodeType: child.StructureNodeType,
-					CanonicalPath:     child.CanonicalPath,
-					ItemIndex:         child.ItemIndex,
-					ChunkText:         child.Text,
-					CharCount:         utils.Len(child.Text),
-					TokenCount:        utils.EstimateTokens(child.Text),
-					VectorStatus:      enum.VectorStatusWaitVector,
-				})
-				parentBlock.ChildCount++
-			}
-		}
-		parentBlock.EndChunkNo = globalChunkNo - 1
-		parentBlocks = append(parentBlocks, parentBlock)
-	}
-	return parentBlocks, chunks
 }
 
 // BuildParentBlocks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
@@ -569,7 +518,7 @@ func (p *ChunkingPhase) buildKeywords(title, sectionPath, text string) string {
 	}
 	words := p.tokenizer.SegmentWords(text)
 	add(words...)
-	data, _ := json.Marshal(words)
+	data, _ := json.Marshal(keywords)
 
 	return string(data)
 }
