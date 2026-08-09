@@ -14,6 +14,9 @@ type DocumentIndexBuild struct {
 }
 
 func (d *DocumentIndexBuild) FillEnumNames() {
+	if d == nil {
+		return
+	}
 	d.TaskTypeName = enum.TaskTypeName(d.TaskType)
 	d.TaskStatusName = enum.TaskStatusName(d.TaskStatus)
 	d.IndexStatusName = enum.IndexStatusName(d.IndexStatus)

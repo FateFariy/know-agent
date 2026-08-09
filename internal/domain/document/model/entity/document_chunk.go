@@ -42,30 +42,18 @@ type DocumentChunk struct {
 }
 
 func (d *DocumentChunk) FillEnumName() {
+	if d == nil {
+		return
+	}
 	d.VectorStatusName = enum.VectorStatusName(d.VectorStatus)
 	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }
 
 func (d *DocumentChunk) FillParentInfo(parentBlock *DocumentParentChunk) {
-	if parentBlock != nil {
+	if d != nil && parentBlock == nil {
 		d.ParentBlockNo = parentBlock.ParentNo
 		d.ParentChildCount = parentBlock.ChildCount
 		d.ParentStartChunkNo = parentBlock.StartChunkNo
 		d.ParentEndChunkNo = parentBlock.EndChunkNo
 	}
-}
-
-// GetID 获取块ID
-func (d *DocumentChunk) GetID() int64 {
-	return d.ID
-}
-
-// GetChunkNo 获取块序号
-func (d *DocumentChunk) GetChunkNo() int {
-	return d.ChunkNo
-}
-
-// GetChunkText 获取块文本
-func (d *DocumentChunk) GetChunkText() string {
-	return d.ChunkText
 }

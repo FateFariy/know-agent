@@ -10,6 +10,9 @@ type IndexingOptions struct {
 
 // ResolveRecursiveMaxChars 解析递归最大字符数
 func (o *IndexingOptions) ResolveRecursiveMaxChars(pipelineType enum.PipelineType) int {
+	if o == nil {
+		return 0
+	}
 	if pipelineType == enum.PipelineTypeParent {
 		return o.Chunk.ParentBlockMaxChars
 	}
@@ -18,6 +21,9 @@ func (o *IndexingOptions) ResolveRecursiveMaxChars(pipelineType enum.PipelineTyp
 
 // ResolveSemanticMaxChars 解析语义最大字符数
 func (o *IndexingOptions) ResolveSemanticMaxChars(pipelineType enum.PipelineType) int {
+	if o == nil {
+		return 0
+	}
 	if pipelineType == enum.PipelineTypeParent {
 		return o.Chunk.ParentSemanticMaxChars
 	}
@@ -26,14 +32,20 @@ func (o *IndexingOptions) ResolveSemanticMaxChars(pipelineType enum.PipelineType
 
 // ResolveSemanticMinChars 解析语义最小字符数
 func (o *IndexingOptions) ResolveSemanticMinChars(pipelineType enum.PipelineType) int {
+	if o == nil {
+		return 0
+	}
 	if pipelineType == enum.PipelineTypeParent {
 		return o.Chunk.ParentSemanticMinChars
 	}
-	return o.Chunk.ParentSemanticMinChars
+	return o.Chunk.ChildSemanticMinChars
 }
 
 // ResolveRecursiveOverlap 解析递归重叠字符数
 func (o *IndexingOptions) ResolveRecursiveOverlap(pipelineType enum.PipelineType, maxChars int) int {
+	if o == nil {
+		return 0
+	}
 	if pipelineType == enum.PipelineTypeParent {
 		return min(o.Chunk.ParentBlockOverlapChars, max(0, maxChars-1))
 	}
@@ -42,6 +54,9 @@ func (o *IndexingOptions) ResolveRecursiveOverlap(pipelineType enum.PipelineType
 
 // ResolveLlmMaxChars 解析LLM最大字符数
 func (o *IndexingOptions) ResolveLlmMaxChars(pipelineType enum.PipelineType) int {
+	if o == nil {
+		return 0
+	}
 	if pipelineType == enum.PipelineTypeParent {
 		return o.Chunk.ParentBlockMaxChars
 	}

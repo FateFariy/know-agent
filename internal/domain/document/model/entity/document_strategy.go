@@ -30,11 +30,17 @@ type DocumentStrategyPlan struct {
 }
 
 func (d *DocumentStrategyPlan) FillEnumNames() {
+	if d == nil {
+		return
+	}
 	d.PlanSourceName = enum.PlanSourceName(d.PlanSource)
 	d.PlanStatusName = enum.ParseStatusName(d.PlanStatus)
 }
 
 func (d *DocumentStrategyPlan) FillAndProcessPipeline(stepList []*DocumentStrategyStep) {
+	if d == nil {
+		return
+	}
 	d.ParentPipeline = NewDocumentStrategyPipeline(enum.PipelineTypeParent, stepList)
 	d.ChildPipeline = NewDocumentStrategyPipeline(enum.PipelineTypeChild, stepList)
 	d.StrategySnapshot = "PARENT:" + d.ParentPipeline.StrategySnapshot + ";CHILD:" + d.ChildPipeline.StrategySnapshot
@@ -60,6 +66,9 @@ type DocumentStrategyStep struct {
 }
 
 func (d *DocumentStrategyStep) FillEnumNames() {
+	if d == nil {
+		return
+	}
 	d.PipelineTypeName = enum.PipelineTypeName(d.PipelineType)
 	d.StrategyTypeName = enum.StrategyTypeName(d.StrategyType)
 	d.StrategyRoleName = enum.StrategyRoleName(d.StrategyRole)
@@ -75,21 +84,30 @@ type DocumentStrategyPipeline struct {
 }
 
 func NewDocumentStrategyPipeline(pipelineType string, stepList []*DocumentStrategyStep) *DocumentStrategyPipeline {
+	if stepList == nil {
+		return nil
+	}
 	pipeline := &DocumentStrategyPipeline{PipelineType: pipelineType}
 	pipeline.FillAndProcessSteps(stepList)
 	return pipeline
 }
 
 func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrategyStep) {
+	if d == nil {
+		return
+	}
 	d.PipelineTypeName = enum.PipelineTypeName(d.PipelineType)
 	steps := make([]*DocumentStrategyStep, 0, len(stepList))
 	strategyTypes := make([]string, 0, len(stepList))
-	for i := range stepList {
-		stepList[i].PipelineType = utils.BlankToDefault(stepList[i].PipelineType, enum.PipelineTypeChild)
-		if stepList[i].PipelineType == d.PipelineType {
-			stepList[i].FillEnumNames()
-			steps = append(steps, stepList[i])
-			strategyTypes = append(strategyTypes, stepList[i].StrategyTypeName)
+	for _, step := range stepList {
+		if step == nil {
+			continue
+		}
+		step.PipelineType = utils.BlankToDefault(step.PipelineType, enum.PipelineTypeChild)
+		if step.PipelineType == d.PipelineType {
+			step.FillEnumNames()
+			steps = append(steps, step)
+			strategyTypes = append(strategyTypes, step.StrategyTypeName)
 		}
 	}
 	slices.SortFunc(steps, func(a, b *DocumentStrategyStep) int { return a.StepNo - b.StepNo })
@@ -103,6 +121,9 @@ type DocumentStrategySteps []*DocumentStrategyStep
 func (s DocumentStrategySteps) SortPipelineSteps(pipelineType string) DocumentStrategySteps {
 	filtered := make(DocumentStrategySteps, 0, len(s))
 	for _, step := range s {
+		if step == nil {
+			continue
+		}
 		toDefault := utils.BlankToDefault(step.PipelineType, enum.PipelineTypeChild)
 		if utils.EqualsIgnoreCase(pipelineType, toDefault) {
 			filtered = append(filtered, step)

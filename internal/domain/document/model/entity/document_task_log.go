@@ -25,6 +25,9 @@ type DocumentTaskLog struct {
 }
 
 func (d *DocumentTaskLog) FillEnumNames() {
+	if d == nil {
+		return
+	}
 	d.StageTypeName = enum.TaskStageName(d.StageType)
 	d.EventTypeName = enum.TaskEventTypeName(d.EventType)
 	d.LogLevelName = enum.LogLevelName(d.LogLevel)

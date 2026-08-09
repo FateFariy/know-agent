@@ -91,6 +91,9 @@ type DocumentBlocks []*DocumentBlock
 
 func (b DocumentBlocks) FirstPageNo() int {
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		pageNo := block.PageNo
 		if pageNo > 0 {
 			return pageNo
@@ -104,6 +107,9 @@ func (b DocumentBlocks) PageRange() string {
 	pageSet := make(map[int]bool, len(b))
 	pages := make([]int, 0, len(b))
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		if pn := block.PageNo; pn > 0 && !pageSet[pn] {
 			pageSet[pn] = true
 			pages = append(pages, pn)
@@ -123,6 +129,9 @@ func (b DocumentBlocks) PageRange() string {
 
 	// 回退逻辑：使用块自带的 pageRange
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		if r := strings.TrimSpace(block.PageRange); r != "" {
 			return r
 		}
@@ -136,6 +145,9 @@ func (b DocumentBlocks) Ids() string {
 	count := 0
 	builder.WriteString("[")
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		id := block.ID
 		_, exists := seen[id]
 		if id > 0 && !exists {
@@ -154,6 +166,9 @@ func (b DocumentBlocks) Ids() string {
 func (b DocumentBlocks) CanonicalPaths() []string {
 	result := make([]string, 0, len(b))
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		result = append(result, block.CanonicalPath)
 	}
 	return result
@@ -166,7 +181,7 @@ func (b DocumentBlocks) ResolveTitle(sectionPath string) string {
 		return normalized
 	}
 	for _, block := range b {
-		if block.IsTitleBlock() && strutil.IsNotBlank(block.Text) {
+		if block != nil && block.IsTitleBlock() && strutil.IsNotBlank(block.Text) {
 			return normalizeTitle(block.Text)
 		}
 	}
@@ -191,6 +206,9 @@ func (b DocumentBlocks) JoinBlockTexts() string {
 	var builder strings.Builder
 	first := true
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		content := strings.TrimSpace(block.RenderBlockContent())
 		if content == "" {
 			continue
@@ -215,6 +233,9 @@ func (b DocumentBlocks) CleanupAndSort() DocumentBlocks {
 	}
 	result := make(DocumentBlocks, 0, len(b))
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		if predicate(block) {
 			result = append(result, block)
 		}
@@ -246,6 +267,9 @@ func (b DocumentBlocks) ResolveChunkType() string {
 	var blockTypes []string
 
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		blockType := strutil.Trim(block.BlockType)
 		if blockType == "" {
 			continue
@@ -268,6 +292,9 @@ func (b DocumentBlocks) ResolveChunkType() string {
 
 func (b DocumentBlocks) CommonSectionPath() string {
 	for _, block := range b {
+		if block == nil {
+			continue
+		}
 		trimmed := strings.TrimSpace(block.SectionPath)
 		if trimmed != "" {
 			return trimmed

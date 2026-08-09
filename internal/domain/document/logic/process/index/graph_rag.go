@@ -67,7 +67,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		// 构建失败，使用已有的结果或创建新的失败结果
 		if graphRagBuildResult == nil {
 			graphRagBuildResult = &vo.GraphRagBuildResult{
-				GraphPersistenceOutcome: vo.GraphPersistenceOutcomeFailed,
+				GraphPersistenceOutcome: enum.GraphPersistenceOutcomeFailed,
 				KgCommitted:             false,
 			}
 		}
@@ -120,7 +120,7 @@ func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *Context)
 	buildCtx.GraphTypedChunkList = graphTypedChunkList
 
 	// 检查处置结果
-	if buildResult.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+	if buildResult.OuterTaskDisposition == enum.OuterTaskDispositionRepairRequired {
 		task := &entity.DocumentTask{
 			ID:           buildCtx.TaskId,
 			TaskStatus:   enum.TaskStatusRunning,
@@ -133,7 +133,7 @@ func (p *GraphRagPhase) finalizeGraphRag(ctx context.Context, buildCtx *Context)
 			buildCtx.DocumentId, buildCtx.TaskId)
 		return nil // 需要外部修复
 	}
-	if buildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+	if buildResult.OuterTaskDisposition == enum.OuterTaskDispositionFailIndexTask {
 		return p.handleGraphRagBuildFailure(ctx, buildCtx, buildResult)
 	}
 
@@ -145,10 +145,10 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 	buildResult *vo.GraphRagBuildResult) *vo.GraphRagFinalization {
 
 	var typedChunks []vo.TypedChunk
-	typedOutcome := vo.ComponentOutcomeNotApplicable
+	typedOutcome := enum.ComponentOutcomeNotApplicable
 
-	if !buildResult.KgCommitted || buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeFailed {
-		typedOutcome = vo.ComponentOutcomeNotApplicable
+	if !buildResult.KgCommitted || buildResult.GraphPersistenceOutcome == enum.GraphPersistenceOutcomeFailed {
+		typedOutcome = enum.ComponentOutcomeNotApplicable
 	} else {
 		// TODO: 实现 listFrozenTypedChunks
 		var existingTypedChunks []*entity.DocumentChunk // 占位
@@ -158,20 +158,20 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 			existingTypedInterface[i] = chunk
 		}
 
-		graphEmpty := buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeEmpty
+		graphEmpty := buildResult.GraphPersistenceOutcome == enum.GraphPersistenceOutcomeEmpty
 		reuseSuccessfulTyped := buildCtx.ResumeCommittedGraph &&
-			buildResult.TypedIndexOutcome == vo.ComponentOutcomeSuccess &&
+			buildResult.TypedIndexOutcome == enum.ComponentOutcomeSuccess &&
 			len(existingTypedChunks) > 0
 		reuseEmptyTyped := buildCtx.ResumeCommittedGraph &&
 			graphEmpty &&
-			buildResult.TypedIndexOutcome == vo.ComponentOutcomeNotApplicable &&
+			buildResult.TypedIndexOutcome == enum.ComponentOutcomeNotApplicable &&
 			len(existingTypedChunks) == 0
 
 		if reuseSuccessfulTyped {
 			typedChunks = existingTypedInterface
-			typedOutcome = vo.ComponentOutcomeSuccess
+			typedOutcome = enum.ComponentOutcomeSuccess
 		} else if reuseEmptyTyped {
-			typedOutcome = vo.ComponentOutcomeNotApplicable
+			typedOutcome = enum.ComponentOutcomeNotApplicable
 		} else {
 			if err := p.Repo.UpdateTaskById(ctx, &entity.DocumentTask{
 				ID: buildCtx.TaskId, CurrentStage: enum.TaskStageGraphTypedIndex,
@@ -185,7 +185,7 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 				logx.Warnf("GraphRAG typed projection failed; preserving committed KG: documentId=%d, taskId=%d, message=%v",
 					buildCtx.DocumentId, buildCtx.TaskId, err)
 				typedChunks = []vo.TypedChunk{}
-				typedOutcome = vo.ComponentOutcomeFailed
+				typedOutcome = enum.ComponentOutcomeFailed
 			} else {
 				if replaced == nil {
 					typedChunks = []vo.TypedChunk{}
@@ -196,19 +196,19 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 					}
 				}
 				if graphEmpty && len(typedChunks) == 0 {
-					typedOutcome = vo.ComponentOutcomeNotApplicable
+					typedOutcome = enum.ComponentOutcomeNotApplicable
 				} else if len(typedChunks) == 0 {
-					typedOutcome = vo.ComponentOutcomeFailed
+					typedOutcome = enum.ComponentOutcomeFailed
 				} else {
-					typedOutcome = vo.ComponentOutcomeSuccess
+					typedOutcome = enum.ComponentOutcomeSuccess
 				}
 			}
 		}
 	}
 
 	// 计算候选最终结果
-	candidate := p.GraphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeSuccess)
-	if candidate.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+	candidate := p.GraphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, enum.ObservationProjectionOutcomeSuccess)
+	if candidate.OuterTaskDisposition == enum.OuterTaskDispositionRepairRequired {
 		candidate = p.withdrawPendingCrossDocumentProjection(ctx, buildCtx, candidate)
 	}
 
@@ -217,7 +217,7 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 		p.resultAttempt(candidate), p.resultMaxAttempts(candidate)); err != nil {
 		logx.Warnf("GraphRAG final outcome projection failed; BUILD_INDEX remains repairable: documentId=%d, taskId=%d, message=%v",
 			buildCtx.DocumentId, buildCtx.TaskId, err)
-		failedObservation := p.GraphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeFailed)
+		failedObservation := p.GraphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, enum.ObservationProjectionOutcomeFailed)
 		failedObservation = p.withdrawPendingCrossDocumentProjection(ctx, buildCtx, failedObservation)
 		return &vo.GraphRagFinalization{Result: failedObservation, TypedChunks: typedChunks}
 	}
@@ -233,20 +233,20 @@ func (p *GraphRagPhase) handleGraphRagBuildFailure(ctx context.Context, buildCtx
 	failureResult := buildCtx.GraphRagBuildResult
 	if failureResult == nil {
 		failureResult = &vo.GraphRagBuildResult{
-			GraphPersistenceOutcome: vo.GraphPersistenceOutcomeFailed,
+			GraphPersistenceOutcome: enum.GraphPersistenceOutcomeFailed,
 			KgCommitted:             false,
 		}
 	}
 
 	// 计算最终结果
 	terminalResult := p.GraphRagOutcomePolicy.FinalizeOuterDisposition(
-		failureResult, vo.ComponentOutcomeNotApplicable, vo.ObservationProjectionOutcomeSuccess)
+		failureResult, enum.ComponentOutcomeNotApplicable, enum.ObservationProjectionOutcomeSuccess)
 
 	// 尝试标记检查点
 	if err := p.GraphRagBuildCheckpoint.MarkOutcome(ctx, buildCtx.DocumentId, buildCtx.TaskId, terminalResult, 0, 1); err != nil {
 		logx.Warnf("GraphRAG 检查点标记失败: documentId=%d, taskId=%d, err=%v", buildCtx.DocumentId, buildCtx.TaskId, err)
 		terminalResult = p.GraphRagOutcomePolicy.FinalizeOuterDisposition(
-			failureResult, vo.ComponentOutcomeNotApplicable, vo.ObservationProjectionOutcomeFailed)
+			failureResult, enum.ComponentOutcomeNotApplicable, enum.ObservationProjectionOutcomeFailed)
 	}
 
 	return p.applyGraphFailureDisposition(ctx, buildCtx, terminalResult, cause)
@@ -307,7 +307,7 @@ func (p *GraphRagPhase) applyGraphFailureDisposition(ctx context.Context, buildC
 func (p *GraphRagPhase) withdrawPendingCrossDocumentProjection(ctx context.Context,
 	buildCtx *Context, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
 	if buildResult == nil ||
-		buildResult.CrossDocumentIndexOutcome != vo.ComponentOutcomeSuccess ||
+		buildResult.CrossDocumentIndexOutcome != enum.ComponentOutcomeSuccess ||
 		buildCtx.Document == nil ||
 		buildCtx.Document.LastIndexTaskId == buildCtx.TaskId {
 		return buildResult
@@ -319,7 +319,7 @@ func (p *GraphRagPhase) withdrawPendingCrossDocumentProjection(ctx context.Conte
 		logx.Infof("GraphRAG pending cross-document projection withdrawn to active document pointers: documentId=%d, taskId=%d",
 			buildCtx.DocumentId, buildCtx.TaskId)
 	}
-	return p.GraphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeFailed)
+	return p.GraphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeFailed)
 }
 
 // resultAttempt 获取尝试次数

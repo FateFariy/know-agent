@@ -126,7 +126,7 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 	graphRagBuildResult := task.ReadGraphRagBuildResult()
 
 	// 检查是否需要直接失败
-	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == enum.OuterTaskDispositionFailIndexTask {
 		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
 		return nil // 直接失败，无需继续执行
 	}
@@ -187,7 +187,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 
 	// 读取已有的 GraphRAG 构建结果（用于断点恢复）
 	graphRagBuildResult := d.readGraphRagBuildResult(task)
-	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+	if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == enum.OuterTaskDispositionFailIndexTask {
 		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
 		return nil
 	}
@@ -544,7 +544,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		graphTypedChunkList = graphFinalization.TypedChunks
 	}
 
-	if graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+	if graphRagBuildResult.OuterTaskDisposition == enum.OuterTaskDispositionRepairRequired {
 		// 需要修复，保持 RUNNING 状态
 		if err = d.repo.UpdateTaskById(ctx, &entity.DocumentTask{ID: taskId, TaskStatus: enum.TaskStatusRunning, CurrentStage: enum.TaskStageGraphTypedIndex}); err != nil {
 			panic(err)
@@ -552,7 +552,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		logx.Warnf("GraphRAG post-commit component requires repair; BUILD_INDEX remains RUNNING: documentId=%d, taskId=%d", documentId, taskId)
 		return nil
 	}
-	if graphRagBuildResult.OuterTaskDisposition == vo.OuterTaskDispositionFailIndexTask {
+	if graphRagBuildResult.OuterTaskDisposition == enum.OuterTaskDispositionFailIndexTask {
 		d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
 		return nil
 	}
@@ -882,7 +882,7 @@ func (d *AsyncProcessImpl) cleanupParentCandidates(candidates []*vo.ParentChunkC
 
 // isCommittedGraph 检查图谱是否已提交
 func (d *AsyncProcessImpl) isCommittedGraph(result *vo.GraphRagBuildResult) bool {
-	return result != nil && result.KgCommitted && result.GraphPersistenceOutcome != "" && result.GraphPersistenceOutcome != vo.GraphPersistenceOutcomeFailed
+	return result != nil && result.KgCommitted && result.GraphPersistenceOutcome != "" && result.GraphPersistenceOutcome != enum.GraphPersistenceOutcomeFailed
 }
 
 // applyGraphFailureDisposition 应用图谱失败处置
@@ -927,7 +927,7 @@ func (d *AsyncProcessImpl) handleGraphRagBuildFailure(ctx context.Context, docum
 	failureResult := exception.Result
 	if failureResult == nil {
 		failureResult = &vo.GraphRagBuildResult{
-			GraphPersistenceOutcome: vo.GraphPersistenceOutcomeFailed,
+			GraphPersistenceOutcome: enum.GraphPersistenceOutcomeFailed,
 			KgCommitted:             false,
 		}
 	}
@@ -935,8 +935,8 @@ func (d *AsyncProcessImpl) handleGraphRagBuildFailure(ctx context.Context, docum
 	// 计算最终结果
 	terminalResult := d.graphRagOutcomePolicy.FinalizeOuterDisposition(
 		failureResult,
-		vo.ComponentOutcomeNotApplicable,
-		vo.ObservationProjectionOutcomeSuccess,
+		enum.ComponentOutcomeNotApplicable,
+		enum.ObservationProjectionOutcomeSuccess,
 	)
 
 	// 尝试标记检查点
@@ -945,8 +945,8 @@ func (d *AsyncProcessImpl) handleGraphRagBuildFailure(ctx context.Context, docum
 		// 降级为观察失败
 		terminalResult = d.graphRagOutcomePolicy.FinalizeOuterDisposition(
 			failureResult,
-			vo.ComponentOutcomeNotApplicable,
-			vo.ObservationProjectionOutcomeFailed,
+			enum.ComponentOutcomeNotApplicable,
+			enum.ObservationProjectionOutcomeFailed,
 		)
 	}
 
@@ -975,10 +975,10 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 	}
 
 	var typedChunks []vo.TypedChunk
-	typedOutcome := vo.ComponentOutcomeNotApplicable
+	typedOutcome := enum.ComponentOutcomeNotApplicable
 
-	if !buildResult.KgCommitted || buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeFailed {
-		typedOutcome = vo.ComponentOutcomeNotApplicable
+	if !buildResult.KgCommitted || buildResult.GraphPersistenceOutcome == enum.GraphPersistenceOutcomeFailed {
+		typedOutcome = enum.ComponentOutcomeNotApplicable
 	} else {
 		existingTypedChunks, err := d.listFrozenTypedChunks(ctx, documentId, taskId)
 		if err != nil {
@@ -991,20 +991,20 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 			existingTypedInterface[i] = chunk
 		}
 
-		graphEmpty := buildResult.GraphPersistenceOutcome == vo.GraphPersistenceOutcomeEmpty
+		graphEmpty := buildResult.GraphPersistenceOutcome == enum.GraphPersistenceOutcomeEmpty
 		reuseSuccessfulTyped := resumeCommittedGraph &&
-			buildResult.TypedIndexOutcome == vo.ComponentOutcomeSuccess &&
+			buildResult.TypedIndexOutcome == enum.ComponentOutcomeSuccess &&
 			len(existingTypedChunks) > 0
 		reuseEmptyTyped := resumeCommittedGraph &&
 			graphEmpty &&
-			buildResult.TypedIndexOutcome == vo.ComponentOutcomeNotApplicable &&
+			buildResult.TypedIndexOutcome == enum.ComponentOutcomeNotApplicable &&
 			len(existingTypedChunks) == 0
 
 		if reuseSuccessfulTyped {
 			typedChunks = existingTypedInterface
-			typedOutcome = vo.ComponentOutcomeSuccess
+			typedOutcome = enum.ComponentOutcomeSuccess
 		} else if reuseEmptyTyped {
-			typedOutcome = vo.ComponentOutcomeNotApplicable
+			typedOutcome = enum.ComponentOutcomeNotApplicable
 		} else {
 			// 执行类型化索引替换
 			if err := d.repo.UpdateTaskById(ctx, &entity.DocumentTask{
@@ -1019,7 +1019,7 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 				logx.Warnf("GraphRAG typed projection failed; preserving committed KG: documentId=%d, taskId=%d, message=%v",
 					documentId, taskId, err)
 				typedChunks = []vo.TypedChunk{}
-				typedOutcome = vo.ComponentOutcomeFailed
+				typedOutcome = enum.ComponentOutcomeFailed
 			} else {
 				if replaced == nil {
 					typedChunks = []vo.TypedChunk{}
@@ -1030,19 +1030,19 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 					}
 				}
 				if graphEmpty && len(typedChunks) == 0 {
-					typedOutcome = vo.ComponentOutcomeNotApplicable
+					typedOutcome = enum.ComponentOutcomeNotApplicable
 				} else if len(typedChunks) == 0 {
-					typedOutcome = vo.ComponentOutcomeFailed
+					typedOutcome = enum.ComponentOutcomeFailed
 				} else {
-					typedOutcome = vo.ComponentOutcomeSuccess
+					typedOutcome = enum.ComponentOutcomeSuccess
 				}
 			}
 		}
 	}
 
 	// 计算候选最终结果
-	candidate := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeSuccess)
-	if candidate.OuterTaskDisposition == vo.OuterTaskDispositionRepairRequired {
+	candidate := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, enum.ObservationProjectionOutcomeSuccess)
+	if candidate.OuterTaskDisposition == enum.OuterTaskDispositionRepairRequired {
 		candidate = d.withdrawPendingCrossDocumentProjection(ctx, document, taskId, candidate)
 	}
 
@@ -1050,7 +1050,7 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 	if err := d.graphRagBuildCheckpoint.MarkOutcome(ctx, documentId, taskId, candidate, d.resultAttempt(candidate), d.resultMaxAttempts(candidate)); err != nil {
 		logx.Warnf("GraphRAG final outcome projection failed; BUILD_INDEX remains repairable: documentId=%d, taskId=%d, message=%v",
 			documentId, taskId, err)
-		failedObservation := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, vo.ObservationProjectionOutcomeFailed)
+		failedObservation := d.graphRagOutcomePolicy.FinalizeOuterDisposition(buildResult, typedOutcome, enum.ObservationProjectionOutcomeFailed)
 		failedObservation = d.withdrawPendingCrossDocumentProjection(ctx, document, taskId, failedObservation)
 		return &vo.GraphRagFinalization{Result: failedObservation, TypedChunks: typedChunks}
 	}
@@ -1062,21 +1062,21 @@ func (d *AsyncProcessImpl) finalizeGraphRagOutcome(ctx context.Context, document
 func (d *AsyncProcessImpl) repairCrossDocumentProjection(ctx context.Context, document *entity.Document,
 	documentId, taskId int64, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
 	alreadyActive := document != nil && document.LastIndexTaskId == taskId
-	if alreadyActive && buildResult.CrossDocumentIndexOutcome == vo.ComponentOutcomeSuccess {
+	if alreadyActive && buildResult.CrossDocumentIndexOutcome == enum.ComponentOutcomeSuccess {
 		return buildResult
 	}
 	if err := d.crossDocumentIndexer.RebuildAll(ctx, documentId, taskId); err != nil {
 		logx.Warnf("GraphRAG cross-document repair failed: documentId=%d, taskId=%d, message=%v", documentId, taskId, err)
-		return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeFailed)
+		return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeFailed)
 	}
-	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeSuccess)
+	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeSuccess)
 }
 
 // withdrawPendingCrossDocumentProjection 撤回待处理的跨文档投影
 func (d *AsyncProcessImpl) withdrawPendingCrossDocumentProjection(ctx context.Context, document *entity.Document,
 	taskId int64, buildResult *vo.GraphRagBuildResult) *vo.GraphRagBuildResult {
 	if buildResult == nil ||
-		buildResult.CrossDocumentIndexOutcome != vo.ComponentOutcomeSuccess ||
+		buildResult.CrossDocumentIndexOutcome != enum.ComponentOutcomeSuccess ||
 		document == nil ||
 		document.LastIndexTaskId == taskId {
 		return buildResult
@@ -1088,7 +1088,7 @@ func (d *AsyncProcessImpl) withdrawPendingCrossDocumentProjection(ctx context.Co
 		logx.Infof("GraphRAG pending cross-document projection withdrawn to active document pointers: documentId=%d, taskId=%d",
 			document.ID, taskId)
 	}
-	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, vo.ComponentOutcomeFailed)
+	return d.graphRagOutcomePolicy.WithCrossDocumentOutcome(buildResult, enum.ComponentOutcomeFailed)
 }
 
 // resultAttempt 获取尝试次数

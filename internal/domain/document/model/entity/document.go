@@ -57,6 +57,9 @@ type Document struct {
 
 // FillEnumNames 填充枚举名称
 func (d *Document) FillEnumNames() {
+	if d == nil {
+		return
+	}
 	d.FileTypeName = enum.FileTypeName(d.FileType)
 	d.ParseStatusName = enum.ParseStatusName(d.ParseStatus)
 	d.StrategyStatusName = enum.StrategyStatusName(d.StrategyStatus)
@@ -65,6 +68,9 @@ func (d *Document) FillEnumNames() {
 
 // FillLatestTaskInfo 填充最新任务信息
 func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
+	if d == nil || task == nil {
+		return
+	}
 	d.LatestTaskId = task.ID
 	d.LatestTaskType = task.TaskType
 	d.LatestTaskTypeName = enum.TaskTypeName(task.TaskType)
@@ -74,6 +80,9 @@ func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
 
 // FillDocumentTags 填充文档标签，逗号分隔
 func (d *Document) FillDocumentTags(knowledgeScopeCode, documentType string, coreTopics []string) {
+	if d == nil {
+		return
+	}
 	tags := strings.Split(d.DocumentTags, ",")
 	tags = append(tags, knowledgeScopeCode, documentType)
 	tags = append(tags, utils.LimitSlice(coreTopics, 4)...)

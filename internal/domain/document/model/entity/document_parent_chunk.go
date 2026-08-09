@@ -29,5 +29,8 @@ type DocumentParentChunk struct {
 }
 
 func (d *DocumentParentChunk) FillEnumName() {
+	if d == nil {
+		return
+	}
 	d.SourceTypeName = enum.DocumentChunkSourceTypeName(d.SourceType)
 }

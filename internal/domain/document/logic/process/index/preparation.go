@@ -52,14 +52,10 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error
 		}
 		return p.repo.UpdateTaskById(txCtx, task)
 	}
-	return p.repo.Do(ctx, markBuildingTx)
-}
-
-// isCommittedGraph 检查图谱是否已提交
-func (p *PreparationPhase) isCommittedGraph(result *vo.GraphRagBuildResult) bool {
-	return result != nil && result.KgCommitted &&
-		result.GraphPersistenceOutcome != "" &&
-		result.GraphPersistenceOutcome != vo.GraphPersistenceOutcomeFailed
+	if err := p.repo.Do(ctx, markBuildingTx); err != nil {
+		return err
+	}
+	return nil
 }
 
 // resumeFromCommittedGraph 从已提交的 GraphRAG outcome 恢复

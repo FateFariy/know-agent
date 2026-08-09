@@ -64,6 +64,9 @@ type ParentChunkCandidate struct {
 type DocumentStrategyStepDrafts []*DocumentStrategyStepDraft
 
 func (d DocumentStrategyStepDrafts) PipelineSnapshot() string {
+	if len(d) == 0 {
+		return ""
+	}
 	steps := make([]string, 0, len(d))
 	for _, step := range d {
 		steps = append(steps, strconv.Itoa(step.StrategyType))
@@ -75,6 +78,9 @@ type ParentChunkCandidates []*ParentChunkCandidate
 
 // CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
 func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
+	if len(p) == 0 {
+		return p
+	}
 	seen := make(map[string]struct{})
 	result := make(ParentChunkCandidates, 0, len(p))
 	for _, candidate := range p {

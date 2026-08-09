@@ -6,6 +6,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
@@ -60,10 +61,10 @@ type GraphRagBuilder interface {
 // GraphRagOutcomePolicy GraphRAG 结果策略
 type GraphRagOutcomePolicy interface {
 	// FinalizeOuterDisposition 最终化外部处置
-	FinalizeOuterDisposition(buildResult *vo.GraphRagBuildResult, typedOutcome vo.ComponentOutcome, observationOutcome vo.ObservationProjectionOutcome) *vo.GraphRagBuildResult
+	FinalizeOuterDisposition(buildResult *vo.GraphRagBuildResult, typedOutcome enum.ComponentOutcome, observationOutcome enum.ObservationProjectionOutcome) *vo.GraphRagBuildResult
 
 	// WithCrossDocumentOutcome 设置跨文档结果
-	WithCrossDocumentOutcome(buildResult *vo.GraphRagBuildResult, outcome vo.ComponentOutcome) *vo.GraphRagBuildResult
+	WithCrossDocumentOutcome(buildResult *vo.GraphRagBuildResult, outcome enum.ComponentOutcome) *vo.GraphRagBuildResult
 }
 
 // GraphRagBuildCheckpoint GraphRAG 构建检查点
