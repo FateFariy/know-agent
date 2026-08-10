@@ -13,9 +13,9 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-	chunkllm "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/llm"
-	chunkrecursive "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
-	chunksemantic "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/llm"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -26,14 +26,14 @@ import (
 type ChunkingPhase struct {
 	repo      adapter.DocumentRepository
 	port      *adapter.DocumentPort
-	registry  map[int]chunk.Chunker
+	registry  chunk.Registry
 	resolver  IndexingConfigResolver
 	tokenizer adapter.Tokenizer
 }
 
 // NewChunkingPhase 创建切块阶段
 func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort,
-	registry map[int]chunk.Chunker, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingPhase {
+	registry chunk.Registry, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingPhase {
 	return &ChunkingPhase{
 		repo:      repo,
 		port:      port,
@@ -323,7 +323,7 @@ func (p *ChunkingPhase) buildBlockWindowParentSeeds(blocks entity.DocumentBlocks
 	seeds := make(vo.ChunkCandidates, 0)
 	currentBlocks := make(entity.DocumentBlocks, 0)
 	currentChars := 0
-	recursiveSplit := p.registry[enum.StrategyTypeRecursive]
+	recursiveSplit := p.registry.Get(enum.StrategyTypeRecursive)
 	for _, block := range blocks {
 		blockText := strings.TrimSpace(block.RenderBlockContent())
 		if blockText == "" {
@@ -340,8 +340,8 @@ func (p *ChunkingPhase) buildBlockWindowParentSeeds(blocks entity.DocumentBlocks
 
 			// 递归拆分超长文本
 			parts, _ := recursiveSplit.Chunk(context.TODO(), blockText,
-				chunkrecursive.WithMaxChars(maxChars),
-				chunkrecursive.WithOverlapChars(0))
+				recursive.WithMaxChars(maxChars),
+				recursive.WithOverlapChars(0))
 			for _, splitText := range parts {
 				seeds = append(seeds, p.toSplitBlockSeed(block, nodes, splitText))
 			}
@@ -400,9 +400,9 @@ func (p *ChunkingPhase) executePipeline(ctx context.Context, seeds vo.ChunkCandi
 
 	// 按配置的步骤顺序执行分块策略
 	for _, step := range steps {
-		strategy, ok := p.registry[step.StrategyType]
+		strategy := p.registry.Get(step.StrategyType)
 		// 跳过未注册的策略或结构型策略（由其他流程处理）
-		if !ok || step.StrategyType == enum.StrategyTypeStructure {
+		if strategy == nil || step.StrategyType == enum.StrategyTypeStructure {
 			continue
 		}
 
@@ -442,20 +442,20 @@ func (p *ChunkingPhase) buildPipelineOptions(options *vo.IndexingOptions, strate
 		maxChars := options.ResolveRecursiveMaxChars(pipelineType)
 		overlap := options.ResolveRecursiveOverlap(pipelineType, maxChars)
 		return []chunk.Option{
-			chunkrecursive.WithMaxChars(maxChars),
-			chunkrecursive.WithOverlapChars(overlap),
+			recursive.WithMaxChars(maxChars),
+			recursive.WithOverlapChars(overlap),
 		}
 	case enum.StrategyTypeSemantic:
 		maxChars := options.ResolveSemanticMaxChars(pipelineType)
 		minChars := options.ResolveSemanticMinChars(pipelineType)
 		return []chunk.Option{
-			chunksemantic.WithMaxChars(maxChars),
-			chunksemantic.WithMinChars(minChars),
-			chunksemantic.WithSimilarityThreshold(options.Chunk.ChildSemanticSimilarityThreshold),
+			semantic.WithMaxChars(maxChars),
+			semantic.WithMinChars(minChars),
+			semantic.WithSimilarityThreshold(options.Chunk.ChildSemanticSimilarityThreshold),
 		}
 	case enum.StrategyTypeLLM:
 		return []chunk.Option{
-			chunkllm.WithLlmMaxChars(options.ResolveLlmMaxChars(pipelineType)),
+			llm.WithLlmMaxChars(options.ResolveLlmMaxChars(pipelineType)),
 		}
 	default:
 		return nil

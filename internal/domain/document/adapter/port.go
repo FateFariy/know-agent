@@ -73,3 +73,9 @@ type Tokenizer interface {
 type KnowledgeGateway interface {
 	RequireEnabled(ctx context.Context, knowledgeBaseId int64) (*entity.KnowledgeBase, error)
 }
+
+// PromptRenderer 负责将 sourceText 渲染为大模型提示词
+type PromptRenderer interface {
+	// Render 渲染提示词
+	Render(templateName string, variables map[string]any) (string, error)
+}

@@ -8,7 +8,8 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
 )
@@ -19,22 +20,16 @@ const (
 	defaultLLMMaxChars = 3500                 // 默认大模型最大字符数
 )
 
-// PromptRenderer 负责将 sourceText 渲染为大模型提示词
-type PromptRenderer interface {
-	// Render 渲染提示词
-	Render(templateName string, variables map[string]any) (string, error)
-}
-
 // Chunker 大模型智能分块器
 type Chunker struct {
 	model     model.ChatModel
-	renderer  PromptRenderer
+	renderer  adapter.PromptRenderer
 	recursive *recursive.Chunker
 	opt       *options
 }
 
 // NewChunker 创建大模型智能分块器
-func NewChunker(model model.ChatModel, renderer PromptRenderer, opts ...chunk.Option) *Chunker {
+func NewChunker(model model.ChatModel, renderer adapter.PromptRenderer, opts ...chunk.Option) *Chunker {
 	return &Chunker{
 		opt: chunk.GetSpecificOptions(&options{
 			llmSplitPrompt: documentLlmSplit,

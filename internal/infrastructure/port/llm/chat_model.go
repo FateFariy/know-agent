@@ -13,6 +13,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/duke-git/lancet/v2/slice"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
@@ -49,7 +50,7 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 }
 
 // Generate 同步调用模型，返回文本响应
-func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
+func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	// 调用底层模型执行生成
 	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
@@ -63,7 +64,7 @@ func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPromp
 }
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (string, error) {
+func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
 	ctx = OnStart(ctx, meta, input)
 
@@ -84,7 +85,7 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 }
 
 // Stream 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...model.Option) (<-chan string, error) {
+func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (<-chan string, error) {
 	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
 	ctx = OnStart(ctx, meta, input)
 
@@ -151,16 +152,16 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 }
 
 // buildModelUsageInput 构建模型使用量追踪的元信息和输入参数
-func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...model.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
-	commonOpts := model.GetOptions(o.options, opts...)
+func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...common.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
+	options := common.GetImplSpecificOptions(o.options, opts...)
 	meta := &vo.ModelCallMeta{
 		Stage:     stage,
 		Provider:  o.provider,
 		ModelName: o.options.Model,
 	}
 	input := &vo.ModelCallInput{
-		Temperature: utils.PointerOrDefault(commonOpts.Temperature, 0.0),
-		TopP:        utils.PointerOrDefault(commonOpts.TopP, 0.0),
+		Temperature: utils.PointerOrDefault(options.Temperature, 0.0),
+		TopP:        utils.PointerOrDefault(options.TopP, 0.0),
 	}
 	return meta, input
 }
@@ -192,9 +193,9 @@ func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 }
 
 // convertOptions 转换模型调用选项
-func (o *ChatModelImpl[M]) convertOptions(opts ...model.Option) []eino.Option {
+func (o *ChatModelImpl[M]) convertOptions(opts ...common.Option) []eino.Option {
 	options := make([]eino.Option, len(opts))
-	opt := model.GetOptions(o.options, opts...)
+	opt := common.GetImplSpecificOptions(o.options, opts...)
 	if opt.Model != "" {
 		options = append(options, eino.WithModel(opt.Model))
 	}
