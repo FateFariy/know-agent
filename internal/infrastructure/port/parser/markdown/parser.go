@@ -1,10 +1,12 @@
 package markdown
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -12,14 +14,15 @@ import (
 	extensionAst "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
 
 // MarkdownParser 定义 Markdown 解析器接口
 type MarkdownParser interface {
-	Parse(sourceText string) (*vo.MarkdownSyntax, error)
-	ToBlocks(syntax *vo.MarkdownSyntax, parserName string) []*entity.DocumentBlock
+	Parse(sourceText []byte) (*shared.MarkdownSyntax, error)
+	ToBlocks(syntax *shared.MarkdownSyntax, parserName string) []*entity.DocumentBlock
 }
 
 type GoldmarkParser struct {
@@ -42,7 +45,7 @@ type nodeDraft struct {
 	charSpan     [2]int
 	hasSpan      bool
 	text         string
-	level        *int
+	level        int
 	marker       string
 	ordinal      *int
 	isHeader     bool
@@ -53,7 +56,7 @@ type nodeDraft struct {
 }
 
 type openingFields struct {
-	level        *int
+	level        int
 	marker       string
 	ordinal      *int
 	isHeader     bool
@@ -64,11 +67,16 @@ type openingFields struct {
 	cellCharSpan [2]int
 }
 
-func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
-	sourceBytes := []byte(sourceText)
-	reader := text.NewReader(sourceBytes)
+const Markdown = "native_markdown"
+
+func (p *GoldmarkParser) Name() string {
+	return Markdown
+}
+
+func (p *GoldmarkParser) Parse(_ context.Context, sourceText []byte) (entity.DocumentBlocks, error) {
+	reader := text.NewReader(sourceText)
 	rootAst := p.parser.Parser().Parse(reader)
-	si := newSourceIndex(sourceText)
+	si := newSourceIndex(string(sourceText))
 
 	var drafts []*nodeDraft
 	draftMap := make(map[string]*nodeDraft)
@@ -76,14 +84,14 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 	tableRowCount := make(map[string]int)
 	rowColIndex := make(map[string]int)
 
-	appendNode := func(ntype, parentId string, span [2]int, hasSpan bool) *nodeDraft {
+	appendNode := func(nodeType, parentId string, span [2]int, hasSpan bool) *nodeDraft {
 		oid := len(drafts)
 		nid := fmt.Sprintf("md-%06d", oid)
 		d := &nodeDraft{
 			order:        oid,
 			nodeId:       nid,
 			parentNodeId: parentId,
-			nodeType:     ntype,
+			nodeType:     nodeType,
 			origin:       "markdown-parse",
 			charSpan:     span,
 			hasSpan:      hasSpan,
@@ -92,7 +100,7 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 		draftMap[nid] = d
 		return d
 	}
-	rootDraft := appendNode(NodeDocument, "", [2]int{0, len([]rune(sourceText))}, true)
+	rootDraft := appendNode(NodeDocument, "", [2]int{0, utils.Len(string(sourceText))}, true)
 	stack = append(stack, rootDraft.nodeId)
 
 	err := ast.Walk(rootAst, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -100,17 +108,20 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 			return ast.WalkContinue, nil
 		}
 		parentId := stack[len(stack)-1]
-		ntype := mapNodeType(n)
+		nodeType := mapNodeType(n)
+		if nodeType == "" {
+			return ast.WalkContinue, nil
+		}
 		if entering {
 			if isContainerNode(n) {
-				lm := getNodeLineMap(n, sourceBytes)
+				lm := getNodeLineMap(n, sourceText)
 				cs, ce, err := si.CharacterSpan(lm)
 				if err != nil {
 					return ast.WalkStop, err
 				}
 				span := [2]int{cs, ce}
-				fields := p.fillOpeningFields(n, ntype, parentId, draftMap, tableRowCount, rowColIndex, si, span)
-				draft := appendNode(ntype, parentId, span, true)
+				fields := p.fillOpeningFields(n, nodeType, parentId, draftMap, tableRowCount, rowColIndex, si, span)
+				draft := appendNode(nodeType, parentId, span, true)
 				draft.level = fields.level
 				draft.marker = fields.marker
 				draft.ordinal = fields.ordinal
@@ -123,15 +134,15 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 				}
 				stack = append(stack, draft.nodeId)
 			} else {
-				lm := getNodeLineMap(n, sourceBytes)
+				lm := getNodeLineMap(n, sourceText)
 				cs, ce, err := si.CharacterSpan(lm)
 				if err != nil {
 					return ast.WalkStop, err
 				}
-				draft := appendNode(ntype, parentId, [2]int{cs, ce}, true)
-				draft.text = extractLeafText(n, sourceBytes)
+				draft := appendNode(nodeType, parentId, [2]int{cs, ce}, true)
+				draft.text = extractLeafText(n, sourceText)
 				if cd, ok := n.(*ast.FencedCodeBlock); ok {
-					draft.codeInfo = string(cd.Language(sourceBytes))
+					draft.codeInfo = string(cd.Language(sourceText))
 					draft.marker = "```"
 				}
 			}
@@ -140,7 +151,7 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 		if isContainerNode(n) {
 			curDraft := draftMap[stack[len(stack)-1]]
 			if curDraft.text == "" {
-				curDraft.text = extractInlineText(n, sourceBytes)
+				curDraft.text = extractInlineText(n, sourceText)
 			}
 			stack = stack[:len(stack)-1]
 		}
@@ -150,64 +161,114 @@ func (p *GoldmarkParser) Parse(sourceText string) (*vo.MarkdownSyntax, error) {
 		return nil, err
 	}
 	fillMissingSpans(drafts, draftMap)
-	fillContainerText(drafts, draftMap)
+	fillContainerText(drafts)
 
-	nodes := make([]*vo.MarkdownNode, 0, len(drafts))
+	nodes := make([]*shared.MarkdownNode, 0, len(drafts))
 	for _, d := range drafts {
-		level := 0
-		if d.level != nil {
-			level = *d.level
-		}
-		ordinal := 0
-		if d.ordinal != nil {
-			ordinal = *d.ordinal
-		}
-		rowIndex := 0
-		if d.rowIndex != nil {
-			rowIndex = *d.rowIndex
-		}
-		columnIndex := 0
-		if d.columnIndex != nil {
-			columnIndex = *d.columnIndex
-		}
-		nodes = append(nodes, &vo.MarkdownNode{
+		nodes = append(nodes, &shared.MarkdownNode{
 			Order:        d.order,
 			NodeId:       d.nodeId,
 			ParentNodeId: d.parentNodeId,
 			NodeType:     d.nodeType,
 			Origin:       d.origin,
 			Text:         d.text,
-			Level:        level,
+			Level:        d.level,
 			Marker:       d.marker,
-			Ordinal:      ordinal,
+			Ordinal:      utils.PointerOrDefault(d.ordinal, 0),
 			IsHeader:     d.isHeader,
 			Alignment:    d.alignment,
-			RowIndex:     rowIndex,
-			ColumnIndex:  columnIndex,
+			RowIndex:     utils.PointerOrDefault(d.rowIndex, 0),
+			ColumnIndex:  utils.PointerOrDefault(d.columnIndex, 0),
 			CodeInfo:     d.codeInfo,
 			SourceSpan:   si.SourceSpan(d.charSpan),
 		})
 	}
-	hash := sha256.Sum256(sourceBytes)
-	return &vo.MarkdownSyntax{
+	hash := sha256.Sum256(sourceText)
+
+	syntax := &shared.MarkdownSyntax{
 		SchemaVersion:     "1.0.0",
 		SourceOrigin:      "markdown-parse",
-		SourceText:        sourceText,
-		SourceLengthBytes: len(sourceBytes),
+		SourceText:        string(sourceText),
+		SourceLengthBytes: len(sourceText),
 		SourceSHA256:      hex.EncodeToString(hash[:]),
 		Nodes:             nodes,
-	}, nil
+	}
+	return p.syntaxToBlocks(syntax), nil
+}
+
+// syntaxToBlocks 将 MarkdownSyntax 文档转换为 DocumentBlock 列表
+func (p *GoldmarkParser) syntaxToBlocks(syntax *shared.MarkdownSyntax) entity.DocumentBlocks {
+	if syntax == nil || len(syntax.Nodes) == 0 {
+		return nil
+	}
+
+	root := syntax.Nodes[0]
+	topLevel := make([]*shared.MarkdownNode, 0)
+	for _, node := range syntax.Nodes {
+		if node.ParentNodeId == root.NodeId {
+			topLevel = append(topLevel, node)
+		}
+	}
+
+	childrenByParent := buildChildrenMap(syntax.Nodes)
+
+	var blocks []*entity.DocumentBlock
+	for _, node := range topLevel {
+		rawText := nodeSourceText(syntax, node)
+		blockType, txt := legacyBlockContent(node, rawText)
+		if txt == "" && blockType != BlockTypeTable {
+			continue
+		}
+		rows := tableRows(node, childrenByParent)
+		if blockType == BlockTypeTable && txt == "" {
+			var rowStrs []string
+			for _, row := range rows {
+				rowStrs = append(rowStrs, strings.Join(row, " | "))
+			}
+			txt = strings.Join(rowStrs, "\n")
+		}
+		tableHTML := ""
+		if blockType == BlockTypeTable {
+			tableHTML = renderMarkdownTable(rawText)
+		}
+
+		metadata := map[string]any{
+			"parser":              Markdown,
+			"syntaxSchemaVersion": syntax.SchemaVersion,
+			"syntaxNodeId":        node.NodeId,
+			"syntaxNodeType":      node.NodeType,
+			"sourceOrigin":        node.Origin,
+			"sourceSpan":          node.SourceSpan,
+		}
+		if node.Level > 0 {
+			metadata["headingLevel"] = node.Level
+		}
+		if node.Marker != "" {
+			metadata["originalMarker"] = node.Marker
+		}
+
+		block := &entity.DocumentBlock{
+			BlockNo:   len(blocks) + 1,
+			BlockType: blockType,
+			Text:      txt,
+			TableHTML: tableHTML,
+			TableRows: rows,
+			Metadata:  metadata,
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks
 }
 
 func (p *GoldmarkParser) fillOpeningFields(n ast.Node, nodeType string, parentId string,
 	draftsById map[string]*nodeDraft, rowCountByTable map[string]int, colCountByRow map[string]int,
-	sourceIndex sourceIndexer, parentCharSpan [2]int) openingFields {
+	sourceIndex *sourceIndex, parentCharSpan [2]int) openingFields {
 	fields := openingFields{}
 	switch nodeType {
 	case NodeHeading:
 		h := n.(*ast.Heading)
 		lvl := h.Level
-		fields.level = &lvl
+		fields.level = lvl
 		fields.marker = ""
 		for i := 0; i < lvl; i++ {
 			fields.marker += "#"
@@ -259,8 +320,4 @@ func (p *GoldmarkParser) fillOpeningFields(n ast.Node, nodeType string, parentId
 		fields.cellSpanSet = true
 	}
 	return fields
-}
-
-func (p *GoldmarkParser) ToBlocks(syntax *vo.MarkdownSyntax, parserName string) []*entity.DocumentBlock {
-	return SyntaxToBlocks(syntax, parserName)
 }

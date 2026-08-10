@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
+
+var re = regexp.MustCompile(`\r\n|\n|\r`)
 
 type sourceIndex struct {
 	sourceText  string
@@ -24,7 +26,6 @@ func newSourceIndex(sourceText string) *sourceIndex {
 }
 
 func (s *sourceIndex) buildLineStarts() {
-	re := regexp.MustCompile(`\r\n|\n|\r`)
 	matches := re.FindAllStringIndex(s.sourceText, -1)
 	s.lineStarts = []int{0}
 	for _, m := range matches {
@@ -60,11 +61,11 @@ func (s *sourceIndex) CharacterSpan(lineMap []int) (int, int, error) {
 	return start, end, nil
 }
 
-func (s *sourceIndex) SourceSpan(charSpan [2]int) *vo.SourceSpan {
+func (s *sourceIndex) SourceSpan(charSpan [2]int) *shared.SourceSpan {
 	start, end := charSpan[0], charSpan[1]
 	startLine, startCol := s.LineColumn(start)
 	endLine, endCol := s.LineColumn(end)
-	return &vo.SourceSpan{
+	return &shared.SourceSpan{
 		StartByte:   s.byteOffsets[start],
 		EndByte:     s.byteOffsets[end],
 		StartLine:   startLine,
@@ -95,7 +96,7 @@ func (s *sourceIndex) TableCellSpan(rowCharSpan [2]int, columnIndex int) (int, i
 	rowText = strings.TrimSuffix(rowText, "\r")
 
 	leftTrimmed := strings.TrimLeft(rowText, " ")
-	contentStart := rowStart + len([]rune(rowText)) - len([]rune(leftTrimmed))
+	contentStart := rowStart + utils.Len(rowText) - utils.Len(leftTrimmed)
 	content := strings.TrimRight(leftTrimmed, " ")
 
 	var segments [][2]int
