@@ -124,8 +124,8 @@ func (p *ChunkingPhase) Execute(ctx context.Context, buildCtx *Context) error {
 func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.Document,
 	steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) (vo.ParentChunkCandidates, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
-	parentSteps := steps.FilterByPipelineSorted(enum.PipelineTypeParent)
-	childSteps := steps.FilterByPipelineSorted(enum.PipelineTypeChild)
+	parentSteps := steps.GetSortedStepsByPipeline(enum.PipelineTypeParent)
+	childSteps := steps.GetSortedStepsByPipeline(enum.PipelineTypeChild)
 	if len(parentSteps) == 0 {
 		return nil, errorx.ErrParentBlockMissing
 	}

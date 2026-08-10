@@ -19,29 +19,10 @@ type AsyncProcessor interface {
 	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) error
 }
 
-// ChunkCoordinator 分块协调器
-type ChunkCoordinator interface {
-	// Recommend 推荐策略方案
-	Recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
-
-	// NormalizeSteps 标准化策略步骤
-	NormalizeSteps(ctx context.Context, baseSteps []*entity.DocumentStrategyStep,
-		parentStrategyTypes []int, childStrategyTypes []int, documentId int64) ([]*entity.DocumentStrategyStep, error)
-}
-
 // TextPreprocessor 文本预处理器
 type TextPreprocessor interface {
 	// Process 文本预处理
 	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error)
-}
-
-// StructureNodeManager 结构节点管理器
-type StructureNodeManager interface {
-	// ListDocumentNodes 查询文档结构节点列表
-	ListDocumentNodes(ctx context.Context, documentId, parseTaskId int64) ([]*entity.StructureNode, error)
-
-	// DeleteByDocumentId 按文档ID删除所有结构节点
-	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
 
 // ProfileGenerator 文档画像生成器

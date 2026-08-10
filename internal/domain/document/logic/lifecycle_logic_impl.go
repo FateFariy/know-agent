@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
-	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
@@ -31,7 +30,6 @@ type LifecycleLogicImpl struct {
 	repo             adapter.DocumentRepository
 	store            adapter.Storage
 	generator        process.ProfileGenerator
-	coordinator      process.ChunkCoordinator
 	knowledgeGateway adapter.KnowledgeGateway
 	parseTopic       string
 	indexTopic       string
@@ -40,14 +38,12 @@ type LifecycleLogicImpl struct {
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
 func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, store adapter.Storage,
-	repo adapter.DocumentRepository, generator process.ProfileGenerator,
-	coordinator process.ChunkCoordinator, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
+	repo adapter.DocumentRepository, generator process.ProfileGenerator, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
 		port:             port,
 		repo:             repo,
 		store:            store,
 		generator:        generator,
-		coordinator:      coordinator,
 		knowledgeGateway: knowledgeGateway,
 		parseTopic:       svcCtx.Config.MQ.ParseTopic,
 		indexTopic:       svcCtx.Config.MQ.IndexTopic,
@@ -279,48 +275,29 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 	}
 
 	// 查询基础方案的步骤列表
-	baseStepList, err := d.repo.SelectStepListByPlanId(ctx, basePlan.ID)
+	baseSteps, err := d.repo.SelectStepListByPlanId(ctx, basePlan.ID)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// 标准化策略步骤，过滤未知策略类型并去重
+	normalized := cmd.NormalizeSteps()
 
 	// 提取用户提交的策略类型列表
-	extractStrategyTypes := func(steps []*vo.DocumentStrategyStepItem) []int {
-		slice.SortBy(steps, func(a, b *vo.DocumentStrategyStepItem) bool { return a.StepNo < b.StepNo })
-		return slice.Map(steps, func(index int, item *vo.DocumentStrategyStepItem) int { return item.StrategyType })
-	}
-	parentTypeList := extractStrategyTypes(cmd.ParentSteps)
-	childTypeList := extractStrategyTypes(cmd.ChildSteps)
-
-	// 标准化策略步骤
-	normalizedStepList, err := d.coordinator.NormalizeSteps(ctx, baseStepList, parentTypeList, childTypeList, cmd.DocumentId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// 校验策略步骤不能为空
-	if len(normalizedStepList) == 0 {
-		return nil, nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "策略步骤不能为空。")
-	}
-
-	// 提取标准化后的流水线类型列表
-	normalizedParentTypeList := d.extractPipelineTypes(normalizedStepList, enum.PipelineTypeParent)
-	normalizedChildTypeList := d.extractPipelineTypes(normalizedStepList, enum.PipelineTypeChild)
-	if len(normalizedParentTypeList) == 0 {
+	parentStrategyTypes := cmd.GetSortedParentStrategyTypes()
+	childStrategyTypes := cmd.GetSortedChildStrategyTypes()
+	if len(parentStrategyTypes) == 0 {
 		return nil, nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "父块流水线不能为空。")
 	}
-	if len(normalizedChildTypeList) == 0 {
+	if len(childStrategyTypes) == 0 {
 		return nil, nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "子块流水线不能为空。")
 	}
 
-	// 提取基础方案的流水线类型列表
-	baseParentTypeList := d.extractPipelineTypes(baseStepList, enum.PipelineTypeParent)
-	baseChildTypeList := d.extractPipelineTypes(baseStepList, enum.PipelineTypeChild)
+	// 标准化策略步骤
+	steps := d.buildParentChildSteps(baseSteps, parentStrategyTypes, childStrategyTypes, cmd.DocumentId)
 
 	// 判断是否发生了策略变更
-	distinctParentTypeList := stream.FromSlice(parentTypeList).Distinct().ToSlice()
-	distinctChildTypeList := stream.FromSlice(childTypeList).Distinct().ToSlice()
-	changed := !slice.Equal(baseParentTypeList, normalizedParentTypeList) || !slice.Equal(baseChildTypeList, normalizedChildTypeList)
+	changed := !steps.EqualUnordered(baseSteps)
 
 	// 查询最新解析任务信息
 	latestParseTask, err := d.repo.SelectLatestTask(ctx, document.ID, enum.TaskTypeParseRoute)
@@ -350,13 +327,14 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 				PlanVersion:     latestPlanVersion + 1,
 				PlanSource:      enum.PlanSourceUserAdjust,
 				PlanStatus:      enum.PlanStatusConfirmed,
-				StrategyCount:   len(normalizedStepList),
+				StrategyCount:   len(steps),
 				RecommendReason: basePlan.RecommendReason,
 				AdjustNote:      cmd.AdjustNote,
 				ConfirmUserId:   cmd.OperatorId,
 				ConfirmTime:     utils.Pointer(time.Now()),
 			}
-			newPlan.FillAndProcessPipeline(normalizedStepList)
+
+			newPlan.FillAndProcessPipeline(steps)
 
 			// 更新文档的当前方案ID为新方案
 			document.CurrentPlanId = newPlan.ID
@@ -367,21 +345,21 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 			}
 
 			// 为步骤分配ID和方案ID
-			for _, step := range normalizedStepList {
+			for _, step := range steps {
 				step.ID = utils.GetSnowflakeNextID()
 				step.PlanId = newPlan.ID
 			}
 
 			// 插入新方案的步骤
-			if err = d.repo.InsertStepBatch(txCtx, normalizedStepList); err != nil {
+			if err = d.repo.InsertStepBatch(txCtx, steps); err != nil {
 				return err
 			}
 
 			// 构建调整日志
 			if latestParseTask != nil {
 				detailJson, _ := json.Marshal(map[string]any{
-					"parentStrategyTypes": normalizedParentTypeList,
-					"childStrategyTypes":  normalizedChildTypeList,
+					"parentStrategyTypes": parentStrategyTypes,
+					"childStrategyTypes":  childStrategyTypes,
 					"adjustNote":          cmd.AdjustNote,
 				})
 				adjustLog := &entity.DocumentTaskLog{
@@ -423,8 +401,8 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 			// 创建确认日志
 			detailJson, _ := json.Marshal(map[string]any{
 				"planId":              document.CurrentPlanId,
-				"parentStrategyTypes": normalizedParentTypeList,
-				"childStrategyTypes":  normalizedChildTypeList,
+				"parentStrategyTypes": parentStrategyTypes,
+				"childStrategyTypes":  childStrategyTypes,
 			})
 			confirmLog := &entity.DocumentTaskLog{
 				ID:           utils.GetSnowflakeNextID(),
@@ -460,7 +438,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		return nil, nil, err
 	}
 
-	newPlan.Normalized = !slice.Equal(distinctParentTypeList, normalizedParentTypeList) || !slice.Equal(distinctChildTypeList, normalizedChildTypeList)
+	newPlan.Normalized = normalized
 
 	return newPlan, document, nil
 }
@@ -782,11 +760,39 @@ func (d *LifecycleLogicImpl) getChunkTaskId(ctx context.Context, taskId int64, d
 	return taskId
 }
 
-// extractPipelineTypes 提取流水线类型
-func (d *LifecycleLogicImpl) extractPipelineTypes(stepList []*entity.DocumentStrategyStep, pipelineType string) []int {
-	result := slice.Filter(stepList, func(index int, item *entity.DocumentStrategyStep) bool {
-		return utils.EqualsIgnoreCase(pipelineType, utils.BlankToDefault(item.PipelineType, enum.PipelineTypeChild))
-	})
-	slice.SortBy(result, func(a, b *entity.DocumentStrategyStep) bool { return a.StepNo < b.StepNo })
-	return slice.Map(result, func(index int, item *entity.DocumentStrategyStep) int { return item.StrategyType })
+// buildParentChildSteps 根据父、子策略类型生成对应的可执行步骤列表，并保留已存在的用户配置
+func (d *LifecycleLogicImpl) buildParentChildSteps(baseSteps entity.DocumentStrategySteps, parentStrategyTypes []int, childStrategyTypes []int, documentId int64) entity.DocumentStrategySteps {
+	// 按流水线+策略类型构建基础步骤映射（便于复用已存在的用户配置）
+	baseStepMap := baseSteps.GroupByPipelineAndStrategyType()
+
+	steps := make([]*entity.DocumentStrategyStep, 0, len(parentStrategyTypes)+len(childStrategyTypes))
+	// 构建标准化步骤实体，若 baseStep 存在则标记为用户保留并复用原因；否则标记为用户追加
+	buildSteps := func(pipelineType string, normalizedTypes []int) {
+		for i, strategyType := range normalizedTypes {
+			baseStep := baseStepMap[pipelineType][strategyType]
+			step := &entity.DocumentStrategyStep{
+				DocumentId:      documentId,
+				PipelineType:    pipelineType,
+				StepNo:          i + 1,
+				StrategyType:    strategyType,
+				StrategyRole:    enum.ResolveRole(i, strategyType),
+				SourceType:      enum.StrategySourceTypeUserAdd,
+				ExecuteStatus:   enum.StrategyExecuteStatusWaitExecute,
+				RecommendReason: "用户手动追加该策略。",
+			}
+			if baseStep != nil {
+				step.SourceType = enum.StrategySourceTypeUserKeep
+				step.RecommendReason = baseStep.RecommendReason
+			}
+			steps = append(steps, step)
+		}
+	}
+
+	// 生成父块标准化步骤
+	buildSteps(enum.PipelineTypeParent, parentStrategyTypes)
+
+	// 生成子块标准化步骤
+	buildSteps(enum.PipelineTypeChild, childStrategyTypes)
+
+	return steps
 }

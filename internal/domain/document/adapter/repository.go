@@ -92,7 +92,7 @@ type DocumentRepository interface {
 	DeleteStepByDocumentId(ctx context.Context, documentId int64) error
 
 	// SelectStepListByPlanId 根据方案ID查询步骤列表
-	SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error)
+	SelectStepListByPlanId(ctx context.Context, planId int64) (entity.DocumentStrategySteps, error)
 
 	// UpdateStepExecuteStatus 更新步骤执行状态
 	UpdateStepExecuteStatus(ctx context.Context, planId int64, status int) error

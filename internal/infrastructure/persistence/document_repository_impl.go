@@ -303,7 +303,7 @@ func (d *DocumentRepositoryImpl) DeleteStepByDocumentId(ctx context.Context, doc
 }
 
 // SelectStepListByPlanId  根据方案/策略ID查询步骤列表
-func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) ([]*entity.DocumentStrategyStep, error) {
+func (d *DocumentRepositoryImpl) SelectStepListByPlanId(ctx context.Context, planId int64) (entity.DocumentStrategySteps, error) {
 	var steps []*entity.DocumentStrategyStep
 	if err := d.dbWithContext(ctx).Model(&model.DocumentStrategyStep{}).Where("plan_id = ?", planId).Find(&steps).Error; err != nil {
 		return nil, err

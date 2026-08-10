@@ -117,8 +117,47 @@ func (d *DocumentStrategyPipeline) FillAndProcessSteps(stepList []*DocumentStrat
 
 type DocumentStrategySteps []*DocumentStrategyStep
 
-// FilterByPipelineSorted 过滤属于指定流水线的步骤并按 StepNo 升序排列
-func (s DocumentStrategySteps) FilterByPipelineSorted(pipelineType string) DocumentStrategySteps {
+// GroupByPipelineAndStrategyType 按流水线类型和策略类型分组
+func (s DocumentStrategySteps) GroupByPipelineAndStrategyType() map[string]map[int]*DocumentStrategyStep {
+	baseStepMap := make(map[string]map[int]*DocumentStrategyStep)
+	for _, baseStep := range s {
+		pipelineType := utils.BlankToDefault(baseStep.PipelineType, enum.PipelineTypeChild)
+		if _, exists := baseStepMap[pipelineType]; !exists {
+			baseStepMap[pipelineType] = make(map[int]*DocumentStrategyStep)
+		}
+		baseStepMap[pipelineType][baseStep.StrategyType] = baseStep
+	}
+	return baseStepMap
+}
+
+func (s DocumentStrategySteps) EqualUnordered(other DocumentStrategySteps) bool {
+	if len(s) != len(other) {
+		return false
+	}
+	seen := make(map[string]map[int]int, 2)
+	for _, step := range s {
+		if step == nil {
+			continue
+		}
+		if _, exists := seen[step.PipelineType]; !exists {
+			seen[step.PipelineType] = make(map[int]int, len(s))
+		}
+		seen[step.PipelineType][step.StrategyType]++
+	}
+	for _, step := range other {
+		if step == nil {
+			continue
+		}
+		if seen[step.PipelineType][step.StrategyType] == 0 {
+			return false
+		}
+		seen[step.PipelineType][step.StrategyType]--
+	}
+	return true
+}
+
+// GetSortedStepsByPipeline 获取指定类型流水线的步骤并按 StepNo 升序排列
+func (s DocumentStrategySteps) GetSortedStepsByPipeline(pipelineType string) DocumentStrategySteps {
 	filtered := make(DocumentStrategySteps, 0, len(s))
 	for _, step := range s {
 		if step == nil {
