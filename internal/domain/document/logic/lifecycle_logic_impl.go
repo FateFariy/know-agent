@@ -27,23 +27,30 @@ import (
 )
 
 type LifecycleLogicImpl struct {
-	port        *adapter.DocumentPort
-	repo        adapter.DocumentRepository
-	generator   process.ProfileGenerator
-	coordinator process.ChunkCoordinator
-	parseTopic  string
-	indexTopic  string
+	port             *adapter.DocumentPort
+	repo             adapter.DocumentRepository
+	store            adapter.Storage
+	generator        process.ProfileGenerator
+	coordinator      process.ChunkCoordinator
+	knowledgeGateway adapter.KnowledgeGateway
+	parseTopic       string
+	indexTopic       string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, repo adapter.DocumentRepository, coordinator process.ChunkCoordinator) *LifecycleLogicImpl {
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, store adapter.Storage,
+	repo adapter.DocumentRepository, generator process.ProfileGenerator,
+	coordinator process.ChunkCoordinator, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
-		port:        port,
-		repo:        repo,
-		coordinator: coordinator,
-		parseTopic:  svcCtx.Config.MQ.ParseTopic,
-		indexTopic:  svcCtx.Config.MQ.IndexTopic,
+		port:             port,
+		repo:             repo,
+		store:            store,
+		generator:        generator,
+		coordinator:      coordinator,
+		knowledgeGateway: knowledgeGateway,
+		parseTopic:       svcCtx.Config.MQ.ParseTopic,
+		indexTopic:       svcCtx.Config.MQ.IndexTopic,
 	}
 }
 
@@ -67,11 +74,17 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 		return nil, 0, errorx.ErrEmptyFileContent.Format(err.Error())
 	}
 
+	// 校验知识库是否启用
+	knowledgeBase, err := d.knowledgeGateway.RequireEnabled(ctx, document.KnowledgeBaseId)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	// 生成全局唯一文档ID
 	documentId := utils.GetSnowflakeNextID()
 
 	// 上传原文件至MinIO存储
-	storedObjectInfo, err := d.port.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, mimeType)
+	storedObjectInfo, err := d.store.UploadOriginalFile(ctx, documentId, header.Filename, fileBytes, mimeType)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -83,17 +96,15 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 	document.FileType = fileType
 	document.MimeType = mimeType
 	document.FileSize = int64(len(fileBytes))
-	document.StorageType = enum.StorageTypeMINIO
+	document.StorageType = d.store.Name()
 	document.BucketName = storedObjectInfo.BucketName
 	document.ObjectName = storedObjectInfo.ObjectName
 	document.ObjectUrl = storedObjectInfo.ObjectUrl
 	document.ParseStatus = enum.ParseStatusParsing
 	document.StrategyStatus = enum.StrategyStatusWaitRecommend
 	document.IndexStatus = enum.IndexStatusWaitBuild
-	document.KnowledgeScopeCode = strutil.Trim(document.KnowledgeScopeCode)
-	document.KnowledgeScopeName = strutil.Trim(document.KnowledgeScopeName)
-	document.BusinessCategory = strutil.Trim(document.BusinessCategory)
-	document.DocumentTags = strutil.Trim(document.DocumentTags)
+	document.KnowledgeBaseId = knowledgeBase.ID
+	document.KnowledgeBaseName = knowledgeBase.BaseName
 
 	// 创建解析任务
 	taskId := utils.GetSnowflakeNextID()

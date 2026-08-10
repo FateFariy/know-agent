@@ -294,12 +294,9 @@ type TaskLog struct {
 }
 
 type UploadDocumentReq struct {
-	DocumentName       string `json:"documentName,optional"`       // 文档名称
-	OperatorId         string `json:"operatorId,optional"`         // 操作人ID
-	KnowledgeScopeCode string `json:"knowledgeScopeCode,optional"` // 知识范围编码
-	KnowledgeScopeName string `json:"knowledgeScopeName,optional"` // 知识范围名称
-	BusinessCategory   string `json:"businessCategory,optional"`   // 业务分类
-	DocumentTags       string `json:"documentTags,optional"`       // 文档标签
+	DocumentName    string `json:"documentName,optional"` // 文档名称
+	OperatorId      string `json:"operatorId,optional"`   // 操作人ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"`       // 知识库ID
 }
 
 type UploadDocumentResp struct {

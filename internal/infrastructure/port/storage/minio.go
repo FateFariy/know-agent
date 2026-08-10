@@ -15,6 +15,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -32,6 +33,10 @@ func NewMinioStorage(svcCtx *svc.ServiceContext) *MinioStorage {
 		Client: svcCtx.Minio,
 		Config: svcCtx.Config.Minio,
 	}
+}
+
+func (s *MinioStorage) Name() int {
+	return enum.StorageTypeMINIO
 }
 
 // UploadOriginalFile 上传原始文件

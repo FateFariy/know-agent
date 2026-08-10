@@ -61,4 +61,19 @@ type KnowledgeConfigLogic interface {
 
 	// ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
 	ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error)
+
+	// GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置（不存在或已停用则返回错误）
+	GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error)
+
+	// ListKnowledgeConfigOptions 查询知识库选项列表（包含可检索文档数量）
+	ListKnowledgeConfigOptions(ctx context.Context) ([]*KnowledgeConfigOption, error)
+}
+
+// KnowledgeConfigOption 知识库选项（用于下拉选择等场景）
+type KnowledgeConfigOption struct {
+	ID               int64  // 知识库ID
+	BaseName         string // 知识库名称
+	Description      string // 描述
+	IsDefault        int    // 是否默认
+	RetrievableCount int64  // 可检索文档数量
 }

@@ -69,7 +69,7 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 		if err = d.DeleteTopicDocumentRelationByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
-		if err = d.DeleteParentBlockByDocumentId(ctx, documentId); err != nil {
+		if err = d.DeleteParentChunkByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
 		if err = d.DeleteChunkByDocumentId(ctx, documentId); err != nil {
@@ -398,21 +398,21 @@ func (d *DocumentRepositoryImpl) SelectChunkListByParentBlockId(ctx context.Cont
 
 // ========== 父块相关 ==========
 
-func (d *DocumentRepositoryImpl) InsertParentBlock(ctx context.Context, block *entity.DocumentParentChunk) error {
+func (d *DocumentRepositoryImpl) InsertParentChunk(ctx context.Context, block *entity.DocumentParentChunk) error {
 	return d.dbWithContext(ctx).Create(convert.ToDocumentParentBlockModel(block)).Error
 }
 
-func (d *DocumentRepositoryImpl) InsertParentBlockBatch(ctx context.Context, blocks []*entity.DocumentParentChunk) error {
+func (d *DocumentRepositoryImpl) InsertParentChunkBatch(ctx context.Context, blocks []*entity.DocumentParentChunk) error {
 	return d.dbWithContext(ctx).CreateInBatches(convert.ToDocumentParentBlockModelList(blocks), 100).Error
 }
 
-// DeleteParentBlockByDocumentId 根据文档ID删除父块
-func (d *DocumentRepositoryImpl) DeleteParentBlockByDocumentId(ctx context.Context, documentId int64) error {
+// DeleteParentChunkByDocumentId 根据文档ID删除父块
+func (d *DocumentRepositoryImpl) DeleteParentChunkByDocumentId(ctx context.Context, documentId int64) error {
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParentChunk{}).Error
 }
 
-// SelectParentBlockListByIds 根据父块ID列表查询父块列表
-func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentChunk, error) {
+// SelectParentChunkListByIds 根据父块ID列表查询父块列表
+func (d *DocumentRepositoryImpl) SelectParentChunkListByIds(ctx context.Context, ids []int64) ([]*entity.DocumentParentChunk, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -426,8 +426,8 @@ func (d *DocumentRepositoryImpl) SelectParentBlockListByIds(ctx context.Context,
 	return parentBlocks, nil
 }
 
-// SelectParentBlockById 根据父块ID查询父块详情
-func (d *DocumentRepositoryImpl) SelectParentBlockById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentChunk, error) {
+// SelectParentChunkById 根据父块ID查询父块详情
+func (d *DocumentRepositoryImpl) SelectParentChunkById(ctx context.Context, blockId, documentId, taskId int64) (*entity.DocumentParentChunk, error) {
 	parentBlock := &entity.DocumentParentChunk{ID: blockId, DocumentId: documentId, TaskId: taskId}
 	if err := d.dbWithContext(ctx).Model(&model.DocumentParentChunk{}).Where(parentBlock).First(parentBlock).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -659,4 +659,49 @@ func (d *DocumentRepositoryImpl) SelectDocumentBlockPageNumbers(ctx context.Cont
 		return nil, err
 	}
 	return pageNumbers, nil
+}
+
+// ========== 知识库统计相关 ==========
+
+// CountDocumentsByKnowledgeBaseIds 按知识库ID列表统计文档数量
+func (d *DocumentRepositoryImpl) CountDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
+	return d.countByKnowledgeBaseIds(ctx, knowledgeBaseIds, nil)
+}
+
+// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量
+func (d *DocumentRepositoryImpl) CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
+	return d.countByKnowledgeBaseIds(ctx, knowledgeBaseIds, func(query *gorm.DB) *gorm.DB {
+		return query.Where("index_status = ? AND last_index_task_id IS NOT NULL", enum.IndexStatusBuildSuccess)
+	})
+}
+
+// countByKnowledgeBaseIds 通用统计方法，支持自定义查询条件
+func (d *DocumentRepositoryImpl) countByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64, applyCondition func(*gorm.DB) *gorm.DB) (map[int64]int64, error) {
+	if len(knowledgeBaseIds) == 0 {
+		return map[int64]int64{}, nil
+	}
+
+	type result struct {
+		KnowledgeBaseId int64 `gorm:"column:knowledge_base_id"`
+		Count           int64 `gorm:"column:count"`
+	}
+
+	var results []result
+	query := d.dbWithContext(ctx).Model(&model.Document{}).
+		Select("knowledge_base_id, COUNT(*) as count").
+		Where("knowledge_base_id IN ?", knowledgeBaseIds)
+
+	if applyCondition != nil {
+		query = applyCondition(query)
+	}
+
+	if err := query.Group("knowledge_base_id").Find(&results).Error; err != nil {
+		return nil, err
+	}
+
+	countMap := make(map[int64]int64, len(results))
+	for _, r := range results {
+		countMap[r.KnowledgeBaseId] = r.Count
+	}
+	return countMap, nil
 }

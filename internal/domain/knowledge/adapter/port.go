@@ -17,3 +17,8 @@ type RouteLexicalIndex interface {
 	// Search 在指定实体类型下进行词面检索，返回命中 (entityCode/documentId, score) 列表
 	Search(ctx context.Context, routingText string, entityType string, size int) ([]*vo.RouteLexicalHit, error)
 }
+
+type DocumentGateway interface {
+	// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量（返回 map[knowledgeBaseId]count）
+	CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
+}

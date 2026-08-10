@@ -158,9 +158,9 @@ type KnowledgeConverter interface {
 	// goverter:map . Model
 	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 	// goverter:map Model.ID ID
-	ToKnowledgeConfigEntity(src *model.KnowledgeConfig) *klen.KnowledgeConfig
-	ToKnowledgeConfigEntities(src []*model.KnowledgeConfig) []*klen.KnowledgeConfig
+	ToKnowledgeBaseEntity(src *model.KnowledgeBase) *klen.KnowledgeConfig
+	ToKnowledgeBaseEntities(src []*model.KnowledgeBase) []*klen.KnowledgeConfig
 	// goverter:map . Model
-	ToKnowledgeConfigModel(src *klen.KnowledgeConfig) *model.KnowledgeConfig
-	ToKnowledgeConfigModelList(src []*klen.KnowledgeConfig) []*model.KnowledgeConfig
+	ToKnowledgeBaseModel(src *klen.KnowledgeConfig) *model.KnowledgeBase
+	ToKnowledgeBaseModelList(src []*klen.KnowledgeConfig) []*model.KnowledgeBase
 }

@@ -490,10 +490,7 @@ func FromUploadDocumentReq(source *document.UploadDocumentReq) *entity1.Document
 	if source != nil {
 		var entityDocument entity1.Document
 		entityDocument.DocumentName = (*source).DocumentName
-		entityDocument.KnowledgeScopeCode = (*source).KnowledgeScopeCode
-		entityDocument.KnowledgeScopeName = (*source).KnowledgeScopeName
-		entityDocument.BusinessCategory = (*source).BusinessCategory
-		entityDocument.DocumentTags = (*source).DocumentTags
+		entityDocument.KnowledgeBaseId = StringToInt64((*source).KnowledgeBaseId)
 		entityDocument.OperatorId = StringToInt64((*source).OperatorId)
 		pEntityDocument = &entityDocument
 	}
@@ -640,10 +637,6 @@ func ToDocumentDetailResp(source *entity1.Document) *document.DocumentDetailResp
 		if (*source).ParseErrorMsg != nil {
 			documentDocumentDetailResp.ParseErrorMsg = *(*source).ParseErrorMsg
 		}
-		documentDocumentDetailResp.KnowledgeScopeCode = (*source).KnowledgeScopeCode
-		documentDocumentDetailResp.KnowledgeScopeName = (*source).KnowledgeScopeName
-		documentDocumentDetailResp.BusinessCategory = (*source).BusinessCategory
-		documentDocumentDetailResp.DocumentTags = (*source).DocumentTags
 		documentDocumentDetailResp.CurrentPlanId = Int64ToString((*source).CurrentPlanId)
 		documentDocumentDetailResp.LastIndexTaskId = Int64ToString((*source).LastIndexTaskId)
 		documentDocumentDetailResp.LatestTaskId = Int64ToString((*source).LatestTaskId)
@@ -1405,17 +1398,17 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	}
 	return pEntityKnowledgeTopicNode
 }
-func ToKnowledgeConfigEntities(source []*model.KnowledgeConfig) []*entity2.KnowledgeConfig {
+func ToKnowledgeBaseEntities(source []*model.KnowledgeBase) []*entity2.KnowledgeConfig {
 	var pEntityKnowledgeConfigList []*entity2.KnowledgeConfig
 	if source != nil {
 		pEntityKnowledgeConfigList = make([]*entity2.KnowledgeConfig, len(source))
 		for i := 0; i < len(source); i++ {
-			pEntityKnowledgeConfigList[i] = ToKnowledgeConfigEntity(source[i])
+			pEntityKnowledgeConfigList[i] = ToKnowledgeBaseEntity(source[i])
 		}
 	}
 	return pEntityKnowledgeConfigList
 }
-func ToKnowledgeConfigEntity(source *model.KnowledgeConfig) *entity2.KnowledgeConfig {
+func ToKnowledgeBaseEntity(source *model.KnowledgeBase) *entity2.KnowledgeConfig {
 	var pEntityKnowledgeConfig *entity2.KnowledgeConfig
 	if source != nil {
 		var entityKnowledgeConfig entity2.KnowledgeConfig
@@ -1433,33 +1426,33 @@ func ToKnowledgeConfigEntity(source *model.KnowledgeConfig) *entity2.KnowledgeCo
 	}
 	return pEntityKnowledgeConfig
 }
-func ToKnowledgeConfigModel(source *entity2.KnowledgeConfig) *model.KnowledgeConfig {
-	var pModelKnowledgeConfig *model.KnowledgeConfig
+func ToKnowledgeBaseModel(source *entity2.KnowledgeConfig) *model.KnowledgeBase {
+	var pModelKnowledgeBase *model.KnowledgeBase
 	if source != nil {
-		var modelKnowledgeConfig model.KnowledgeConfig
-		modelKnowledgeConfig.Model = entityKnowledgeConfigToCommonModel((*source))
-		modelKnowledgeConfig.BaseName = NormalizeString((*source).BaseName)
-		modelKnowledgeConfig.Description = NormalizeString((*source).Description)
-		modelKnowledgeConfig.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
-		modelKnowledgeConfig.RetrievalConfigJson = jsonRawMessageToDatatypesJSON((*source).RetrievalConfigJson)
-		modelKnowledgeConfig.GraphRagConfigJson = jsonRawMessageToDatatypesJSON((*source).GraphRagConfigJson)
-		modelKnowledgeConfig.RaptorConfigJson = jsonRawMessageToDatatypesJSON((*source).RaptorConfigJson)
-		modelKnowledgeConfig.MetadataFilterJson = jsonRawMessageToDatatypesJSON((*source).MetadataFilterJson)
-		modelKnowledgeConfig.IsDefault = (*source).IsDefault
-		modelKnowledgeConfig.SortOrder = (*source).SortOrder
-		pModelKnowledgeConfig = &modelKnowledgeConfig
+		var modelKnowledgeBase model.KnowledgeBase
+		modelKnowledgeBase.Model = entityKnowledgeConfigToCommonModel((*source))
+		modelKnowledgeBase.BaseName = NormalizeString((*source).BaseName)
+		modelKnowledgeBase.Description = NormalizeString((*source).Description)
+		modelKnowledgeBase.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		modelKnowledgeBase.RetrievalConfigJson = jsonRawMessageToDatatypesJSON((*source).RetrievalConfigJson)
+		modelKnowledgeBase.GraphRagConfigJson = jsonRawMessageToDatatypesJSON((*source).GraphRagConfigJson)
+		modelKnowledgeBase.RaptorConfigJson = jsonRawMessageToDatatypesJSON((*source).RaptorConfigJson)
+		modelKnowledgeBase.MetadataFilterJson = jsonRawMessageToDatatypesJSON((*source).MetadataFilterJson)
+		modelKnowledgeBase.IsDefault = (*source).IsDefault
+		modelKnowledgeBase.SortOrder = (*source).SortOrder
+		pModelKnowledgeBase = &modelKnowledgeBase
 	}
-	return pModelKnowledgeConfig
+	return pModelKnowledgeBase
 }
-func ToKnowledgeConfigModelList(source []*entity2.KnowledgeConfig) []*model.KnowledgeConfig {
-	var pModelKnowledgeConfigList []*model.KnowledgeConfig
+func ToKnowledgeBaseModelList(source []*entity2.KnowledgeConfig) []*model.KnowledgeBase {
+	var pModelKnowledgeBaseList []*model.KnowledgeBase
 	if source != nil {
-		pModelKnowledgeConfigList = make([]*model.KnowledgeConfig, len(source))
+		pModelKnowledgeBaseList = make([]*model.KnowledgeBase, len(source))
 		for i := 0; i < len(source); i++ {
-			pModelKnowledgeConfigList[i] = ToKnowledgeConfigModel(source[i])
+			pModelKnowledgeBaseList[i] = ToKnowledgeBaseModel(source[i])
 		}
 	}
-	return pModelKnowledgeConfigList
+	return pModelKnowledgeBaseList
 }
 func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
 	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem

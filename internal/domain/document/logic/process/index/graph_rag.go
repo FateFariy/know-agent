@@ -182,7 +182,7 @@ func (p *GraphRagPhase) finalizeGraphRagOutcome(ctx context.Context, buildCtx *C
 				logx.Warnf("更新任务阶段失败: %v", err)
 			}
 
-			replaced, err := p.GraphRagBuilder.ReplaceTypedIndex(ctx, buildCtx.DocumentId, buildCtx.TaskId,
+			replaced, err := p.builder.ReplaceTypedIndex(ctx, buildCtx.DocumentId, buildCtx.TaskId,
 				buildCtx.PlanId, buildCtx.ChildChunks, p.nextChunkNo(buildCtx.ChildChunks))
 			if err != nil {
 				logx.Warnf("GraphRAG typed projection failed; preserving committed KG: documentId=%d, taskId=%d, message=%v",

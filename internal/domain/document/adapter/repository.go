@@ -224,6 +224,14 @@ type DocumentRepository interface {
 
 	// SelectDocumentBlockPageNumbers 查询文档块中不重复的页码列表
 	SelectDocumentBlockPageNumbers(ctx context.Context, documentId, taskId int64) ([]int, error)
+
+	// ========== 知识库统计相关 ==========
+
+	// CountDocumentsByKnowledgeBaseIds 按知识库ID列表统计文档数量（返回 map[knowledgeBaseId]count）
+	CountDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
+
+	// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量（返回 map[knowledgeBaseId]count）
+	CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
 }
 
 type TableRepository interface {

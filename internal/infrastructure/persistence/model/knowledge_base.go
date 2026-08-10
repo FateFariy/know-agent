@@ -6,7 +6,7 @@ import (
 	"github.com/swiftbit/know-agent/common"
 )
 
-type KnowledgeConfig struct {
+type KnowledgeBase struct {
 	common.Model
 	BaseName            string         `gorm:"column:base_name;type:varchar(255)"`       // 基础名称
 	Description         string         `gorm:"column:description;type:text"`             // 描述

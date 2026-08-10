@@ -30,10 +30,6 @@ type Document struct {
 	ContentQualityLevel  int       `gorm:"column:content_quality_level"` // 内容质量等级
 	ParseTextPath        string    `gorm:"column:parse_text_path"`       // 解析文本路径
 	ParseErrorMsg        *string   `gorm:"column:parse_error_msg"`       // 解析错误信息
-	KnowledgeScopeCode   string    `gorm:"column:knowledge_scope_code"`  // 知识范围编码
-	KnowledgeScopeName   string    `gorm:"column:knowledge_scope_name"`  // 知识范围名称
-	BusinessCategory     string    `gorm:"column:business_category"`     // 业务分类
-	DocumentTags         string    `gorm:"column:document_tags"`         // 文档标签
 	CurrentPlanId        int64     `gorm:"column:current_plan_id"`       // 当前方案ID
 	LastParseTaskId      int64     `gorm:"column:last_parse_task_id"`    // 上一次解析任务ID
 	StructureNodeCount   int       `gorm:"column:structure_node_count"`  // 结构化节点数
@@ -76,18 +72,4 @@ func (d *Document) FillLatestTaskInfo(task *DocumentTask) {
 	d.LatestTaskTypeName = enum.TaskTypeName(task.TaskType)
 	d.LatestTaskStatus = task.TaskStatus
 	d.LatestTaskStatusName = enum.TaskStatusName(task.TaskStatus)
-}
-
-// FillDocumentTags 填充文档标签，逗号分隔
-func (d *Document) FillDocumentTags(knowledgeScopeCode, documentType string, coreTopics []string) {
-	if d == nil {
-		return
-	}
-	tags := strings.Split(d.DocumentTags, ",")
-	tags = append(tags, knowledgeScopeCode, documentType)
-	tags = append(tags, utils.LimitSlice(coreTopics, 4)...)
-	filterLimit := utils.DistinctFilterLimit(tags, 8, func(tag string) (string, bool) {
-		return strutil.Trim(tag), strutil.IsNotBlank(tag)
-	})
-	d.DocumentTags = strings.Join(filterLimit, ",")
 }

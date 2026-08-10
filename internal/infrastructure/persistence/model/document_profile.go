@@ -2,7 +2,7 @@ package model
 
 import "github.com/swiftbit/know-agent/common"
 
-type SuperAgentDocumentProfile struct {
+type DocumentProfile struct {
 	common.Model
 	DocumentId           int64   `gorm:"column:document_id;type:bigint"`          // 文档ID
 	ProfileVersion       int     `gorm:"column:profile_version;type:int"`         // 配置版本
