@@ -739,6 +739,28 @@ func ToDocumentParentBlockModelList(source []*entity1.DocumentParentChunk) []*mo
 	}
 	return pModelDocumentParentChunkList
 }
+func ToDocumentProfileModel(source *entity1.DocumentProfile) *model.DocumentProfile {
+	var pModelDocumentProfile *model.DocumentProfile
+	if source != nil {
+		var modelDocumentProfile model.DocumentProfile
+		modelDocumentProfile.Model = entityDocumentProfileToCommonModel((*source))
+		modelDocumentProfile.DocumentId = (*source).DocumentId
+		modelDocumentProfile.ProfileVersion = (*source).ProfileVersion
+		modelDocumentProfile.DocumentSummary = (*source).DocumentSummary
+		modelDocumentProfile.DocumentType = (*source).DocumentType
+		modelDocumentProfile.CoreTopics = (*source).CoreTopics
+		modelDocumentProfile.ExampleQuestions = (*source).ExampleQuestions
+		modelDocumentProfile.GraphFriendly = (*source).GraphFriendly
+		modelDocumentProfile.SupportsGraphOutline = (*source).SupportsGraphOutline
+		modelDocumentProfile.SupportsItemLookup = (*source).SupportsItemLookup
+		modelDocumentProfile.SupportsGraphAssist = (*source).SupportsGraphAssist
+		modelDocumentProfile.ProfileSource = (*source).ProfileSource
+		modelDocumentProfile.ProfileStatus = (*source).ProfileStatus
+		modelDocumentProfile.ErrorMsg = (*source).ErrorMsg
+		pModelDocumentProfile = &modelDocumentProfile
+	}
+	return pModelDocumentProfile
+}
 func ToDocumentProfileResp(source *entity1.DocumentProfile) *document.DocumentProfileResp {
 	var pDocumentDocumentProfileResp *document.DocumentProfileResp
 	if source != nil {
@@ -950,7 +972,7 @@ func ToDocumentTableModel(source *entity1.DocumentTable) *model.DocumentTable {
 		modelDocumentTable.SectionPath = (*source).SectionPath
 		modelDocumentTable.PageNo = (*source).PageNo
 		modelDocumentTable.PageRange = (*source).PageRange
-		modelDocumentTable.BboxJSON = (*source).BboxJSON
+		modelDocumentTable.BboxJson = (*source).BboxJson
 		modelDocumentTable.Title = (*source).Title
 		modelDocumentTable.RowCount = (*source).RowCount
 		modelDocumentTable.ColumnCount = (*source).ColumnCount
@@ -1135,20 +1157,6 @@ func ToQueryTaskLogsResp(source *entity1.DocumentTask) *document.QueryTaskLogsRe
 	}
 	return pDocumentQueryTaskLogsResp
 }
-func ToUploadDocumentResp(source *vo1.DocumentUpload) *document.UploadDocumentResp {
-	var pDocumentUploadDocumentResp *document.UploadDocumentResp
-	if source != nil {
-		var documentUploadDocumentResp document.UploadDocumentResp
-		documentUploadDocumentResp.DocumentId = Int64ToString((*source).DocumentId)
-		documentUploadDocumentResp.TaskId = Int64ToString((*source).TaskId)
-		documentUploadDocumentResp.DocumentName = (*source).DocumentName
-		documentUploadDocumentResp.ParseStatus = (*source).ParseStatus
-		documentUploadDocumentResp.StrategyStatus = (*source).StrategyStatus
-		documentUploadDocumentResp.IndexStatus = (*source).IndexStatus
-		pDocumentUploadDocumentResp = &documentUploadDocumentResp
-	}
-	return pDocumentUploadDocumentResp
-}
 func entityDocumentBlockToCommonModel(source entity1.DocumentBlock) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
@@ -1160,6 +1168,11 @@ func entityDocumentChunkToCommonModel(source entity1.DocumentChunk) common.Model
 	return commonModel
 }
 func entityDocumentParentChunkToCommonModel(source entity1.DocumentParentChunk) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityDocumentProfileToCommonModel(source entity1.DocumentProfile) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

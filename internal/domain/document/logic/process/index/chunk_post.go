@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -32,19 +30,22 @@ func (p *ChunkPostPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	}); err != nil {
 		return err
 	}
-	buildCtx.ParentCandidates = buildCtx.ParentCandidates.CleanupParentCandidates()
+	buildCtx.ParentCandidates = buildCtx.ParentCandidates.WithoutValidChildren()
 
 	// todo 带实现大模型增强
 	// applyChunkKeywordQuestionEnrichment(ctx, buildCtx)
 
-	parentChunks, chunks := p.buildParentChildEntities(buildCtx)
+	parentChunks, childChunks := p.buildParentChildEntities(buildCtx)
+	buildCtx.ParentChunks = parentChunks
+	buildCtx.ChildChunks = childChunks
+
 	fn := func(txCtx context.Context) error {
 		// 批量写入父块
 		if err := p.repo.InsertParentChunkBatch(txCtx, parentChunks); err != nil {
 			return err
 		}
 		// 批量写入子块
-		return p.repo.InsertChunkBatch(txCtx, chunks)
+		return p.repo.InsertChunkBatch(txCtx, childChunks)
 	}
 
 	if err := p.repo.Do(ctx, fn); err != nil {
@@ -73,11 +74,11 @@ func (p *ChunkPostPhase) Execute(ctx context.Context, buildCtx *Context) error {
 // buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
 func (p *ChunkPostPhase) buildParentChildEntities(buildCtx *Context) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
 	parentChunks := make([]*entity.DocumentParentChunk, 0, len(buildCtx.ParentCandidates))
-	chunks := make([]*entity.DocumentChunk, 0)
+	childChunks := make([]*entity.DocumentChunk, 0)
 
 	globalChunkNo := 0
 	for parentIdx, candidate := range buildCtx.ParentCandidates {
-		parentBlock := &entity.DocumentParentChunk{
+		parentChunk := &entity.DocumentParentChunk{
 			ID:                utils.GetSnowflakeNextID(),
 			DocumentId:        buildCtx.DocumentId,
 			TaskId:            buildCtx.TaskId,
@@ -93,17 +94,19 @@ func (p *ChunkPostPhase) buildParentChildEntities(buildCtx *Context) ([]*entity.
 			CharCount:         utils.Len(candidate.Text),
 			TokenCount:        utils.EstimateTokens(candidate.Text),
 			StartChunkNo:      globalChunkNo,
+			PageRange:         candidate.PageRange,
+			SourceBlockIds:    candidate.SourceBlockIds,
 		}
 
 		for _, child := range candidate.ChildChunks {
-			if child != nil && strutil.IsNotBlank(child.Text) {
+			if child != nil && child.Text != "" {
 				globalChunkNo++
-				chunks = append(chunks, &entity.DocumentChunk{
+				childChunks = append(childChunks, &entity.DocumentChunk{
 					ID:                utils.GetSnowflakeNextID(),
 					DocumentId:        buildCtx.DocumentId,
 					TaskId:            buildCtx.TaskId,
 					PlanId:            buildCtx.PlanId,
-					ParentChunkId:     parentBlock.ID,
+					ParentChunkId:     parentChunk.ID,
 					ChunkNo:           globalChunkNo,
 					SourceType:        child.SourceType,
 					SectionPath:       utils.BlankToDefault(child.SectionPath, candidate.SectionPath),
@@ -115,12 +118,21 @@ func (p *ChunkPostPhase) buildParentChildEntities(buildCtx *Context) ([]*entity.
 					CharCount:         utils.Len(child.Text),
 					TokenCount:        utils.EstimateTokens(child.Text),
 					VectorStatus:      enum.VectorStatusWaitVector,
+					ContentWithWeight: utils.BlankToDefault(child.ContentWithWeight, child.Text),
+					ChunkType:         child.ChunkType,
+					Title:             child.Title,
+					Keywords:          child.Keywords,
+					Questions:         child.Questions,
+					PageNo:            child.PageNo,
+					PageRange:         child.PageRange,
+					BboxJson:          child.BboxJson,
+					SourceBlockIds:    child.SourceBlockIds,
 				})
-				parentBlock.ChildCount++
+				parentChunk.ChildCount++
 			}
 		}
-		parentBlock.EndChunkNo = globalChunkNo - 1
-		parentChunks = append(parentChunks, parentBlock)
+		parentChunk.EndChunkNo = globalChunkNo - 1
+		parentChunks = append(parentChunks, parentChunk)
 	}
-	return parentChunks, chunks
+	return parentChunks, childChunks
 }

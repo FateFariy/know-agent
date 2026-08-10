@@ -35,7 +35,7 @@ func (p *RaptorPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		}
 		raptorStartDetail, _ := json.Marshal(map[string]any{
 			"chunkCount":  vectorSize,
-			"parentCount": len(buildCtx.ParentBlocks),
+			"parentCount": len(buildCtx.ParentChunks),
 		})
 		raptorStartLog := &entity.DocumentTaskLog{
 			TaskId:       buildCtx.TaskId,

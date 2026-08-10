@@ -21,7 +21,7 @@ type Context struct {
 	PipelineSteps        vo.DocumentStrategyStepDrafts
 	ParentCandidates     vo.ParentChunkCandidates
 	ChildChunks          []*entity.DocumentChunk
-	ParentBlocks         []*entity.DocumentParentChunk
+	ParentChunks         []*entity.DocumentParentChunk
 	GraphRagBuildResult  *vo.GraphRagBuildResult
 	GraphFinalization    *vo.GraphRagFinalization
 	RaptorBuildResult    *vo.RaptorBuildResult
@@ -39,4 +39,8 @@ type Phase interface {
 
 type IndexingConfigResolver interface {
 	Resolve(ctx context.Context, document *entity.Document) *vo.IndexingOptions
+}
+
+type GraphRagBuilder interface {
+	RebuildDocumentGraph(ctx context.Context, documentId, taskId int64, chunks []*entity.DocumentChunk) (*vo.GraphRagBuildResult, error)
 }

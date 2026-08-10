@@ -26,7 +26,6 @@ type DocumentConverter interface {
 	FromUploadDocumentReq(src *document.UploadDocumentReq) *den.Document
 	FromConfirmStrategyReq(src *document.ConfirmStrategyReq) *dvo.DocumentStrategyConfirmCmd
 
-	ToUploadDocumentResp(src *dvo.DocumentUpload) *document.UploadDocumentResp
 	ToDocumentDetailResp(src *den.Document) *document.DocumentDetailResp
 	ToDocumentDetailRespList(src []*den.Document) []*document.DocumentDetailResp
 	ToKnowledgeDocumentOptionRespList(src []*dvo.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp
@@ -43,7 +42,7 @@ type DocumentConverter interface {
 	// goverter:map . Model
 	ToDocumentModel(src *den.Document) *model.Document
 	// goverter:map . Model
-	//ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
+	ToDocumentProfileModel(src *den.DocumentProfile) *model.DocumentProfile
 	// goverter:map . Model
 	ToDocumentTaskModel(src *den.DocumentTask) *model.DocumentTask
 	// goverter:map . Model

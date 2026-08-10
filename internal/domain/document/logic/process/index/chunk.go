@@ -156,10 +156,10 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 
 	// 为每个父块种子派生其子块；无子块时以父块本身兜底
 	parentChunks := make(vo.ParentChunkCandidates, 0)
-	for _, parentSeed := range parentSeedList.CleanupAndUnique() {
+	for _, parentSeed := range parentSeedList.NormalizeAndDeduplicate() {
 		if parentSeed != nil && strutil.IsNotBlank(parentSeed.Text) {
 			childSeedList := p.buildChildSeedList(ctx, parentSeed, childSteps, blockMap, options)
-			finalChildren := childSeedList.CleanupAndUnique()
+			finalChildren := childSeedList.NormalizeAndDeduplicate()
 
 			trim := strutil.Trim(parentSeed.Text)
 			if len(finalChildren) == 0 {
@@ -185,7 +185,7 @@ func (p *ChunkingPhase) BuildParentBlocks(ctx context.Context, document *entity.
 	}
 
 	// 对父块进行去重与清理后返回
-	return parentChunks.CleanupAndUnique(), nil
+	return parentChunks.NormalizeAndDeduplicate(), nil
 }
 
 // ---------------- 种子构建 ----------------
@@ -393,7 +393,7 @@ func (p *ChunkingPhase) cloneChunkCandidate(original *vo.ChunkCandidate, text st
 func (p *ChunkingPhase) executePipeline(ctx context.Context, seeds vo.ChunkCandidates,
 	steps entity.DocumentStrategySteps, pipelineType string, options *vo.IndexingOptions) vo.ChunkCandidates {
 	// 初始清洗与去重
-	chunks := seeds.CleanupAndUnique()
+	chunks := seeds.NormalizeAndDeduplicate()
 	if len(chunks) == 0 {
 		return chunks
 	}
@@ -428,11 +428,11 @@ func (p *ChunkingPhase) executePipeline(ctx context.Context, seeds vo.ChunkCandi
 
 		// 合并新生成的块并重新清洗去重，作为下一轮的输入
 		chunks = append(chunks, currentChunks...)
-		chunks = currentChunks.CleanupAndUnique()
+		chunks = currentChunks.NormalizeAndDeduplicate()
 	}
 
 	// 最终清洗并返回结果
-	return chunks.CleanupAndUnique()
+	return chunks.NormalizeAndDeduplicate()
 }
 
 // buildPipelineOptions 根据流水线类型和策略类型生成额外的策略选项

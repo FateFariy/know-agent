@@ -33,6 +33,8 @@ func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *Context) erro
 		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过构建关键词，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
 		return nil
 	}
+	buildCtx.Task.CurrentStage = enum.TaskStageKeywordIndex
+
 	// 标记开始关键词索引
 	task := &entity.DocumentTask{
 		ID:           buildCtx.TaskId,

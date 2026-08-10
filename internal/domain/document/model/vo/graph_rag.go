@@ -26,7 +26,7 @@ type GraphRagBuildResult struct {
 	MaxAttempts                  int                               `json:"maxAttempts"`
 }
 
-// isCommittedGraph 检查图谱是否已提交
+// IsCommittedGraph 检查图谱是否已提交
 func (p *GraphRagBuildResult) IsCommittedGraph() bool {
 	return p != nil && p.KgCommitted && p.GraphPersistenceOutcome != "" &&
 		p.GraphPersistenceOutcome != enum.GraphPersistenceOutcomeFailed

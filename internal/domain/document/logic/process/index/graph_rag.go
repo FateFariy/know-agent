@@ -15,12 +15,14 @@ import (
 
 // GraphRagPhase GraphRAG 构建阶段
 type GraphRagPhase struct {
-	repo adapter.DocumentRepository
+	repo    adapter.DocumentRepository
+	builder GraphRagBuilder
 }
 
-func NewGraphRagPhase(repo adapter.DocumentRepository) *GraphRagPhase {
+func NewGraphRagPhase(repo adapter.DocumentRepository, builder GraphRagBuilder) *GraphRagPhase {
 	return &GraphRagPhase{
-		repo: repo,
+		repo:    repo,
+		builder: builder,
 	}
 }
 
@@ -36,6 +38,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过构建，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
 		return p.finalizeGraphRag(ctx, buildCtx)
 	}
+	buildCtx.Task.CurrentStage = enum.TaskStageGraphRag
 
 	task := &entity.DocumentTask{
 		ID:           buildCtx.TaskId,
@@ -46,7 +49,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 	}
 	graphStartDetail, _ := json.Marshal(map[string]any{
 		"chunkCount":  vectorSize,
-		"parentCount": len(buildCtx.ParentBlocks),
+		"parentCount": len(buildCtx.ParentChunks),
 	})
 	graphStartLog := &entity.DocumentTaskLog{
 		TaskId:       buildCtx.TaskId,
@@ -62,7 +65,7 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 执行 GraphRAG 构建
 	graphRagStartTime := time.Now()
-	graphRagBuildResult, err := p.GraphRagBuilder.RebuildDocumentGraph(ctx, buildCtx.DocumentId, buildCtx.TaskId, buildCtx.ChildChunks)
+	graphRagBuildResult, err := p.builder.RebuildDocumentGraph(ctx, buildCtx.DocumentId, buildCtx.TaskId, buildCtx.ChildChunks)
 	if err != nil {
 		// 构建失败，使用已有的结果或创建新的失败结果
 		if graphRagBuildResult == nil {
@@ -78,11 +81,11 @@ func (p *GraphRagPhase) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 记录构建完成日志
 	graphEndDetail, _ := json.Marshal(map[string]any{
-		"entityCount":    graphRagBuildResult.EntityCount,
-		"relationCount":  graphRagBuildResult.RelationCount,
-		"evidenceCount":  graphRagBuildResult.EvidenceCount,
-		"communityCount": graphRagBuildResult.CommunityCount,
-		"costMillis":     time.Since(graphRagStartTime).Milliseconds(),
+		"entityCount":        graphRagBuildResult.EntityCount,
+		"relationCount":      graphRagBuildResult.RelationCount,
+		"evidenceCount":      graphRagBuildResult.EvidenceCount,
+		"communityCount":     graphRagBuildResult.CommunityCount,
+		"graphRagCostMillis": time.Since(graphRagStartTime).Milliseconds(),
 	})
 	graphEndLog := &entity.DocumentTaskLog{
 		TaskId:       buildCtx.TaskId,

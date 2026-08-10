@@ -103,8 +103,8 @@ func (d DocumentStrategyStepDrafts) PipelineSnapshot() string {
 
 type ChunkCandidates []*ChunkCandidate
 
-// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
-func (c ChunkCandidates) CleanupAndUnique() ChunkCandidates {
+// NormalizeAndDeduplicate 过滤空文本并按 路径+序号+文本 去重
+func (c ChunkCandidates) NormalizeAndDeduplicate() ChunkCandidates {
 	seen := make(map[string]struct{})
 	result := make(ChunkCandidates, 0, len(c))
 	for _, candidate := range c {
@@ -128,8 +128,8 @@ func (c ChunkCandidates) CleanupAndUnique() ChunkCandidates {
 
 type ParentChunkCandidates []*ParentChunkCandidate
 
-// CleanupAndUnique 过滤空文本并按 路径+序号+文本 去重
-func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
+// NormalizeAndDeduplicate 过滤空文本并按 路径+序号+文本 去重
+func (p ParentChunkCandidates) NormalizeAndDeduplicate() ParentChunkCandidates {
 	if len(p) == 0 {
 		return p
 	}
@@ -154,8 +154,8 @@ func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
 	return result
 }
 
-// CleanupParentCandidates 过滤"文本为空"或"无子块"的父块候选
-func (p ParentChunkCandidates) CleanupParentCandidates() ParentChunkCandidates {
+// WithoutValidChildren 过滤"文本为空"或"无子块"的父块候选
+func (p ParentChunkCandidates) WithoutValidChildren() ParentChunkCandidates {
 	candidates := make(ParentChunkCandidates, 0, len(p))
 	fn := func(child *ChunkCandidate) bool {
 		return child != nil && strutil.IsNotBlank(child.Text)

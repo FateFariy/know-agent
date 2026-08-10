@@ -66,7 +66,7 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *Context) error 
 		}
 		// 索引构建完成日志
 		buildCompleteDetail, _ := json.Marshal(map[string]any{
-			"parentBlockCount":     len(buildCtx.ParentBlocks),
+			"parentBlockCount":     len(buildCtx.ParentChunks),
 			"chunkCount":           len(buildCtx.ChildChunks),
 			"graphTypedChunkCount": len(buildCtx.GraphTypedChunkList),
 			"costMillis":           totalCostMillis,
@@ -89,6 +89,6 @@ func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *Context) error 
 
 	logx.Infof("索引构建任务执行完成，documentId=%d, taskId=%d, planId=%d, parentCount=%d, chunkCount=%d, costMillis=%d",
 		buildCtx.DocumentId, buildCtx.TaskId, buildCtx.PlanId,
-		len(buildCtx.ParentBlocks), len(buildCtx.ChildChunks), totalCostMillis)
+		len(buildCtx.ParentChunks), len(buildCtx.ChildChunks), totalCostMillis)
 	return nil
 }

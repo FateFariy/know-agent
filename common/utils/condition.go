@@ -7,3 +7,11 @@ func Ternary[T any](condition bool, trueVal, falseVal T) T {
 	}
 	return falseVal
 }
+
+func DefaultIfZero[T comparable](value, defaultValue T) T {
+	var zero T
+	if value == zero {
+		return defaultValue
+	}
+	return value
+}

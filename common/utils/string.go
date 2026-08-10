@@ -52,13 +52,7 @@ func ClipTail(text string, maxChars int) string {
 
 // JoinNonBlank 连接非空字符串
 func JoinNonBlank(sep string, parts ...string) string {
-	result := make([]string, 0, len(parts))
-	for i := 0; i < len(parts); i++ {
-		if strutil.IsNotBlank(parts[i]) {
-			result = append(result, strutil.Trim(parts[i]))
-		}
-	}
-	return strings.Join(result, sep)
+	return strings.Join(FilterBlank(parts), sep)
 }
 
 // ParseChineseNumber 解析松散格式的数字（支持阿拉伯数字和中文数字）
@@ -147,4 +141,15 @@ func FirstNonBlank(strs ...string) string {
 		}
 	}
 	return ""
+}
+
+func FilterBlank(raw []string) []string {
+	out := make([]string, 0, len(raw))
+	for _, k := range raw {
+		space := strings.TrimSpace(k)
+		if space != "" {
+			out = append(out, space)
+		}
+	}
+	return out
 }

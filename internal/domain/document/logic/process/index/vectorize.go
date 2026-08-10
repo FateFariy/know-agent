@@ -49,7 +49,7 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 		"embeddingBatchSize":  embeddingBatch,
 		"embeddingBatchCount": vectorBatch,
 		"vectorStoreType":     enum.VectorStoreTypeMilvus,
-		"parentCount":         len(buildCtx.ParentBlocks),
+		"parentCount":         len(buildCtx.ParentChunks),
 	}
 	// 记录"开始执行向量化"日志
 	vectorStartDetail, _ := json.Marshal(detail)
