@@ -326,7 +326,7 @@ func (d *AsyncProcessImpl) HandleIndexBuildLegacy(ctx context.Context, documentI
 		// 事务性批量落库 + 推进到向量化阶段
 		persistBlocksTx := func(txCtx context.Context) error {
 			// 批量写入父块
-			if err = d.repo.InsertParentBlockBatch(txCtx, parentBlocks); err != nil {
+			if err = d.repo.InsertParentChunkBatch(txCtx, parentBlocks); err != nil {
 				return err
 			}
 			// 批量写入子块

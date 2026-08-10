@@ -18,8 +18,8 @@ type Context struct {
 	Plan                 *entity.DocumentStrategyPlan
 	StartTime            time.Time
 	BuildStartedTime     time.Time
-	PipelineSteps        []*entity.DocumentStrategyStep
-	ParentCandidates     []*vo.ParentChunkCandidate
+	PipelineSteps        vo.DocumentStrategyStepDrafts
+	ParentCandidates     vo.ParentChunkCandidates
 	ChildChunks          []*entity.DocumentChunk
 	ParentBlocks         []*entity.DocumentParentChunk
 	GraphRagBuildResult  *vo.GraphRagBuildResult

@@ -2,6 +2,7 @@ package vo
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -151,6 +152,22 @@ func (p ParentChunkCandidates) CleanupAndUnique() ParentChunkCandidates {
 	}
 
 	return result
+}
+
+// CleanupParentCandidates 过滤"文本为空"或"无子块"的父块候选
+func (p ParentChunkCandidates) CleanupParentCandidates() ParentChunkCandidates {
+	candidates := make(ParentChunkCandidates, 0, len(p))
+	fn := func(child *ChunkCandidate) bool {
+		return child != nil && strutil.IsNotBlank(child.Text)
+	}
+	for _, candidate := range p {
+		if candidate == nil || len(candidate.ChildChunks) == 0 ||
+			strutil.IsBlank(candidate.Text) || slices.ContainsFunc(candidate.ChildChunks, fn) {
+			continue
+		}
+		candidates = append(candidates, candidate)
+	}
+	return candidates
 }
 
 func (p ParentChunkCandidates) CountChildCandidates() int {

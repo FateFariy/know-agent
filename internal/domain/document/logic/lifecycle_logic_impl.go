@@ -610,7 +610,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 	parentBlockIds := slice.Map(chunkList, func(index int, item *entity.DocumentChunk) int64 { return item.ParentChunkId })
 
 	// 批量查询父块信息
-	parentBlockList, err := d.repo.SelectParentBlockListByIds(ctx, parentBlockIds)
+	parentBlockList, err := d.repo.SelectParentChunkListByIds(ctx, parentBlockIds)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -662,7 +662,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, docum
 	var parentBlock *entity.DocumentParentChunk
 	var siblingChunkList []*entity.DocumentChunk
 	if chunk.ParentChunkId > 0 {
-		parentBlock, err = d.repo.SelectParentBlockById(ctx, chunk.ParentChunkId, document.ID, effectiveTaskId)
+		parentBlock, err = d.repo.SelectParentChunkById(ctx, chunk.ParentChunkId, document.ID, effectiveTaskId)
 		if err != nil {
 			return nil, err
 		}
@@ -713,7 +713,7 @@ func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, docum
 
 // QueryParentBlocks 查询父块列表
 func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error) {
-	return d.repo.SelectParentBlockListByIds(ctx, parentIds)
+	return d.repo.SelectParentChunkListByIds(ctx, parentIds)
 }
 
 // markIndexBuildSubmitFailed 标记索引构建提交失败状态

@@ -11,6 +11,7 @@ const (
 	ChunkSourceTypeText
 	ChunkSourceTypeTable
 	ChunkSourceTypeImage
+	ChunkSourceTypeGraphRag
 )
 
 func ChunkSourceTypeName(cst ChunkSourceType) string {
@@ -21,6 +22,8 @@ func ChunkSourceTypeName(cst ChunkSourceType) string {
 		return "表格"
 	case ChunkSourceTypeImage:
 		return "图片"
+	case ChunkSourceTypeGraphRag:
+		return "图谱"
 	default:
 		return "未知"
 	}
@@ -34,7 +37,7 @@ type PipelineType = string
 
 const (
 	PipelineTypeParent PipelineType = "PARENT" // 父块
-	PipelineTypeChild               = "CHILD"  // 子块
+	PipelineTypeChild  PipelineType = "CHILD"  // 子块
 )
 
 func PipelineTypeName(pt PipelineType) string {

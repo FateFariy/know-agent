@@ -4,9 +4,10 @@ package enum
 type GraphPersistenceOutcome = string
 
 const (
-	GraphPersistenceOutcomeSuccess GraphPersistenceOutcome = "SUCCESS"
-	GraphPersistenceOutcomeFailed  GraphPersistenceOutcome = "FAILED"
-	GraphPersistenceOutcomeEmpty   GraphPersistenceOutcome = "EMPTY"
+	GraphPersistenceOutcomeSuccess  GraphPersistenceOutcome = "SUCCESS"
+	GraphPersistenceOutcomeFailed   GraphPersistenceOutcome = "FAILED"
+	GraphPersistenceOutcomeEmpty    GraphPersistenceOutcome = "EMPTY"
+	GraphPersistenceOutcomeDegraded GraphPersistenceOutcome = "DEGRADED"
 )
 
 // ComponentOutcome 组件执行结果枚举
@@ -47,6 +48,12 @@ const (
 type InvocationOutcome = string
 
 const (
-	InvocationOutcomeSuccess InvocationOutcome = "SUCCESS"
-	InvocationOutcomeFailed  InvocationOutcome = "FAILED"
+	InvocationOutcomeSuccess         InvocationOutcome = "SUCCESS"
+	InvocationOutcomeFailed          InvocationOutcome = "FAILED"
+	InvocationOutcomeNotCalled       InvocationOutcome = "NOT_CALLED"
+	InvocationOutcomeInvalidResponse InvocationOutcome = "INVALID_RESPONSE"
+	InvocationOutcomeTransportFailed InvocationOutcome = "TRANSPORT_FAILED"
+	InvocationOutcomeNotGraphable    InvocationOutcome = "NOT_GRAPHABLE"
+	InvocationOutcomeDisabled        InvocationOutcome = "DISABLED"
+	InvocationOutcomeEmpty           InvocationOutcome = "EMPTY"
 )
