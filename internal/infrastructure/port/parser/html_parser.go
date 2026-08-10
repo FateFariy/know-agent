@@ -1,15 +1,16 @@
 package parser
 
 import (
-	"bytes"
 	"context"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
 
-const HTML = "html"
+const Html = "native_html"
 
 type HTMLParser struct {
 }
@@ -17,14 +18,42 @@ type HTMLParser struct {
 var _ parse.Parser = (*HTMLParser)(nil)
 
 func (p *HTMLParser) Name() string {
-	return HTML
+	return Html
 }
 
-func (p *HTMLParser) Parse(_ context.Context, bytesData []byte) (string, error) {
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bytesData))
+func (p *HTMLParser) Parse(_ context.Context, sourceText []byte) (entity.DocumentBlocks, error) {
+	decoded := decodeText(sourceText)
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(decoded))
 	if err != nil {
-		return string(bytesData), nil
+		return nil, err
 	}
 
-	return doc.Text(), nil
+	var blocks entity.DocumentBlocks
+	blockNo := 1
+
+	doc.Find("body").Children().Each(func(i int, s *goquery.Selection) {
+		text := cleanupText(s.Text())
+		if text == "" {
+			return
+		}
+
+		blockType := "TEXT"
+		tag := goquery.NodeName(s)
+		switch tag {
+		case "h1", "h2", "h3", "h4", "h5", "h6":
+			blockType = "TITLE"
+		default:
+			blockType = classifyTextBlock(text)
+		}
+
+		blocks = append(blocks, &entity.DocumentBlock{
+			BlockNo:   blockNo,
+			BlockType: blockType,
+			Text:      text,
+			Metadata:  map[string]any{"parser": Html},
+		})
+		blockNo++
+	})
+
+	return blocks, nil
 }

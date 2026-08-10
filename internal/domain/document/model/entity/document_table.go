@@ -1,8 +1,6 @@
 package entity
 
 import (
-	"fmt"
-
 	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
 
@@ -35,42 +33,42 @@ type DocumentTable struct {
 	SourceMetadata  map[string]any     `gorm:"-"`                    // 源元数据
 }
 
-func (t *DocumentTable) ValidateCandidateRows() ([]*TableRow, error) {
-	if len(t.Rows) == 0 {
-		return nil, fmt.Errorf("table candidate 缺少 rows")
-	}
-
-	rows := t.Rows
-	columnCount := -1
-
-	for rowIndex, row := range rows {
-		// 验证行基础属性
-		if row == nil ||
-			row.RowIndex != rowIndex ||
-			row.Header != (rowIndex == 0) ||
-			row.Cells == nil ||
-			len(row.Cells) == 0 {
-			return nil, fmt.Errorf("table candidate row 顺序/header 非法: rowIndex=%d", rowIndex)
-		}
-
-		// 验证列数一致性
-		if columnCount < 0 {
-			columnCount = len(row.Cells)
-		} else if columnCount != len(row.Cells) {
-			return nil, fmt.Errorf("table candidate columnCount 不守恒")
-		}
-
-		// 验证单元格属性
-		for colIndex, cell := range row.Cells {
-			if cell == nil ||
-				cell.RowIndex != rowIndex ||
-				cell.ColumnIndex != colIndex ||
-				cell.Header != row.Header {
-				return nil, fmt.Errorf("table candidate cell 顺序/header 非法: row=%d, column=%d",
-					rowIndex, colIndex)
-			}
-		}
-	}
-
-	return rows, nil
-}
+//func (t *DocumentTable) ValidateCandidateRows() ([]*TableRow, error) {
+//	if len(t.Rows) == 0 {
+//		return nil, fmt.Errorf("table candidate 缺少 rows")
+//	}
+//
+//	rows := t.Rows
+//	columnCount := -1
+//
+//	for rowIndex, row := range rows {
+//		// 验证行基础属性
+//		if row == nil ||
+//			row.RowIndex != rowIndex ||
+//			row.Header != (rowIndex == 0) ||
+//			row.Cells == nil ||
+//			len(row.Cells) == 0 {
+//			return nil, fmt.Errorf("table candidate row 顺序/header 非法: rowIndex=%d", rowIndex)
+//		}
+//
+//		// 验证列数一致性
+//		if columnCount < 0 {
+//			columnCount = len(row.Cells)
+//		} else if columnCount != len(row.Cells) {
+//			return nil, fmt.Errorf("table candidate columnCount 不守恒")
+//		}
+//
+//		// 验证单元格属性
+//		for colIndex, cell := range row.Cells {
+//			if cell == nil ||
+//				cell.RowIndex != rowIndex ||
+//				cell.ColumnIndex != colIndex ||
+//				cell.Header != row.Header {
+//				return nil, fmt.Errorf("table candidate cell 顺序/header 非法: row=%d, column=%d",
+//					rowIndex, colIndex)
+//			}
+//		}
+//	}
+//
+//	return rows, nil
+//}

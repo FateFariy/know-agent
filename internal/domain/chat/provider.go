@@ -10,13 +10,11 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
-	prompt2 "github.com/swiftbit/know-agent/internal/infrastructure/port/prompt"
 )
 
 var ProviderSet = wire.NewSet(
@@ -28,8 +26,6 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(recommend.QuestionRecommender), new(*recommend.QuestionRecommendImpl)),
 	rag.NewRetrievalImpl,
 	wire.Bind(new(rag.Retriever), new(*rag.RetrievalImpl)),
-	prompt2.NewRendererImpl,
-	wire.Bind(new(prompt.Renderer), new(*prompt2.RendererImpl)),
 	preparation.NewChatPreparationOrchestratorImpl,
 	wire.Bind(new(preparation.ConversationPreOrchestrator), new(*preparation.ConversationPreOrchestratorImpl)),
 	memory.NewSessionMemoryManageImpl,
