@@ -35,14 +35,19 @@ func (r *RedisMutexLock) Lock(ctx context.Context, name string) error {
 	return r.getOrStoreMutex(name).LockContext(ctx)
 }
 
-// Unlock 释放分布式锁
-func (r *RedisMutexLock) Unlock(ctx context.Context, name string) error {
+// UnlockContext 释放分布式锁
+func (r *RedisMutexLock) UnlockContext(ctx context.Context, name string) error {
 	if mutex, ok := r.getMutex(name); ok {
 		r.mutexMap.Delete(name)
 		_, err := mutex.UnlockContext(ctx)
 		return err
 	}
 	return errorx.ErrDistributedLockNotFound.Format(name)
+}
+
+// Unlock 释放分布式锁
+func (r *RedisMutexLock) Unlock(name string) error {
+	return r.UnlockContext(context.Background(), name)
 }
 
 // Extend 续期分布式锁租约

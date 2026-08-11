@@ -3,11 +3,7 @@ package conversation
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 )
 
 type End struct {
@@ -15,7 +11,7 @@ type End struct {
 	distributedLock adapter.DistributedLock
 }
 
-var _ ConversationStage = (*End)(nil)
+var _ Stage = (*End)(nil)
 
 func NewEnd(repo adapter.ChatRepository, distributedLock adapter.DistributedLock) *End {
 	return &End{
@@ -30,7 +26,7 @@ func (e *End) Name() string {
 }
 
 // Execute 执行逻辑
-func (e *End) Execute(ctx context.Context, convCtx *Context, sink adapter.Sink) error {
+func (e *End) Execute(ctx context.Context, convCtx *Context) error {
 	panic("unimplemented")
 }
 

@@ -445,7 +445,7 @@ func (o *ConversationPreOrchestratorImpl) questionRewrite(ctx context.Context, c
 	return rewriteResult, nil
 }
 
-// buildRewriteStageSnapshot 构建改写阶段的统一快照，供追踪的 Start/Fail/Complete 三处复用。
+// buildRewriteStageSnapshot 构建改写阶段的统一快照，供追踪的 StartStage/Fail/Complete 三处复用。
 //
 // 快照字段：
 //   - 原始问题、历史摘要（始终输出）
@@ -456,7 +456,7 @@ func (o *ConversationPreOrchestratorImpl) buildRewriteStageSnapshot(question, hi
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)
 
-	// 仅当改写结果存在时追加输出相关字段（避免在 Start 阶段填充空值）
+	// 仅当改写结果存在时追加输出相关字段（避免在 StartStage 阶段填充空值）
 	if rewriteResult != nil {
 		snapshot["rewriteQuestion"] = strutil.Trim(rewriteResult.RewrittenQuestion)
 		snapshot["subQuestions"] = rewriteResult.SubQuestions

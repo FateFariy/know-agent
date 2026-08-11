@@ -73,12 +73,16 @@ func (c *Context) Finalize(exchange *entity.ChatExchange) {
 	c.CurrentDateText = fmt.Sprintf("%s（%s）", c.CurrentDate.Format(time.DateOnly), weekdayMap[c.CurrentDate.Weekday()])
 }
 
+func (c *Context) SetExecutePlan(plan *vo.ConversationExecutionPlan) {
+	c.ExecutionPlan.Store(plan)
+}
+
 // PublishThinking 发布思考事件
 func (c *Context) PublishThinking(content string) error {
 	if c == nil || strutil.IsBlank(content) {
 		return nil
 	}
-	c.AddThinkingSteps(content)
+	c.ThinkingSteps.AddAll([]string{content})
 	return c.Sink.Thinking(content, c.ConversationId, c.ExchangeId)
 }
 
@@ -95,7 +99,7 @@ func (c *Context) PublishReferences(refs []*vo.SearchReference) error {
 	if c == nil || len(refs) == 0 {
 		return nil
 	}
-	c.AddReferences(refs...)
+	c.References.AddAll(refs)
 	return c.Sink.References(refs, c.ConversationId, c.ExchangeId)
 }
 
@@ -137,16 +141,6 @@ func (c *Context) ReleaseResources() {
 		cancelFunc()
 		c.CancelFunc = nil
 	}
-}
-
-// AddThinkingSteps 添加思考步骤
-func (c *Context) AddThinkingSteps(steps ...string) {
-	c.ThinkingSteps.AddAll(steps)
-}
-
-// AddReferences 添加引用
-func (c *Context) AddReferences(refs ...*vo.SearchReference) {
-	c.References.AddAll(refs)
 }
 
 // AddUsedTools 添加已使用的工具

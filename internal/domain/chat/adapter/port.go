@@ -28,8 +28,11 @@ type DistributedLock interface {
 	// Lock 获取锁
 	Lock(ctx context.Context, name string) error
 
+	// UnlockContext 释放锁
+	UnlockContext(ctx context.Context, name string) error
+
 	// Unlock 释放锁
-	Unlock(ctx context.Context, name string) error
+	Unlock(name string) error
 
 	// Extend 锁续期
 	Extend(ctx context.Context, name string) error

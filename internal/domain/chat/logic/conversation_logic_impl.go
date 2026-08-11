@@ -396,8 +396,7 @@ func (c *ConversationLogicImpl) activateGeneration(ctx context.Context, convCtx 
 func (c *ConversationLogicImpl) buildConversationExecution(convCtx *conversation.Context) func(ctx context.Context) (<-chan string, error) {
 	return func(ctx context.Context) (<-chan string, error) {
 		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
-		err := convCtx.PublishThinking("正在分析问题上下文。")
-		if err != nil {
+		if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
 			return nil, err
 		}
 
@@ -781,9 +780,7 @@ func (c *ConversationLogicImpl) cleanup(convCtx *conversation.Context) {
 
 // releaseConversationLock 释放会话运行锁
 func (c *ConversationLogicImpl) releaseConversationLock(leaseKey string) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelFunc()
-	err := c.distributedLock.Unlock(ctx, leaseKey)
+	err := c.distributedLock.Unlock(leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}

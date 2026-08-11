@@ -23,16 +23,16 @@ const (
 	chatRunningLeaseRenewInterval = 10 * time.Second
 )
 
-type Start struct {
+type StartStage struct {
 	repo            adapter.ChatRepository
 	runtimeRegistry *ChatRuntimeRegistry
 	distributedLock adapter.DistributedLock
 }
 
-var _ Stage = (*Start)(nil)
+var _ Stage = (*StartStage)(nil)
 
-func NewStart(repo adapter.ChatRepository, runtimeRegistry *ChatRuntimeRegistry, distributedLock adapter.DistributedLock) *Start {
-	return &Start{
+func NewStart(repo adapter.ChatRepository, runtimeRegistry *ChatRuntimeRegistry, distributedLock adapter.DistributedLock) *StartStage {
+	return &StartStage{
 		repo:            repo,
 		runtimeRegistry: runtimeRegistry,
 		distributedLock: distributedLock,
@@ -40,19 +40,19 @@ func NewStart(repo adapter.ChatRepository, runtimeRegistry *ChatRuntimeRegistry,
 }
 
 // Name 阶段名称
-func (s *Start) Name() string {
+func (s *StartStage) Name() string {
 	return "启动会话"
 }
 
 // Execute 执行逻辑
-func (s *Start) Execute(ctx context.Context, convCtx *Context) (err error) {
+func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) {
 	panic("unimplemented")
 }
 
 // bootstrapConversation 启动会话：创建本轮 exchange 记录，构建对话上下文，注册到运行注册表，
 // 最后在独立 goroutine 中激活生成逻辑，异步返回客户端可读的流式 channel。
 // 并发控制：注册失败表示会话已在执行中，直接落库为失败状态并拒绝，避免同一会话重复执行。
-func (s *Start) bootstrapConversation(ctx context.Context, convCtx *Context) error {
+func (s *StartStage) bootstrapConversation(ctx context.Context, convCtx *Context) error {
 	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）
 	exchange, err := s.startExchange(ctx, convCtx)
 	if err != nil {
@@ -77,7 +77,7 @@ func (s *Start) bootstrapConversation(ctx context.Context, convCtx *Context) err
 	return nil
 }
 
-func (s *Start) startExchange(ctx context.Context, convCtx *Context) (*entity.ChatExchange, error) {
+func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*entity.ChatExchange, error) {
 	// 构造对话实体（按 ConversationId 聚合整个会话），状态初始化为 Running
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       convCtx.ConversationId,
@@ -122,7 +122,7 @@ func (s *Start) startExchange(ctx context.Context, convCtx *Context) (*entity.Ch
 //     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
 //
 // 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
-func (s *Start) activateGeneration(ctx context.Context, convCtx *Context) {
+func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) {
 	// 快速路径：会话已被前置 finalize，直接返回
 	if convCtx.Finalized.Load() {
 		return
@@ -183,7 +183,7 @@ func (s *Start) activateGeneration(ctx context.Context, convCtx *Context) {
 //  3. 发送"上下文分析完成，已准备执行计划"的思考事件
 //  4. 通过 executorRegistry 根据 plan.Mode 解析执行器
 //  5. 调用 executor.Execute 进入实际执行逻辑，返回流式结果 channel
-func (s *Start) buildConversationExecution(convCtx *Context) func(ctx context.Context) (<-chan string, error) {
+func (s *StartStage) buildConversationExecution(convCtx *Context) func(ctx context.Context) (<-chan string, error) {
 	return func(ctx context.Context) (<-chan string, error) {
 		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
 		if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
@@ -195,7 +195,7 @@ func (s *Start) buildConversationExecution(convCtx *Context) func(ctx context.Co
 		if err != nil {
 			return nil, err
 		}
-		convCtx.ExecutionPlan.Store(plan)
+		convCtx.SetExecutePlan(plan)
 
 		// 发送"上下文分析完成"的思考事件（前端调试/感知）
 		if err := convCtx.PublishThinking("上下文分析完成，已准备执行计划。"); err != nil {
@@ -214,7 +214,7 @@ func (s *Start) buildConversationExecution(convCtx *Context) func(ctx context.Co
 }
 
 // startLeaseRenewal 启动租约续期，若续期失败则自动停止当前会话并终止生成
-func (s *Start) startLeaseRenewal(ctx context.Context, convCtx *Context) {
+func (s *StartStage) startLeaseRenewal(ctx context.Context, convCtx *Context) {
 	ticker := time.NewTicker(chatRunningLeaseRenewInterval)
 	defer ticker.Stop()
 	for {
@@ -243,8 +243,8 @@ func (s *Start) startLeaseRenewal(ctx context.Context, convCtx *Context) {
 //	2.使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
 //	3. 根据所选文档刷新会话范围（在文档模式下）
 //	4. 初始化调试轨迹
-func (c *ConversationLogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *conversation.Context) (*vo.ConversationExecutionPlan, error) {
-	execPlan, err := c.preOrchestrator.Prepare(ctx, convCtx)
+func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context) (*vo.ConversationExecutionPlan, error) {
+	execPlan, err := s.preOrchestrator.Prepare(ctx, convCtx)
 	if err != nil {
 		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 		return nil, err
@@ -286,10 +286,10 @@ func (c *ConversationLogicImpl) prepareExecutionPlan(ctx context.Context, convCt
 }
 
 // releaseConversationLock 释放会话分布式锁
-func (s *Start) releaseConversationLock(leaseKey string) {
+func (s *StartStage) releaseConversationLock(leaseKey string) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelFunc()
-	err := s.distributedLock.Unlock(ctx, leaseKey)
+	err := s.distributedLock.UnlockContext(ctx, leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}

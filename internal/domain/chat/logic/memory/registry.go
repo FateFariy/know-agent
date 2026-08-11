@@ -23,8 +23,8 @@ func (f *StrategyRegistry) Register(strategy strategy.Memory) {
 
 // Get 获取指定类型的策略
 func (f *StrategyRegistry) Get(strategyType string) (strategy.Memory, error) {
-	if strategy, ok := f.strategyMap[strategyType]; ok {
-		return strategy, nil
+	if memoryStrategy, ok := f.strategyMap[strategyType]; ok {
+		return memoryStrategy, nil
 	}
-	return nil, fmt.Errorf("unsupported memory strategy type: %s", strategyType)
+	return nil, fmt.Errorf("unsupported memory memory type: %s", strategyType)
 }
