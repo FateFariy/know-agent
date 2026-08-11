@@ -1,12 +1,16 @@
 package vo
 
-import "time"
+import (
+	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+)
 
 // ConversationExecutionPlan 对话执行计划（聚合根的一部分）
 // 用于存储一次对话执行前的完整计划信息，包括查询改写、检索策略、历史压缩等。
 type ConversationExecutionPlan struct {
-	Mode                         ExecutionMode               // 执行模式
-	ChatMode                     ChatQueryMode               // 对话模式/查询模式
+	Mode                         enum.ExecutionMode          // 执行模式
+	ChatMode                     enum.ChatQueryMode          // 对话模式/查询模式
 	OriginalQuestion             string                      // 原始问题
 	AgentQuestion                string                      // 问题改写结果
 	RewriteQuestion              string                      // 问题改写结果

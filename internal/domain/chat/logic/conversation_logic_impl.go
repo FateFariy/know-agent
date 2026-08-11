@@ -14,14 +14,13 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/lock"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
@@ -36,8 +35,8 @@ const (
 	channelBufferSize             = 100
 )
 
-// LogicImpl 聊天业务逻辑实现
-type LogicImpl struct {
+// ConversationLogicImpl 聊天业务逻辑实现
+type ConversationLogicImpl struct {
 	repo             adapter.ChatRepository
 	preOrchestrator  preparation.ConversationPreOrchestrator
 	renderer         prompt.Renderer
@@ -47,12 +46,12 @@ type LogicImpl struct {
 	lifecycleLogic   doclog.LifecycleLogic
 	recommender      recommend.QuestionRecommender
 	memoryManager    memory.SessionMemoryManager
-	distributedLock  lock.DistributedLock
-	checkPointStore  checkpoint.Store
+	distributedLock  adapter.DistributedLock
+	checkPointStore  adapter.CheckPointStore
 	*options
 }
 
-var _ ConversationLogic = (*LogicImpl)(nil)
+var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 
 // NewConversationLogicImpl 创建聊天逻辑实例
 func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
@@ -63,10 +62,10 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	renderer prompt.Renderer,
 	recommender recommend.QuestionRecommender,
 	memoryManager memory.SessionMemoryManager,
-	distributedLock lock.DistributedLock,
-	checkPointStore checkpoint.Store,
-) *LogicImpl {
-	return &LogicImpl{
+	distributedLock adapter.DistributedLock,
+	checkPointStore adapter.CheckPointStore,
+) *ConversationLogicImpl {
+	return &ConversationLogicImpl{
 		repo:             repo,
 		executorRegistry: executorRegistry,
 		preOrchestrator:  preOrchestrator,
@@ -89,7 +88,7 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 }
 
 // OpenConversationStream 打开会话流
-func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) (stream <-chan string) {
+func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) (stream <-chan string) {
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
@@ -126,7 +125,7 @@ func (c *LogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatComm
 }
 
 // StopConversation 停止会话
-func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string) (bool, string, error) {
+func (c *ConversationLogicImpl) StopConversation(ctx context.Context, conversationId string) (bool, string, error) {
 	convCtx, ok := c.runtimeRegistry.Get(conversationId)
 	if !ok {
 		return false, "没有找到正在执行的会话", nil
@@ -136,7 +135,7 @@ func (c *LogicImpl) StopConversation(ctx context.Context, conversationId string)
 }
 
 // GetSessionDetail 获取会话详情
-func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
+func (c *ConversationLogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
 	record, err := c.repo.SelectSessionRecord(ctx, conversationId)
 	if err != nil {
 		return nil, err
@@ -151,7 +150,7 @@ func (c *LogicImpl) GetSessionDetail(ctx context.Context, conversationId string)
 }
 
 // GetExchangeDetail 获取对话详情（含阶段追踪）
-func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error) {
+func (c *ConversationLogicImpl) GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error) {
 	exchange, err := c.repo.SelectExchangeById(ctx, exchangeId)
 	if err != nil {
 		return nil, nil, err
@@ -165,7 +164,7 @@ func (c *LogicImpl) GetExchangeDetail(ctx context.Context, conversationId string
 }
 
 // ListSessions 获取会话列表（分页）
-func (c *LogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
+func (c *ConversationLogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
 	records, total, err := c.repo.ListSessionRecordPage(ctx, pageNo, pageSize, chatMode, latestTurnStatus, keyword)
 	if err != nil {
 		return nil, 0, err
@@ -179,7 +178,7 @@ func (c *LogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode
 }
 
 // ResetConversation 重置会话：停止并清除所有相关落库数据
-func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error) {
+func (c *ConversationLogicImpl) ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error) {
 	stopResult := &vo.ConversationStop{}
 	// 停止正在运行的会话
 	if convCtx, ok := c.runtimeRegistry.Get(conversationId); ok {
@@ -229,7 +228,7 @@ func (c *LogicImpl) ResetConversation(ctx context.Context, conversationId string
 }
 
 // RebuildConversationSummary 重建会话摘要
-func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
+func (c *ConversationLogicImpl) RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error) {
 	summary, err := c.memoryManager.RebuildConversationSummary(ctx, conversationId)
 	if err != nil {
 		return nil, err
@@ -239,12 +238,12 @@ func (c *LogicImpl) RebuildConversationSummary(ctx context.Context, conversation
 }
 
 // GetRetrievalResults 获取检索结果
-func (c *LogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
+func (c *ConversationLogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
 	return c.repo.SelectRetrievalResults(ctx, conversationId, exchangeId)
 }
 
 // GetChannelExecutions 获取渠道执行结果
-func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
+func (c *ConversationLogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
 	return c.repo.SelectChannelExecutions(ctx, conversationId, exchangeId)
 }
 
@@ -258,7 +257,7 @@ func (c *LogicImpl) GetChannelExecutions(ctx context.Context, conversationId str
 //  1. 规范化会话 ID：优先使用传入的 conversationId；为空时生成无连字符的 UUID
 //  2. 构建初始计划（问题、会话 ID、聊天模式），并填充当前时间
 //  3. 若命令中指定了文档 ID，则从可检索文档列表中查找并写入文档名与索引任务 ID；缺失则返回错误
-func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
+func (c *ConversationLogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*vo.StreamLaunchPlan, error) {
 	// 规范化会话 ID —— 空值时生成 UUID 作为新会话标识
 	conversationId := strutil.Trim(cmd.ConversationId)
 	if conversationId == "" {
@@ -296,7 +295,7 @@ func (c *LogicImpl) buildLaunchPlan(ctx context.Context, cmd *vo.ChatCommand) (*
 // bootstrapConversation 启动会话：创建本轮 exchange 记录，构建对话上下文，注册到运行注册表，
 // 最后在独立 goroutine 中激活生成逻辑，异步返回客户端可读的流式 channel。
 // 并发控制：注册失败表示会话已在执行中，直接落库为失败状态并拒绝，避免同一会话重复执行。
-func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (<-chan string, error) {
+func (c *ConversationLogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLaunchPlan) (<-chan string, error) {
 	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）
 	exchange, err := c.startExchange(ctx, plan)
 	if err != nil {
@@ -317,7 +316,7 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 		failExchange := &entity.ChatExchange{
 			ID:             exchange.ID,
 			ConversationId: plan.ConversationId,
-			TurnStatus:     vo.ChatTurnStatusFailed,
+			TurnStatus:     enum.ChatTurnStatusFailed,
 			ErrorMessage:   "该会话当前正在执行中，请稍后再试",
 		}
 		// 完成失败的 exchange
@@ -346,7 +345,7 @@ func (c *LogicImpl) bootstrapConversation(ctx context.Context, plan *vo.StreamLa
 //     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
 //
 // 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
-func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *ConversationLogicImpl) activateGeneration(ctx context.Context, convCtx *vo.ConversationContext) {
 	// 快速路径：会话已被前置 finalize，直接返回
 	if convCtx.Finalized.Load() {
 		return
@@ -407,7 +406,7 @@ func (c *LogicImpl) activateGeneration(ctx context.Context, convCtx *vo.Conversa
 //  3. 发送"上下文分析完成，已准备执行计划"的思考事件
 //  4. 通过 executorRegistry 根据 plan.Mode 解析执行器
 //  5. 调用 executor.Execute 进入实际执行逻辑，返回流式结果 channel
-func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) (<-chan string, error) {
+func (c *ConversationLogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) func(ctx context.Context) (<-chan string, error) {
 	return func(ctx context.Context) (<-chan string, error) {
 		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
 		thinkingEvent := c.eventBuilder.Thinking("正在分析问题上下文。", convCtx.ConversationId, convCtx.ExchangeId)
@@ -440,7 +439,7 @@ func (c *LogicImpl) buildConversationExecution(convCtx *vo.ConversationContext) 
 }
 
 // startLeaseRenewal 启动租约续期，若续期失败则自动停止当前会话并终止生成
-func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *ConversationLogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.ConversationContext) {
 	ticker := time.NewTicker(chatRunningLeaseRenewInterval)
 	defer ticker.Stop()
 	for {
@@ -469,7 +468,7 @@ func (c *LogicImpl) startLeaseRenewal(ctx context.Context, convCtx *vo.Conversat
 //	2.使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
 //	3. 根据所选文档刷新会话范围（在文档模式下）
 //	4. 初始化调试轨迹
-func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
+func (c *ConversationLogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.ConversationContext) (*vo.ConversationExecutionPlan, error) {
 	execPlan, err := c.preOrchestrator.Prepare(ctx, convCtx)
 	if err != nil {
 		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
@@ -512,7 +511,7 @@ func (c *LogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *vo.Conver
 }
 
 // emitModelChunk 发出模型输出块（text 事件），并更新首响应时间
-func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) error {
+func (c *ConversationLogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string) error {
 	convCtx.WriteAnswerBuffer(chunk)
 	convCtx.FirstResponseTimeMs.CompareAndSwap(0, time.Since(convCtx.StartTime).Milliseconds())
 	textEvent := c.eventBuilder.Text(chunk, convCtx.ConversationId, convCtx.ExchangeId)
@@ -520,7 +519,7 @@ func (c *LogicImpl) emitModelChunk(convCtx *vo.ConversationContext, chunk string
 }
 
 // stopTask 停止任务：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
-func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
+func (c *ConversationLogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContext, reason string) *vo.ConversationStop {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return &vo.ConversationStop{
 			ConversationId: convCtx.ConversationId,
@@ -550,7 +549,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	//         log.debug("中断 ReactAgent 时出现异常，继续释放资源", exception);
 	//     }
 	responseMessage := "已停止会话生成"
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
 
 	// 发送 status 事件
@@ -564,10 +563,10 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
 	// 构造停止态 exchange 并落库
-	stopExchange := c.buildCurrentChatExchange(convCtx, vo.ChatTurnStatusStopped, reason)
+	stopExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusStopped, reason)
 	if err := c.completeExchange(ctx, stopExchange); err == nil {
 		metadata := map[string]any{
-			"finalStatus":  vo.ChatTurnStatusName(vo.ChatTurnStatusStopped),
+			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusStopped),
 			"reason":       reason,
 			"answerLength": convCtx.AnswerLength(),
 		}
@@ -594,7 +593,7 @@ func (c *LogicImpl) stopTask(ctx context.Context, convCtx *vo.ConversationContex
 //  5. 向客户端流补发引用事件、推荐事件，并发送流 Complete
 //  6. 刷新 DebugTrace 运行时统计
 //  7. 组装成功态 ChatExchange，调用 completeExchange 落库；根据落库结果完成或标记追踪阶段
-func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
+func (c *ConversationLogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.ConversationContext) {
 	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
@@ -616,7 +615,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	uniqueReferences := convCtx.UniqueReferences()
 
 	// 启动 recommendation 阶段
-	recommendCtx := vo.OnStart(ctx, vo.ConversationTraceStageRecommendation,
+	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在生成推荐追问。"})
 
 	// 生成推荐追问
@@ -643,19 +642,19 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 	}
 
 	// 启动 finalize 与 recommendation 两个追踪阶段
-	finalizeCtx := vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
 
 	// 刷新 DebugTrace 的运行时统计
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
 	// 组装成功态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记 finalize 追踪阶段
-	successExchange := c.buildCurrentChatExchange(convCtx, vo.ChatTurnStatusCompleted, "")
+	successExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusCompleted, "")
 	successExchange.Recommendations = common.ToJSONArray(recommendations)
 	if err := c.completeExchange(ctx, successExchange); err == nil {
 		// 落库成功：完成 finalize 追踪阶段，写入完成快照（含推荐、引用、答案长度）
 		snapshot = map[string]any{
-			"finalStatus":         vo.ChatTurnStatusName(vo.ChatTurnStatusCompleted),
+			"finalStatus":         enum.ChatTurnStatusName(enum.ChatTurnStatusCompleted),
 			"recommendationCount": len(recommendations),
 			"recommendations":     recommendations,
 			"referenceCount":      len(uniqueReferences),
@@ -677,7 +676,7 @@ func (c *LogicImpl) finishSuccessfully(ctx context.Context, convCtx *vo.Conversa
 //  5. 发送失败事件与流 Complete 到客户端（失败不影响主流程）
 //  6. 刷新 DebugTrace 的运行时统计
 //  7. 组装失败态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记追踪阶段
-func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.ConversationContext, err error) {
+func (c *ConversationLogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.ConversationContext, err error) {
 	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
@@ -695,7 +694,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 
 	// 启动 finalize 追踪阶段（失败时忽略错误，不影响主流程）
 	errorMessage := err.Error()
-	finalizeCtx := vo.OnStart(ctx, vo.ConversationTraceStageFinalize,
+	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾失败会话。"})
 
 	// 向失败事件 + 流 Complete 信号；发送失败仅告警
@@ -708,11 +707,11 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 	c.refreshDebugTraceRuntimeStats(convCtx)
 
 	// 组装失败 ChatExchange（保留已生成的答案/引用/思考链），调用 completeExchange 落库
-	failExchange := c.buildCurrentChatExchange(convCtx, vo.ChatTurnStatusFailed, errorMessage)
+	failExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusFailed, errorMessage)
 	if err = c.completeExchange(ctx, failExchange); err == nil {
 		// 落库成功：完成 finalize 追踪阶段，写入失败快照
 		snapshot := map[string]any{
-			"finalStatus":  vo.ChatTurnStatusName(vo.ChatTurnStatusFailed),
+			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusFailed),
 			"errorMessage": errorMessage,
 			"answerLength": convCtx.AnswerLength(),
 		}
@@ -723,7 +722,7 @@ func (c *LogicImpl) finishWithFailure(ctx context.Context, convCtx *vo.Conversat
 }
 
 // refreshDebugTraceRuntimeStats 刷新调试轨迹中的统计信息
-func (c *LogicImpl) refreshDebugTraceRuntimeStats(convCtx *vo.ConversationContext) {
+func (c *ConversationLogicImpl) refreshDebugTraceRuntimeStats(convCtx *vo.ConversationContext) {
 	debugTrace := convCtx.DebugTrace.Load()
 	if debugTrace == nil {
 		return
@@ -742,7 +741,7 @@ func (c *LogicImpl) refreshDebugTraceRuntimeStats(convCtx *vo.ConversationContex
 }
 
 // startExchange 开始新一轮会话交互（exchange）
-func (c *LogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan) (*entity.ChatExchange, error) {
+func (c *ConversationLogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan) (*entity.ChatExchange, error) {
 	// 构造对话实体（按 ConversationId 聚合整个会话），状态初始化为 Running
 	dialogue := &entity.ChatDialogue{
 		ConversationId:       plan.ConversationId,
@@ -750,14 +749,14 @@ func (c *LogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan
 		ChatMode:             plan.ChatMode,
 		SelectedDocumentId:   plan.SelectedDocumentId,
 		SelectedDocumentName: plan.SelectedDocumentName,
-		SessionStatus:        vo.ChatSessionStatusRunning,
+		SessionStatus:        enum.ChatSessionStatusRunning,
 	}
 	// 构造本轮交互实体，状态 Running（使用雪花 ID 保证全局唯一）
 	chatExchange := &entity.ChatExchange{
 		ID:             utils.GetSnowflakeNextID(),
 		ConversationId: plan.ConversationId,
 		Question:       plan.Question,
-		TurnStatus:     vo.ChatTurnStatusRunning,
+		TurnStatus:     enum.ChatTurnStatusRunning,
 	}
 	// 事务中原子执行：Upsert 对话 + 插入新交互
 	startFn := func(txCtx context.Context) error {
@@ -775,7 +774,7 @@ func (c *LogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan
 }
 
 // completeExchange 完成会话交互（exchange）
-func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
+func (c *ConversationLogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
 	completeFn := func(txCtx context.Context) error {
 		// 更新交互记录（含答案、耗时、最终状态等，由调用方已在 exchange 对象中填充）
 		if err := c.repo.UpdateExchangeById(txCtx, exchange); err != nil {
@@ -784,7 +783,7 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 		// 将对应会话的状态重置为 Idle（释放"运行中"标记）
 		dialogue := &entity.ChatDialogue{
 			ConversationId: exchange.ConversationId,
-			SessionStatus:  vo.ChatSessionStatusIdle,
+			SessionStatus:  enum.ChatSessionStatusIdle,
 		}
 		return c.repo.UpdateDialogueByConversationId(txCtx, dialogue)
 	}
@@ -797,7 +796,7 @@ func (c *LogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatE
 }
 
 // cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
-func (c *LogicImpl) cleanup(convCtx *vo.ConversationContext) {
+func (c *ConversationLogicImpl) cleanup(convCtx *vo.ConversationContext) {
 	support.SafeEmitComplete(convCtx.Channel)
 	c.unlockConversationLock(convCtx.LeaseKey)
 	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
@@ -805,7 +804,7 @@ func (c *LogicImpl) cleanup(convCtx *vo.ConversationContext) {
 }
 
 // unlockConversationLock 释放会话运行锁
-func (c *LogicImpl) unlockConversationLock(leaseKey string) {
+func (c *ConversationLogicImpl) unlockConversationLock(leaseKey string) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelFunc()
 	err := c.distributedLock.Unlock(ctx, leaseKey)
@@ -819,7 +818,7 @@ func (c *LogicImpl) unlockConversationLock(leaseKey string) {
 // ---------------------------------------------------------------------------
 
 // buildConversationCtx 构建对话运行上下文
-func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
+func (c *ConversationLogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *entity.ChatExchange) *vo.ConversationContext {
 	convCtx := vo.NewConversationContext(plan)
 	convCtx.ExchangeId = exchange.ID
 	convCtx.TraceId = utils.GenerateUUIDWithoutHyphen()
@@ -831,7 +830,7 @@ func (c *LogicImpl) buildConversationCtx(plan *vo.StreamLaunchPlan, exchange *en
 }
 
 // rejectStream 生成一个仅含错误事件的只读流
-func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
+func (c *ConversationLogicImpl) rejectStream(message, conversationId string, exchangeId int64) <-chan string {
 	stream := make(chan string, 1)
 	defer close(stream)
 	stream <- c.eventBuilder.Error(message, conversationId, exchangeId)
@@ -839,7 +838,7 @@ func (c *LogicImpl) rejectStream(message, conversationId string, exchangeId int6
 }
 
 // fetchRecentExchanges 获取最近的历史轮次（排除当前）
-func (c *LogicImpl) fetchRecentExchanges(ctx context.Context, conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
+func (c *ConversationLogicImpl) fetchRecentExchanges(ctx context.Context, conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
 	recent, err := c.repo.ListRecentExchanges(ctx, conversationId, c.options.historyPreviewTurns)
 	if err != nil {
 		logx.Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
@@ -851,7 +850,7 @@ func (c *LogicImpl) fetchRecentExchanges(ctx context.Context, conversationId str
 }
 
 // buildCurrentChatExchange 构建当前会话交互（exchange）
-func (c *LogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, turnStatus int, errorMsg string) *entity.ChatExchange {
+func (c *ConversationLogicImpl) buildCurrentChatExchange(convCtx *vo.ConversationContext, turnStatus int, errorMsg string) *entity.ChatExchange {
 	return &entity.ChatExchange{
 		ID:                  convCtx.ExchangeId,
 		ConversationId:      convCtx.ConversationId,

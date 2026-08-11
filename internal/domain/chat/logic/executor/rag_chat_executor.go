@@ -8,6 +8,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -35,8 +36,8 @@ func NewRagChatExecutor(
 var _ Executor = (*RagChatExecutor)(nil)
 
 // Mode 返回执行模式 RETRIEVAL
-func (e *RagChatExecutor) Mode() vo.ExecutionMode {
-	return vo.ExecutionModeRetrieval
+func (e *RagChatExecutor) Mode() enum.ExecutionMode {
+	return enum.ExecutionModeRetrieval
 }
 
 // Execute 执行检索 + Prompt 装配 + 模型流式回答
@@ -51,7 +52,7 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 		return nil, err
 	}
 
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRAGRetrieve,
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRAGRetrieve,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行双通道混合检索。"})
 
 	retrievalCtx, err := e.retriever.Retrieve(ctx, plan)
@@ -140,7 +141,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	}
 
 	// Prompt 装配与预算
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageEvidenceBudget,
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageEvidenceBudget,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})
 	promptResult, err := e.promptAssembler.Assemble(ctx, plan, retrievalCtx)
 	if err != nil {
@@ -161,7 +162,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 	}
 	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "证据预算与 Prompt 组装完成。", Snapshot: snapshot})
 
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageAnswerGenerate, e.Mode().String(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, e.Mode().String(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
 
 	callbackOpt := model.WithCallback(func() {
 		vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "答案生成完成。", Snapshot: map[string]any{
@@ -169,7 +170,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 			"answerLength":        convCtx.AnswerLength(),
 		}})
 	})
-	streamCh, err := e.chatModel.Stream(ctx, vo.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, callbackOpt)
+	streamCh, err := e.chatModel.Stream(ctx, enum.ChatStageRagAnswer, promptResult.SystemPrompt, promptResult.UserPrompt, callbackOpt)
 	if err != nil {
 		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		vo.OnError(ctx, "答案生成失败。", err)

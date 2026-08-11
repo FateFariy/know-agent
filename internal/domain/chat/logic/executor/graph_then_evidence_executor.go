@@ -11,6 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -34,8 +35,8 @@ func NewGraphThenEvidenceExecutor(querier graph.GraphQuerier, answerRender graph
 var _ Executor = (*GraphThenEvidenceExecutor)(nil)
 
 // Mode 返回 GRAPH_THEN_EVIDENCE
-func (e *GraphThenEvidenceExecutor) Mode() vo.ExecutionMode {
-	return vo.ExecutionModeGraphThenEvidence
+func (e *GraphThenEvidenceExecutor) Mode() enum.ExecutionMode {
+	return enum.ExecutionModeGraphThenEvidence
 }
 
 // Execute 执行结构图定位与证据渲染
@@ -57,7 +58,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		return nil, err
 	}
 
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageGraphQuery,
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageGraphQuery,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行结构图定位与取证。"})
 
 	documentId := plan.SelectedDocumentId

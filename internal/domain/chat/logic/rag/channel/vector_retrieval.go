@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/retriever"
-
 	"github.com/zeromicro/go-zero/core/logx"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -14,13 +15,13 @@ import (
 
 // VectorRetrievalChannel 向量检索通道
 type VectorRetrievalChannel struct {
-	retriever retriever.VectorRetriever
+	retriever adapter.VectorRetriever
 }
 
 var _ Retrieval = (*VectorRetrievalChannel)(nil)
 
 // NewVectorRetrievalChannel 创建向量检索通道
-func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, retriever retriever.VectorRetriever) *VectorRetrievalChannel {
+func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, retriever adapter.VectorRetriever) *VectorRetrievalChannel {
 	return &VectorRetrievalChannel{
 		retriever: retriever,
 	}
@@ -28,7 +29,7 @@ func NewVectorRetrievalChannel(svcCtx *svc.ServiceContext, retriever retriever.V
 
 // ChannelName 返回通道名称
 func (c *VectorRetrievalChannel) ChannelName() string {
-	return vo.RetrievalChannelVector
+	return enum.RetrievalChannelVector
 }
 
 // Supports 判断是否支持该执行计划

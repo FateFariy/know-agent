@@ -6,6 +6,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 // CtxTraceKey 存储 ConversationTrace 的 ctx key
@@ -53,7 +54,7 @@ func (e *StageError) Unwrap() error {
 }
 
 // OnStart 构造 RunInfo 并调用 callbacks.OnStart
-func OnStart(ctx context.Context, stage *ConversationTraceStage, executionMode string, input *StageInput) context.Context {
+func OnStart(ctx context.Context, stage *enum.ConversationTraceStage, executionMode string, input *StageInput) context.Context {
 	runInfo := &callbacks.RunInfo{
 		StageId:       utils.GetSnowflakeNextID(),
 		Payload:       stage,

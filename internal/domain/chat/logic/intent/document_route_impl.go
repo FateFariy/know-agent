@@ -14,6 +14,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -161,7 +162,7 @@ func (r *DocumentQuestionRouteImpl) Route(ctx context.Context, documentId int64,
 	graphOnly := questionIntent.graphOnly
 	if graphOnly.matched && len(subQuestions) <= 1 {
 		section := r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
-		return r.buildDecision(vo.ExecutionModeGraphOnly, graphOnly.action, section, nil, retrievalPlan, graphOnly.reason), nil
+		return r.buildDecision(enum.ExecutionModeGraphOnly, graphOnly.action, section, nil, retrievalPlan, graphOnly.reason), nil
 	}
 
 	// 分支 B：明确的编号项/步骤型问题（含 "第N步 / 第N项" 或命中 item 关键词）
@@ -170,7 +171,7 @@ func (r *DocumentQuestionRouteImpl) Route(ctx context.Context, documentId int64,
 	itemLookupMatched := itemIndex != nil || questionIntent.itemLookup
 	if itemLookupMatched && !questionIntent.analytic {
 		section := r.resolveSection(ctx, documentId, originalQuestion, rewrittenQuestion)
-		return r.buildDecision(vo.ExecutionModeGraphThenEvidence, vo.DocumentNavigationActionItemReference, section, itemIndex, retrievalPlan, "编号项或步骤型问题走图定位取证"), nil
+		return r.buildDecision(enum.ExecutionModeGraphThenEvidence, enum.DocumentNavigationActionItemReference, section, itemIndex, retrievalPlan, "编号项或步骤型问题走图定位取证"), nil
 	}
 
 	// 分支 C：分析型 / 目录型 / 带有结构线索的问题，以及其余普通文档问题
@@ -184,15 +185,15 @@ func (r *DocumentQuestionRouteImpl) Route(ctx context.Context, documentId int64,
 	// 动作与理由的落地赋值：
 	//  - 存在明确的 item 编号时走 ItemReference；否则视为普通 FreshTopic
 	//  - 能够给出章节软提示时使用对应理由，否则走通用混合检索理由
-	action := vo.DocumentNavigationActionFreshTopic
+	action := enum.DocumentNavigationActionFreshTopic
 	if itemIndex != nil {
-		action = vo.DocumentNavigationActionItemReference
+		action = enum.DocumentNavigationActionItemReference
 	}
 	reason := "普通文档问题走混合检索"
 	if assistedSection != nil {
 		reason = "结构线索仅作为软提示辅助混合检索"
 	}
-	return r.buildDecision(vo.ExecutionModeRetrieval, action, assistedSection, itemIndex, retrievalPlan, reason), nil
+	return r.buildDecision(enum.ExecutionModeRetrieval, action, assistedSection, itemIndex, retrievalPlan, reason), nil
 }
 
 // ============================================================
@@ -200,7 +201,7 @@ func (r *DocumentQuestionRouteImpl) Route(ctx context.Context, documentId int64,
 // ============================================================
 
 // buildDecision 根据执行模式、动作、章节与检索计划，组装最终的 DocumentNavigationDecision
-func (r *DocumentQuestionRouteImpl) buildDecision(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
+func (r *DocumentQuestionRouteImpl) buildDecision(mode enum.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, retrievalPlan *vo.RetrievalQuestionPlan, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{}
 	decision.ExecutionMode = mode
 	decision.ExecutionModeName = mode.Name()
@@ -215,12 +216,12 @@ func (r *DocumentQuestionRouteImpl) buildDecision(mode vo.ExecutionMode, action 
 			TargetSectionHint: strutil.Trim(section.DisplayTitle()),
 			StructureNodeId:   section.NodeId,
 			CanonicalPath:     section.CanonicalPath,
-			ScopeMode:         utils.Ternary(mode == vo.ExecutionModeRetrieval, "SOFT", "GRAPH"),
+			ScopeMode:         utils.Ternary(mode == enum.ExecutionModeRetrieval, "SOFT", "GRAPH"),
 		}
 		decision.SoftSectionHints = []string{section.DisplayTitle()}
 	} else {
 		decision.StructureAnchor = &vo.ConversationStructureAnchor{
-			ScopeMode: utils.Ternary(mode == vo.ExecutionModeRetrieval, "NONE", "GRAPH_UNRESOLVED"),
+			ScopeMode: utils.Ternary(mode == enum.ExecutionModeRetrieval, "NONE", "GRAPH_UNRESOLVED"),
 		}
 	}
 	// 存在明确的 item 编号锚点（第 N 步 / 第 N 项）时，加入 item 锚点
@@ -288,7 +289,7 @@ func (r *DocumentQuestionRouteImpl) detectQuestionIntent(ctx context.Context, ro
 		return &questionIntentDecision{
 			graphOnly:       graphOnly,
 			analytic:        analytic,
-			outline:         outline || graphOnly.action == vo.DocumentNavigationActionChildSectionDescend,
+			outline:         outline || graphOnly.action == enum.DocumentNavigationActionChildSectionDescend,
 			itemLookup:      itemLookup,
 			structureHint:   true,
 			contentQuestion: contentQuestion,
@@ -332,7 +333,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if strutil.ContainsAny(question, adjacencyHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			action:     enum.DocumentNavigationActionSectionAdjacencyLookup,
 			confidence: 1.0,
 			reason:     "命中明确相邻章节表达，结构型问题直接走图查询。",
 			source:     "rule-adjacency-hint",
@@ -353,7 +354,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if hasSectionReference && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			action:     enum.DocumentNavigationActionSectionAdjacencyLookup,
 			confidence: 0.92,
 			reason:     "命中章节编号与方向词组合，结构相邻关系问题走图查询。",
 			source:     "rule-section-code-direction",
@@ -363,7 +364,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if quotedTextPattern.MatchString(question) && (hasExplicitAdjacency || hasAdjacencyAnswerTarget) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			action:     enum.DocumentNavigationActionSectionAdjacencyLookup,
 			confidence: 0.9,
 			reason:     "命中标题锚点与方向词组合，结构相邻关系问题走图查询。",
 			source:     "rule-quoted-title-direction",
@@ -375,7 +376,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 		strutil.ContainsAny(question, graphOnlyAdjacencyAnswerHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			action:     enum.DocumentNavigationActionSectionAdjacencyLookup,
 			confidence: 0.88,
 			reason:     "命中指代锚点、方向词和章节答案目标，结构相邻关系问题走图查询。",
 			source:     "rule-pronoun-direction-answer",
@@ -385,7 +386,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if strutil.ContainsAny(question, graphOnlyStructureObjectHints) && strutil.ContainsAny(question, graphOnlyExplicitAdjacencyHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionSectionAdjacencyLookup,
+			action:     enum.DocumentNavigationActionSectionAdjacencyLookup,
 			confidence: 0.86,
 			reason:     "命中结构对象与方向关系组合，结构相邻关系问题走图查询。",
 			source:     "rule-structure-direction",
@@ -396,7 +397,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if asksOutline(question) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionChildSectionDescend,
+			action:     enum.DocumentNavigationActionChildSectionDescend,
 			confidence: 1.0,
 			reason:     "命中明确章节展开表达，结构型问题直接走图查询。",
 			source:     "rule-outline-hint",
@@ -406,7 +407,7 @@ func (r *DocumentQuestionRouteImpl) detectGraphOnlyIntentByRules(question string
 	if hasGraphOnlyAnchor(question) && strutil.ContainsAny(question, graphOnlyOutlineActionHints) {
 		return &graphOnlyIntentDecision{
 			matched:    true,
-			action:     vo.DocumentNavigationActionChildSectionDescend,
+			action:     enum.DocumentNavigationActionChildSectionDescend,
 			confidence: 0.86,
 			reason:     "命中章节锚点与目录展开动作，结构型问题直接走图查询。",
 			source:     "rule-outline-action",
@@ -534,17 +535,17 @@ func parseQuestionIntentResult(raw string, localDecision *questionIntentDecision
 // resolveModelGraphOnlyAction 将模型返回的动作/意图映射到我们内部的动作常量
 func resolveModelGraphOnlyAction(rawAction, intentType string) string {
 	action := strings.ToUpper(strutil.Trim(rawAction))
-	if action == vo.DocumentNavigationActionSectionAdjacencyLookup {
-		return vo.DocumentNavigationActionSectionAdjacencyLookup
+	if action == enum.DocumentNavigationActionSectionAdjacencyLookup {
+		return enum.DocumentNavigationActionSectionAdjacencyLookup
 	}
-	if action == vo.DocumentNavigationActionChildSectionDescend {
-		return vo.DocumentNavigationActionChildSectionDescend
+	if action == enum.DocumentNavigationActionChildSectionDescend {
+		return enum.DocumentNavigationActionChildSectionDescend
 	}
 	switch strings.ToUpper(intentType) {
 	case "ADJACENCY":
-		return vo.DocumentNavigationActionSectionAdjacencyLookup
+		return enum.DocumentNavigationActionSectionAdjacencyLookup
 	case "OUTLINE":
-		return vo.DocumentNavigationActionChildSectionDescend
+		return enum.DocumentNavigationActionChildSectionDescend
 	}
 	return ""
 }
@@ -1035,7 +1036,7 @@ func splitRoughTerms(question string) []string {
 }
 
 // buildSummaryText 根据模式、动作、章节、条目、理由生成一行可读性强的摘要
-func buildSummaryText(mode vo.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, reason string) string {
+func buildSummaryText(mode enum.ExecutionMode, action string, section *entity.GraphSection, itemIndex *int, reason string) string {
 	sectionTitle := safeDisplayTitle(section)
 	itemIndexStr := ""
 	if itemIndex != nil {

@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 // ChatDebugTrace 单轮对话调试轨迹
 type ChatDebugTrace struct {
 	ExecutionMode                   string                                `json:"executionMode"`                   // 执行模式
-	ChatMode                        ChatQueryMode                         `json:"chatMode"`                        // 聊天模式
+	ChatMode                        enum.ChatQueryMode                    `json:"chatMode"`                        // 聊天模式
 	OriginalQuestion                string                                `json:"originalQuestion"`                // 原始问题
 	RewriteQuestion                 string                                `json:"rewriteQuestion"`                 // 重写问题
 	RewriteSubQuestions             []string                              `json:"rewriteSubQuestions"`             // 重写子问题列表
@@ -179,7 +181,7 @@ func (t *ChatDebugTrace) Serialize() string {
 // DocumentNavigationDecision 文档问答路由结果
 type DocumentNavigationDecision struct {
 	NavigationAction  string                       `json:"navigationAction"` // 导航动作
-	ExecutionMode     ExecutionMode                // 执行模式
+	ExecutionMode     enum.ExecutionMode           // 执行模式
 	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
 	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划

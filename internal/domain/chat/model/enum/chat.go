@@ -1,4 +1,4 @@
-package vo
+package enum
 
 // ============================================================
 // ChatSessionStatus 会话状态

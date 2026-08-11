@@ -33,7 +33,7 @@ func (q *DefaultStructureGraphQuerier) ListSections(ctx context.Context, documen
 	if documentId == 0 || q.db == nil {
 		return nil, nil
 	}
-	var rows []*docent.DocumentStructureNode
+	var rows []*docent.StructureNode
 	err := q.db.WithContext(ctx).
 		Table("document_structure_node").
 		Where("document_id = ?", documentId).
@@ -54,7 +54,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionById(ctx context.Context, docu
 	if documentId == 0 || nodeId == 0 || q.db == nil {
 		return nil, nil
 	}
-	var r docent.DocumentStructureNode
+	var r docent.StructureNode
 	err := q.db.WithContext(ctx).
 		Table("document_structure_node").
 		Where("document_id = ? AND node_id = ?", documentId, nodeId).
@@ -136,7 +136,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionWithChildren(ctx context.Conte
 	if q.db == nil {
 		return &entity.GraphSectionWithChildren{Section: section}, nil
 	}
-	var rows []*docent.DocumentStructureNode
+	var rows []*docent.StructureNode
 	err = q.db.WithContext(ctx).
 		Table("document_structure_node").
 		Where("document_id = ? AND parent_node_id = ?", documentId, sectionNodeId).
@@ -162,7 +162,7 @@ func (q *DefaultStructureGraphQuerier) FindSectionWithSiblings(ctx context.Conte
 	if q.db == nil {
 		return &entity.GraphSectionWithSiblings{Section: section, Parent: parent}, nil
 	}
-	var rows []*docent.DocumentStructureNode
+	var rows []*docent.StructureNode
 	err = q.db.WithContext(ctx).
 		Table("document_structure_node").
 		Where("document_id = ? AND parent_node_id = ?", documentId, section.ParentNodeId).
@@ -219,7 +219,7 @@ func (q *DefaultStructureGraphQuerier) BuildGraphResult(ctx context.Context, doc
 	return result, nil
 }
 
-func toGraphSection(r *docent.DocumentStructureNode) *entity.GraphSection {
+func toGraphSection(r *docent.StructureNode) *entity.GraphSection {
 	if r == nil {
 		return nil
 	}

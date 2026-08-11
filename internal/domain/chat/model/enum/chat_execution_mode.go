@@ -1,4 +1,4 @@
-package vo
+package enum
 
 import "github.com/duke-git/lancet/v2/enum"
 

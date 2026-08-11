@@ -3,6 +3,8 @@ package vo
 import (
 	"fmt"
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 var weekdayMap = map[time.Weekday]string{
@@ -20,7 +22,7 @@ const Zone = "Asia/Shanghai"
 type StreamLaunchPlan struct {
 	Question             string
 	ConversationId       string
-	ChatMode             ChatQueryMode
+	ChatMode             enum.ChatQueryMode
 	SelectedDocumentId   int64
 	SelectedDocumentName string
 	SelectedTaskId       int64

@@ -7,6 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -22,8 +23,8 @@ func NewClarificationExecutor() *ClarificationExecutor {
 var _ Executor = (*ClarificationExecutor)(nil)
 
 // Mode 返回 CLARIFICATION
-func (e *ClarificationExecutor) Mode() vo.ExecutionMode {
-	return vo.ExecutionModeClarification
+func (e *ClarificationExecutor) Mode() enum.ExecutionMode {
+	return enum.ExecutionModeClarification
 }
 
 // Execute 当路由产生多个候选文档且置信度不足时，交互在此处暂停并向用户确认知识范围。
@@ -42,7 +43,7 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 	}
 
 	// 启动澄清路由追踪阶段（以 Mode 名称标识执行路径）
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, e.Mode().Name(), &vo.StageInput{SummaryText: "当前候选存在歧义，先返回澄清问题。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, e.Mode().Name(), &vo.StageInput{SummaryText: "当前候选存在歧义，先返回澄清问题。"})
 
 	// 从执行计划中取出澄清文本、原因与候选项；原因写入调试轨迹以便离线分析
 	reply := utils.BlankToDefault(plan.ClarificationReply, "当前我无法稳定判断你想问哪份知识文档，请补充更具体的文档名、主题或关键词。")

@@ -1,4 +1,4 @@
-package vo
+package enum
 
 // ============================================================
 // DocumentNavigationAction 文档导航动作

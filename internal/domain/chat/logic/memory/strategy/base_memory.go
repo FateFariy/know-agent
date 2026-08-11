@@ -9,6 +9,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -33,7 +34,7 @@ func (b *baseMemoryStrategy) GetStrategyType() string {
 func (b *baseMemoryStrategy) renderRecentTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	// 过滤可渲染的对话（非进行中且有问答内容）
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && (strutil.IsNotBlank(item.Question) || strutil.IsNotBlank(item.Answer))
+		return item != nil && item.TurnStatus != enum.ChatTurnStatusRunning && (strutil.IsNotBlank(item.Question) || strutil.IsNotBlank(item.Answer))
 	})
 
 	if len(renderable) == 0 {
@@ -49,7 +50,7 @@ func (b *baseMemoryStrategy) renderRecentTranscript(exchanges []*entity.ChatExch
 			builder.WriteString(utils.ClipTail(exchange.Question, maxQuestionLength))
 			builder.WriteString("\n")
 		}
-		if exchange.TurnStatus == vo.ChatTurnStatusCompleted && strutil.IsNotBlank(exchange.Answer) {
+		if exchange.TurnStatus == enum.ChatTurnStatusCompleted && strutil.IsNotBlank(exchange.Answer) {
 			builder.WriteString("助手：")
 			builder.WriteString(utils.ClipTail(exchange.Answer, maxAnswerLength))
 			builder.WriteString("\n")
@@ -63,7 +64,7 @@ func (b *baseMemoryStrategy) renderRecentTranscript(exchanges []*entity.ChatExch
 func (b *baseMemoryStrategy) renderRecentQuestionTranscript(exchanges []*entity.ChatExchange, keepRecentTurns, maxChars int) string {
 	// 过滤有问题的对话（非进行中且有提问）
 	renderable := slice.Filter(exchanges, func(i int, item *entity.ChatExchange) bool {
-		return item != nil && item.TurnStatus != vo.ChatTurnStatusRunning && strutil.IsNotBlank(item.Question)
+		return item != nil && item.TurnStatus != enum.ChatTurnStatusRunning && strutil.IsNotBlank(item.Question)
 	})
 
 	if len(renderable) == 0 {

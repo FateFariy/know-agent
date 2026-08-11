@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -206,7 +207,7 @@ func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Conte
 
 	// 过滤已完成的对话（只有已完成的对话才参与摘要提取）
 	stableExchanges := slice.Filter(incrementalExchanges, func(i int, item *entity.ChatExchange) bool {
-		return item.TurnStatus == vo.ChatTurnStatusCompleted && strutil.IsNotBlank(item.Question)
+		return item.TurnStatus == enum.ChatTurnStatusCompleted && strutil.IsNotBlank(item.Question)
 	})
 
 	// 检查是否需要压缩（超出保留窗口的对话需要压缩）
@@ -262,7 +263,7 @@ func (s *SummaryCompressionStrategy) renderCompressionTranscript(batch []*entity
 			builder.WriteString(utils.ClipTail(exchange.Answer, maxAnswerLength))
 			builder.WriteString("\n")
 		}
-		if exchange.TurnStatus == vo.ChatTurnStatusStopped && strutil.IsNotBlank(exchange.ErrorMessage) {
+		if exchange.TurnStatus == enum.ChatTurnStatusStopped && strutil.IsNotBlank(exchange.ErrorMessage) {
 			builder.WriteString("补充说明：本轮被停止，说明=")
 			builder.WriteString(utils.ClipTail(exchange.ErrorMessage, maxItemLength))
 			builder.WriteString("\n")
@@ -297,7 +298,7 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 	}
 
 	// 调用LLM生成合并后的摘要
-	content, err := s.chatModel.GenerateWithTrace(ctx, vo.ChatStageSummary, systemPrompt, userPrompt)
+	content, err := s.chatModel.GenerateWithTrace(ctx, enum.ChatStageSummary, systemPrompt, userPrompt)
 	newSummary, err := s.deserializeSummary(content)
 	if err != nil {
 		return nil, err

@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
@@ -129,7 +130,7 @@ func (e *RetrievalImpl) retrieveSubQuestionParallel(ctx context.Context, ragCtx 
 			}
 
 			fusedDocs := e.fuseByRRF(filteredResults)
-			parentSearchDocs, err := e.elevateToParentBlocks(timeoutCtx, fusedDocs, e.parentEvidenceMaxChars)
+			parentSearchDocs, err := e.elevateToParentChunks(timeoutCtx, fusedDocs, e.parentEvidenceMaxChars)
 			if err != nil {
 				logx.Warnf("父块提升失败: subQuestionIndex=%d, error=%v", subQuestionIndex, err)
 				return
@@ -271,26 +272,26 @@ func (e *RetrievalImpl) retrieveChannel(ctx context.Context, ch channel.Retrieva
 	return result, nil
 }
 
-// elevateToParentBlocks 将子文档提升到父块级别，聚合出更完整的证据
-// 流程：按 parentBlockId 分组 → 查询父块 → 聚合分数/通道 → 按分数排序
-func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
+// elevateToParentChunks 将子文档提升到父块级别，聚合出更完整的证据
+// 流程：按 parentChunkId 分组 → 查询父块 → 聚合分数/通道 → 按分数排序
+func (e *RetrievalImpl) elevateToParentChunks(ctx context.Context, childDocuments []*vo.DocumentChunk, maxChars int) ([]*vo.DocumentChunk, error) {
 	if len(childDocuments) == 0 {
 		return nil, nil
 	}
 
-	// 按 parentBlockId 分组，并收集无法被归类的 childDocument 作为 fallback
+	// 按 parentChunkId 分组，并收集无法被归类的 childDocument 作为 fallback
 	childGroupsByParent := make(map[int64][]*vo.DocumentChunk, len(childDocuments))
 	fallbackDocuments := make([]*vo.DocumentChunk, 0, len(childDocuments))
 	parentBlockIds := make([]int64, 0, len(childDocuments))
 	for _, childDocument := range childDocuments {
-		parentBlockId := childDocument.ParentBlockId
-		if parentBlockId == 0 {
+		parentChunkId := childDocument.ParentBlockId
+		if parentChunkId == 0 {
 			fallbackDocuments = append(fallbackDocuments, childDocument)
 			continue
 		}
-		childGroupsByParent[parentBlockId] = append(childGroupsByParent[parentBlockId], childDocument)
-		if _, exists := childGroupsByParent[parentBlockId]; exists {
-			parentBlockIds = append(parentBlockIds, parentBlockId)
+		childGroupsByParent[parentChunkId] = append(childGroupsByParent[parentChunkId], childDocument)
+		if _, exists := childGroupsByParent[parentChunkId]; exists {
+			parentBlockIds = append(parentBlockIds, parentChunkId)
 		}
 	}
 
@@ -299,18 +300,18 @@ func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocument
 	}
 
 	// 查询父块
-	parentBlocks, err := e.documentLogic.QueryParentBlocks(ctx, parentBlockIds)
+	parentChunks, err := e.documentLogic.QueryParentChunks(ctx, parentBlockIds)
 	if err != nil {
 		return nil, err
 	}
-	parentBlockMap := utils.SliceToMapBy(parentBlocks, func(item *den.DocumentParentBlock) (int64, *den.DocumentParentBlock) {
+	parentChunkMap := utils.SliceToMapBy(parentChunks, func(item *den.DocumentParentChunk) (int64, *den.DocumentParentChunk) {
 		return item.ID, item
 	})
 
 	// 构建父级证据文档，或当父块未找到时直接保留子文档
 	elevatedDocuments := make([]*vo.DocumentChunk, 0, len(childGroupsByParent)+len(fallbackDocuments))
 	for parentId, children := range childGroupsByParent {
-		parentBlock, ok := parentBlockMap[parentId]
+		parentBlock, ok := parentChunkMap[parentId]
 		if !ok {
 			elevatedDocuments = append(elevatedDocuments, children...)
 			continue
@@ -333,7 +334,7 @@ func (e *RetrievalImpl) elevateToParentBlocks(ctx context.Context, childDocument
 }
 
 // buildParentEvidenceDocument 构建父级证据文档
-func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *den.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
+func (e *RetrievalImpl) buildParentEvidenceDocument(parentBlock *den.DocumentParentChunk, childDocuments []*vo.DocumentChunk, maxChars int) *vo.DocumentChunk {
 	if parentBlock == nil || len(childDocuments) == 0 {
 		return nil
 	}
@@ -383,12 +384,12 @@ func (e *RetrievalImpl) applyEvidenceGate(result *vo.RetrievalChannelResult) *vo
 
 	var documents []*vo.DocumentChunk
 	switch result.ChannelName {
-	case vo.RetrievalChannelVector:
+	case enum.RetrievalChannelVector:
 		// 向量通道：使用绝对相似度阈值过滤
 		documents = slice.Filter(result.Documents, func(index int, doc *vo.DocumentChunk) bool {
 			return doc.Score >= e.minVectorSimilarity
 		})
-	case vo.RetrievalChannelKeyword:
+	case enum.RetrievalChannelKeyword:
 		// 关键词通道：使用相对分数阈值过滤（相对于最高分）
 		maxScore := slices.MaxFunc(result.Documents, func(doc1, doc2 *vo.DocumentChunk) int { return int(doc1.Score - doc2.Score) }).Score
 		documents = slice.Filter(result.Documents, func(index int, doc *vo.DocumentChunk) bool {
@@ -428,7 +429,7 @@ func (e *RetrievalImpl) fuseByRRF(channelResults []*vo.RetrievalChannelResult) [
 		ForEach(func(holder *candidateHolder) {
 			// 填充文档元数据（分数、通道来源）
 			holder.document.RRFScore = holder.score
-			holder.document.Channel = utils.Ternary(len(holder.channels) > 1, vo.RetrievalChannelHybrid, maputil.Keys(holder.channels)[0])
+			holder.document.Channel = utils.Ternary(len(holder.channels) > 1, enum.RetrievalChannelHybrid, maputil.Keys(holder.channels)[0])
 			result = append(result, holder.document)
 		})
 	return result
@@ -459,7 +460,7 @@ func (e *RetrievalImpl) applyRerank(ctx context.Context, ragCtx *vo.RagRetrieval
 		return candidates
 	}
 
-	ragCtx.AddUsedChannel(vo.RetrievalChannelRerank)
+	ragCtx.AddUsedChannel(enum.RetrievalChannelRerank)
 	result, err := e.reranker.Process(ctx, subQuestion, candidates)
 	if err != nil {
 		logx.Warnf("重排序处理失败: subQuestion='%s', error=%v", subQuestion, err)
@@ -471,7 +472,7 @@ func (e *RetrievalImpl) applyRerank(ctx context.Context, ragCtx *vo.RagRetrieval
 // assignReferenceIds 为检索证据分配引用ID
 func (e *RetrievalImpl) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
 	referenceNumber := 1
-	assignedIDs := make(map[string]string)
+	assignedIds := make(map[string]string)
 
 	for _, evidence := range evidenceList {
 		references := make([]*vo.SearchReference, 0, len(evidence.Documents))
@@ -479,13 +480,13 @@ func (e *RetrievalImpl) assignReferenceIds(evidenceList []*vo.SubQuestionEvidenc
 			ref := vo.NewSearchReference(doc, evidence.SubQuestionIndex, 0, evidence.SubQuestion)
 			uniqueKey := ref.UniqueKey()
 
-			assignedID, ok := assignedIDs[uniqueKey]
+			assignedId, ok := assignedIds[uniqueKey]
 			if !ok {
-				assignedID = fmt.Sprintf("%d", referenceNumber)
-				assignedIDs[uniqueKey] = assignedID
+				assignedId = fmt.Sprintf("%d", referenceNumber)
+				assignedIds[uniqueKey] = assignedId
 				referenceNumber++
 			}
-			ref.ReferenceId = assignedID
+			ref.ReferenceId = assignedId
 			references = append(references, ref)
 		}
 		evidence.References = references
@@ -687,10 +688,10 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 			// 判定是否被选入最终 Prompt；否则写入原因
 			if view.GatePassed == 0 {
 				// 未通过闸门：按渠道类型格式化原因
-				if vo.RetrievalChannelVector == channelName {
+				if enum.RetrievalChannelVector == channelName {
 					view.SelectionReason = fmt.Sprintf("向量闸门过滤：分数 %.4f < 阈值 %.4f",
 						view.OriginalScore, e.minVectorSimilarity)
-				} else if vo.RetrievalChannelKeyword == channelName {
+				} else if enum.RetrievalChannelKeyword == channelName {
 					view.SelectionReason = fmt.Sprintf("关键词闸门过滤：分数 %.4f 低于相对阈值（floor=%.2f）",
 						view.OriginalScore, e.keywordRelativeScoreFloor)
 				} else {
@@ -714,7 +715,7 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 }
 
 // renderParentEvidenceText 渲染父级证据文本：[父块内容] + [命中子片段]
-func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *den.DocumentParentBlock, childDocuments []*vo.DocumentChunk, maxChars int) string {
+func (e *RetrievalImpl) renderParentEvidenceText(parentBlock *den.DocumentParentChunk, childDocuments []*vo.DocumentChunk, maxChars int) string {
 	parentText := strutil.Trim(parentBlock.ParentText)
 
 	// 当父块无内容时，使用首条子文档的内容作为回退

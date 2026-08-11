@@ -9,6 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -32,7 +33,7 @@ func NewGraphOnlyExecutor(querier graph.GraphQuerier, answerRender graph.AnswerR
 var _ Executor = (*GraphOnlyExecutor)(nil)
 
 // Mode 返回 GRAPH_ONLY
-func (e *GraphOnlyExecutor) Mode() vo.ExecutionMode { return vo.ExecutionModeGraphOnly }
+func (e *GraphOnlyExecutor) Mode() enum.ExecutionMode { return enum.ExecutionModeGraphOnly }
 
 // Execute 执行结构图查询并渲染答案
 func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
@@ -54,7 +55,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 		return nil, err
 	}
 
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageGraphQuery,
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageGraphQuery,
 		e.Mode().String(), &vo.StageInput{SummaryText: "正在执行结构图查询。"})
 
 	documentId := plan.SelectedDocumentId
@@ -96,7 +97,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 // - 其他（默认 CHILD_SECTION_DESCEND）：查询目标章节 + 直接下级章节列表
 func (e *GraphOnlyExecutor) buildGraphResult(ctx context.Context, documentId, sectionNodeId int64,
 	decision *vo.DocumentNavigationDecision) (*ragvo.GraphQueryResult, error) {
-	if decision != nil && decision.NavigationAction == vo.DocumentNavigationActionSectionAdjacencyLookup {
+	if decision != nil && decision.NavigationAction == enum.DocumentNavigationActionSectionAdjacencyLookup {
 		siblings, err := e.querier.FindSectionWithSiblings(ctx, documentId, sectionNodeId)
 		if err != nil {
 			return nil, err

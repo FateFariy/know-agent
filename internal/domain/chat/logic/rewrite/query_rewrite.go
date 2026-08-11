@@ -13,6 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -77,7 +78,7 @@ func (q *QueryRewriteImpl) Rewrite(ctx context.Context, question, historySummary
 	}
 
 	// 调用LLM生成改写结果
-	raw, err := q.chatModel.GenerateWithTrace(ctx, vo.ChatStageRewrite, "", promptText, q.options...)
+	raw, err := q.chatModel.GenerateWithTrace(ctx, enum.ChatStageRewrite, "", promptText, q.options...)
 	if err != nil {
 		logx.Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil

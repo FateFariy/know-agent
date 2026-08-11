@@ -19,7 +19,7 @@ import (
 
 var ProviderSet = wire.NewSet(
 	chatlogic.NewConversationLogicImpl,
-	wire.Bind(new(chatlogic.ConversationLogic), new(*chatlogic.LogicImpl)),
+	wire.Bind(new(chatlogic.ConversationLogic), new(*chatlogic.ConversationLogicImpl)),
 	rewrite.NewQueryRewriteImpl,
 	wire.Bind(new(rewrite.QueryRewriter), new(*rewrite.QueryRewriteImpl)),
 	recommend.NewQuestionRecommendImpl,

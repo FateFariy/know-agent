@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
@@ -107,17 +108,17 @@ func (o *ConversationPreOrchestratorImpl) Prepare(ctx context.Context, convCtx *
 
 	// 根据 chatMode 分发到具体的子计划方法
 	switch convCtx.ChatMode {
-	case vo.ChatQueryModeOpenChat:
+	case enum.ChatQueryModeOpenChat:
 		// 开放式聊天：直接走 ReactAgent
 		err = o.prepareOpenChat(ctx, convCtx, execPlan)
-	case vo.ChatQueryModeDocument:
+	case enum.ChatQueryModeDocument:
 		// 指定文档问答：路由到所选文档内做导航
 		err = o.prepareDocumentMode(ctx, convCtx, execPlan)
-	case vo.ChatQueryModeAutoDocument:
+	case enum.ChatQueryModeAutoDocument:
 		// 自动文档问答：先做知识路由选文档，再在文档内导航
 		err = o.prepareAutoDocumentMode(ctx, convCtx, execPlan)
 	default:
-		return nil, fmt.Errorf("不支持的聊天模式: %s", vo.ChatQueryModeName(convCtx.ChatMode))
+		return nil, fmt.Errorf("不支持的聊天模式: %s", enum.ChatQueryModeName(convCtx.ChatMode))
 	}
 	// 子计划方法失败则直接返回错误
 	if err != nil {
@@ -186,7 +187,7 @@ func (o *ConversationPreOrchestratorImpl) prepareCommon(ctx context.Context, con
 	// 非 OpenChat 模式需要问题改写产物（用于更精准的文档检索）
 	//  - 若 RAG 未启用，直接返回错误以避免后续空引用
 	//  - 改写完成后，同时更新 Rewrite 与 Retrieval 字段（路由阶段可能进一步覆盖 Retrieval）
-	if convCtx.ChatMode != vo.ChatQueryModeOpenChat {
+	if convCtx.ChatMode != enum.ChatQueryModeOpenChat {
 		if !o.ragEnabled {
 			return nil, fmt.Errorf("当前文档问答模式未启用，请先开启聊天侧 RAG 编排")
 		}
@@ -209,13 +210,13 @@ func (o *ConversationPreOrchestratorImpl) prepareCommon(ctx context.Context, con
 //  2. 启动并完成路由追踪阶段，写入快照（chatMode / executionMode / 时间信号）
 func (o *ConversationPreOrchestratorImpl) prepareOpenChat(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 设置执行模式为 ReactAgent（完全由下游 Agent 自主规划）
-	execPlan.Mode = vo.ExecutionModeReactAgent
+	execPlan.Mode = enum.ExecutionModeReactAgent
 
 	// 启动路由追踪阶段（此处以 Rewrite 阶段为名，记录判定结果与时间信号）
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRewrite, vo.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
 	snapshot := map[string]any{
-		"chatMode":                     vo.ChatQueryModeName(convCtx.ChatMode),
-		"executionMode":                vo.ExecutionModeReactAgent.String(),
+		"chatMode":                     enum.ChatQueryModeName(convCtx.ChatMode),
+		"executionMode":                enum.ExecutionModeReactAgent.String(),
 		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
 		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
 	}
@@ -264,7 +265,7 @@ func (o *ConversationPreOrchestratorImpl) prepareDocumentMode(ctx context.Contex
 //   - 需要澄清：返回 Clarification 模式，由用户选择目标知识
 func (o *ConversationPreOrchestratorImpl) prepareAutoDocumentMode(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 启动路由阶段追踪（标识为 auto_document）
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在生成知识范围候选。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在生成知识范围候选。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
 	//  - 路由失败时仅告警，并以空决策对象兜底（避免后续代码 panic）
@@ -306,7 +307,7 @@ func (o *ConversationPreOrchestratorImpl) prepareAutoDocumentMode(ctx context.Co
 	// 检查是否需要澄清（多个候选相近、路由歧义等）
 	//  - 需要澄清时直接返回 Clarification 模式执行计划（含回复文案、选项、理由）
 	if o.shouldAskClarification(routeDecision, candidateDocuments) {
-		execPlan.Mode = vo.ExecutionModeClarification
+		execPlan.Mode = enum.ExecutionModeClarification
 		execPlan.ClarificationReply = o.buildClarificationReply(candidateDocuments)
 		execPlan.ClarificationOptions = o.buildClarificationOptions(candidateDocuments)
 		execPlan.ClarificationReason = o.buildClarificationReason(routeDecision, candidateDocuments)
@@ -337,7 +338,7 @@ func (o *ConversationPreOrchestratorImpl) prepareAutoDocumentMode(ctx context.Co
 //  6. 打印关键编排结果并返回
 func (o *ConversationPreOrchestratorImpl) routeAndFinalizePlan(ctx context.Context, convCtx *vo.ConversationContext, execPlan *vo.ConversationExecutionPlan) error {
 	// 启动文档内路由阶段追踪，并以 "混合检索" 为默认模式名
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRoute, vo.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
@@ -375,7 +376,7 @@ func (o *ConversationPreOrchestratorImpl) routeAndFinalizePlan(ctx context.Conte
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s, targetSection='%s",
-		convCtx.ConversationId, vo.ChatQueryModeName(convCtx.ChatMode), strutil.Trim(convCtx.Question),
+		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), strutil.Trim(convCtx.Question),
 		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
 
 	return nil
@@ -390,7 +391,7 @@ func (o *ConversationPreOrchestratorImpl) routeAndFinalizePlan(ctx context.Conte
 //  4. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
 func (o *ConversationPreOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
 	// 启动记忆追踪阶段，使用 chatMode 作为执行模式名
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageMemory, vo.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。", Snapshot: nil})
 
 	// 调用 memoryManager 装载记忆上下文（含长期摘要、近期转录、压缩状态）
 	memoryContext, err := o.memoryManager.LoadMemoryContext(ctx, convCtx.ConversationId)
@@ -422,7 +423,7 @@ func (o *ConversationPreOrchestratorImpl) summarizeHistory(ctx context.Context, 
 //  4. 成功时提交追踪并对结果做空值兜底（改写失败则回退原始问题、单子问题列表）
 func (o *ConversationPreOrchestratorImpl) questionRewrite(ctx context.Context, convCtx *vo.ConversationContext, historySummary string) (*vo.QuestionRewriteResult, error) {
 	// 启动改写追踪阶段
-	ctx = vo.OnStart(ctx, vo.ConversationTraceStageRewrite, vo.ExecutionModeRetrieval.String(), &vo.StageInput{SummaryText: "正在生成检索友好的问题表达。", Snapshot: o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(), &vo.StageInput{SummaryText: "正在生成检索友好的问题表达。", Snapshot: o.buildRewriteStageSnapshot(convCtx.Question, historySummary, nil)})
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := o.rewriter.Rewrite(ctx, convCtx.Question, historySummary)
 	if err != nil {

@@ -14,7 +14,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -92,7 +92,7 @@ func (r *QuestionRecommendImpl) generateRecommendations(ctx context.Context, que
 	}
 
 	// 调用LLM生成推荐
-	content, err := r.chatModel.GenerateWithTrace(ctx, vo.ChatStageRecommend, "", userPrompt)
+	content, err := r.chatModel.GenerateWithTrace(ctx, enum.ChatStageRecommend, "", userPrompt)
 	if strutil.IsBlank(content) {
 		return nil, err
 	}

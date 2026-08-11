@@ -7,6 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -23,11 +24,11 @@ func NewDefaultAnswerRender() *DefaultAnswerRender {
 var _ AnswerRender = (*DefaultAnswerRender)(nil)
 
 // RenderAnswer 渲染图谱回答
-func (r *DefaultAnswerRender) RenderAnswer(mode vo.ExecutionMode, decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
+func (r *DefaultAnswerRender) RenderAnswer(mode enum.ExecutionMode, decision *vo.DocumentNavigationDecision, result *entity.GraphQueryResult) string {
 	if result == nil || result.TargetSection == nil {
 		return ""
 	}
-	if mode != nil && mode.Value() == vo.ExecutionModeGraphThenEvidence.Value() {
+	if mode != nil && mode.Value() == enum.ExecutionModeGraphThenEvidence.Value() {
 		return r.renderGraphThenEvidence(decision, result)
 	}
 	return r.renderGraphOnly(decision, result)
@@ -43,7 +44,7 @@ func (r *DefaultAnswerRender) renderGraphOnly(decision *vo.DocumentNavigationDec
 			question = decision.RetrievalPlan.RetrievalQuestion
 		}
 	}
-	if action == vo.DocumentNavigationActionSectionAdjacencyLookup || r.asksAdjacency(question) {
+	if action == enum.DocumentNavigationActionSectionAdjacencyLookup || r.asksAdjacency(question) {
 		return r.renderAdjacency(result)
 	}
 	if r.asksChildren(question) || len(result.Children) > 0 {

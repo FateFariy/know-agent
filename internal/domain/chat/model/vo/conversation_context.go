@@ -11,13 +11,14 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 type ConversationContext struct {
 	ConversationId       string                                    // 对话ID
 	ExchangeId           int64                                     // 交换ID
 	Question             string                                    // 用户问题
-	ChatMode             ChatQueryMode                             // 聊天模式
+	ChatMode             enum.ChatQueryMode                        // 聊天模式
 	TraceId              string                                    // 追踪ID
 	SelectedDocumentId   int64                                     // 选中的文档ID
 	SelectedDocumentName string                                    // 选中的文档名
@@ -143,7 +144,7 @@ func (c *ConversationContext) ExecutionModeName() string {
 // NeedClarification 是否需要澄清
 func (c *ConversationContext) NeedClarification() bool {
 	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
-		return execPlan.Mode == ExecutionModeClarification && len(execPlan.ClarificationOptions) > 0
+		return execPlan.Mode == enum.ExecutionModeClarification && len(execPlan.ClarificationOptions) > 0
 	}
 	return false
 }
