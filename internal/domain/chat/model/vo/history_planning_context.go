@@ -1,7 +1,5 @@
 package vo
 
-import "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
-
 type HistoryPlanningContext struct {
 	ConversationGoal  string   // 对话目标
 	StableFacts       []string // 稳定事实
@@ -10,7 +8,7 @@ type HistoryPlanningContext struct {
 	QueryContextHints []string // 查询上下文提示
 }
 
-func NewHistoryPlanningContext(summary *entity.ConversationSummary) *HistoryPlanningContext {
+func NewHistoryPlanningContext(summary *ConversationSummary) *HistoryPlanningContext {
 	if summary == nil {
 		return &HistoryPlanningContext{}
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -135,7 +136,7 @@ func (c *ConversationLogicImpl) StopConversation(ctx context.Context, conversati
 }
 
 // GetSessionDetail 获取会话详情
-func (c *ConversationLogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
+func (c *ConversationLogicImpl) GetSessionDetail(ctx context.Context, conversationId string) (*aggregate.ConversationArchiveRecord, error) {
 	record, err := c.repo.SelectSessionRecord(ctx, conversationId)
 	if err != nil {
 		return nil, err
@@ -164,7 +165,7 @@ func (c *ConversationLogicImpl) GetExchangeDetail(ctx context.Context, conversat
 }
 
 // ListSessions 获取会话列表（分页）
-func (c *ConversationLogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
+func (c *ConversationLogicImpl) ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*aggregate.ConversationArchiveRecord, int64, error) {
 	records, total, err := c.repo.ListSessionRecordPage(ctx, pageNo, pageSize, chatMode, latestTurnStatus, keyword)
 	if err != nil {
 		return nil, 0, err

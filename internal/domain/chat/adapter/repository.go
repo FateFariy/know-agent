@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -46,10 +47,10 @@ type ChatRepository interface {
 	// ========== 会话归档与查询 ==========
 
 	// SelectSessionRecord 获取会话记录
-	SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)
+	SelectSessionRecord(ctx context.Context, conversationId string) (*aggregate.ConversationArchiveRecord, error)
 
 	// ListSessionRecordPage 列出会话记录分页
-	ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error)
+	ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*aggregate.ConversationArchiveRecord, int64, error)
 
 	// DeleteSession 删除会话及所有记录
 	DeleteSession(ctx context.Context, conversationId string) (int64, int64, error)

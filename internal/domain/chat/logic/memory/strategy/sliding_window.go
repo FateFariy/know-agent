@@ -6,7 +6,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -34,8 +34,8 @@ func NewSlidingWindowStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepos
 }
 
 // LoadMemoryContext 加载会话记忆上下文（滑动窗口策略）
-func (s *SlidingWindowStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
-	memoryCtx := &vo.MemoryContext{}
+func (s *SlidingWindowStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*aggregate.Conversation, error) {
+	memoryCtx := &aggregate.Conversation{}
 	if strutil.IsBlank(conversationId) {
 		return memoryCtx, nil
 	}

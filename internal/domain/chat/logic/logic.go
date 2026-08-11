@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -16,13 +17,13 @@ type ConversationLogic interface {
 	StopConversation(ctx context.Context, conversationId string) (bool, string, error)
 
 	// GetSessionDetail 获取会话详情
-	GetSessionDetail(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error)
+	GetSessionDetail(ctx context.Context, conversationId string) (*aggregate.ConversationArchiveRecord, error)
 
 	// GetExchangeDetail 获取对话详情
 	GetExchangeDetail(ctx context.Context, conversationId string, exchangeId int64) (*entity.ChatExchange, []*entity.ChatExchangeTraceStage, error)
 
 	// ListSessions 获取会话列表
-	ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error)
+	ListSessions(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*aggregate.ConversationArchiveRecord, int64, error)
 
 	// ResetConversation 重置会话
 	ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error)

@@ -3,14 +3,14 @@ package memory
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // SessionMemoryManager 会话记忆管理器
 type SessionMemoryManager interface {
 	// LoadMemoryContext 加载会话记忆上下文
-	LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error)
+	LoadMemoryContext(ctx context.Context, conversationId string) (*aggregate.Conversation, error)
 
 	// RefreshConversationSummaryAsync 异步刷新会话摘要
 	RefreshConversationSummaryAsync(conversationId string)

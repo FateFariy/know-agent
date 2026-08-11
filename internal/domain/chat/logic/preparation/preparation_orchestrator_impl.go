@@ -19,6 +19,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/chat/support"
@@ -389,7 +390,7 @@ func (o *ConversationPreOrchestratorImpl) routeAndFinalizePlan(ctx context.Conte
 //  2. 调用 memoryManager 装载长期摘要与近期转录（含压缩状态）
 //  3. 失败时记录失败追踪并返回
 //  4. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
-func (o *ConversationPreOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*vo.MemoryContext, error) {
+func (o *ConversationPreOrchestratorImpl) summarizeHistory(ctx context.Context, convCtx *vo.ConversationContext) (*aggregate.Conversation, error) {
 	// 启动记忆追踪阶段，使用 chatMode 作为执行模式名
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。", Snapshot: nil})
 
@@ -476,7 +477,7 @@ func (o *ConversationPreOrchestratorImpl) buildRewriteStageSnapshot(question, hi
 //  3. 两者以 "\n\n" 分隔；总长度上限由 planningHistoryMaxChars 控制
 //
 // 最终用于问题改写与 Agent 规划引用。
-func (o *ConversationPreOrchestratorImpl) buildPlanningHistory(memoryContext *vo.MemoryContext, historyPlanningContext *vo.HistoryPlanningContext) string {
+func (o *ConversationPreOrchestratorImpl) buildPlanningHistory(memoryContext *aggregate.Conversation, historyPlanningContext *vo.HistoryPlanningContext) string {
 	// 拼接结构化历史（会话目标 + 三类要点提示）
 	var sb strings.Builder
 	o.appendSection(&sb, "会话目标", historyPlanningContext.ConversationGoal)

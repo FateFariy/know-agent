@@ -18,6 +18,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -60,8 +61,8 @@ func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.Chat
 }
 
 // LoadMemoryContext 加载会话记忆上下文（摘要压缩策略）
-func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
-	memoryCtx := &vo.MemoryContext{}
+func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*aggregate.Conversation, error) {
+	memoryCtx := &aggregate.Conversation{}
 
 	// 空会话ID直接返回空上下文
 	if strutil.IsBlank(conversationId) {
@@ -273,8 +274,8 @@ func (s *SummaryCompressionStrategy) renderCompressionTranscript(batch []*entity
 }
 
 // mergeSummaryByLLM 由大模型合并摘要
-func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldSummary *entity.ConversationSummary,
-	batch []*entity.ChatExchange) (*entity.ConversationSummary, error) {
+func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldSummary *vo.ConversationSummary,
+	batch []*entity.ChatExchange) (*vo.ConversationSummary, error) {
 	// 渲染系统提示词
 	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
 	if err != nil {
@@ -309,7 +310,7 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 }
 
 // fallbackMerge 回退合并策略（当LLM合并失败时使用规则合并）
-func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.ConversationSummary, batch []*entity.ChatExchange) *entity.ConversationSummary {
+func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *vo.ConversationSummary, batch []*entity.ChatExchange) *vo.ConversationSummary {
 	newSummary := copySummary(oldSummary)
 
 	// 批次高亮
@@ -348,7 +349,7 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *entity.Conversati
 
 // saveSummarySnapshot 保存摘要快照
 func (s *SummaryCompressionStrategy) saveSummarySnapshot(ctx context.Context, lastExchange *entity.ChatExchange,
-	summary *entity.ConversationSummary, coveredExchangeCount int) (*entity.ChatMemorySummary, error) {
+	summary *vo.ConversationSummary, coveredExchangeCount int) (*entity.ChatMemorySummary, error) {
 	// 获取当前摘要
 	latestState, err := s.repo.SelectMemorySummary(ctx, lastExchange.ConversationId)
 	if err != nil {
@@ -406,9 +407,9 @@ func (s *SummaryCompressionStrategy) saveSummarySnapshot(ctx context.Context, la
 }
 
 // readSummary 读取摘要
-func (s *SummaryCompressionStrategy) readSummary(summaryState *entity.ChatMemorySummary) *entity.ConversationSummary {
+func (s *SummaryCompressionStrategy) readSummary(summaryState *entity.ChatMemorySummary) *vo.ConversationSummary {
 	if summaryState == nil {
-		return &entity.ConversationSummary{}
+		return &vo.ConversationSummary{}
 	}
 
 	if strutil.IsNotBlank(summaryState.SummaryJson) {
@@ -418,11 +419,11 @@ func (s *SummaryCompressionStrategy) readSummary(summaryState *entity.ChatMemory
 		}
 	}
 
-	return s.normalizeSummary(&entity.ConversationSummary{Summary: summaryState.SummaryText})
+	return s.normalizeSummary(&vo.ConversationSummary{Summary: summaryState.SummaryText})
 }
 
 // serializeSummary 序列化摘要
-func (s *SummaryCompressionStrategy) serializeSummary(summary *entity.ConversationSummary) (string, error) {
+func (s *SummaryCompressionStrategy) serializeSummary(summary *vo.ConversationSummary) (string, error) {
 	data, err := json.Marshal(summary)
 	if err != nil {
 		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
@@ -471,7 +472,7 @@ func (s *SummaryCompressionStrategy) extractRetrievalHints(question string) []st
 }
 
 // buildLongTermSummaryText 构建长期摘要文本
-func (s *SummaryCompressionStrategy) buildLongTermSummaryText(payload *entity.ConversationSummary) string {
+func (s *SummaryCompressionStrategy) buildLongTermSummaryText(payload *vo.ConversationSummary) string {
 	normalized := s.normalizeSummary(payload)
 	var builder strings.Builder
 
@@ -520,8 +521,8 @@ func (s *SummaryCompressionStrategy) appendBulletSection(builder *strings.Builde
 }
 
 // deserializeSummary 反序列化摘要
-func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*entity.ConversationSummary, error) {
-	summary := &entity.ConversationSummary{}
+func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*vo.ConversationSummary, error) {
+	summary := &vo.ConversationSummary{}
 	if err := utils.Unmarshal(raw, summary); err != nil {
 		logx.Errorf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
 		return nil, err
@@ -531,9 +532,9 @@ func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*entity.Con
 }
 
 // normalizeSummary 规范化摘要
-func (s *SummaryCompressionStrategy) normalizeSummary(payload *entity.ConversationSummary) *entity.ConversationSummary {
+func (s *SummaryCompressionStrategy) normalizeSummary(payload *vo.ConversationSummary) *vo.ConversationSummary {
 	summary := utils.ClipTail(strutil.Trim(payload.Summary), s.historySummary.SummaryMaxChars)
-	summaryEntity := &entity.ConversationSummary{
+	summaryEntity := &vo.ConversationSummary{
 		ConversationGoal: utils.ClipTail(strutil.Trim(payload.ConversationGoal), maxGoalLength),
 		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
 		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
@@ -549,7 +550,7 @@ func (s *SummaryCompressionStrategy) normalizeSummary(payload *entity.Conversati
 }
 
 // synthesizeSummaryFromSections 从各部分合成摘要
-func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *entity.ConversationSummary) string {
+func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *vo.ConversationSummary) string {
 	var parts []string
 	if strutil.IsNotBlank(payload.ConversationGoal) {
 		parts = append(parts, "目标："+utils.ClipTail(payload.ConversationGoal, maxItemLength))
@@ -581,11 +582,11 @@ func isNoiseHint(value string) bool {
 }
 
 // copySummary 复制摘要
-func copySummary(summary *entity.ConversationSummary) *entity.ConversationSummary {
+func copySummary(summary *vo.ConversationSummary) *vo.ConversationSummary {
 	if summary == nil {
-		return &entity.ConversationSummary{}
+		return &vo.ConversationSummary{}
 	}
-	return &entity.ConversationSummary{
+	return &vo.ConversationSummary{
 		Summary:          summary.Summary,
 		ConversationGoal: summary.ConversationGoal,
 		StableFacts:      append([]string{}, summary.StableFacts...),

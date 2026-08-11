@@ -1,4 +1,4 @@
-package vo
+package aggregate
 
 import (
 	"time"

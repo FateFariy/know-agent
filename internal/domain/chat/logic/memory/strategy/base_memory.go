@@ -8,9 +8,9 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // baseMemoryStrategy 记忆策略基类（封装公共渲染和裁剪方法）
@@ -22,7 +22,7 @@ const (
 	maxAnswerLength   = 320
 )
 
-func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
+func (b *baseMemoryStrategy) LoadMemoryContext(ctx context.Context, conversationId string) (*aggregate.Conversation, error) {
 	panic("implement me")
 }
 

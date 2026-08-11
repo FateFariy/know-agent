@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // SessionMemoryManageImpl 会话记忆管理器实现
@@ -20,7 +20,7 @@ func NewSessionMemoryManageImpl(memoryStrategy strategy.Memory) *SessionMemoryMa
 }
 
 // LoadMemoryContext 加载会话记忆上下文
-func (s *SessionMemoryManageImpl) LoadMemoryContext(ctx context.Context, conversationId string) (*vo.MemoryContext, error) {
+func (s *SessionMemoryManageImpl) LoadMemoryContext(ctx context.Context, conversationId string) (*aggregate.Conversation, error) {
 	return s.strategy.LoadMemoryContext(ctx, conversationId)
 }
 
