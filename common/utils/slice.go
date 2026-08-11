@@ -46,32 +46,40 @@ func Distinct[T any, V comparable](slice []T, keyFunc func(T) V) []T {
 	return uniqueSlice
 }
 
-// DistinctFilterLimit 先按 keyOf 提取键对切片去重，并保留前 n 个结果；
-// keyOf 返回的 bool 值用于元素级的选择过滤，false 时跳过该元素。
-//   - items: 源切片；为空时直接返回 nil
-//   - n: 保留的最大数量（≤0 时返回全部）
-//   - keyOf: (键, 是否保留) —— 键用于去重，bool 为 false 时跳过该元素
-func DistinctFilterLimit[T any, V comparable](items []T, n int, keyOf func(T) (V, bool)) []T {
+// FilterMapUniqueLimit 过滤并映射切片元素，按 Key 去重后返回前 n 个结果。
+// 流程：Filter (bool) -> Map (K, V) -> Unique (K) -> Limit (n)。
+// 当 n <= 0 时返回全部去重后的结果。
+func FilterMapUniqueLimit[T, V any, K comparable](items []T, n int, keyOf func(T) (K, V, bool)) []V {
 	if len(items) == 0 {
 		return nil
 	}
 	if n <= 0 {
 		n = len(items)
 	}
-	seen := make(map[V]struct{}, n)
-	result := make([]T, 0, n)
+	seen := make(map[K]struct{}, n)
+	result := make([]V, 0, n)
 	for _, v := range items {
-		key, keep := keyOf(v)
+		key, value, keep := keyOf(v)
 		if !keep {
 			continue
 		}
 		if _, ok := seen[key]; !ok {
 			seen[key] = struct{}{}
-			result = append(result, v)
+			result = append(result, value)
 		}
 		if len(result) >= n {
 			break
 		}
 	}
 	return result
+}
+
+// FilterUniqueLimit 过滤、去重并截断切片。
+// 按 keyOf 返回的键去重，保留前 n 个；n<=0 返回全部。
+// keyOf 的 bool 用于过滤，false 则跳过。
+func FilterUniqueLimit[T any, K comparable](items []T, n int, keyOf func(T) (K, bool)) []T {
+	return FilterMapUniqueLimit(items, n, func(item T) (K, T, bool) {
+		key, keep := keyOf(item)
+		return key, item, keep
+	})
 }

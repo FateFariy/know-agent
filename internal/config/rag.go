@@ -35,7 +35,7 @@ type HistorySummaryConf struct {
 	Enabled               bool `json:",default=true"` // 是否启用摘要压缩
 	KeepRecentTurns       int  `json:",default=3"`    // 保留最近轮次
 	CompressionBatchTurns int  `json:",default=3"`    // 压缩批次轮次
-	SummaryMaxChars       int  `json:",default=1024"` // 摘要最大字符数
+	MaxChars              int  `json:",default=1024"` // 摘要最大字符数
 }
 
 // RewriteConf 问题改写配置

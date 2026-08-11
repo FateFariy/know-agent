@@ -83,7 +83,7 @@ Chat:
       Enabled: true
       KeepRecentTurns: 3
       CompressionBatchTurns: 3
-      SummaryMaxChars: 1024
+      MaxChars: 1024
     RewriteHistoryTurns: 4
     RecentTranscriptMaxChars: 1024
     QuestionHistoryMaxChars: 512

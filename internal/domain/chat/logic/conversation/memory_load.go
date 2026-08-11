@@ -38,7 +38,6 @@ func (m *MemoryLoadStage) Name() string {
 }
 
 func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
-	// 规范化原始问题
 	question := strutil.Trim(convCtx.Question)
 
 	// 装载会话记忆（含长期摘要、近期转录、压缩信息）
@@ -47,12 +46,11 @@ func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
 		return err
 	}
 
-	// 构建历史规划上下文与问题历史上下文
-	//  - historyPlanningContext：聚合长期记忆，供 Agent 做规划引用
-	//  - historySummary：以可读文本形式描述规划历史
-	//  - questionHistoryContext：当前问题 + 近期对话转录，用于后续改写与检索
+	// 聚合长期记忆，供 Agent 做规划引用
 	historyPlanningContext := vo.NewHistoryPlanningContext(memoryContext.Summary)
+	// 以可读文本形式描述规划历史
 	historySummary := m.buildPlanningHistory(memoryContext, historyPlanningContext)
+	// 当前问题 + 近期对话转录，用于后续改写与检索
 	questionHistoryContext := vo.NewQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript), m.planningHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断，无外部调用）
@@ -91,12 +89,10 @@ func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
 // summarizeHistory 构建会话记忆
 //
 // 执行步骤：
-//  1. 启动记忆追踪阶段
-//  2. 调用 memoryManager 装载长期摘要与近期转录（含压缩状态）
-//  3. 失败时记录失败追踪并返回
-//  4. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
+//  1. 调用 memoryManager 装载长期摘要与近期转录（含压缩状态）
+//  2. 失败时记录失败追踪并返回
+//  3. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
 func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context) (*aggregate.Conversation, error) {
-	// 启动记忆追踪阶段，使用 chatMode 作为执行模式名
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
 
 	// 调用 memoryManager 装载记忆上下文（含长期摘要、近期转录、压缩状态）

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChatExchange 对话记录表
@@ -23,4 +24,20 @@ type ChatExchange struct {
 	TotalResponseTimeMs int64            `gorm:"column:total_response_time_ms"`    // 总响应时间毫秒
 	CreateTime          time.Time        `gorm:"column:create_time"`               // 创建时间
 	UpdateTime          time.Time        `gorm:"column:update_time"`               // 更新时间
+}
+
+func (m *ChatMemorySummary) ToConversationSummary() *vo.ConversationSummary {
+	if m == nil {
+		return &vo.ConversationSummary{}
+	}
+	summary := &vo.ConversationSummary{}
+
+	// 优先从 JSON 恢复
+	if m.SummaryJson != "" {
+		if err := summary.Unmarshal(m.SummaryJson); err != nil {
+			// 回退到文本字段
+			summary = &vo.ConversationSummary{Summary: m.SummaryText}
+		}
+	}
+	return summary
 }

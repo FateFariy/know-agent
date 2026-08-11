@@ -2,14 +2,12 @@ package strategy
 
 import (
 	"context"
-	"encoding/json"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
-	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -92,7 +90,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	memoryCtx.RecentQuestionTranscript = s.renderRecentQuestionTranscript(recentExchanges, s.historySummary.KeepRecentTurns, s.questionHistoryMaxChars)
 
 	// 反序列化摘要JSON
-	memoryCtx.Summary = s.readSummary(summaryState)
+	memoryCtx.Summary = s.normalizeSummary(summaryState.ToConversationSummary())
 
 	// 组装长期摘要和上下文元数据
 	if summaryState != nil {
@@ -153,7 +151,7 @@ func (s *SummaryCompressionStrategy) GetConversationSummary(ctx context.Context,
 	}
 
 	// 反序列化摘要JSON并设置压缩状态
-	summary.SummaryPayload = s.readSummary(summary)
+	summary.SummaryPayload = s.normalizeSummary(summary.ToConversationSummary())
 	summary.IsCompressed = strutil.IsNotBlank(summary.SummaryText)
 
 	return summary, nil
@@ -227,7 +225,7 @@ func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Conte
 		batch := overflowExchanges[start:end]
 
 		// 优先使用LLM合并摘要，失败时回退到规则合并
-		oldSummary := s.readSummary(workingState)
+		oldSummary := s.normalizeSummary(workingState.ToConversationSummary())
 		newSummary, err := s.mergeSummaryByLLM(ctx, oldSummary, batch)
 		if err != nil {
 			logx.Errorf("LLM合并会话长期摘要失败，回退到规则压缩, conversationId=%s, err=%v", conversationId, err)
@@ -283,7 +281,9 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 	}
 
 	// 序列化现有摘要（规范化后转为JSON）
-	serializeSummary, err := s.serializeSummary(s.normalizeSummary(copySummary(oldSummary)))
+	summary := oldSummary.CopySummary()
+	summary.Normalize(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
+	serializeSummary, err := summary.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -300,25 +300,25 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 
 	// 调用LLM生成合并后的摘要
 	content, err := s.chatModel.GenerateWithTrace(ctx, enum.ChatStageSummary, systemPrompt, userPrompt)
-	newSummary, err := s.deserializeSummary(content)
-	if err != nil {
+	if err = summary.Unmarshal(content); err != nil {
 		return nil, err
 	}
 
 	// 规范化摘要（限制字段长度、去重）
-	return s.normalizeSummary(newSummary), nil
+	summary.Normalize(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
+	return summary, nil
 }
 
 // fallbackMerge 回退合并策略（当LLM合并失败时使用规则合并）
 func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *vo.ConversationSummary, batch []*entity.ChatExchange) *vo.ConversationSummary {
-	newSummary := copySummary(oldSummary)
+	newSummary := oldSummary.CopySummary()
 
 	// 批次高亮
 	batchHighlight := s.renderFallbackBatchHighlight(batch)
 
 	// 合并摘要文本（用分号连接旧摘要和批次高亮）
 	newSummary.Summary = utils.JoinNonBlank(";", newSummary.Summary, batchHighlight)
-	newSummary.Summary = utils.ClipTail(newSummary.Summary, s.historySummary.SummaryMaxChars)
+	newSummary.Summary = utils.ClipTail(newSummary.Summary, s.historySummary.MaxChars)
 
 	// 设置会话目标（若尚未设置，则取最后一条问题作为目标）
 	lastQuestion := batch[len(batch)-1].Question
@@ -334,7 +334,7 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *vo.ConversationSu
 			pendingQuestions = append(pendingQuestions, utils.ClipTail(exchange.Question, maxItemLength))
 		}
 	}
-	newSummary.PendingQuestions = s.deduplicateAndLimit(pendingQuestions)
+	newSummary.PendingQuestions = s.filterMapUniqueLimit(pendingQuestions)
 
 	// 累积检索提示（从最后一条问题中提取关键词）
 	retrievalHints := make([]string, 0, len(oldSummary.RetrievalHints))
@@ -342,7 +342,7 @@ func (s *SummaryCompressionStrategy) fallbackMerge(oldSummary *vo.ConversationSu
 	if len(batch) > 0 && strutil.IsNotBlank(lastQuestion) {
 		retrievalHints = append(retrievalHints, s.extractRetrievalHints(lastQuestion)...)
 	}
-	newSummary.RetrievalHints = s.deduplicateAndLimit(retrievalHints)
+	newSummary.RetrievalHints = s.filterMapUniqueLimit(retrievalHints)
 
 	return s.normalizeSummary(newSummary)
 }
@@ -364,8 +364,8 @@ func (s *SummaryCompressionStrategy) saveSummarySnapshot(ctx context.Context, la
 		}
 	}
 
-	summaryText := s.buildLongTermSummaryText(summary)
-	summaryJson, err := s.serializeSummary(summary)
+	summaryText := summary.BuildLongText(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
+	summaryJson, err := summary.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -406,32 +406,6 @@ func (s *SummaryCompressionStrategy) saveSummarySnapshot(ctx context.Context, la
 	return latestState, nil
 }
 
-// readSummary 读取摘要
-func (s *SummaryCompressionStrategy) readSummary(summaryState *entity.ChatMemorySummary) *vo.ConversationSummary {
-	if summaryState == nil {
-		return &vo.ConversationSummary{}
-	}
-
-	if strutil.IsNotBlank(summaryState.SummaryJson) {
-		summary, err := s.deserializeSummary(summaryState.SummaryJson)
-		if err == nil {
-			return s.normalizeSummary(summary)
-		}
-	}
-
-	return s.normalizeSummary(&vo.ConversationSummary{Summary: summaryState.SummaryText})
-}
-
-// serializeSummary 序列化摘要
-func (s *SummaryCompressionStrategy) serializeSummary(summary *vo.ConversationSummary) (string, error) {
-	data, err := json.Marshal(summary)
-	if err != nil {
-		logx.Errorf("序列化会话长期摘要失败, err=%v", err)
-		return "{}", err
-	}
-	return string(data), nil
-}
-
 // renderFallbackBatchHighlight 渲染回退批次高亮
 func (s *SummaryCompressionStrategy) renderFallbackBatchHighlight(batch []*entity.ChatExchange) string {
 	var highlights []string
@@ -466,110 +440,20 @@ func (s *SummaryCompressionStrategy) extractRetrievalHints(question string) []st
 			break
 		}
 	}
-	s.deduplicateAndLimit(hints)
-
-	return hints
+	return s.filterMapUniqueLimit(hints)
 }
 
-// buildLongTermSummaryText 构建长期摘要文本
-func (s *SummaryCompressionStrategy) buildLongTermSummaryText(payload *vo.ConversationSummary) string {
-	normalized := s.normalizeSummary(payload)
-	var builder strings.Builder
-
-	s.appendSection(&builder, "长期会话摘要", normalized.Summary)
-	s.appendSection(&builder, "会话目标", normalized.ConversationGoal)
-	s.appendBulletSection(&builder, "已确认事实", normalized.StableFacts)
-	s.appendBulletSection(&builder, "用户偏好与约束", normalized.UserPreferences)
-	s.appendBulletSection(&builder, "已解决问题", normalized.ResolvedPoints)
-	s.appendBulletSection(&builder, "待跟进问题", normalized.PendingQuestions)
-	s.appendBulletSection(&builder, "检索提示", normalized.RetrievalHints)
-
-	return utils.ClipTail(strutil.Trim(builder.String()), 1024)
+// filterMapUniqueLimit 去重并限制数量
+func (s *SummaryCompressionStrategy) filterMapUniqueLimit(values []string) []string {
+	return utils.FilterMapUniqueLimit(values, maxSectionItems, func(item string) (string, string, bool) {
+		tail := utils.ClipTail(strutil.Trim(item), maxItemLength)
+		return tail, tail, strutil.IsNotBlank(tail)
+	})
 }
 
-// appendSection 添加段落
-func (s *SummaryCompressionStrategy) appendSection(builder *strings.Builder, title, content string) {
-	if strutil.IsBlank(content) {
-		return
-	}
-	if builder.Len() > 0 {
-		builder.WriteString("\n")
-	}
-	builder.WriteString("【")
-	builder.WriteString(title)
-	builder.WriteString("】\n")
-	builder.WriteString(strutil.Trim(content))
-	builder.WriteString("\n")
-}
-
-// appendBulletSection 添加项目符号段落
-func (s *SummaryCompressionStrategy) appendBulletSection(builder *strings.Builder, title string, values []string) {
-	if len(values) == 0 {
-		return
-	}
-	if builder.Len() > 0 {
-		builder.WriteString("\n")
-	}
-	builder.WriteString("【")
-	builder.WriteString(title)
-	builder.WriteString("】\n")
-	for _, v := range values {
-		builder.WriteString("- ")
-		builder.WriteString(v)
-		builder.WriteString("\n")
-	}
-}
-
-// deserializeSummary 反序列化摘要
-func (s *SummaryCompressionStrategy) deserializeSummary(raw string) (*vo.ConversationSummary, error) {
-	summary := &vo.ConversationSummary{}
-	if err := utils.Unmarshal(raw, summary); err != nil {
-		logx.Errorf("反序列化会话长期摘要 JSON 失败: %s, err=%v", raw, err)
-		return nil, err
-	}
-
-	return summary, nil
-}
-
-// normalizeSummary 规范化摘要
-func (s *SummaryCompressionStrategy) normalizeSummary(payload *vo.ConversationSummary) *vo.ConversationSummary {
-	summary := utils.ClipTail(strutil.Trim(payload.Summary), s.historySummary.SummaryMaxChars)
-	summaryEntity := &vo.ConversationSummary{
-		ConversationGoal: utils.ClipTail(strutil.Trim(payload.ConversationGoal), maxGoalLength),
-		StableFacts:      s.deduplicateAndLimit(payload.StableFacts),
-		UserPreferences:  s.deduplicateAndLimit(payload.UserPreferences),
-		ResolvedPoints:   s.deduplicateAndLimit(payload.ResolvedPoints),
-		PendingQuestions: s.deduplicateAndLimit(payload.PendingQuestions),
-		RetrievalHints:   s.deduplicateAndLimit(payload.RetrievalHints),
-	}
-	summaryEntity.Summary = summary
-	if strutil.IsBlank(summary) {
-		summaryEntity.Summary = s.synthesizeSummaryFromSections(summaryEntity)
-	}
-	return summaryEntity
-}
-
-// synthesizeSummaryFromSections 从各部分合成摘要
-func (s *SummaryCompressionStrategy) synthesizeSummaryFromSections(payload *vo.ConversationSummary) string {
-	var parts []string
-	if strutil.IsNotBlank(payload.ConversationGoal) {
-		parts = append(parts, "目标："+utils.ClipTail(payload.ConversationGoal, maxItemLength))
-	}
-	if len(payload.StableFacts) > 0 {
-		parts = append(parts, "事实："+strings.Join(payload.StableFacts, "；"))
-	}
-	if len(payload.PendingQuestions) > 0 {
-		parts = append(parts, "待跟进："+strings.Join(payload.PendingQuestions, "；"))
-	}
-	return utils.ClipTail(strings.Join(parts, "；"), s.historySummary.SummaryMaxChars)
-}
-
-// deduplicateAndLimit 去重并限制数量
-func (s *SummaryCompressionStrategy) deduplicateAndLimit(values []string) []string {
-	return stream.FromSlice(values).
-		Map(func(item string) string { return utils.ClipTail(strutil.Trim(item), maxItemLength) }).
-		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).
-		Distinct().Limit(maxSectionItems).ToSlice()
+func (s *SummaryCompressionStrategy) normalizeSummary(summary *vo.ConversationSummary) *vo.ConversationSummary {
+	summary.Normalize(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
+	return summary
 }
 
 // isNoiseHint 判断是否为噪音提示
@@ -579,20 +463,4 @@ func isNoiseHint(value string) bool {
 		"什么": true, "哪个": true, "这个": true, "那个": true, "可以": true, "需要": true,
 	}
 	return noiseHints[value]
-}
-
-// copySummary 复制摘要
-func copySummary(summary *vo.ConversationSummary) *vo.ConversationSummary {
-	if summary == nil {
-		return &vo.ConversationSummary{}
-	}
-	return &vo.ConversationSummary{
-		Summary:          summary.Summary,
-		ConversationGoal: summary.ConversationGoal,
-		StableFacts:      append([]string{}, summary.StableFacts...),
-		UserPreferences:  append([]string{}, summary.UserPreferences...),
-		ResolvedPoints:   append([]string{}, summary.ResolvedPoints...),
-		PendingQuestions: append([]string{}, summary.PendingQuestions...),
-		RetrievalHints:   append([]string{}, summary.RetrievalHints...),
-	}
 }
