@@ -47,7 +47,7 @@ type VectorRetriever interface {
 
 type DocumentFetcher interface {
 	// FetchRetrieveDocuments 获取文档
-	FetchRetrieveDocuments(ctx context.Context, id string) ([]byte, error)
+	FetchRetrieveDocuments(ctx context.Context) ([]*vo.DocumentMetadata, error)
 
 	// QueryParentChunks 查询父块
 	QueryParentChunks(ctx context.Context, id string) ([]*vo.DocumentChunk, error)

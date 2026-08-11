@@ -4,6 +4,7 @@ import (
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/api/document"
 	"github.com/swiftbit/know-agent/api/knowledge"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	cen "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	dagg "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
@@ -97,8 +98,8 @@ type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
 
 	ToRetrievalResultRespList(src []*cvo.ChatRetrievalResult) []*chat.RetrievalResultResp
-	ToConversationSessionResp(src *cvo.ConversationArchiveRecord) *chat.ConversationSessionResp
-	ToConversationSessionRespList(src []*cvo.ConversationArchiveRecord) []*chat.ConversationSessionResp
+	ToConversationSessionResp(src *aggregate.ConversationArchiveRecord) *chat.ConversationSessionResp
+	ToConversationSessionRespList(src []*aggregate.ConversationArchiveRecord) []*chat.ConversationSessionResp
 	ToConversationResetResp(src *cvo.ConversationReset) *chat.ConversationResetResp
 	// goverter:map DebugTrace | ToChatDebugTrace
 	ToConversationExchange(src *cen.ChatExchange) *chat.ConversationExchange

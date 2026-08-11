@@ -1,6 +1,9 @@
 package common
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrInvalidParam = NewBizError(10001, "参数错误：%s")
@@ -42,6 +45,20 @@ func (e *BizError) Format(args ...any) *BizError {
 		Msg:  fmt.Sprintf(e.Msg, args...),
 		Err:  e.Err,
 	}
+}
+
+func (e *BizError) Is(target error) bool {
+	if e == nil {
+		return false
+	}
+	if e == target {
+		return true
+	}
+	var bizError *BizError
+	if errors.As(target, &bizError) {
+		return bizError.Code == e.Code
+	}
+	return false
 }
 
 // WrapErr 将底层原始错误，包装为带业务码的错误

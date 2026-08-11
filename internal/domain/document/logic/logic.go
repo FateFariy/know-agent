@@ -44,8 +44,8 @@ type LifecycleLogic interface {
 	// ListRetrievableDocuments 获取可检索的文档列表
 	ListRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
 
-	// QueryParentBlocks 查询父块列表
-	QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error)
+	// QueryParentChunks 查询父块列表
+	QueryParentChunks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error)
 }
 
 // ProfileLogic 文档画像逻辑接口

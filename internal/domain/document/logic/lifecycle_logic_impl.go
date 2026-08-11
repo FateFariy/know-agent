@@ -211,7 +211,7 @@ func (d *LifecycleLogicImpl) QueryDocumentDetail(ctx context.Context, documentId
 // DeleteDocument 删除文档 todo 删除其他索引,实现关键词搜索、导航索引、知识路由索引、结构图投影
 func (d *LifecycleLogicImpl) DeleteDocument(ctx context.Context, documentId int64) (string, error) {
 	// 检查是否有活跃任务
-	activeTaskCount, err := d.repo.CountActiveTask(ctx, documentId, 0, enum.TaskStatusNew, enum.TaskStatusRunning)
+	activeTaskCount, err := d.repo.CountTaskByParams(ctx, documentId, 0, []int{enum.TaskStatusNew, enum.TaskStatusRunning})
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +293,7 @@ func (d *LifecycleLogicImpl) ConfirmStrategy(ctx context.Context, cmd *vo.Docume
 		return nil, nil, common.NewBizError(errorx.ErrStrategyStepEmpty.Code, "子块流水线不能为空。")
 	}
 
-	// 标准化策略步骤
+	// 构建父子流水线步骤
 	steps := d.buildParentChildSteps(baseSteps, parentStrategyTypes, childStrategyTypes, cmd.DocumentId)
 
 	// 判断是否发生了策略变更
@@ -462,7 +462,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 	}
 
 	// 并发控制：检查是否存在同类型的活跃任务，防止重复构建
-	runningTaskCount, err := d.repo.CountActiveTask(ctx, documentId, enum.TaskTypeBuildIndex, enum.TaskStatusNew, enum.TaskStatusRunning)
+	runningTaskCount, err := d.repo.CountTaskByParams(ctx, documentId, enum.TaskTypeBuildIndex, []int{enum.TaskStatusNew, enum.TaskStatusRunning})
 	if err != nil {
 		return nil, err
 	}
@@ -590,31 +590,31 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 	}
 
 	// 分页查询文档块列表
-	chunkList, total, err := d.repo.SelectChunkPage(ctx, document.ID, effectiveTaskId, pageNo, pageSize)
+	chunks, total, err := d.repo.SelectChunkPage(ctx, document.ID, effectiveTaskId, pageNo, pageSize)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
 	// 提取所有文档块的父块ID列表
-	parentBlockIds := slice.Map(chunkList, func(index int, item *entity.DocumentChunk) int64 { return item.ParentChunkId })
+	parentChunkIds := slice.Map(chunks, func(index int, item *entity.DocumentChunk) int64 { return item.ParentChunkId })
 
 	// 批量查询父块信息
-	parentBlockList, err := d.repo.SelectParentChunkListByIds(ctx, parentBlockIds)
+	parentChunks, err := d.repo.SelectParentChunkListByIds(ctx, parentChunkIds)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
 	// 构建父块ID到父块对象的映射
-	parentBlockMap := utils.SliceToMapBy(parentBlockList,
+	parentChunkMap := utils.SliceToMapBy(parentChunks,
 		func(item *entity.DocumentParentChunk) (int64, *entity.DocumentParentChunk) { return item.ID, item })
 
 	// 填充每个文档块的父块信息和枚举名称
-	slice.ForEach(chunkList, func(index int, item *entity.DocumentChunk) {
-		item.FillParentInfo(parentBlockMap[item.ParentChunkId])
+	slice.ForEach(chunks, func(index int, item *entity.DocumentChunk) {
+		item.FillParentInfo(parentChunkMap[item.ParentChunkId])
 		item.FillEnumName()
 	})
 
-	return chunkList, total, task.PlanId, nil
+	return chunks, total, task.PlanId, nil
 }
 
 // QueryDocumentChunkDetail 查询文档块详情
@@ -655,7 +655,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, docum
 		if err != nil {
 			return nil, err
 		}
-		siblingChunkList, err = d.repo.SelectChunkListByParentBlockId(ctx, document.ID, effectiveTaskId, chunk.ParentChunkId)
+		siblingChunkList, err = d.repo.SelectChunkListByParentChunkId(ctx, document.ID, effectiveTaskId, chunk.ParentChunkId)
 		if err != nil {
 			return nil, err
 		}
@@ -700,8 +700,8 @@ func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, docum
 	return d.repo.SelectRetrievableDocuments(ctx, documentIds...)
 }
 
-// QueryParentBlocks 查询父块列表
-func (d *LifecycleLogicImpl) QueryParentBlocks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error) {
+// QueryParentChunks 查询父块列表
+func (d *LifecycleLogicImpl) QueryParentChunks(ctx context.Context, parentIds []int64) ([]*entity.DocumentParentChunk, error) {
 	return d.repo.SelectParentChunkListByIds(ctx, parentIds)
 }
 
@@ -742,7 +742,8 @@ func (d *LifecycleLogicImpl) markIndexBuildSubmitFailed(ctx context.Context, doc
 			Content:      "索引构建后台任务提交失败，未进入切块执行。",
 			DetailJson:   string(detailJson),
 		}
-		return d.repo.InsertTaskLog(ctx, log)
+		_ = d.repo.InsertTaskLog(ctx, log)
+		return nil
 	}
 	return d.repo.Do(ctx, fn)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -41,14 +42,14 @@ func (e *RagChatExecutor) Mode() enum.ExecutionMode {
 }
 
 // Execute 执行检索 + Prompt 装配 + 模型流式回答
-func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
+func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *conversation.Context) (<-chan string, error) {
 	// 加载执行计划，缺失时直接报错
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
 		return nil, fmt.Errorf("invalid value")
 	}
 
-	if err := publishThinking(convCtx, "正在根据问题规划知识检索范围。"); err != nil {
+	if err := convCtx.PublishThinking("正在根据问题规划知识检索范围。"); err != nil {
 		return nil, err
 	}
 
@@ -103,12 +104,12 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *vo.ConversationC
 }
 
 // streamFromRetrievalContext 基于检索上下文生成流式回答
-func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCtx *vo.ConversationContext,
+func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCtx *conversation.Context,
 	plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (<-chan string, error) {
 	// 先下发思考事件（检索笔记、渠道列表）
 	notes := retrievalCtx.RetrievalNotes()
 	for _, note := range notes {
-		if err := publishThinking(convCtx, note); err != nil {
+		if err := convCtx.PublishThinking(note); err != nil {
 			return nil, err
 		}
 	}
@@ -123,7 +124,7 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	// 空证据兜底
 	if retrievalCtx.IsEmpty() {
-		if err := publishThinking(convCtx, "当前没有足够证据，直接返回无证据兜底回复。"); err != nil {
+		if err := convCtx.PublishThinking("当前没有足够证据，直接返回无证据兜底回复。"); err != nil {
 			return nil, err
 		}
 		return singleValueChan(utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)), nil
@@ -131,12 +132,12 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 
 	references := retrievalCtx.FlattenReferences()
 	if len(references) > 0 {
-		if err := publishReferences(convCtx, references); err != nil {
+		if err := convCtx.PublishReferences(references); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := publishThinking(convCtx, "证据整理完成，正在基于证据生成回答。"); err != nil {
+	if err := convCtx.PublishThinking("证据整理完成，正在基于证据生成回答。"); err != nil {
 		return nil, err
 	}
 

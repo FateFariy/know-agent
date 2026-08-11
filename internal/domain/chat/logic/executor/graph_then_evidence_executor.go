@@ -9,6 +9,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -40,7 +41,7 @@ func (e *GraphThenEvidenceExecutor) Mode() enum.ExecutionMode {
 }
 
 // Execute 执行结构图定位与证据渲染
-func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
+func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *conversation.Context) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	var decision *vo.DocumentNavigationDecision
 	noEvidenceReply := defaultNoEvidenceReply
@@ -54,7 +55,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 		return singleValueChan(noEvidenceReply), nil
 	}
 
-	if err := publishThinking(convCtx, "正在通过结构图定位目标章节和编号项。"); err != nil {
+	if err := convCtx.PublishThinking("正在通过结构图定位目标章节和编号项。"); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +77,7 @@ func (e *GraphThenEvidenceExecutor) Execute(ctx context.Context, convCtx *vo.Con
 	graphResult, err := e.querier.BuildGraphResult(ctx, documentId, sectionNodeId, itemIndex, itemKeywordHint)
 	if err != nil {
 		vo.OnError(ctx, "结构图查询失败。", err)
-		if err = publishThinking(convCtx, "结构图查询失败。"); err != nil {
+		if err = convCtx.PublishThinking("结构图查询失败。"); err != nil {
 			return nil, err
 		}
 		return singleValueChan(noEvidenceReply), nil

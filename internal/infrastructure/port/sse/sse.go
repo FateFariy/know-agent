@@ -84,7 +84,7 @@ func (s *Sink) newEvent(eventType string, content any, conversationId string, ex
 	return &streamEvent{
 		Type:           eventType,
 		Content:        content,
-		Timestamp:      time.Now().Format(time.DateTime),
+		Timestamp:      time.Now().Format("2006-01-02 15:04:05.000"),
 		ConversationId: strutil.Trim(conversationId),
 		ExchangeId:     exchangeId,
 	}

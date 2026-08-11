@@ -1,6 +1,6 @@
 package vo
 
-type KnowledgeDocument struct {
+type DocumentMetadata struct {
 	DocumentId        int64  `gorm:"column:id"`                  // 文档ID
 	DocumentName      string `gorm:"column:document_name"`       // 文档名称
 	KnowledgeBaseId   int64  `gorm:"column:knowledge_base_id"`   // 知识库ID

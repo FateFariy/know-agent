@@ -12,6 +12,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -42,7 +43,7 @@ func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.
 		return ctx
 	}
 
-	stageCode, _ := info.Payload.(*vo.ConversationTraceStage)
+	stageCode, _ := info.Payload.(*enum.ConversationTraceStage)
 	if stageCode == nil {
 		logx.Warn("ConversationTraceHandler.OnStart: Payload 无效")
 		return ctx
@@ -66,7 +67,7 @@ func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.
 		StageOrder:     stageCode.Order,
 		StageLevel:     1,
 		ExecutionMode:  info.ExecutionMode,
-		StageState:     vo.ConversationTraceStageStateRunning,
+		StageState:     enum.ConversationTraceStageStateRunning,
 		StartTime:      utils.Pointer(info.StartTime),
 		SummaryText:    utils.Pointer(summaryText),
 		SnapshotJson:   utils.Pointer(t.snapshot(snapshot)),
@@ -91,7 +92,7 @@ func (t *ConversationTraceHandler) OnEnd(ctx context.Context, info *callbacks.Ru
 		return ctx
 	}
 	t.updateStage(ctx, info.StageId, trace.ConversationId(), info.StartTime,
-		vo.ConversationTraceStageStateCompleted, stageOutput.SummaryText, "", stageOutput.Snapshot)
+		enum.ConversationTraceStageStateCompleted, stageOutput.SummaryText, "", stageOutput.Snapshot)
 	return ctx
 }
 
@@ -114,7 +115,7 @@ func (t *ConversationTraceHandler) OnError(ctx context.Context, info *callbacks.
 		}
 	}
 	t.updateStage(ctx, info.StageId, trace.ConversationId(), info.StartTime,
-		vo.ConversationTraceStageStateFailed, summaryText, errMsg, nil)
+		enum.ConversationTraceStageStateFailed, summaryText, errMsg, nil)
 	return ctx
 }
 

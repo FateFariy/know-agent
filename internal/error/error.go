@@ -25,4 +25,5 @@ var (
 	ErrSessionNotFound          = common.NewBizError(20020, "会话不存在: %d")
 	ErrExchangeNotFound         = common.NewBizError(20021, "对话记录不存在: %d")
 	ErrKnowledgeBaseNotFound    = common.NewBizError(20022, "知识库配置不存在: %d")
+	ErrSessionRunning           = common.NewBizError(20023, "该会话当前正在执行中，请稍后再试")
 )

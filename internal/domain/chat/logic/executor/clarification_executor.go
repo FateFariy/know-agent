@@ -7,6 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -35,7 +36,7 @@ func (e *ClarificationExecutor) Mode() enum.ExecutionMode {
 //  3. 准备澄清回复、原因、候选项；原因写入调试轨迹
 //  4. 发布思考事件 + 状态事件（原因非空时）
 //  5. 提交追踪快照，最后通过 singleValueChan 返回澄清文本
-func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
+func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *conversation.Context) (<-chan string, error) {
 	// 加载执行计划，缺失时直接报错
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {
@@ -57,11 +58,11 @@ func (e *ClarificationExecutor) Execute(ctx context.Context, convCtx *vo.Convers
 	}
 
 	// 向客户端流发布思考事件；原因非空时再追加一条状态事件
-	if err := publishThinking(convCtx, "当前问题涉及多份候选文档，先向你确认知识范围。"); err != nil {
+	if err := convCtx.PublishThinking("当前问题涉及多份候选文档，先向你确认知识范围。"); err != nil {
 		return nil, err
 	}
 	if strutil.IsNotBlank(reason) {
-		if err := publishStatus(convCtx, reason); err != nil {
+		if err := convCtx.PublishStatus(reason); err != nil {
 			return nil, err
 		}
 	}

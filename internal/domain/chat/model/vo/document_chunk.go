@@ -55,7 +55,7 @@ type DocumentChunk struct {
 	ItemIndex         int     `json:"itemIndex"`         // 文档项索引
 	OriginalSnippet   string  `json:"originalSnippet"`   // 文档原始片段
 
-	// ========== 从 KnowledgeDocument 补充 ==========
+	// ========== 从 DocumentMetadata 补充 ==========
 	DocumentName       string `json:"documentName"`       // 文档名称
 	KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 文档知识范围编码
 	KnowledgeScopeName string `json:"knowledgeScopeName"` // 文档知识范围名称
@@ -80,9 +80,5 @@ func (d *DocumentChunk) FillKnowledge(knowledge *vo2.KnowledgeDocument) {
 	if knowledge == nil {
 		return
 	}
-	d.KnowledgeScopeCode = knowledge.KnowledgeScopeCode
-	d.KnowledgeScopeName = knowledge.KnowledgeScopeName
-	d.BusinessCategory = knowledge.BusinessCategory
-	d.DocumentTags = knowledge.DocumentTags
 	d.DocumentName = knowledge.DocumentName
 }

@@ -2,12 +2,14 @@ package handler
 
 import (
 	"context"
+	"io"
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/sse"
 )
 
 // ChatService 聊天服务实现
@@ -25,8 +27,12 @@ func NewChatService(l logic.ConversationLogic) *ChatService {
 }
 
 // StreamChat 流式聊天
-func (c *ChatService) StreamChat(ctx context.Context, req *chat.ChatReq) <-chan string {
-	return c.l.OpenConversationStream(ctx, convert.FromChatReq(req))
+func (c *ChatService) StreamChat(ctx context.Context, writer io.Writer, req *chat.ChatReq) error {
+	sink, err := sse.NewSink(writer)
+	if err != nil {
+		return err
+	}
+	return c.l.OpenConversationStream(ctx, sink, convert.FromChatReq(req))
 }
 
 // StopConversation 停止会话
@@ -63,7 +69,7 @@ func (c *ChatService) GetExchangeDetail(ctx context.Context, req *chat.Conversat
 
 // ListSessions 获取会话列表
 func (c *ChatService) ListSessions(ctx context.Context, req *chat.ConversationSessionListReq) (*chat.ConversationSessionListResp, error) {
-	records, total, err := c.l.ListSessions(ctx, req.PageNo, req.PageSize, vo.ToChatQueryMode(req.ChatMode), vo.ToChatTurnStatus(req.TurnStatus), req.Keyword)
+	records, total, err := c.l.ListSessions(ctx, req.PageNo, req.PageSize, enum.ToChatQueryMode(req.ChatMode), enum.ToChatTurnStatus(req.TurnStatus), req.Keyword)
 	if err != nil {
 		return nil, err
 	}

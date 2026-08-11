@@ -9,9 +9,10 @@ import (
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
 	common "github.com/swiftbit/know-agent/common"
+	aggregate "github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	entity "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	vo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	aggregate "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
+	aggregate1 "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
@@ -26,7 +27,7 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 		var voChatCommand vo.ChatCommand
 		voChatCommand.Question = (*source).Question
 		voChatCommand.ConversationId = (*source).ConversationId
-		voChatCommand.ChatMode = ToChatQueryMode((*source).ChatMode)
+		voChatCommand.ChatMode = (*source).ChatMode
 		voChatCommand.SelectedDocumentId = StringToInt64((*source).SelectedDocumentId)
 		pVoChatCommand = &voChatCommand
 	}
@@ -260,7 +261,7 @@ func ToConversationMemorySummaryResp(source *entity.ChatMemorySummary) *chat.Con
 		chatConversationMemorySummaryResp.CompressionCount = (*source).CompressionCount
 		chatConversationMemorySummaryResp.SummaryVersion = (*source).SummaryVersion
 		chatConversationMemorySummaryResp.SummaryText = (*source).SummaryText
-		chatConversationMemorySummaryResp.SummaryPayload = pEntityConversationSummaryToPChatSummaryPayload((*source).SummaryPayload)
+		chatConversationMemorySummaryResp.SummaryPayload = pVoConversationSummaryToPChatSummaryPayload((*source).SummaryPayload)
 		chatConversationMemorySummaryResp.LastSourceUpdateTime = TimeToString((*source).LastSourceUpdateTime)
 		chatConversationMemorySummaryResp.UpdateTime = TimeToStringMs((*source).UpdateTime)
 		pChatConversationMemorySummaryResp = &chatConversationMemorySummaryResp
@@ -280,7 +281,7 @@ func ToConversationResetResp(source *vo.ConversationReset) *chat.ConversationRes
 	}
 	return pChatConversationResetResp
 }
-func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.ConversationSessionResp {
+func ToConversationSessionResp(source *aggregate.ConversationArchiveRecord) *chat.ConversationSessionResp {
 	var pChatConversationSessionResp *chat.ConversationSessionResp
 	if source != nil {
 		var chatConversationSessionResp chat.ConversationSessionResp
@@ -309,7 +310,7 @@ func ToConversationSessionResp(source *vo.ConversationArchiveRecord) *chat.Conve
 	}
 	return pChatConversationSessionResp
 }
-func ToConversationSessionRespList(source []*vo.ConversationArchiveRecord) []*chat.ConversationSessionResp {
+func ToConversationSessionRespList(source []*aggregate.ConversationArchiveRecord) []*chat.ConversationSessionResp {
 	var pChatConversationSessionRespList []*chat.ConversationSessionResp
 	if source != nil {
 		pChatConversationSessionRespList = make([]*chat.ConversationSessionResp, len(source))
@@ -391,21 +392,6 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.C
 	}
 	return pChatConversationTraceStage
 }
-func pEntityConversationSummaryToPChatSummaryPayload(source *entity.ConversationSummary) *chat.SummaryPayload {
-	var pChatSummaryPayload *chat.SummaryPayload
-	if source != nil {
-		var chatSummaryPayload chat.SummaryPayload
-		chatSummaryPayload.Summary = (*source).Summary
-		chatSummaryPayload.ConversationGoal = (*source).ConversationGoal
-		chatSummaryPayload.StableFacts = (*source).StableFacts
-		chatSummaryPayload.UserPreferences = (*source).UserPreferences
-		chatSummaryPayload.ResolvedPoints = (*source).ResolvedPoints
-		chatSummaryPayload.PendingQuestions = (*source).PendingQuestions
-		chatSummaryPayload.RetrievalHints = (*source).RetrievalHints
-		pChatSummaryPayload = &chatSummaryPayload
-	}
-	return pChatSummaryPayload
-}
 func pTimeTimeToString(source *time.Time) string {
 	var xstring string
 	if source != nil {
@@ -447,6 +433,21 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalRe
 		pChatRetrievalResultResp = &chatRetrievalResultResp
 	}
 	return pChatRetrievalResultResp
+}
+func pVoConversationSummaryToPChatSummaryPayload(source *vo.ConversationSummary) *chat.SummaryPayload {
+	var pChatSummaryPayload *chat.SummaryPayload
+	if source != nil {
+		var chatSummaryPayload chat.SummaryPayload
+		chatSummaryPayload.Summary = (*source).Summary
+		chatSummaryPayload.ConversationGoal = (*source).ConversationGoal
+		chatSummaryPayload.StableFacts = (*source).StableFacts
+		chatSummaryPayload.UserPreferences = (*source).UserPreferences
+		chatSummaryPayload.ResolvedPoints = (*source).ResolvedPoints
+		chatSummaryPayload.PendingQuestions = (*source).PendingQuestions
+		chatSummaryPayload.RetrievalHints = (*source).RetrievalHints
+		pChatSummaryPayload = &chatSummaryPayload
+	}
+	return pChatSummaryPayload
 }
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
@@ -1085,7 +1086,7 @@ func ToParseArtifactModelList(source []*entity1.ParseArtifact) []*model.Document
 	}
 	return pModelDocumentParseArtifactList
 }
-func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
+func ToQueryDocumentChunkDetailResp(source *aggregate1.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
 	if source != nil {
 		var documentQueryDocumentChunkDetailResp document.QueryDocumentChunkDetailResp
@@ -1093,7 +1094,6 @@ func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *docu
 		documentQueryDocumentChunkDetailResp.TaskId = Int64ToString((*source).TaskId)
 		documentQueryDocumentChunkDetailResp.PlanId = Int64ToString((*source).PlanId)
 		documentQueryDocumentChunkDetailResp.Chunk = pEntityDocumentChunkToPDocumentDocumentChunkItem((*source).Chunk)
-		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem((*source).ParentChunk)
 		documentQueryDocumentChunkDetailResp.SiblingChunks = ToDocumentChunkItemList((*source).SiblingChunks)
 		pDocumentQueryDocumentChunkDetailResp = &documentQueryDocumentChunkDetailResp
 	}
@@ -1256,23 +1256,6 @@ func pEntityDocumentChunkToPDocumentDocumentChunkItem(source *entity1.DocumentCh
 		pDocumentDocumentChunkItem = &documentDocumentChunkItem
 	}
 	return pDocumentDocumentChunkItem
-}
-func pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem(source *entity1.DocumentParentChunk) *document.DocumentParentBlockItem {
-	var pDocumentDocumentParentBlockItem *document.DocumentParentBlockItem
-	if source != nil {
-		var documentDocumentParentBlockItem document.DocumentParentBlockItem
-		documentDocumentParentBlockItem.SectionPath = (*source).SectionPath
-		documentDocumentParentBlockItem.SourceType = (*source).SourceType
-		documentDocumentParentBlockItem.SourceTypeName = (*source).SourceTypeName
-		documentDocumentParentBlockItem.CharCount = (*source).CharCount
-		documentDocumentParentBlockItem.TokenCount = (*source).TokenCount
-		documentDocumentParentBlockItem.ChildCount = (*source).ChildCount
-		documentDocumentParentBlockItem.StartChunkNo = (*source).StartChunkNo
-		documentDocumentParentBlockItem.EndChunkNo = (*source).EndChunkNo
-		documentDocumentParentBlockItem.ParentText = (*source).ParentText
-		pDocumentDocumentParentBlockItem = &documentDocumentParentBlockItem
-	}
-	return pDocumentDocumentParentBlockItem
 }
 func pEntityDocumentStrategyPipelineToPDocumentDocumentStrategyPipeline(source *entity1.DocumentStrategyPipeline) *document.DocumentStrategyPipeline {
 	var pDocumentDocumentStrategyPipeline *document.DocumentStrategyPipeline

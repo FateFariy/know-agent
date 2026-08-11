@@ -52,8 +52,8 @@ type DocumentRepository interface {
 	// SelectTaskListByDocumentIds 根据文档ID列表查询任务
 	SelectTaskListByDocumentIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentTask, error)
 
-	// CountActiveTask 统计活跃任务数
-	CountActiveTask(ctx context.Context, documentId int64, taskType int, taskStatus ...int) (int64, error)
+	// CountTaskByParams 统计任务数
+	CountTaskByParams(ctx context.Context, documentId int64, taskType int, taskStatus []int) (int64, error)
 
 	// ========== 任务日志相关 ==========
 
@@ -120,8 +120,8 @@ type DocumentRepository interface {
 	// SelectChunkById 根据ID查询块
 	SelectChunkById(ctx context.Context, chunkId, documentId, taskId int64) (*entity.DocumentChunk, error)
 
-	// SelectChunkListByParentBlockId 根据父块ID查询块列表
-	SelectChunkListByParentBlockId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error)
+	// SelectChunkListByParentChunkId 根据父块ID查询块列表
+	SelectChunkListByParentChunkId(ctx context.Context, documentId, taskId, parentChunkId int64) ([]*entity.DocumentChunk, error)
 
 	// SelectChunks 根据条件查询块列表
 	SelectChunks(ctx context.Context, where map[string]any) ([]*entity.DocumentChunk, error)

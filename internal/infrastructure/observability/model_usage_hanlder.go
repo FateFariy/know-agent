@@ -177,10 +177,10 @@ func logStageCallOptions(meta *vo.ModelCallMeta, input *vo.ModelCallInput) {
 		provider = meta.Provider
 	}
 	if input.Temperature == 0 && input.TopP == 0 {
-		logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s", stage, provider, modelName)
+		logx.Infof("模型调用参数: conversation=%s, provider=%s, model=%s", stage, provider, modelName)
 		return
 	}
-	logx.Infof("模型调用参数: stage=%s, provider=%s, model=%s, temperature=%.2f, topP=%.2f",
+	logx.Infof("模型调用参数: conversation=%s, provider=%s, model=%s, temperature=%.2f, topP=%.2f",
 		stage, provider, modelName, input.Temperature, input.TopP)
 }
 

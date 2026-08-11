@@ -11,6 +11,7 @@ import (
 
 	"github.com/swiftbit/know-agent/api/chat"
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
@@ -23,12 +24,8 @@ func TimeToStringMs(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05.000")
 }
 
-func ToChatQueryMode(name string) cvo.ChatQueryMode {
-	return cvo.ToChatQueryMode(name)
-}
-
 func ToChatQueryModeName(code int) string {
-	return cvo.ChatQueryModeName(code)
+	return enum.ChatQueryModeName(code)
 }
 
 func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
@@ -38,7 +35,7 @@ func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 	}
 	return &chat.ChatDebugTrace{
 		ExecutionMode:                 debugTrace.ExecutionMode,
-		ChatMode:                      cvo.ChatQueryModeName(debugTrace.ChatMode),
+		ChatMode:                      enum.ChatQueryModeName(debugTrace.ChatMode),
 		OriginalQuestion:              debugTrace.OriginalQuestion,
 		RewriteQuestion:               debugTrace.RewriteQuestion,
 		RewriteSubQuestions:           debugTrace.RewriteSubQuestions,

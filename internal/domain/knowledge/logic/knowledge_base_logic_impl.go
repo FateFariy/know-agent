@@ -14,12 +14,14 @@ import (
 
 // KnowledgeConfigLogicImpl 知识库配置管理
 type KnowledgeConfigLogicImpl struct {
-	repo adapter.KnowledgeRepository
+	repo       adapter.KnowledgeRepository
+	docGateway adapter.DocumentGateway
 }
 
-func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository) *KnowledgeConfigLogicImpl {
+func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway) *KnowledgeConfigLogicImpl {
 	return &KnowledgeConfigLogicImpl{
-		repo: repo,
+		repo:       repo,
+		docGateway: docGateway,
 	}
 }
 
@@ -31,7 +33,7 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeConfig(ctx context.Context, conf
 
 	// 名称唯一性校验
 	existing, err := k.repo.SelectKnowledgeConfigByBaseName(ctx, strutil.Trim(config.BaseName))
-	if err != nil && !errors.Is(err, errorx.ErrKnowledgeConfigNotFound) {
+	if err != nil && !errors.Is(err, errorx.ErrKnowledgeBaseNotFound) {
 		return nil, err
 	}
 	if existing.ID != config.ID {
@@ -128,4 +130,53 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigsByIds(ctx context.Context
 		return nil, nil
 	}
 	return k.repo.SelectKnowledgeConfigByIds(ctx, ids)
+}
+
+// GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置
+func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error) {
+	if id <= 0 {
+		return nil, errors.New("id 不能为空")
+	}
+	config, err := k.repo.SelectKnowledgeConfigById(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+// ListKnowledgeConfigOptions 查询知识库选项列表
+func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
+	configs, err := k.repo.SelectKnowledgeConfigs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(configs) == 0 {
+		return []*KnowledgeConfigOption{}, nil
+	}
+
+	// 收集所有知识库ID
+	kbIds := make([]int64, 0, len(configs))
+	for _, c := range configs {
+		kbIds = append(kbIds, c.ID)
+	}
+
+	// 批量统计可检索文档数量
+	retrievableCounts, err := k.docGateway.CountRetrievableDocumentsByKnowledgeBaseIds(ctx, kbIds)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建选项列表
+	options := make([]*KnowledgeConfigOption, 0, len(configs))
+	for _, c := range configs {
+		option := &KnowledgeConfigOption{
+			ID:               c.ID,
+			BaseName:         c.BaseName,
+			Description:      c.Description,
+			IsDefault:        c.IsDefault,
+			RetrievableCount: retrievableCounts[c.ID],
+		}
+		options = append(options, option)
+	}
+	return options, nil
 }

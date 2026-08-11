@@ -7,6 +7,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	ragvo "github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -36,7 +37,7 @@ var _ Executor = (*GraphOnlyExecutor)(nil)
 func (e *GraphOnlyExecutor) Mode() enum.ExecutionMode { return enum.ExecutionModeGraphOnly }
 
 // Execute 执行结构图查询并渲染答案
-func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.ConversationContext) (<-chan string, error) {
+func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *conversation.Context) (<-chan string, error) {
 	plan := convCtx.ExecutionPlan.Load()
 	var decision *vo.DocumentNavigationDecision
 	noEvidenceReply := defaultNoEvidenceReply
@@ -51,7 +52,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 		return singleValueChan(noEvidenceReply), nil
 	}
 
-	if err := publishThinking(convCtx, "正在通过结构图直接查询章节关系。"); err != nil {
+	if err := convCtx.PublishThinking("正在通过结构图直接查询章节关系。"); err != nil {
 		return nil, err
 	}
 
@@ -67,7 +68,7 @@ func (e *GraphOnlyExecutor) Execute(ctx context.Context, convCtx *vo.Conversatio
 	graphResult, err := e.buildGraphResult(ctx, documentId, sectionNodeId, decision)
 	if err != nil {
 		vo.OnError(ctx, "结构图查询失败。", err)
-		if err = publishThinking(convCtx, "结构图查询失败。"); err != nil {
+		if err = convCtx.PublishThinking("结构图查询失败。"); err != nil {
 			return nil, err
 		}
 		return singleValueChan(noEvidenceReply), nil
