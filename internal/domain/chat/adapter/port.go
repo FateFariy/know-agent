@@ -55,5 +55,24 @@ type DocumentFetcher interface {
 
 // Sink 面向客户端的事件输出端口
 type Sink interface {
-	WriteFrame(e *entity.Event) error
+	// Text 发送文本事件
+	Text(content string, conversationId string, exchangeId int64) error
+
+	// Thinking 发送思考中事件
+	Thinking(content string, conversationId string, exchangeId int64) error
+
+	// Status 发送状态事件
+	Status(content string, conversationId string, exchangeId int64) error
+
+	// Error 发送错误事件
+	Error(content string, conversationId string, exchangeId int64) error
+
+	// References 发送参考事件
+	References(references []*vo.SearchReference, conversationId string, exchangeId int64) error
+
+	// Recommendations 发送推荐事件
+	Recommendations(recommendations []string, conversationId string, exchangeId int64) error
+
+	// Finish 发送完成事件
+	Finish(conversationId string, exchangeId int64) error
 }

@@ -10,16 +10,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// streamEvent 流式事件结构体
-type streamEvent struct {
-	Type           string `json:"type"`                     // 事件类型
-	Content        any    `json:"content"`                  // 事件内容
-	Timestamp      string `json:"timestamp"`                // 时间戳
-	ConversationId string `json:"conversationId,omitempty"` // 会话ID（可选）
-	ExchangeId     int64  `json:"exchangeId,omitempty"`     // 交换ID（可选）
-	Count          *int   `json:"count,omitempty"`          // 数量（可选，使用指针区分是否设置）
-}
-
 // StreamEventBuilder 流式事件构建器, 用于构建 SSE 流式响应中的各类事件 JSON 字符串
 type StreamEventBuilder struct {
 }

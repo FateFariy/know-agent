@@ -14,11 +14,6 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 		[]rest.Route{
 			{
 				Method:  http.MethodPost,
-				Path:    "/stream",
-				Handler: StreamChatHandler(svcCtx, srv),
-			},
-			{
-				Method:  http.MethodPost,
 				Path:    "/session/stop",
 				Handler: StopConversationHandler(svcCtx, srv),
 			},
@@ -58,6 +53,13 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 				Handler: GetChannelExecutionsHandler(svcCtx, srv),
 			},
 		},
-		rest.WithPrefix("/chat"), rest.WithSSE(),
+		rest.WithPrefix("/chat"),
 	)
+	server.AddRoutes([]rest.Route{
+		{
+			Method:  http.MethodPost,
+			Path:    "/stream",
+			Handler: StreamChatHandler(svcCtx, srv),
+		},
+	}, rest.WithPrefix("/chat"), rest.WithSSE())
 }

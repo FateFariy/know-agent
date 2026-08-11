@@ -60,13 +60,13 @@ func UploadDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UploadDocumentReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
 		file, header, err := r.FormFile("file")
 		if err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 		defer file.Close()
@@ -81,7 +81,7 @@ func QueryDocumentPageHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentPageReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -95,7 +95,7 @@ func QueryDocumentDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -117,7 +117,7 @@ func DeleteDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DeleteDocumentReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -131,7 +131,7 @@ func QueryStrategyPlanHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryStrategyPlanReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -145,7 +145,7 @@ func ConfirmStrategyHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConfirmStrategyReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -159,7 +159,7 @@ func BuildIndexHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req BuildIndexReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -173,7 +173,7 @@ func QueryDocumentChunksHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentChunksReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -187,7 +187,7 @@ func QueryDocumentChunkDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer)
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentChunkDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -201,7 +201,7 @@ func QueryTaskLogsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryTaskLogsReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -215,7 +215,7 @@ func GetDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -229,7 +229,7 @@ func RegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileRegenerateReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -243,7 +243,7 @@ func BatchRegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPS
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileBatchRegenerateReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 

@@ -89,37 +89,35 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 }
 
 // OpenConversationStream 打开会话流
-func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) (stream <-chan string) {
+func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, sink adapter.Sink, cmd *vo.ChatCommand) (err error) {
 	cmdJSON, _ := json.Marshal(cmd)
 	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
 	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
 	defer func() {
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				c.unlockConversationLock(leaseKey)
-				logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
-					cmd.ConversationId, cmd.Question, err)
-				stream = c.rejectStream(err.Error(), cmd.ConversationId, 0)
-			}
+		if err != nil {
+			c.unlockConversationLock(leaseKey)
+			logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
+				cmd.ConversationId, cmd.Question, err)
+			sink.Error(err.Error(), cmd.ConversationId, 0)
 		}
 	}()
 
 	// 获取分布式租约
 	if err := c.distributedLock.TryLock(ctx, leaseKey); err != nil {
-		panic(fmt.Errorf("该会话当前正在执行中，请稍后再试"))
+		return fmt.Errorf("该会话当前正在执行中，请稍后再试")
 	}
 
 	// 构建启动计划
 	plan, err := c.buildLaunchPlan(ctx, cmd)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// 启动会话：创建 exchange + 注册运行上下文
-	stream, err = c.bootstrapConversation(ctx, plan)
+	stream, err := c.bootstrapConversation(ctx, plan)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	return

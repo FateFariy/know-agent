@@ -13,7 +13,9 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
@@ -45,12 +47,12 @@ func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity
 		ID:             utils.GetSnowflakeNextID(),
 		ConversationId: dialogue.ConversationId,
 		Question:       dialogue.Question,
-		TurnStatus:     vo.ChatTurnStatusRunning,
+		TurnStatus:     enum.ChatTurnStatusRunning,
 		CreateTime:     time.Now(),
 		UpdateTime:     time.Now(),
 	}
 	return chatExchange, r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		dialogue.SessionStatus = vo.ChatSessionStatusRunning
+		dialogue.SessionStatus = enum.ChatSessionStatusRunning
 		if err := r.UpsertDialogue(ctx, dialogue); err != nil {
 			return err
 		}
@@ -166,14 +168,14 @@ func (r *ChatRepositoryImpl) UpsertDialogue(ctx context.Context, dialogue *entit
 
 // RefreshSessionScope 刷新会话范围（更新会话状态、模式、文档选择）
 func (r *ChatRepositoryImpl) RefreshSessionScope(ctx context.Context, dialogue *entity.ChatDialogue) error {
-	dialogue.SessionStatus = vo.ChatSessionStatusRunning
+	dialogue.SessionStatus = enum.ChatSessionStatusRunning
 	return r.UpsertDialogue(ctx, dialogue)
 }
 
 // ========== 会话归档与查询 ==========
 
 // SelectSessionRecord 获取会话
-func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversationId string) (*vo.ConversationArchiveRecord, error) {
+func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversationId string) (*aggregate.ConversationArchiveRecord, error) {
 	dialogue := &entity.ChatDialogue{}
 	err := r.dbWithContext(ctx).
 		Where("conversation_id = ?", conversationId).
@@ -195,7 +197,7 @@ func (r *ChatRepositoryImpl) SelectSessionRecord(ctx context.Context, conversati
 }
 
 // ListSessionRecordPage 列出会话记录分页
-func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*vo.ConversationArchiveRecord, int64, error) {
+func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, pageNo, pageSize, chatMode, latestTurnStatus int, keyword string) ([]*aggregate.ConversationArchiveRecord, int64, error) {
 	query := r.buildListDialoguePageQuery(ctx, keyword, chatMode, latestTurnStatus)
 
 	var total int64
@@ -214,7 +216,7 @@ func (r *ChatRepositoryImpl) ListSessionRecordPage(ctx context.Context, pageNo, 
 	if err != nil {
 		return nil, 0, err
 	}
-	records := slice.Map(dialogues, func(index int, item *entity.ChatDialogue) *vo.ConversationArchiveRecord {
+	records := slice.Map(dialogues, func(index int, item *entity.ChatDialogue) *aggregate.ConversationArchiveRecord {
 		return r.toChatArchiveRecord(item, []*entity.ChatExchange{chatExchangesMap[item.ConversationId]})
 	})
 	return records, total, nil
@@ -327,7 +329,7 @@ func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, key
 	}
 
 	if latestTurnStatus > 1 {
-		query.Where("session_status = ?", vo.ChatSessionStatusIdle)
+		query.Where("session_status = ?", enum.ChatSessionStatusIdle)
 		latestIdSubQuery := r.db.Session(&gorm.Session{NewDB: true, Context: ctx}).
 			Table("chat_exchange AS latest").
 			Select("latest.id").
@@ -342,7 +344,7 @@ func (r *ChatRepositoryImpl) buildListDialoguePageQuery(ctx context.Context, key
 			Where("e.turn_status = ?", latestTurnStatus)
 		query.Where("EXISTS (?)", existsQuery)
 	} else if latestTurnStatus > 0 {
-		query.Where("session_status = ?", vo.ChatSessionStatusRunning)
+		query.Where("session_status = ?", enum.ChatSessionStatusRunning)
 	}
 
 	return query.Order("update_time DESC, id DESC")
@@ -410,11 +412,11 @@ func (r *ChatRepositoryImpl) DeleteChannelExecutionsByConversationId(ctx context
 }
 
 // toChatArchiveRecord 转换为会话记录
-func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *vo.ConversationArchiveRecord {
-	return &vo.ConversationArchiveRecord{
+func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *aggregate.ConversationArchiveRecord {
+	return &aggregate.ConversationArchiveRecord{
 		ConversationId:       dialogue.ConversationId,
 		ChatMode:             dialogue.ChatMode,
-		Running:              dialogue.SessionStatus == vo.ChatSessionStatusRunning,
+		Running:              dialogue.SessionStatus == enum.ChatSessionStatusRunning,
 		SelectedDocumentId:   dialogue.SelectedDocumentId,
 		SelectedDocumentName: dialogue.SelectedDocumentName,
 		CreatedTime:          dialogue.CreateTime,

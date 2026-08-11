@@ -13,7 +13,7 @@ type Body struct {
 	Msg  string      `json:"msg"`
 }
 
-func Response(w http.ResponseWriter, resp interface{}, okMsg string, err error) {
+func Response(w http.ResponseWriter, resp any, okMsg string, err error) {
 	var body Body
 	if err != nil {
 		var bizErr *BizError
@@ -30,4 +30,14 @@ func Response(w http.ResponseWriter, resp interface{}, okMsg string, err error) 
 		body.Msg = okMsg
 	}
 	httpx.OkJson(w, body)
+}
+
+// Success 响应成功结果
+func Success(w http.ResponseWriter, resp any, msg string) {
+	Response(w, resp, msg, nil)
+}
+
+// Error 响应错误结果
+func Error(w http.ResponseWriter, err error) {
+	Response(w, nil, "", err)
 }

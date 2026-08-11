@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/checkpoint"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 )
 
 type MemoryCheckPointStore struct {
@@ -16,7 +16,7 @@ func NewMemoryCheckPointStore() *MemoryCheckPointStore {
 	return &MemoryCheckPointStore{}
 }
 
-var _ checkpoint.Store = (*MemoryCheckPointStore)(nil)
+var _ adapter.CheckPointStore = (*MemoryCheckPointStore)(nil)
 
 func (m *MemoryCheckPointStore) Get(ctx context.Context, checkPointId string) ([]byte, bool, error) {
 	return nil, false, nil

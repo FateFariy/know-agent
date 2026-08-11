@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -11,7 +12,7 @@ import (
 // ConversationLogic 聊天业务逻辑接口
 type ConversationLogic interface {
 	// OpenConversationStream 打开会话流
-	OpenConversationStream(ctx context.Context, cmd *vo.ChatCommand) <-chan string
+	OpenConversationStream(ctx context.Context, sink adapter.Sink, cmd *vo.ChatCommand) error
 
 	// StopConversation 停止会话
 	StopConversation(ctx context.Context, conversationId string) (bool, string, error)

@@ -21,6 +21,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -159,7 +160,7 @@ func (b *Base) convertToDocumentChunks(retrievedDocs []*schema.Document) []*cvo.
 			Content:           doc.Content,
 			OriginalSnippet:   doc.Content,
 			SourceType:        "DOCUMENT",
-			Channel:           cvo.RetrievalChannelVector,
+			Channel:           enum.RetrievalChannelVector,
 			Score:             doc.Score(),
 			TaskId:            b.metaToInt(meta[cvo.MetaTaskId]),
 			DocumentId:        b.metaToInt(meta[cvo.MetaDocumentId]),

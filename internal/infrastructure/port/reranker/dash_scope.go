@@ -13,6 +13,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpc"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -68,9 +69,9 @@ func NewDashScope(svcCtx *svc.ServiceContext) *DashScope {
 }
 
 // Process 调用 DashScope Rerank API 对传入的文档块进行重排序
-func (d *DashScope) Process(ctx context.Context, question string, chunks []*vo.DocumentChunk, opts ...reranker.Option) ([]*vo.DocumentChunk, error) {
+func (d *DashScope) Process(ctx context.Context, question string, chunks []*vo.DocumentChunk, opts ...common.Option) ([]*vo.DocumentChunk, error) {
 	// 合并外部选项
-	d.Options = reranker.GetOptions(d.Options, opts...)
+	d.Options = common.GetImplSpecificOptions(d.Options, opts...)
 
 	// 调用 DashScope Rerank HTTP API
 	start := time.Now()

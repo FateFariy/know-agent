@@ -47,7 +47,7 @@ func SaveKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeScopeSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -61,7 +61,7 @@ func DeleteKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeScopeDeleteReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -83,7 +83,7 @@ func SaveKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -97,7 +97,7 @@ func DeleteKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicDeleteReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -111,7 +111,7 @@ func ListKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicListReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -125,7 +125,7 @@ func ListTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationListReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -139,7 +139,7 @@ func SaveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -153,7 +153,7 @@ func RemoveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServ
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationRemoveReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 
@@ -167,7 +167,7 @@ func QueryKnowledgeRouteTracePageHandler(svcCtx *svc.ServiceContext, srv HTTPSer
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeRouteTracePageReq
 		if err := httpx.Parse(r, &req); err != nil {
-			common.Response(w, nil, "", common.ErrInvalidParam.Format(err.Error()))
+			common.Error(w, common.ErrInvalidParam.Format(err.Error()))
 			return
 		}
 

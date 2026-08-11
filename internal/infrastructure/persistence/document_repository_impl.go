@@ -211,8 +211,8 @@ func (d *DocumentRepositoryImpl) SelectTaskListByDocumentIds(ctx context.Context
 	return tasks, res.Error
 }
 
-// CountActiveTask 统计活跃任务数量
-func (d *DocumentRepositoryImpl) CountActiveTask(ctx context.Context, documentId int64, taskType int, taskStatus ...int) (int64, error) {
+// CountTaskByParams 统计任务数量
+func (d *DocumentRepositoryImpl) CountTaskByParams(ctx context.Context, documentId int64, taskType int, taskStatus []int) (int64, error) {
 	var count int64
 	var err error
 	query := d.dbWithContext(ctx).Model(&model.DocumentTask{}).Where("document_id = ?", documentId)
@@ -385,8 +385,8 @@ func (d *DocumentRepositoryImpl) SelectChunkById(ctx context.Context, chunkId, d
 	return chunk, nil
 }
 
-// SelectChunkListByParentBlockId 根据父块ID查询块列表
-func (d *DocumentRepositoryImpl) SelectChunkListByParentBlockId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error) {
+// SelectChunkListByParentChunkId 根据父块ID查询块列表
+func (d *DocumentRepositoryImpl) SelectChunkListByParentChunkId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error) {
 	var chunks []*entity.DocumentChunk
 	if err := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).
 		Where("document_id = ? AND task_id = ? AND parent_block_id = ?", documentId, taskId, parentBlockId).
