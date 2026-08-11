@@ -11,6 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // QuestionRewriteStage 问题改写阶段
@@ -18,7 +19,7 @@ import (
 // 仅当 RAG 开启时执行，OpenChat 模式跳过。
 type QuestionRewriteStage struct {
 	rewriter        rewrite.QueryRewriter
-	rewriteEnabled  bool
+	enabled         bool
 	ragEnabled      bool
 	maxSubQuestions int
 	temperature     float32
@@ -28,16 +29,15 @@ type QuestionRewriteStage struct {
 
 var _ Stage = (*QuestionRewriteStage)(nil)
 
-func NewQuestionRewriteStage(rewriter rewrite.QueryRewriter, rewriteEnabled, ragEnabled bool,
-	maxSubQuestions int, temperature, topP float32, thinking bool) *QuestionRewriteStage {
+func NewQuestionRewriteStage(svcCtx *svc.ServiceContext, rewriter rewrite.QueryRewriter) *QuestionRewriteStage {
 	return &QuestionRewriteStage{
 		rewriter:        rewriter,
-		rewriteEnabled:  rewriteEnabled,
-		ragEnabled:      ragEnabled,
-		maxSubQuestions: maxSubQuestions,
-		temperature:     temperature,
-		topP:            topP,
-		thinking:        thinking,
+		enabled:         svcCtx.Config.Chat.Rewrite.Enabled,
+		ragEnabled:      svcCtx.Config.Chat.Rag.Enabled,
+		maxSubQuestions: svcCtx.Config.Chat.Rewrite.MaxSubQuestions,
+		temperature:     svcCtx.Config.Chat.Rewrite.Temperature,
+		thinking:        svcCtx.Config.Chat.Rewrite.Thinking,
+		topP:            svcCtx.Config.Chat.Rewrite.TopP,
 	}
 }
 
@@ -69,7 +69,7 @@ func (q *QuestionRewriteStage) Execute(ctx context.Context, convCtx *Context) er
 	// 启动改写追踪阶段
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(),
 		&vo.StageInput{SummaryText: "正在生成检索友好的问题表达。",
-			Snapshot: buildRewriteStageSnapshot(question, historySummary, nil, q.rewriteEnabled, q.temperature, q.topP, q.thinking)})
+			Snapshot: buildRewriteStageSnapshot(question, historySummary, nil, q.enabled, q.temperature, q.topP, q.thinking)})
 
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := q.rewriter.Rewrite(ctx, question, historySummary)
@@ -80,7 +80,7 @@ func (q *QuestionRewriteStage) Execute(ctx context.Context, convCtx *Context) er
 
 	// 提交改写追踪（包含改写结果快照以便离线分析）
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "问题改写完成。",
-		Snapshot: buildRewriteStageSnapshot(question, historySummary, rewriteResult, q.rewriteEnabled, q.temperature, q.topP, q.thinking)})
+		Snapshot: buildRewriteStageSnapshot(question, historySummary, rewriteResult, q.enabled, q.temperature, q.topP, q.thinking)})
 
 	// 对改写结果做兜底处理
 	//  - RewrittenQuestion 为空时回退到原始问题
@@ -102,12 +102,7 @@ func (q *QuestionRewriteStage) Execute(ctx context.Context, convCtx *Context) er
 	return nil
 }
 
-// ShouldExecute 决定是否执行该阶段（实现 ConditionalStage 接口）
-func (q *QuestionRewriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
-	return convCtx.ChatMode != enum.ChatQueryModeOpenChat
-}
-
-// buildRewriteStageSnapshot 构建改写阶段的统一快照，供追踪的 StartStage/Fail/Complete 三处复用。
+// buildRewriteStageSnapshot 构建改写阶段的统一快照
 //
 // 快照字段：
 //   - 原始问题、历史摘要（始终输出）
@@ -119,7 +114,7 @@ func buildRewriteStageSnapshot(question, historySummary string, rewriteResult *v
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)
 
-	// 仅当改写结果存在时追加输出相关字段（避免在 StartStage 阶段填充空值）
+	// 仅当改写结果存在时追加输出相关字段
 	if rewriteResult != nil {
 		snapshot["rewriteQuestion"] = strutil.Trim(rewriteResult.RewrittenQuestion)
 		snapshot["subQuestions"] = rewriteResult.SubQuestions
