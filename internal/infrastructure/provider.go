@@ -13,6 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser/markdown"
 
 	chatadapter "github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	documentadapter "github.com/swiftbit/know-agent/internal/domain/document/adapter"
@@ -62,6 +63,7 @@ func NewParserRegistry() *parse2.Registry {
 		&parser.HTMLParser{},
 		&parser.TextParser{},
 		&parser.PDFParser{},
+		&markdown.GoldmarkParser{},
 	}
 	return parse2.NewRegistry(fallbackParser, parsers...)
 }

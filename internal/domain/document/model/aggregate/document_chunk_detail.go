@@ -11,18 +11,18 @@ type DocumentChunkDetail struct {
 	TaskId        int64
 	PlanId        int64
 	Chunk         *entity.DocumentChunk
-	ParentBlock   *entity.DocumentParentChunk
+	ParentChunk   *entity.DocumentParentChunk
 	SiblingChunks []*entity.DocumentChunk
 }
 
-func (d *DocumentChunkDetail) FillParentInfo(parentBlock *entity.DocumentParentChunk) {
-	if parentBlock != nil {
-		d.ParentBlock = parentBlock
-		d.ParentBlock.FillEnumName()
-		d.Chunk.FillParentInfo(parentBlock)
+func (d *DocumentChunkDetail) FillParentInfo(parentChunk *entity.DocumentParentChunk) {
+	if parentChunk != nil {
+		d.ParentChunk = parentChunk
+		d.ParentChunk.FillEnumName()
+		d.Chunk.FillParentInfo(parentChunk)
 		d.Chunk.FillEnumName()
 		slice.ForEach(d.SiblingChunks, func(index int, item *entity.DocumentChunk) {
-			item.FillParentInfo(parentBlock)
+			item.FillParentInfo(parentChunk)
 			item.FillEnumName()
 		})
 	}

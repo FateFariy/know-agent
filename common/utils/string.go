@@ -153,3 +153,13 @@ func FilterBlank(raw []string) []string {
 	}
 	return out
 }
+
+// CleanupSpace 清理文本中的常见空白字符
+func CleanupSpace(text string) string {
+	if text == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer("\r\n", "\n", "\r", "\n", "\x00", " ", "\t", " ")
+	text = replacer.Replace(text)
+	return strings.TrimSpace(text)
+}

@@ -149,6 +149,62 @@ func (b *DocumentBlock) CloneWithText(text string) *DocumentBlock {
 	return &clone
 }
 
+func (b *DocumentBlock) BuildContentWithWeight() string {
+	parts := make([]string, 0, 6)
+	if b.SectionPath != "" {
+		parts = append(parts, fmt.Sprintf("section: %s", b.SectionPath))
+	}
+	if b.BlockType != "" {
+		parts = append(parts, fmt.Sprintf("type: %s", b.BlockType))
+	}
+	if b.Text != "" {
+		parts = append(parts, b.Text)
+	}
+	if b.ImageCaption != "" && b.ImageCaption != b.Text {
+		parts = append(parts, fmt.Sprintf("caption: %s", b.ImageCaption))
+	}
+	if len(b.TableRows) > 0 {
+		parts = append(parts, tableText(b.TableRows))
+	}
+	return strings.Join(parts, "\n")
+}
+
+// tableText 将二维字符串数组（表格行）转换为纯文本表示
+func tableText(rows [][]string) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(rows))
+	for _, row := range rows {
+		// 收集非空单元格
+		cells := make([]string, 0, len(row))
+		for _, cell := range row {
+			if cell != "" {
+				cells = append(cells, cell)
+			}
+		}
+		// 若该行有非空单元格，则构建行字符串
+		if len(cells) > 0 {
+			lines = append(lines, strings.Join(cells, " | "))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+var nonAllowedCharsRegex = regexp.MustCompile(`[^0-9a-zA-Z\u4e00-\u9fff]+`)
+
+// BuildCanonicalPath 生成规范路径，格式：章节路径-块编号
+func (b *DocumentBlock) BuildCanonicalPath() string {
+	section := b.SectionPath
+	// 正则：匹配非字母、数字、汉字的字符（连续多个替换为一个 "-"）
+	section = nonAllowedCharsRegex.ReplaceAllString(section, "-")
+	section = strings.Trim(section, "-")
+	if section == "" {
+		section = "root"
+	}
+	return fmt.Sprintf("/%s/%d", section, b.BlockNo)
+}
+
 type DocumentBlocks []*DocumentBlock
 
 func (b DocumentBlocks) FirstPageNo() int {
@@ -405,4 +461,49 @@ func (b DocumentBlocks) FirstBlankSectionPath() string {
 		}
 	}
 	return ""
+}
+
+// Normalize 对块列表进行规范化处理：
+//   - 过滤掉无文本、无表格 HTML、无图片说明的空块；
+//   - 重新连续编号 block_no；
+//   - 清理文本（使用 cleanupText）；
+//   - 根据标题更新当前章节路径；
+//   - 为每个块补全 section_path、canonical_path 和 content_with_weight
+func (b DocumentBlocks) Normalize() DocumentBlocks {
+	normalized := make(DocumentBlocks, 0, len(b))
+	currentSection := ""
+
+	for _, block := range b {
+		text := utils.CleanupSpace(block.Text)
+		if text == "" && block.TableHTML == "" && block.ImageCaption == "" {
+			continue
+		}
+
+		// 重新编号（从1开始）
+		block.BlockNo = len(normalized) + 1
+		block.Text = text
+
+		// 若当前块是标题，更新当前章节信息
+		if block.BlockType == "TITLE" {
+			currentSection = text
+		}
+
+		// 补全 section_path（若为空则使用当前章节路径）
+		if block.SectionPath == "" {
+			block.SectionPath = currentSection
+		}
+
+		// 补全 canonical_path（若为空则自动生成）
+		if block.CanonicalPath == "" {
+			block.CanonicalPath = block.BuildCanonicalPath()
+		}
+
+		// 补全 content_with_weight（若为空则自动生成）
+		if block.ContentWithWeight == "" {
+			block.ContentWithWeight = block.BuildContentWithWeight()
+		}
+
+		normalized = append(normalized, block)
+	}
+	return normalized
 }

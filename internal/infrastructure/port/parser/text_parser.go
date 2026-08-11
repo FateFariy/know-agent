@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
@@ -44,7 +45,7 @@ func (p *TextParser) Parse(_ context.Context, sourceText []byte) (entity.Documen
 
 // splitParagraphs 将文本分割为段落列表
 func splitParagraphs(text string) []string {
-	cleaned := cleanupText(text)
+	cleaned := utils.CleanupSpace(text)
 	if cleaned == "" {
 		return []string{}
 	}

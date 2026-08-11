@@ -6,6 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
@@ -32,7 +33,7 @@ func (p *HTMLParser) Parse(_ context.Context, sourceText []byte) (entity.Documen
 	blockNo := 1
 
 	doc.Find("body").Children().Each(func(i int, s *goquery.Selection) {
-		text := cleanupText(s.Text())
+		text := utils.CleanupSpace(s.Text())
 		if text == "" {
 			return
 		}

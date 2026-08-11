@@ -648,10 +648,10 @@ func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, docum
 	}
 
 	// 查询父块信息和兄弟块列表（如果有父块）
-	var parentBlock *entity.DocumentParentChunk
+	var parentChunk *entity.DocumentParentChunk
 	var siblingChunkList []*entity.DocumentChunk
 	if chunk.ParentChunkId > 0 {
-		parentBlock, err = d.repo.SelectParentChunkById(ctx, chunk.ParentChunkId, document.ID, effectiveTaskId)
+		parentChunk, err = d.repo.SelectParentChunkById(ctx, chunk.ParentChunkId, document.ID, effectiveTaskId)
 		if err != nil {
 			return nil, err
 		}
@@ -672,7 +672,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunkDetail(ctx context.Context, docum
 		Chunk:         chunk,
 		SiblingChunks: siblingChunkList,
 	}
-	detail.FillParentInfo(parentBlock)
+	detail.FillParentInfo(parentChunk)
 
 	return detail, nil
 }

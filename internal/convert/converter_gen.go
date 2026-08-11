@@ -1093,7 +1093,7 @@ func ToQueryDocumentChunkDetailResp(source *aggregate.DocumentChunkDetail) *docu
 		documentQueryDocumentChunkDetailResp.TaskId = Int64ToString((*source).TaskId)
 		documentQueryDocumentChunkDetailResp.PlanId = Int64ToString((*source).PlanId)
 		documentQueryDocumentChunkDetailResp.Chunk = pEntityDocumentChunkToPDocumentDocumentChunkItem((*source).Chunk)
-		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem((*source).ParentBlock)
+		documentQueryDocumentChunkDetailResp.ParentBlock = pEntityDocumentParentChunkToPDocumentDocumentParentBlockItem((*source).ParentChunk)
 		documentQueryDocumentChunkDetailResp.SiblingChunks = ToDocumentChunkItemList((*source).SiblingChunks)
 		pDocumentQueryDocumentChunkDetailResp = &documentQueryDocumentChunkDetailResp
 	}
