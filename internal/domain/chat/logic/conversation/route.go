@@ -13,11 +13,10 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
-	vo2 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
@@ -38,7 +37,7 @@ var (
 type RouteStage struct {
 	knowledgeRouter kelog.KnowledgeRouter
 	documentRouter  intent.DocumentRouter
-	lifecycleLogic  doclog.LifecycleLogic
+	fetcher         adapter.DocumentFetcher
 	noEvidenceReply string
 }
 
@@ -47,13 +46,13 @@ var _ Stage = (*RouteStage)(nil)
 func NewRouteStage(
 	knowledgeRouter kelog.KnowledgeRouter,
 	documentRouter intent.DocumentRouter,
-	lifecycleLogic doclog.LifecycleLogic,
+	fetcher adapter.DocumentFetcher,
 	noEvidenceReply string,
 ) *RouteStage {
 	return &RouteStage{
 		knowledgeRouter: knowledgeRouter,
 		documentRouter:  documentRouter,
-		lifecycleLogic:  lifecycleLogic,
+		fetcher:         fetcher,
 		noEvidenceReply: noEvidenceReply,
 	}
 }
@@ -110,8 +109,8 @@ func (r *RouteStage) prepareOpenChat(ctx context.Context, convCtx *Context, exec
 	// 设置执行模式为 ReactAgent（完全由下游 Agent 自主规划）
 	execPlan.Mode = enum.ExecutionModeReactAgent
 
-	// 启动路由追踪阶段（此处以 Rewrite 阶段为名，记录判定结果与时间信号）
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
+	// 启动路由追踪阶段
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
 	snapshot := map[string]any{
 		"chatMode":                     enum.ChatQueryModeName(convCtx.ChatMode),
 		"executionMode":                enum.ExecutionModeReactAgent.String(),
@@ -127,7 +126,7 @@ func (r *RouteStage) prepareOpenChat(ctx context.Context, convCtx *Context, exec
 // 路由策略：DocumentMode（指定文档问答）
 // ============================================================================
 
-// prepareDocumentMode 指定文档问答：用户已在界面选择具体文档。
+// prepareDocumentMode 指定文档问答：用户已在界面选择具体文档
 //
 // 步骤：
 //  1. 校验所选文档/索引任务 ID 是否有效
@@ -379,7 +378,7 @@ func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *kl
 // 返回得分最高的前 limit 个候选，理由统一标注为"低置信度时基于文档元数据进行保守扩范围候选"。
 func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*klvo.DocumentRouteCandidate {
 	// 拉取全部可检索文档；失败或为空时返回 nil（上游可继续用主文档或混合检索兜底）
-	docs, err := r.lifecycleLogic.ListRetrievableDocuments(ctx)
+	docs, err := r.fetcher.FetchRetrieveDocuments(ctx)
 	if err != nil {
 		logx.Warnf("获取可检索文档失败: %v", err)
 		return nil
@@ -581,9 +580,9 @@ func (r *RouteStage) extractFallbackTerms(question, rewriteQuestion string) []st
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (r *RouteStage) fallbackDescriptorScore(descriptor *vo2.KnowledgeDocument, queryTerms []string) float64 {
+func (r *RouteStage) fallbackDescriptorScore(metadata *vo.DocumentMetadata, queryTerms []string) float64 {
 	content := strings.Join([]string{
-		descriptor.DocumentName,
+		metadata.DocumentName,
 	}, " ")
 
 	content = r.normalizeFallbackText(content)

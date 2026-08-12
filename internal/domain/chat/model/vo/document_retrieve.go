@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/duke-git/lancet/v2/slice"
-	"github.com/duke-git/lancet/v2/stream"
 	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
+
+	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/common/utils"
 )
 
 var (
@@ -170,9 +171,10 @@ func buildFilters(question string) *DocumentRetrieveFilters {
 
 	// 提取章节路径提示（如"第一章"、"附录A"），并去除空格
 	sectionPathHints := sectionPattern.FindAllString(question, -1)
-	sectionPathHints = stream.FromSlice(sectionPathHints).
-		Map(func(item string) string { return spacePattern.ReplaceAllString(item, "") }).
-		Filter(func(item string) bool { return item != "" }).ToSlice()
+	sectionPathHints = utils.FilterMapUniqueLimit(sectionPathHints, -1, func(item string) (string, string, bool) {
+		newItem := spacePattern.ReplaceAllString(item, "")
+		return newItem, newItem, newItem != ""
+	})
 
 	// 定义匹配谓词（检查问题是否包含提示词）
 	predicate := func(index int, item string) bool { return strings.Contains(normalized, strings.ToLower(item)) }
@@ -204,21 +206,18 @@ func extractMeaningfulTerms(question string) []string {
 		return nil
 	}
 	segments := separators.Split(question, -1)
-	return stream.FromSlice(segments).
-		Map(func(s string) string { return strutil.Trim(s) }).
-		Filter(func(s string) bool { return len(s) > 1 }).
-		Distinct().Limit(6).ToSlice()
+	return utils.FilterMapUniqueLimit(segments, 6, func(s string) (string, string, bool) {
+		trim := strings.TrimSpace(s)
+		return trim, trim, utils.Len(trim) > 1
+	})
 }
 
 // distinctTrimLimit 去重并限制数量
 func distinctTrimLimit(items []string, limit int) []string {
-	if len(items) == 0 {
-		return nil
-	}
-	return stream.FromSlice(items).
-		Map(func(s string) string { return strutil.Trim(s) }).
-		Filter(func(s string) bool { return s != "" }).
-		Distinct().Limit(limit).ToSlice()
+	return utils.FilterMapUniqueLimit(items, limit, func(s string) (string, string, bool) {
+		trim := strings.TrimSpace(s)
+		return trim, trim, trim != ""
+	})
 }
 
 func normalizeTopK(topK int) int {
