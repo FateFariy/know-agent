@@ -18,7 +18,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -37,7 +36,7 @@ const (
 type ConversationLogicImpl struct {
 	repo             adapter.ChatRepository
 	preOrchestrator  preparation.ConversationPreOrchestrator
-	renderer         prompt.Renderer
+	renderer         adapter.Renderer
 	runtimeRegistry  *conversation.ChatRuntimeRegistry
 	executorRegistry *executor.Registry
 	documentFetcher  adapter.DocumentFetcher
@@ -57,7 +56,7 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	executorRegistry *executor.Registry,
 	documentFetcher adapter.DocumentFetcher,
 	preOrchestrator preparation.ConversationPreOrchestrator,
-	renderer prompt.Renderer,
+	renderer adapter.Renderer,
 	recommender recommend.QuestionRecommender,
 	memoryManager memory.SessionMemoryManager,
 	distributedLock adapter.DistributedLock,
@@ -469,7 +468,7 @@ func (c *ConversationLogicImpl) prepareExecutionPlan(ctx context.Context, convCt
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, err := c.renderer.Render(prompt.AgentQuestion, variables)
+	agentQuestion, err := c.renderer.Render(enum.AgentQuestion, variables)
 	if err != nil {
 		return nil, err
 	}

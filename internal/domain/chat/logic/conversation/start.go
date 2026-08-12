@@ -11,7 +11,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -258,7 +257,7 @@ func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context)
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, err := c.renderer.Render(prompt.AgentQuestion, variables)
+	agentQuestion, err := c.renderer.Render(enum.AgentQuestion, variables)
 	if err != nil {
 		return nil, err
 	}

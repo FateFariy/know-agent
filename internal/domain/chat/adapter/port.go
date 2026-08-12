@@ -79,3 +79,7 @@ type Sink interface {
 	// Finish 发送完成事件
 	Finish(conversationId string, exchangeId int64) error
 }
+
+type Renderer interface {
+	Render(templateName string, variables map[string]any) (string, error)
+}

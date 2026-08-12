@@ -10,9 +10,9 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -110,7 +110,7 @@ type DocumentQuestionRouteImpl struct {
 	chatModel          model.ChatModel        // 可选：兜底意图分类用的对话模型
 	graphQuerier       graph.GraphQuerier     // 结构图谱查询
 	navigationIndexSvc NavigationIndexService // 可选：章节索引服务；非 nil 时用于章节定位
-	renderer           prompt.Renderer        // 可选：LLM 用的 Prompt 模板渲染
+	renderer           adapter.Renderer       // 可选：LLM 用的 Prompt 模板渲染
 }
 
 // NavigationSectionHit 章节索引服务返回的命中节点
@@ -121,7 +121,7 @@ type NavigationSectionHit struct {
 
 // NewDocumentQuestionRouteImpl 构造文档问题路由器
 func NewDocumentQuestionRouteImpl(chatModel model.ChatModel, graphQuerier graph.GraphQuerier,
-	navigationIndexSvc NavigationIndexService, renderer prompt.Renderer) *DocumentQuestionRouteImpl {
+	navigationIndexSvc NavigationIndexService, renderer adapter.Renderer) *DocumentQuestionRouteImpl {
 	return &DocumentQuestionRouteImpl{
 		chatModel:          chatModel,
 		graphQuerier:       graphQuerier,
@@ -469,7 +469,7 @@ func (r *DocumentQuestionRouteImpl) classifyQuestionIntentWithModel(ctx context.
 	if r.chatModel == nil || r.renderer == nil {
 		return localDecision
 	}
-	promptText, err := r.renderer.Render(prompt.DocumentGraphOnlyIntent, map[string]any{
+	promptText, err := r.renderer.Render(enum.DocumentGraphOnlyIntent, map[string]any{
 		"originalQuestion":  strutil.Trim(originalQuestion),
 		"rewrittenQuestion": strutil.Trim(rewrittenQuestion),
 		"routeText":         strutil.Trim(routeText),

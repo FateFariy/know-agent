@@ -15,7 +15,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -39,7 +38,7 @@ type SummaryCompressionStrategy struct {
 	baseMemoryStrategy
 	repo                      adapter.ChatRepository
 	chatModel                 model.ChatModel
-	promptTemplate            prompt.Renderer
+	promptTemplate            adapter.Renderer
 	refreshingConversationIds sync.Map
 	historySummary            config.HistorySummaryConf
 	questionHistoryMaxChars   int
@@ -47,7 +46,7 @@ type SummaryCompressionStrategy struct {
 }
 
 // NewSummaryCompressionStrategy 创建摘要压缩策略实例
-func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate prompt.Renderer) *SummaryCompressionStrategy {
+func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate adapter.Renderer) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
 		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,
@@ -193,6 +192,9 @@ func (s *SummaryCompressionStrategy) DeleteConversationSummary(ctx context.Conte
 // refreshSummaryIfNecessary 刷新摘要（如果需要）
 func (s *SummaryCompressionStrategy) refreshSummaryIfNecessary(ctx context.Context, conversationId string,
 	currentState *entity.ChatMemorySummary) (*entity.ChatMemorySummary, error) {
+	if conversationId == "" {
+		return &entity.ChatMemorySummary{}, nil
+	}
 	// 获取增量对话（只拉取摘要尚未覆盖的新增轮次，避免重复压缩）
 	coveredExchangeId := int64(0)
 	if currentState != nil {
@@ -275,14 +277,13 @@ func (s *SummaryCompressionStrategy) renderCompressionTranscript(batch []*entity
 func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldSummary *vo.ConversationSummary,
 	batch []*entity.ChatExchange) (*vo.ConversationSummary, error) {
 	// 渲染系统提示词
-	systemPrompt, err := s.promptTemplate.Render(prompt.ConversationSummarySystem, nil)
+	systemPrompt, err := s.promptTemplate.Render(enum.ConversationSummarySystem, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// 序列化现有摘要（规范化后转为JSON）
-	summary := oldSummary.CopySummary()
-	summary.Normalize(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
+	summary := s.normalizeSummary(oldSummary.CopySummary())
 	serializeSummary, err := summary.Marshal()
 	if err != nil {
 		return nil, err
@@ -293,7 +294,7 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 		"existingSummaryJson":  serializeSummary,
 		"newConversationBatch": s.renderCompressionTranscript(batch),
 	}
-	userPrompt, err := s.promptTemplate.Render(prompt.ConversationSummaryMerge, variables)
+	userPrompt, err := s.promptTemplate.Render(enum.ConversationSummaryMerge, variables)
 	if err != nil {
 		return nil, err
 	}

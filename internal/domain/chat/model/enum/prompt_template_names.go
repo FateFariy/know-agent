@@ -1,4 +1,4 @@
-package prompt
+package enum
 
 // Prompt模板名称常量
 const (

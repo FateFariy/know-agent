@@ -11,8 +11,8 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -26,14 +26,14 @@ var (
 // QueryRewriteImpl 问题改写逻辑实现
 type QueryRewriteImpl struct {
 	chatModel       model.ChatModel
-	promptTemplate  prompt.Renderer
+	promptTemplate  adapter.Renderer
 	maxSubQuestions int
 	options         []model.Option
 }
 
 // NewQueryRewriteImpl 创建问题改写逻辑实例
 func NewQueryRewriteImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate prompt.Renderer) *QueryRewriteImpl {
+	promptTemplate adapter.Renderer) *QueryRewriteImpl {
 	return &QueryRewriteImpl{
 		chatModel:       chatModel,
 		promptTemplate:  promptTemplate,
@@ -71,7 +71,7 @@ func (q *QueryRewriteImpl) Rewrite(ctx context.Context, question, historySummary
 	}
 
 	// 渲染提示词
-	promptText, err := q.promptTemplate.Render(prompt.ChatQueryRewrite, templateVars)
+	promptText, err := q.promptTemplate.Render(enum.ChatQueryRewrite, templateVars)
 	if err != nil {
 		logx.Warnf("RAG 改写失败，回退到规则改写: question='%s', err=%v", question, err)
 		return fallback, nil

@@ -9,7 +9,8 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -22,14 +23,14 @@ import (
 //  3. 复用已渲染引用（避免重复输出相同证据块）
 //  4. 统计渲染/省略引用详情，供上层跟踪。
 type PromptAssembler struct {
-	promptRenderer               prompt.Renderer
+	promptRenderer               adapter.Renderer
 	totalEvidenceBudget          int    // 总证据预算（字符数）
 	perSubQuestionEvidenceBudget int    // 每个子问题的证据预算（字符数）
 	systemPrompt                 string // 系统提示词
 }
 
 // NewPromptAssembler 创建 RAG 提示词组装实现
-func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer prompt.Renderer) *PromptAssembler {
+func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer adapter.Renderer) *PromptAssembler {
 	return &PromptAssembler{
 		promptRenderer:               promptRenderer,
 		totalEvidenceBudget:          svcCtx.Config.Chat.Rag.TotalEvidenceMaxChars,
@@ -45,7 +46,7 @@ func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecu
 	}
 	budget := newPromptBudget(s.totalEvidenceBudget, s.perSubQuestionEvidenceBudget)
 
-	userPrompt, _ := s.promptRenderer.Render(prompt.RagAnswerUser, map[string]any{
+	userPrompt, _ := s.promptRenderer.Render(enum.RagAnswerUser, map[string]any{
 		"currentDate":          plan.CurrentDateText,
 		"originalQuestion":     plan.OriginalQuestion,
 		"hasRetrievalQuestion": s.hasRetrievalQuestion(plan),
@@ -110,7 +111,7 @@ func (s *PromptAssembler) buildSystemPrompt() string {
 	if strutil.IsNotBlank(s.systemPrompt) {
 		return strutil.Trim(s.systemPrompt)
 	}
-	rendered, _ := s.promptRenderer.Render(prompt.RagAnswerSystem, nil)
+	rendered, _ := s.promptRenderer.Render(enum.RagAnswerSystem, nil)
 	return strutil.Trim(rendered)
 }
 
@@ -122,7 +123,7 @@ func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RagRetrievalConte
 	var b strings.Builder
 	for _, subQuestion := range retrievalCtx.SubQuestionEvidenceList {
 		refs := s.renderSubQuestionReferences(subQuestion.References, budget)
-		block, _ := s.promptRenderer.Render(prompt.RagAnswerSubQuestionEvidence, map[string]any{
+		block, _ := s.promptRenderer.Render(enum.RagAnswerSubQuestionEvidence, map[string]any{
 			"subQuestionIndex": subQuestion.SubQuestionIndex,
 			"subQuestion":      strutil.Trim(subQuestion.SubQuestion),
 			"references":       refs,
@@ -146,7 +147,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 			continue
 		}
 		if _, exists := renderedKeys[ref.UniqueKey()]; exists {
-			reuse, _ := s.promptRenderer.Render(prompt.RagAnswerReuseReference, map[string]any{
+			reuse, _ := s.promptRenderer.Render(enum.RagAnswerReuseReference, map[string]any{
 				"referenceId": strutil.Trim(ref.ReferenceId),
 			})
 			reuse = reuse + "\n"
@@ -158,7 +159,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 
 		var block string
 		if strings.EqualFold(ref.SourceType, "WEB") {
-			rendered, _ := s.promptRenderer.Render(prompt.RagAnswerWebReference, map[string]any{
+			rendered, _ := s.promptRenderer.Render(enum.RagAnswerWebReference, map[string]any{
 				"referenceId": ref.ReferenceId,
 				"title":       utils.BlankToDefault(ref.Title, "网页来源"),
 				"url":         utils.BlankToDefault(ref.Url, "未知"),
@@ -167,7 +168,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 			block = rendered + "\n\n"
 		} else {
 			docName := strutil.Trim(utils.BlankToDefault(ref.DocumentName, ref.Title))
-			rendered, _ := s.promptRenderer.Render(prompt.RagAnswerDocumentReference, map[string]any{
+			rendered, _ := s.promptRenderer.Render(enum.RagAnswerDocumentReference, map[string]any{
 				"referenceId":  ref.ReferenceId,
 				"documentName": utils.BlankToDefault(docName, "文档来源"),
 				"sectionPath":  utils.BlankToDefault(ref.SectionPath, "未识别"),
@@ -181,7 +182,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 			budget.markRendered(ref.ReferenceSummary("已纳入 Prompt"))
 		} else {
 			budget.markOmitted(ref.ReferenceSummary("超出上下文预算，已省略"))
-			omitted, _ := s.promptRenderer.Render(prompt.RagAnswerOmittedEvidence, nil)
+			omitted, _ := s.promptRenderer.Render(enum.RagAnswerOmittedEvidence, nil)
 			b.WriteString(omitted)
 			b.WriteString("\n")
 			break
@@ -192,7 +193,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 
 // renderNoEvidenceBlock 渲染无证据块
 func (s *PromptAssembler) renderNoEvidenceBlock() string {
-	rendered, _ := s.promptRenderer.Render(prompt.RagAnswerNoEvidence, nil)
+	rendered, _ := s.promptRenderer.Render(enum.RagAnswerNoEvidence, nil)
 	return rendered + "\n"
 }
 

@@ -11,8 +11,8 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -25,11 +25,11 @@ const (
 // QuestionRecommendImpl 追问推荐实现
 type QuestionRecommendImpl struct {
 	properties     config.RecommendationConf
-	promptTemplate prompt.Renderer
+	promptTemplate adapter.Renderer
 	chatModel      model.ChatModel
 }
 
-func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate prompt.Renderer, chatModel model.ChatModel) *QuestionRecommendImpl {
+func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate adapter.Renderer, chatModel model.ChatModel) *QuestionRecommendImpl {
 	return &QuestionRecommendImpl{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,
@@ -82,7 +82,7 @@ func (r *QuestionRecommendImpl) generateRecommendations(ctx context.Context, que
 	recentContext := r.buildRecentContext(recentExchanges)
 
 	// 渲染提示词模板
-	userPrompt, err := r.promptTemplate.Render(prompt.RecommendationUser, map[string]any{
+	userPrompt, err := r.promptTemplate.Render(enum.RecommendationUser, map[string]any{
 		"recentContext": recentContext,
 		"question":      question,
 		"answer":        answer,
