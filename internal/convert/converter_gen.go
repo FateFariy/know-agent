@@ -16,6 +16,7 @@ import (
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	vo2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	datatypes "gorm.io/datatypes"
 	"time"
@@ -1064,7 +1065,7 @@ func ToKnowledgeDocumentOptionRespList(source []*vo1.DocumentMetadata) []*docume
 	if source != nil {
 		pDocumentKnowledgeDocumentOptionRespList = make([]*document.KnowledgeDocumentOptionResp, len(source))
 		for i := 0; i < len(source); i++ {
-			pDocumentKnowledgeDocumentOptionRespList[i] = pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source[i])
+			pDocumentKnowledgeDocumentOptionRespList[i] = pVoDocumentMetadataToPDocumentKnowledgeDocumentOptionResp(source[i])
 		}
 	}
 	return pDocumentKnowledgeDocumentOptionRespList
@@ -1328,7 +1329,7 @@ func pTimeTimeToString2(source *time.Time) string {
 	}
 	return xstring
 }
-func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.DocumentMetadata) *document.KnowledgeDocumentOptionResp {
+func pVoDocumentMetadataToPDocumentKnowledgeDocumentOptionResp(source *vo1.DocumentMetadata) *document.KnowledgeDocumentOptionResp {
 	var pDocumentKnowledgeDocumentOptionResp *document.KnowledgeDocumentOptionResp
 	if source != nil {
 		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp
@@ -1442,6 +1443,32 @@ func ToKnowledgeBaseModelList(source []*entity2.KnowledgeBase) []*model.Knowledg
 		}
 	}
 	return pModelKnowledgeBaseList
+}
+func ToKnowledgeBaseSelectionSnapshot(source *entity2.KnowledgeBaseSelectionSnapshot) *vo.KnowledgeBaseSelectionSnapshot {
+	var pVoKnowledgeBaseSelectionSnapshot *vo.KnowledgeBaseSelectionSnapshot
+	if source != nil {
+		var voKnowledgeBaseSelectionSnapshot vo.KnowledgeBaseSelectionSnapshot
+		voKnowledgeBaseSelectionSnapshot.SelectionMode = NormalizeString((*source).SelectionMode)
+		voKnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds = (*source).SelectedKnowledgeBaseIds
+		voKnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames = (*source).SelectedKnowledgeBaseNames
+		if (*source).SelectedKnowledgeBases != nil {
+			voKnowledgeBaseSelectionSnapshot.SelectedKnowledgeBases = make([]*vo.KnowledgeBase, len((*source).SelectedKnowledgeBases))
+			for i := 0; i < len((*source).SelectedKnowledgeBases); i++ {
+				voKnowledgeBaseSelectionSnapshot.SelectedKnowledgeBases[i] = pEntityKnowledgeBaseToPVoKnowledgeBase((*source).SelectedKnowledgeBases[i])
+			}
+		}
+		if (*source).AllowedDocuments != nil {
+			voKnowledgeBaseSelectionSnapshot.AllowedDocuments = make([]*vo.DocumentMetadata, len((*source).AllowedDocuments))
+			for j := 0; j < len((*source).AllowedDocuments); j++ {
+				voKnowledgeBaseSelectionSnapshot.AllowedDocuments[j] = pVoDocumentMetadataToPVoDocumentMetadata((*source).AllowedDocuments[j])
+			}
+		}
+		voKnowledgeBaseSelectionSnapshot.AllowedDocumentIds = (*source).AllowedDocumentIds
+		voKnowledgeBaseSelectionSnapshot.AllowedTaskIds = (*source).AllowedTaskIds
+		voKnowledgeBaseSelectionSnapshot.RagRuntimeOptions = pVoRagRuntimeOptionsToPVoRagRuntimeOptions((*source).RagRuntimeOptions)
+		pVoKnowledgeBaseSelectionSnapshot = &voKnowledgeBaseSelectionSnapshot
+	}
+	return pVoKnowledgeBaseSelectionSnapshot
 }
 func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
 	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem
@@ -1667,4 +1694,86 @@ func jsonRawMessageToDatatypesJSON(source json.RawMessage) datatypes.JSON {
 		}
 	}
 	return datatypesJSON
+}
+func jsonRawMessageToJsonRawMessage(source json.RawMessage) json.RawMessage {
+	return source
+}
+func pEntityKnowledgeBaseToPVoKnowledgeBase(source *entity2.KnowledgeBase) *vo.KnowledgeBase {
+	var pVoKnowledgeBase *vo.KnowledgeBase
+	if source != nil {
+		var voKnowledgeBase vo.KnowledgeBase
+		voKnowledgeBase.ID = (*source).ID
+		voKnowledgeBase.BaseName = NormalizeString((*source).BaseName)
+		voKnowledgeBase.Description = NormalizeString((*source).Description)
+		voKnowledgeBase.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		voKnowledgeBase.RetrievalConfigJson = jsonRawMessageToJsonRawMessage((*source).RetrievalConfigJson)
+		voKnowledgeBase.GraphRagConfigJson = jsonRawMessageToJsonRawMessage((*source).GraphRagConfigJson)
+		voKnowledgeBase.RaptorConfigJson = jsonRawMessageToJsonRawMessage((*source).RaptorConfigJson)
+		voKnowledgeBase.MetadataFilterJson = jsonRawMessageToJsonRawMessage((*source).MetadataFilterJson)
+		voKnowledgeBase.IsDefault = (*source).IsDefault
+		voKnowledgeBase.SortOrder = (*source).SortOrder
+		pVoKnowledgeBase = &voKnowledgeBase
+	}
+	return pVoKnowledgeBase
+}
+func pVoDocumentMetadataToPVoDocumentMetadata(source *vo2.DocumentMetadata) *vo.DocumentMetadata {
+	var pVoDocumentMetadata *vo.DocumentMetadata
+	if source != nil {
+		var voDocumentMetadata vo.DocumentMetadata
+		voDocumentMetadata.DocumentId = (*source).DocumentId
+		voDocumentMetadata.DocumentName = NormalizeString((*source).DocumentName)
+		voDocumentMetadata.KnowledgeBaseId = (*source).KnowledgeBaseId
+		voDocumentMetadata.KnowledgeBaseName = NormalizeString((*source).KnowledgeBaseName)
+		voDocumentMetadata.LastIndexTaskId = (*source).LastIndexTaskId
+		pVoDocumentMetadata = &voDocumentMetadata
+	}
+	return pVoDocumentMetadata
+}
+func pVoHybridOptionsToPVoHybridOptions(source *vo2.HybridOptions) *vo.HybridOptions {
+	var pVoHybridOptions *vo.HybridOptions
+	if source != nil {
+		var voHybridOptions vo.HybridOptions
+		voHybridOptions.VectorWeight = (*source).VectorWeight
+		voHybridOptions.KeywordWeight = (*source).KeywordWeight
+		voHybridOptions.TableWeight = (*source).TableWeight
+		voHybridOptions.GraphRagWeight = (*source).GraphRagWeight
+		voHybridOptions.RaptorWeight = (*source).RaptorWeight
+		voHybridOptions.RankWeight = (*source).RankWeight
+		voHybridOptions.OriginalScoreWeight = (*source).OriginalScoreWeight
+		voHybridOptions.MetadataBoostWeight = (*source).MetadataBoostWeight
+		voHybridOptions.MaxMetadataBoost = (*source).MaxMetadataBoost
+		pVoHybridOptions = &voHybridOptions
+	}
+	return pVoHybridOptions
+}
+func pVoRagRuntimeOptionsToPVoRagRuntimeOptions(source *vo2.RagRuntimeOptions) *vo.RagRuntimeOptions {
+	var pVoRagRuntimeOptions *vo.RagRuntimeOptions
+	if source != nil {
+		var voRagRuntimeOptions vo.RagRuntimeOptions
+		voRagRuntimeOptions.VectorTopK = (*source).VectorTopK
+		voRagRuntimeOptions.KeywordTopK = (*source).KeywordTopK
+		voRagRuntimeOptions.GraphRagTopK = (*source).GraphRagTopK
+		voRagRuntimeOptions.GraphRagMaxHops = (*source).GraphRagMaxHops
+		voRagRuntimeOptions.RaptorTopK = (*source).RaptorTopK
+		voRagRuntimeOptions.RaptorSourceChunkTopK = (*source).RaptorSourceChunkTopK
+		voRagRuntimeOptions.CandidateTopK = (*source).CandidateTopK
+		voRagRuntimeOptions.RerankCandidateTopK = (*source).RerankCandidateTopK
+		voRagRuntimeOptions.FinalTopK = (*source).FinalTopK
+		voRagRuntimeOptions.RerankEnabled = (*source).RerankEnabled
+		voRagRuntimeOptions.ChannelTimeout = timeDurationToTimeDuration((*source).ChannelTimeout)
+		voRagRuntimeOptions.SubQuestionTimeout = timeDurationToTimeDuration((*source).SubQuestionTimeout)
+		voRagRuntimeOptions.MinVectorSimilarity = (*source).MinVectorSimilarity
+		voRagRuntimeOptions.KeywordRelativeScoreFloor = (*source).KeywordRelativeScoreFloor
+		voRagRuntimeOptions.KeywordChannelEnabled = (*source).KeywordChannelEnabled
+		voRagRuntimeOptions.TableChannelEnabled = (*source).TableChannelEnabled
+		voRagRuntimeOptions.GraphRagChannelEnabled = (*source).GraphRagChannelEnabled
+		voRagRuntimeOptions.RaptorChannelEnabled = (*source).RaptorChannelEnabled
+		voRagRuntimeOptions.Hybrid = pVoHybridOptionsToPVoHybridOptions((*source).Hybrid)
+		voRagRuntimeOptions.KbConfigConflictFields = (*source).KbConfigConflictFields
+		pVoRagRuntimeOptions = &voRagRuntimeOptions
+	}
+	return pVoRagRuntimeOptions
+}
+func timeDurationToTimeDuration(source time.Duration) time.Duration {
+	return source
 }

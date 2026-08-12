@@ -16,7 +16,7 @@ type KnowledgeBaseSelectionSnapshot struct {
 	AllowedDocuments           []*vo.DocumentMetadata          `json:"allowedDocuments"`
 	AllowedDocumentIds         []int64                         `json:"allowedDocumentIds"`
 	AllowedTaskIds             []int64                         `json:"allowedTaskIds"`
-	//RagRuntimeOptions        *RagRuntimeOptions           `json:"ragRuntimeOptions,omitempty"`
+	RagRuntimeOptions          *vo.RagRuntimeOptions           `json:"ragRuntimeOptions,omitempty"`
 }
 
 // SelectionModeName 返回选择模式的名称，若快照或模式为空则返回 enum.KbSelectionModeNone

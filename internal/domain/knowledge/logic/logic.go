@@ -69,6 +69,12 @@ type KnowledgeConfigLogic interface {
 	ListKnowledgeConfigOptions(ctx context.Context) ([]*KnowledgeConfigOption, error)
 }
 
+// KnowledgeBaseRetrievalLogic 知识库检索范围
+type KnowledgeBaseRetrievalLogic interface {
+	// Resolve 根据聊天模式和知识库选择模式解析检索范围
+	Resolve(ctx context.Context, chatMode, selectionMode string, selectedKnowledgeBaseIds []string) (*entity.KnowledgeBaseSelectionSnapshot, error)
+}
+
 // KnowledgeConfigOption 知识库选项（用于下拉选择等场景）
 type KnowledgeConfigOption struct {
 	ID               int64  // 知识库ID

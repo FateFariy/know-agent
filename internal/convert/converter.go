@@ -164,4 +164,6 @@ type KnowledgeConverter interface {
 	// goverter:map . Model
 	ToKnowledgeBaseModel(src *klen.KnowledgeBase) *model.KnowledgeBase
 	ToKnowledgeBaseModelList(src []*klen.KnowledgeBase) []*model.KnowledgeBase
+
+	ToKnowledgeBaseSelectionSnapshot(src *klen.KnowledgeBaseSelectionSnapshot) *cvo.KnowledgeBaseSelectionSnapshot
 }
