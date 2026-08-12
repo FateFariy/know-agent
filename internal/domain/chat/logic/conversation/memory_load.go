@@ -6,6 +6,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -14,16 +15,23 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
+const (
+	maxSnippetChars    = 300
+	maxRecentExchanges = 3
+)
+
 type MemoryLoadStage struct {
+	repo                    adapter.ChatRepository
 	memoryManager           memory.SessionMemoryManager
 	planningHistoryMaxChars int    // 规划历史最大字符数
 	noEvidenceReply         string // 无证据回复
 }
 
-func NewMemoryLoadStage(svcCtx *svc.ServiceContext, m memory.SessionMemoryManager) *MemoryLoadStage {
+func NewMemoryLoadStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, m memory.SessionMemoryManager) *MemoryLoadStage {
 	noEvidenceReply := svcCtx.Config.Chat.Rag.NoEvidenceReply
 	noEvidenceReply = utils.BlankToDefault(noEvidenceReply, "当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。")
 	return &MemoryLoadStage{
+		repo:                    repo,
 		memoryManager:           m,
 		planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
 		noEvidenceReply:         noEvidenceReply,
@@ -111,4 +119,34 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 	// 提交记忆追踪阶段，成功后返回记忆上下文
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: snapshot})
 	return memoryContext, nil
+}
+
+// loadRecentEvidenceAnchors 加载最近的证据锚点，从对话历史中抽取追问可继承的结构锚点
+func (m *MemoryLoadStage) loadRecentEvidenceAnchors(ctx context.Context, conversationId string, limit int) ([]*vo.EvidenceAnchor, error) {
+	if conversationId == "" || limit <= 0 {
+		return nil, nil
+	}
+
+	exchanges, err := m.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
+	if err != nil || len(exchanges) == 0 {
+		return nil, err
+	}
+
+	var anchors []*vo.EvidenceAnchor
+	for _, exchange := range exchanges {
+		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
+			continue
+		}
+		for _, ref := range exchange.ParseReferences() {
+			anchor := ref.ToEvidenceAnchor(maxSnippetChars)
+			if anchor == nil {
+				continue
+			}
+			anchors = append(anchors, anchor)
+			if len(anchors) >= limit {
+				return anchors, nil
+			}
+		}
+	}
+	return anchors, nil
 }

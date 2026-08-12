@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -26,18 +27,23 @@ type ChatExchange struct {
 	UpdateTime          time.Time        `gorm:"column:update_time"`               // 更新时间
 }
 
-func (m *ChatMemorySummary) ToConversationSummary() *vo.ConversationSummary {
-	if m == nil {
-		return &vo.ConversationSummary{}
+// IsCompleted 判断对话轮次是否已完成
+func (e *ChatExchange) IsCompleted() bool {
+	if e == nil {
+		return false
 	}
-	summary := &vo.ConversationSummary{}
+	return e.TurnStatus == 0 || e.TurnStatus == enum.ChatTurnStatusCompleted
+}
 
-	// 优先从 JSON 恢复
-	if m.SummaryJson != "" {
-		if err := summary.Unmarshal(m.SummaryJson); err != nil {
-			// 回退到文本字段
-			summary = &vo.ConversationSummary{Summary: m.SummaryText}
+func (e *ChatExchange) ParseReferences() []*vo.SearchReference {
+	var refs = make([]*vo.SearchReference, 0, len(e.References))
+	for _, ref := range e.References {
+		switch v := ref.(type) {
+		case vo.SearchReference:
+			refs = append(refs, &v)
+		case *vo.SearchReference:
+			refs = append(refs, v)
 		}
 	}
-	return summary
+	return refs
 }

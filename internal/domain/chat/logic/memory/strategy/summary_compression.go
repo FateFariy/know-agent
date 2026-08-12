@@ -62,7 +62,7 @@ func (s *SummaryCompressionStrategy) LoadMemoryContext(ctx context.Context, conv
 	memoryCtx := &aggregate.Conversation{}
 
 	// 空会话ID直接返回空上下文
-	if strutil.IsBlank(conversationId) {
+	if utils.IsBlank(conversationId) {
 		return memoryCtx, nil
 	}
 

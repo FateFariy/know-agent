@@ -98,3 +98,36 @@ func (r *SearchReference) ReferenceSummary(suffix string) string {
 	}
 	return "[" + refId + "] " + title + " | " + path + " | " + suffix
 }
+
+// HasUsableAnchor 检查引用是否有可用的锚点信息
+func (r *SearchReference) HasUsableAnchor() bool {
+	if r == nil {
+		return false
+	}
+	return r.DocumentId != 0 ||
+		r.StructureNodeId != 0 ||
+		r.ParentBlockId != 0 ||
+		r.ChunkId != 0 ||
+		r.SectionPath != ""
+}
+
+// ToEvidenceAnchor 将搜索引用转换为证据锚点
+func (r *SearchReference) ToEvidenceAnchor(maxSnippetChars int) *EvidenceAnchor {
+	if r == nil || !r.HasUsableAnchor() {
+		return nil
+	}
+	return &EvidenceAnchor{
+		DocumentId:      r.DocumentId,
+		DocumentName:    r.DocumentName,
+		StructureNodeId: r.StructureNodeId,
+		SectionPath:     r.SectionPath,
+		CanonicalPath:   r.CanonicalPath,
+		ItemIndex:       r.ItemIndex,
+		ParentBlockId:   r.ParentBlockId,
+		ChunkId:         r.ChunkId,
+		SourceType:      r.SourceType,
+		Channel:         r.Channel,
+		Snippet:         utils.ClipHead(r.Snippet, maxSnippetChars),
+		Score:           r.Score,
+	}
+}

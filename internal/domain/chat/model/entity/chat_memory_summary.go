@@ -21,3 +21,19 @@ type ChatMemorySummary struct {
 	IsCompressed         bool                    `gorm:"-"`                              // 是否已应用历史压缩
 	SummaryPayload       *vo.ConversationSummary `gorm:"-"`                              // 会话摘要
 }
+
+func (m *ChatMemorySummary) ToConversationSummary() *vo.ConversationSummary {
+	if m == nil {
+		return &vo.ConversationSummary{}
+	}
+	summary := &vo.ConversationSummary{}
+
+	// 优先从 JSON 恢复
+	if m.SummaryJson != "" {
+		if err := summary.Unmarshal(m.SummaryJson); err != nil {
+			// 回退到文本字段
+			summary = &vo.ConversationSummary{Summary: m.SummaryText}
+		}
+	}
+	return summary
+}

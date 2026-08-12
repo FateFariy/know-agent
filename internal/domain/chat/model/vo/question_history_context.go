@@ -1,80 +1,87 @@
 package vo
 
 import (
-	"regexp"
 	"strings"
-
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
 )
 
 // QuestionHistoryContext 提问历史上下文
 type QuestionHistoryContext struct {
-	RenderedText      string
-	StructuredContext string
-	RecentContext     string
-	FollowUpQuestion  bool
-	TotalBudget       int
-	RecentBudget      int
-	StructuredBudget  int
+	RenderedText      string          // 完整渲染文本
+	StructuredContext string          // 结构化上下文（证据锚点）
+	RecentContext     string          // 近期对话上下文
+	EvidenceAnchors   EvidenceAnchors // 证据锚点列表
+	ResolvedTopic     string          // 推断的主题
+	FollowUpQuestion  bool            // 是否为追问
+	TotalBudget       int             // 总预算字符数
+	RecentBudget      int             // 近期上下文实际长度
+	StructuredBudget  int             // 结构化上下文实际长度
 }
 
-var followUpHints = []string{
-	"刚才", "上面", "前面", "前文", "上一条", "上一个", "上一轮", "这个", "那个", "这条", "那条",
-	"继续", "展开", "补充", "详细", "细说", "进一步", "为什么", "怎么做", "怎么理解", "还有呢",
-}
-
-var followUpPattern = regexp.MustCompile(`.*第\s*[0-9一二三四五六七八九十百]+\s*([条点项]).*`)
-
-// NewQuestionHistoryContext 组装问题历史上下文, 仅当问题为续问类型（如"为什么"、"还有呢"等）且存在历史上下文时，才组装最近对话
-func NewQuestionHistoryContext(question, recentQuestionTranscript string, questionHistoryMaxChars int) *QuestionHistoryContext {
-	// 提取最近用户问题（过滤掉助手回答，只保留"用户："开头的行）
+// NewQuestionHistoryContext 构建提问历史上下文
+// 参数：
+//   - question: 当前问题
+//   - recentQuestionTranscript: 最近对话转录（含"用户："）
+//   - queryUnderstanding: 查询理解结果（可为 nil）
+//   - recentEvidenceAnchors: 最近的证据锚点（可为 nil）
+//   - maxChars: 总预算字符数（应 > 0）
+func NewQuestionHistoryContext(question, recentQuestionTranscript string, queryUnderstanding *QueryUnderstandingResult,
+	recentEvidenceAnchors EvidenceAnchors, maxChars int) *QuestionHistoryContext {
+	normalizedQuestion := strings.TrimSpace(question)
 	recentUserContext := extractRecentUserQuestions(recentQuestionTranscript)
+	totalBudget := max(maxChars, 1)
+	hasRecentContext := utils.IsNotBlank(recentUserContext)
+	followUpQuestion := queryUnderstanding.IsFollowUpQuestion(normalizedQuestion)
+	anchors := utils.FilterLimit(recentEvidenceAnchors, 5, func(anchor *EvidenceAnchor) bool {
+		return anchor.HasAnchorIdentity()
+	})
 
-	// 判断当前问题是否为续问（包含"刚才"、"上面"、"为什么"等关键词）
-	followUpQuestion := looksLikeFollowUpQuestion(strutil.Trim(question))
-
-	// 初始化上下文对象
-	questionHistoryContext := &QuestionHistoryContext{
+	historyContext := &QuestionHistoryContext{
 		FollowUpQuestion: followUpQuestion,
-		TotalBudget:      questionHistoryMaxChars,
+		TotalBudget:      totalBudget,
+	}
+	if !followUpQuestion || (!hasRecentContext && len(anchors) == 0) {
+		return historyContext
 	}
 
-	// 非续问或无历史上下文时，直接返回（不需要组装）
-	if !followUpQuestion || recentUserContext == "" {
-		return questionHistoryContext
+	// 渲染近期上下文（取尾部预算）
+	recentPart := renderRecentContext(recentUserContext, totalBudget)
+	// 结构化部分使用剩余预算
+	structuredBudget := totalBudget - utils.Len(recentPart)
+	structuredPart := EvidenceAnchors(anchors).RenderStructuredContext(structuredBudget)
+	renderedText := utils.JoinNonBlank("\n", structuredPart, recentPart)
+
+	if renderedText == "" && len(anchors) == 0 {
+		return historyContext
 	}
 
-	// 渲染最近上下文（添加标题并裁剪到预算长度）
-	recentPart := renderRecentContext(recentUserContext, questionHistoryMaxChars)
-	if recentPart == "" {
-		return questionHistoryContext
-	}
-
-	// 填充上下文详情
-	questionHistoryContext.RecentContext = recentPart
-	questionHistoryContext.RecentBudget = questionHistoryMaxChars
-	questionHistoryContext.FollowUpQuestion = followUpQuestion
-
-	return questionHistoryContext
+	historyContext.RenderedText = renderedText
+	historyContext.StructuredContext = structuredPart
+	historyContext.ResolvedTopic = resolveTopic(anchors)
+	historyContext.RecentContext = recentPart
+	historyContext.EvidenceAnchors = anchors
+	historyContext.RecentBudget = utils.Len(recentPart)
+	historyContext.StructuredBudget = utils.Len(structuredPart)
+	return historyContext
 }
 
 // 提取最近用户问题
 func extractRecentUserQuestions(recentQuestionTranscript string) string {
-	normalized := strutil.Trim(recentQuestionTranscript)
+	normalized := utils.Trim(recentQuestionTranscript)
 
-	if strings.HasPrefix(normalized, "【最近相关对话】") {
-		normalized = strutil.Trim(normalized[len("【最近相关对话】"):])
-	}
-	if strings.HasPrefix(normalized, "最近相关对话：") {
-		normalized = strutil.Trim(normalized[len("最近相关对话："):])
+	prefixes := []string{"【最近相关对话】", "最近相关对话："}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(normalized, prefix) {
+			normalized = strings.TrimSpace(normalized[len(prefix):])
+			break
+		}
 	}
 
 	var builder strings.Builder
 	lines := strings.Split(normalized, "\n")
 	for _, line := range lines {
-		trimmed := strutil.Trim(line)
+		trimmed := utils.Trim(line)
 		if !strings.HasPrefix(trimmed, "用户：") {
 			continue
 		}
@@ -84,35 +91,32 @@ func extractRecentUserQuestions(recentQuestionTranscript string) string {
 		builder.WriteString(trimmed)
 	}
 
-	return strutil.Trim(builder.String())
+	return utils.Trim(builder.String())
 }
 
-// 判断问题是否为续问
-func looksLikeFollowUpQuestion(question string) bool {
-	if question == "" {
-		return false
+// resolveTopic 从锚点中推断主题（优先取 sectionPath，否则取 documentName）
+func resolveTopic(anchors []*EvidenceAnchor) string {
+	if len(anchors) == 0 {
+		return ""
 	}
-
-	questionLen := utils.Len(question)
-	if strutil.ContainsAny(question, followUpHints) || followUpPattern.MatchString(question) || questionLen <= 12 {
-		return true
-	}
-
-	return questionLen <= 18 && (strings.HasSuffix(question, "呢") || strings.HasSuffix(question, "吗"))
+	anchor := anchors[0]
+	return utils.BlankToDefault(anchor.SectionPath, anchor.DocumentName)
 }
 
-// 渲染最近用户问题
+// renderRecentContext 渲染近期上下文（用户问题部分）
 func renderRecentContext(recentUserContext string, budget int) string {
+	if budget <= 0 || utils.IsBlank(recentUserContext) {
+		return ""
+	}
 	title := "对话承接上下文（仅用于理解指代，不作为事实证据）：\n"
 	titleLen := utils.Len(title)
 	if budget <= titleLen {
+		// 预算不够标题，只返回裁剪后的用户问题
 		return utils.ClipTail(recentUserContext, budget)
 	}
-
 	body := utils.ClipTail(recentUserContext, budget-titleLen)
 	if body == "" {
 		return ""
 	}
-
 	return title + body
 }

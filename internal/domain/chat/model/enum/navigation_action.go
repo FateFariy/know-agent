@@ -11,4 +11,8 @@ const (
 	DocumentNavigationActionChildSectionDescend    = "CHILD_SECTION_DESCEND"    // 展开下级章节
 	DocumentNavigationActionItemReference          = "ITEM_REFERENCE"           // 项目引用 / 步骤型问题
 	DocumentNavigationActionFreshTopic             = "FRESH_TOPIC"              // 普通文档检索主题
+	DocumentNavigationActionTopicContinue          = "TOPIC_CONTINUE"           // 继续当前主题
+	DocumentNavigationActionTopicSwitch            = "TOPIC_SWITCH"             // 切换主题
+	DocumentNavigationActionSiblingSectionSwitch   = "SIBLING_SECTION_SWITCH"   // 切换兄弟章节
+	DocumentNavigationActionAncestorSectionReturn  = "ANCESTOR_SECTION_RETURN"  // 返回上级章节
 )
