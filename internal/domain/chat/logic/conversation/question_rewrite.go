@@ -48,8 +48,8 @@ func (q *QuestionRewriteStage) Name() string {
 
 // Execute 执行问题改写
 func (q *QuestionRewriteStage) Execute(ctx context.Context, convCtx *Context) error {
-	// OpenChat 模式不需要问题改写
-	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
+	// OpenChat 模式不需要问题改写, 且未选择任何库时也不执行
+	if convCtx.ChatMode == enum.ChatQueryModeOpenChat || convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName() == enum.KbSelectionModeNone {
 		return nil
 	}
 

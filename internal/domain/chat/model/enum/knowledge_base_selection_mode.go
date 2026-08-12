@@ -1,6 +1,6 @@
 package enum
 
-type KnowledgeBaseSelectionMode string
+type KnowledgeBaseSelectionMode = string
 
 const (
 	KbSelectionModeNone     KnowledgeBaseSelectionMode = "none"     // 不使用知识库检索

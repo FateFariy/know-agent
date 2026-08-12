@@ -84,10 +84,12 @@ type ChatModelUsageTrace struct {
 }
 
 type ChatReq struct {
-	Question           string `json:"question"`                                          // 问题内容
-	ConversationId     string `json:"conversationId,optional"`                           // 会话ID
-	ChatMode           string `json:"chatMode,options=document|open_chat|auto_document"` // 聊天模式
-	SelectedDocumentId string `json:"selectedDocumentId,optional"`                       // 选中的文档ID
+	Question                   string   `json:"question"`                                             // 问题内容
+	ConversationId             string   `json:"conversationId,optional"`                              // 会话ID
+	ChatMode                   string   `json:"chatMode,options=document|open_chat|auto_document"`    // 聊天模式
+	SelectedDocumentId         string   `json:"selectedDocumentId,optional"`                          // 选中的文档ID
+	KnowledgeBaseSelectionMode string   `json:"knowledgeBaseSelectionMode,options=document|none|all"` // 知识库选择模式
+	SelectedKnowledgeBaseIds   []string `json:"selectedKnowledgeBaseIds,optional"`                    // 选择的知识库Ids
 }
 
 type ChatToolTrace struct {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -34,17 +35,17 @@ const (
 
 // ConversationLogicImpl 聊天业务逻辑实现
 type ConversationLogicImpl struct {
-	repo             adapter.ChatRepository
-	preOrchestrator  preparation.ConversationPreOrchestrator
-	renderer         adapter.Renderer
-	runtimeRegistry  *conversation.ChatRuntimeRegistry
-	executorRegistry *executor.Registry
-	documentFetcher  adapter.DocumentFetcher
-	recommender      recommend.QuestionRecommender
-	memoryManager    memory.SessionMemoryManager
-	distributedLock  adapter.DistributedLock
-	checkPointStore  adapter.CheckPointStore
-	chain            *conversation.Chain
+	repo                  adapter.ChatRepository
+	preOrchestrator       preparation.ConversationPreOrchestrator
+	renderer              adapter.Renderer
+	knowledgeBaseResolver adapter.KnowledgeBaseResolver
+	runtimeRegistry       *conversation.ChatRuntimeRegistry
+	executorRegistry      *executor.Registry
+	recommender           recommend.QuestionRecommender
+	memoryManager         memory.SessionMemoryManager
+	distributedLock       adapter.DistributedLock
+	checkPointStore       adapter.CheckPointStore
+	chain                 *conversation.Chain
 	*options
 }
 
@@ -54,7 +55,7 @@ var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	executorRegistry *executor.Registry,
-	documentFetcher adapter.DocumentFetcher,
+	knowledgeBaseResolver adapter.KnowledgeBaseResolver,
 	preOrchestrator preparation.ConversationPreOrchestrator,
 	renderer adapter.Renderer,
 	recommender recommend.QuestionRecommender,
@@ -63,16 +64,16 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	checkPointStore adapter.CheckPointStore,
 ) *ConversationLogicImpl {
 	return &ConversationLogicImpl{
-		repo:             repo,
-		executorRegistry: executorRegistry,
-		preOrchestrator:  preOrchestrator,
-		renderer:         renderer,
-		runtimeRegistry:  &conversation.ChatRuntimeRegistry{},
-		documentFetcher:  documentFetcher,
-		recommender:      recommender,
-		memoryManager:    memoryManager,
-		distributedLock:  distributedLock,
-		checkPointStore:  checkPointStore,
+		repo:                  repo,
+		executorRegistry:      executorRegistry,
+		knowledgeBaseResolver: knowledgeBaseResolver,
+		preOrchestrator:       preOrchestrator,
+		renderer:              renderer,
+		runtimeRegistry:       &conversation.ChatRuntimeRegistry{},
+		recommender:           recommender,
+		memoryManager:         memoryManager,
+		distributedLock:       distributedLock,
+		checkPointStore:       checkPointStore,
 		options: &options{
 			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
 			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
@@ -254,29 +255,31 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		conversationId = utils.GenerateUUIDWithoutHyphen()
 	}
 
+	selectionSnapshot, err := c.knowledgeBaseResolver.Resolve(ctx, cmd.ChatMode, cmd.KnowledgeBaseSelectionMode, cmd.SelectedKnowledgeBaseIds)
+	if err != nil {
+		return nil, err
+	}
 	// 构建启动计划，填充问题、会话 ID、聊天模式
 	convCtx := &conversation.Context{
-		Question:       cmd.Question,
-		ConversationId: conversationId,
-		ChatMode:       enum.ToChatQueryMode(cmd.ChatMode),
+		Question:                       cmd.Question,
+		ConversationId:                 conversationId,
+		ChatMode:                       enum.ToChatQueryMode(cmd.ChatMode),
+		KnowledgeBaseSelectionSnapshot: selectionSnapshot,
 	}
 
 	// 当命令指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID
 	if cmd.SelectedDocumentId != 0 {
-		documents, err := c.documentFetcher.FetchRetrieveDocuments(ctx)
-		if err != nil {
-			return nil, err
-		}
-		selectedDocument, ok := slice.FindBy(documents, func(index int, doc *vo.DocumentMetadata) bool {
+		documents := utils.Ternary(cmd.KnowledgeBaseSelectionMode == enum.KbSelectionModeNone, nil, selectionSnapshot.AllowedDocuments)
+		index := slices.IndexFunc(documents, func(doc *vo.DocumentMetadata) bool {
 			return doc.DocumentId == cmd.SelectedDocumentId
 		})
 		// 指定的文档不存在或索引不可用，直接返回错误
-		if !ok {
+		if index == -1 {
 			return nil, errorx.ErrDocumentIndexUnavailable.Format(cmd.SelectedDocumentId)
 		}
-		convCtx.SelectedDocumentId = selectedDocument.DocumentId
-		convCtx.SelectedDocumentName = selectedDocument.DocumentName
-		convCtx.SelectedTaskId = selectedDocument.LastIndexTaskId
+		convCtx.SelectedDocumentId = documents[index].DocumentId
+		convCtx.SelectedDocumentName = documents[index].DocumentName
+		convCtx.SelectedTaskId = documents[index].LastIndexTaskId
 	}
 	return convCtx, nil
 }

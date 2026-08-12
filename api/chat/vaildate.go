@@ -27,14 +27,30 @@ func (r *ChatReq) Validate() (err error) {
 	if strutil.IsBlank(r.Question) {
 		return fmt.Errorf("question 不能为空")
 	}
-	if r.ChatMode == OpenChat && r.SelectedDocumentId != "" {
-		return fmt.Errorf("open_chat 模式 selectedDocumentId 必须为空")
-	}
-	if r.ChatMode == AutoDoc && r.SelectedDocumentId != "" {
-		return fmt.Errorf("auto_document 模式 selectedDocumentId 必须为空")
-	}
-	if r.ChatMode == Document && r.SelectedDocumentId == "" {
-		return fmt.Errorf("document 模式必须传 selectedDocumentId")
+	switch r.ChatMode {
+	case OpenChat:
+		if r.KnowledgeBaseSelectionMode != "none" {
+			return fmt.Errorf("open_chat 模式 KnowledgeBaseSelectionMode 必须为 'none'")
+		}
+		if r.SelectedDocumentId != "" {
+			return fmt.Errorf("open_chat 模式 SelectedDocumentId 必须为空")
+		}
+	case AutoDoc:
+		if r.KnowledgeBaseSelectionMode != "all" {
+			return fmt.Errorf("auto_document 模式 KnowledgeBaseSelectionMode 必须为 'all'")
+		}
+		if r.SelectedDocumentId != "" {
+			return fmt.Errorf("auto_document 模式 SelectedDocumentId 必须为空")
+		}
+	case Document:
+		if r.KnowledgeBaseSelectionMode == "none" {
+			return fmt.Errorf("document 模式必须选择知识库或使用全部知识库")
+		}
+		if r.SelectedDocumentId == "" {
+			return fmt.Errorf("document 模式必须传 SelectedDocumentId")
+		}
+	default:
+		return fmt.Errorf("未知的 ChatMode: %s", r.ChatMode)
 	}
 	return nil
 }

@@ -42,28 +42,28 @@ type KnowledgeLogic interface {
 // KnowledgeConfigLogic 知识库配置服务
 type KnowledgeConfigLogic interface {
 	// SaveKnowledgeConfig 保存/更新知识库配置（ID=0 时插入，否则更新）
-	SaveKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error)
+	SaveKnowledgeConfig(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error)
 
 	// DeleteKnowledgeConfig 删除知识库配置（软删除）
 	DeleteKnowledgeConfig(ctx context.Context, id int64) (bool, error)
 
 	// ListKnowledgeConfigs 查询所有知识库配置列表
-	ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error)
+	ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error)
 
 	// GetKnowledgeConfig 根据ID查询知识库配置详情
-	GetKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error)
+	GetKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeBase, error)
 
 	// UpdateKnowledgeConfigSetting 更新知识库配置（仅更新配置JSON字段）
-	UpdateKnowledgeConfigSetting(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error)
+	UpdateKnowledgeConfigSetting(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error)
 
 	// ListEnabledKnowledgeConfigs 查询所有启用的知识库配置
-	ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error)
+	ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error)
 
 	// ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
-	ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error)
+	ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error)
 
 	// GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置（不存在或已停用则返回错误）
-	GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error)
+	GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeBase, error)
 
 	// ListKnowledgeConfigOptions 查询知识库选项列表（包含可检索文档数量）
 	ListKnowledgeConfigOptions(ctx context.Context) ([]*KnowledgeConfigOption, error)

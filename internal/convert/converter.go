@@ -92,7 +92,7 @@ type DocumentConverter interface {
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString ToChatQueryMode ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences Int64ToString StringToInt64
+// goverter:extend TimeToString ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences Int64ToString StringToInt64
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
@@ -159,9 +159,9 @@ type KnowledgeConverter interface {
 	// goverter:map . Model
 	ToKnowledgeRouteTraceModel(src *klen.KnowledgeRouteTrace) *model.KnowledgeRouteTrace
 	// goverter:map Model.ID ID
-	ToKnowledgeBaseEntity(src *model.KnowledgeBase) *klen.KnowledgeConfig
-	ToKnowledgeBaseEntities(src []*model.KnowledgeBase) []*klen.KnowledgeConfig
+	ToKnowledgeBaseEntity(src *model.KnowledgeBase) *klen.KnowledgeBase
+	ToKnowledgeBaseEntities(src []*model.KnowledgeBase) []*klen.KnowledgeBase
 	// goverter:map . Model
-	ToKnowledgeBaseModel(src *klen.KnowledgeConfig) *model.KnowledgeBase
-	ToKnowledgeBaseModelList(src []*klen.KnowledgeConfig) []*model.KnowledgeBase
+	ToKnowledgeBaseModel(src *klen.KnowledgeBase) *model.KnowledgeBase
+	ToKnowledgeBaseModelList(src []*klen.KnowledgeBase) []*model.KnowledgeBase
 }

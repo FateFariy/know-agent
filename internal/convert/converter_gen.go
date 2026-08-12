@@ -29,6 +29,8 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 		voChatCommand.ConversationId = (*source).ConversationId
 		voChatCommand.ChatMode = (*source).ChatMode
 		voChatCommand.SelectedDocumentId = StringToInt64((*source).SelectedDocumentId)
+		voChatCommand.KnowledgeBaseSelectionMode = (*source).KnowledgeBaseSelectionMode
+		voChatCommand.SelectedKnowledgeBaseIds = (*source).SelectedKnowledgeBaseIds
 		pVoChatCommand = &voChatCommand
 	}
 	return pVoChatCommand
@@ -117,6 +119,9 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 		modelChatDialogue.ChatMode = (*source).ChatMode
 		modelChatDialogue.SelectedDocumentId = (*source).SelectedDocumentId
 		modelChatDialogue.SelectedDocumentName = (*source).SelectedDocumentName
+		modelChatDialogue.KnowledgeBaseSelectionMode = (*source).KnowledgeBaseSelectionMode
+		modelChatDialogue.SelectedKnowledgeBaseIdsJson = (*source).SelectedKnowledgeBaseIdsJson
+		modelChatDialogue.SelectedKnowledgeBaseNamesJson = (*source).SelectedKnowledgeBaseNamesJson
 		pModelChatDialogue = &modelChatDialogue
 	}
 	return pModelChatDialogue
@@ -129,15 +134,19 @@ func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 		modelChatExchange.ConversationId = (*source).ConversationId
 		modelChatExchange.Question = (*source).Question
 		modelChatExchange.Answer = (*source).Answer
+		modelChatExchange.TurnStatus = (*source).TurnStatus
 		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
 		modelChatExchange.References = commonJSONArrayToCommonJSONArray((*source).References)
 		modelChatExchange.Recommendations = commonJSONArrayToCommonJSONArray((*source).Recommendations)
 		modelChatExchange.UsedTools = commonJSONArrayToCommonJSONArray((*source).UsedTools)
 		modelChatExchange.DebugTrace = (*source).DebugTrace
-		modelChatExchange.TurnStatus = (*source).TurnStatus
 		modelChatExchange.ErrorMessage = (*source).ErrorMessage
 		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
 		modelChatExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
+		modelChatExchange.KnowledgeBaseSelectionMode = (*source).KnowledgeBaseSelectionMode
+		modelChatExchange.SelectedKnowledgeBaseIdsJson = (*source).SelectedKnowledgeBaseIdsJson
+		modelChatExchange.SelectedKnowledgeBaseNamesJson = (*source).SelectedKnowledgeBaseNamesJson
+		modelChatExchange.RetrievalConfigSnapshot = (*source).RetrievalConfigSnapshot
 		pModelChatExchange = &modelChatExchange
 	}
 	return pModelChatExchange
@@ -1325,9 +1334,6 @@ func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.Know
 		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp
 		documentKnowledgeDocumentOptionResp.DocumentId = Int64ToString((*source).DocumentId)
 		documentKnowledgeDocumentOptionResp.DocumentName = (*source).DocumentName
-		documentKnowledgeDocumentOptionResp.KnowledgeScopeName = (*source).KnowledgeScopeName
-		documentKnowledgeDocumentOptionResp.BusinessCategory = (*source).BusinessCategory
-		documentKnowledgeDocumentOptionResp.DocumentTags = StringToStringSlice((*source).DocumentTags)
 		pDocumentKnowledgeDocumentOptionResp = &documentKnowledgeDocumentOptionResp
 	}
 	return pDocumentKnowledgeDocumentOptionResp
@@ -1381,39 +1387,39 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	}
 	return pEntityKnowledgeTopicNode
 }
-func ToKnowledgeBaseEntities(source []*model.KnowledgeBase) []*entity2.KnowledgeConfig {
-	var pEntityKnowledgeConfigList []*entity2.KnowledgeConfig
+func ToKnowledgeBaseEntities(source []*model.KnowledgeBase) []*entity2.KnowledgeBase {
+	var pEntityKnowledgeBaseList []*entity2.KnowledgeBase
 	if source != nil {
-		pEntityKnowledgeConfigList = make([]*entity2.KnowledgeConfig, len(source))
+		pEntityKnowledgeBaseList = make([]*entity2.KnowledgeBase, len(source))
 		for i := 0; i < len(source); i++ {
-			pEntityKnowledgeConfigList[i] = ToKnowledgeBaseEntity(source[i])
+			pEntityKnowledgeBaseList[i] = ToKnowledgeBaseEntity(source[i])
 		}
 	}
-	return pEntityKnowledgeConfigList
+	return pEntityKnowledgeBaseList
 }
-func ToKnowledgeBaseEntity(source *model.KnowledgeBase) *entity2.KnowledgeConfig {
-	var pEntityKnowledgeConfig *entity2.KnowledgeConfig
+func ToKnowledgeBaseEntity(source *model.KnowledgeBase) *entity2.KnowledgeBase {
+	var pEntityKnowledgeBase *entity2.KnowledgeBase
 	if source != nil {
-		var entityKnowledgeConfig entity2.KnowledgeConfig
-		entityKnowledgeConfig.ID = (*source).Model.ID
-		entityKnowledgeConfig.BaseName = NormalizeString((*source).BaseName)
-		entityKnowledgeConfig.Description = NormalizeString((*source).Description)
-		entityKnowledgeConfig.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
-		entityKnowledgeConfig.RetrievalConfigJson = datatypesJSONToJsonRawMessage((*source).RetrievalConfigJson)
-		entityKnowledgeConfig.GraphRagConfigJson = datatypesJSONToJsonRawMessage((*source).GraphRagConfigJson)
-		entityKnowledgeConfig.RaptorConfigJson = datatypesJSONToJsonRawMessage((*source).RaptorConfigJson)
-		entityKnowledgeConfig.MetadataFilterJson = datatypesJSONToJsonRawMessage((*source).MetadataFilterJson)
-		entityKnowledgeConfig.IsDefault = (*source).IsDefault
-		entityKnowledgeConfig.SortOrder = (*source).SortOrder
-		pEntityKnowledgeConfig = &entityKnowledgeConfig
+		var entityKnowledgeBase entity2.KnowledgeBase
+		entityKnowledgeBase.ID = (*source).Model.ID
+		entityKnowledgeBase.BaseName = NormalizeString((*source).BaseName)
+		entityKnowledgeBase.Description = NormalizeString((*source).Description)
+		entityKnowledgeBase.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		entityKnowledgeBase.RetrievalConfigJson = datatypesJSONToJsonRawMessage((*source).RetrievalConfigJson)
+		entityKnowledgeBase.GraphRagConfigJson = datatypesJSONToJsonRawMessage((*source).GraphRagConfigJson)
+		entityKnowledgeBase.RaptorConfigJson = datatypesJSONToJsonRawMessage((*source).RaptorConfigJson)
+		entityKnowledgeBase.MetadataFilterJson = datatypesJSONToJsonRawMessage((*source).MetadataFilterJson)
+		entityKnowledgeBase.IsDefault = (*source).IsDefault
+		entityKnowledgeBase.SortOrder = (*source).SortOrder
+		pEntityKnowledgeBase = &entityKnowledgeBase
 	}
-	return pEntityKnowledgeConfig
+	return pEntityKnowledgeBase
 }
-func ToKnowledgeBaseModel(source *entity2.KnowledgeConfig) *model.KnowledgeBase {
+func ToKnowledgeBaseModel(source *entity2.KnowledgeBase) *model.KnowledgeBase {
 	var pModelKnowledgeBase *model.KnowledgeBase
 	if source != nil {
 		var modelKnowledgeBase model.KnowledgeBase
-		modelKnowledgeBase.Model = entityKnowledgeConfigToCommonModel((*source))
+		modelKnowledgeBase.Model = entityKnowledgeBaseToCommonModel((*source))
 		modelKnowledgeBase.BaseName = NormalizeString((*source).BaseName)
 		modelKnowledgeBase.Description = NormalizeString((*source).Description)
 		modelKnowledgeBase.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
@@ -1427,7 +1433,7 @@ func ToKnowledgeBaseModel(source *entity2.KnowledgeConfig) *model.KnowledgeBase 
 	}
 	return pModelKnowledgeBase
 }
-func ToKnowledgeBaseModelList(source []*entity2.KnowledgeConfig) []*model.KnowledgeBase {
+func ToKnowledgeBaseModelList(source []*entity2.KnowledgeBase) []*model.KnowledgeBase {
 	var pModelKnowledgeBaseList []*model.KnowledgeBase
 	if source != nil {
 		pModelKnowledgeBaseList = make([]*model.KnowledgeBase, len(source))
@@ -1627,7 +1633,7 @@ func datatypesJSONToJsonRawMessage(source datatypes.JSON) json.RawMessage {
 	}
 	return jsonRawMessage
 }
-func entityKnowledgeConfigToCommonModel(source entity2.KnowledgeConfig) common.Model {
+func entityKnowledgeBaseToCommonModel(source entity2.KnowledgeBase) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

@@ -26,7 +26,7 @@ func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository, docGateway ad
 }
 
 // SaveKnowledgeConfig 保存/更新知识库配置
-func (k *KnowledgeConfigLogicImpl) SaveKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) SaveKnowledgeConfig(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if strutil.IsBlank(config.BaseName) {
 		return nil, errors.New("baseName 不能为空")
 	}
@@ -79,12 +79,12 @@ func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeConfig(ctx context.Context, id
 }
 
 // ListKnowledgeConfigs 查询所有知识库配置列表
-func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeConfigs(ctx)
 }
 
 // GetKnowledgeConfig 根据ID查询知识库配置详情
-func (k *KnowledgeConfigLogicImpl) GetKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) GetKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
@@ -96,7 +96,7 @@ func (k *KnowledgeConfigLogicImpl) GetKnowledgeConfig(ctx context.Context, id in
 }
 
 // UpdateKnowledgeConfigSetting 更新知识库配置
-func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Context, config *entity.KnowledgeConfig) (*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if config.ID <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
@@ -120,12 +120,12 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Cont
 }
 
 // ListEnabledKnowledgeConfigs 查询所有启用的知识库配置
-func (k *KnowledgeConfigLogicImpl) ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeConfigs(ctx)
 }
 
 // ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
-func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigsByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -133,7 +133,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigsByIds(ctx context.Context
 }
 
 // GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置
-func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeConfig, error) {
+func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeConfig(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}

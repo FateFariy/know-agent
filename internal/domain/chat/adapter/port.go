@@ -95,3 +95,7 @@ type KnowledgeRouter interface {
 	// RecordShadowRoute 记录影子路由结果
 	RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error
 }
+
+type KnowledgeBaseResolver interface {
+	Resolve(ctx context.Context, chatMode, kbSelectionMode string, selectedKnowledgeBaseIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
+}
