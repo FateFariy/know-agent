@@ -186,12 +186,12 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Cont
 // ========== 知识库配置相关 ==========
 
 // InsertKnowledgeConfig 插入知识库配置
-func (k *KnowledgeRepositoryImpl) InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeConfig) error {
+func (k *KnowledgeRepositoryImpl) InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeBase) error {
 	return k.dbWithContext(ctx).Create(convert.ToKnowledgeBaseModel(config)).Error
 }
 
 // UpdateKnowledgeConfigById 根据ID更新知识库配置
-func (k *KnowledgeRepositoryImpl) UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeConfig) error {
+func (k *KnowledgeRepositoryImpl) UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeBase) error {
 	return k.dbWithContext(ctx).Model(&model.KnowledgeBase{}).
 		Where("id = ?", config.ID).
 		Updates(convert.ToKnowledgeBaseModel(config)).Error
@@ -203,7 +203,7 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeConfigById(ctx context.Context,
 }
 
 // SelectKnowledgeConfigById 根据ID查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeConfig, error) {
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	var config *model.KnowledgeBase
 	if err := k.dbWithContext(ctx).Where("id = ?", id).First(&config).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -215,7 +215,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigById(ctx context.Context,
 }
 
 // SelectKnowledgeConfigs 查询所有知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeConfig, error) {
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	var configs []*model.KnowledgeBase
 	if err := k.dbWithContext(ctx).
 		Order("sort_order ASC, id ASC").
@@ -226,7 +226,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigs(ctx context.Context) ([
 }
 
 // SelectKnowledgeConfigByIds 根据ID列表查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeConfig, error) {
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -241,8 +241,8 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByIds(ctx context.Context
 }
 
 // SelectKnowledgeConfigByBaseName 根据名称查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeConfig, error) {
-	var config entity.KnowledgeConfig
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeBase, error) {
+	var config entity.KnowledgeBase
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeBase{}).
 		Where("base_name = ?", baseName).
 		First(&config).Error; err != nil {

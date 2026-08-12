@@ -163,3 +163,18 @@ func CleanupSpace(text string) string {
 	text = replacer.Replace(text)
 	return strings.TrimSpace(text)
 }
+func ToString(v any) string {
+	return strutil.Trim(convertor.ToString(v))
+}
+
+func IsNotBlank(str string) bool {
+	return strutil.IsNotBlank(str)
+}
+
+func IsBlank(str string) bool {
+	return strutil.IsBlank(str)
+}
+
+func Trim(str string) string {
+	return strutil.Trim(str)
+}

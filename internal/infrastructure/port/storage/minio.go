@@ -94,7 +94,7 @@ func (s *MinioStorage) DownloadText(ctx context.Context, objectName string) (str
 
 // DeleteObjects 删除对象
 func (s *MinioStorage) DeleteObjects(ctx context.Context, objectNameList []string) error {
-	validObjectNameList := utils.DistinctFilterLimit(objectNameList, -1, func(name string) (string, bool) {
+	validObjectNameList := utils.FilterUniqueLimit(objectNameList, -1, func(name string) (string, bool) {
 		trimmed := strings.TrimSpace(name)
 		return trimmed, trimmed != ""
 	})

@@ -1,5 +1,7 @@
 package utils
 
+import "slices"
+
 func SliceToMapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
 	if slice == nil {
 		return nil
@@ -82,4 +84,35 @@ func FilterUniqueLimit[T any, K comparable](items []T, n int, keyOf func(T) (K, 
 		key, keep := keyOf(item)
 		return key, item, keep
 	})
+}
+
+// FilterLimit 过滤并截断切片。
+// filter 函数用于过滤，true 则保留，false 则跳过。
+// n <= 0 时返回全部结果。
+func FilterLimit[T any](items []T, n int, filter func(T) bool) []T {
+	if len(items) == 0 {
+		return nil
+	}
+	if n <= 0 {
+		n = len(items)
+	}
+	result := make([]T, 0, n)
+	for _, item := range items {
+		if filter(item) {
+			result = append(result, item)
+		}
+		if len(result) >= n {
+			break
+		}
+	}
+	return result
+}
+
+func ContainsAny[T comparable](slice []T, elements ...T) bool {
+	for _, element := range elements {
+		if slices.Index(slice, element) != -1 {
+			return true
+		}
+	}
+	return false
 }

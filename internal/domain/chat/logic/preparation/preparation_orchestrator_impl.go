@@ -157,8 +157,9 @@ func (o *ConversationPreOrchestratorImpl) prepareCommon(ctx context.Context, con
 	questionHistoryContext := vo.NewQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript), o.questionHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断，无外部调用）
-	requiresCurrentDateAnchoring := support.RequiresCurrentDateAnchoring(question)
-	requiresRealTimeSearch := support.RequiresRealTimeSearch(question)
+	analyzer := vo.NewQueryAnalyzer(question)
+	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
+	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 
 	// 组装初始执行计划（所有检索/改写字段先以原始问题为兜底值，防止空值扩散）
 	execPlan := &vo.ConversationExecutionPlan{

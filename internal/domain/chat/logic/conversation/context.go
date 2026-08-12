@@ -31,30 +31,31 @@ var weekdayMap = map[time.Weekday]string{
 const Zone = "Asia/Shanghai"
 
 type Context struct {
-	ConversationId       string                                       // 对话ID
-	ExchangeId           int64                                        // 交换ID
-	Question             string                                       // 用户问题
-	ChatMode             enum.ChatQueryMode                           // 聊天模式
-	TraceId              string                                       // 追踪ID
-	SelectedDocumentId   int64                                        // 选中的文档ID
-	SelectedDocumentName string                                       // 选中的文档名
-	SelectedTaskId       int64                                        // 选中的任务ID
-	CurrentDate          time.Time                                    // 当前日期
-	CurrentDateText      string                                       // 当前日期文本
-	ExecutionPlan        atomic.Pointer[vo.ConversationExecutionPlan] // 执行计划
-	DebugTrace           atomic.Pointer[vo.ChatDebugTrace]            // 调试追踪
-	Trace                *vo.ConversationTrace                        // 追踪记录
-	LeaseKey             string                                       // 租约锁键
-	Sink                 adapter.Sink                                 // 消息发送器
-	answerBuffer         strings.Builder                              // 响应内容缓冲区
-	mu                   sync.Mutex                                   // 响应内容缓冲区锁
-	ThinkingSteps        *list.CopyOnWriteList[string]                // 思考步骤列表
-	References           *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
-	UsedTools            *list.CopyOnWriteList[string]                // 已使用的工具集合
-	StartTime            time.Time                                    // 开始时间（毫秒精度）
-	FirstResponseTimeMs  atomic.Int64                                 // 首次响应耗时（毫秒）
-	Finalized            atomic.Bool                                  // 是否已完成
-	CancelFunc           context.CancelFunc                           // 资源释放
+	ConversationId                 string                                       // 对话ID
+	ExchangeId                     int64                                        // 交换ID
+	Question                       string                                       // 用户问题
+	ChatMode                       enum.ChatQueryMode                           // 聊天模式
+	TraceId                        string                                       // 追踪ID
+	SelectedDocumentId             int64                                        // 选中的文档ID
+	SelectedDocumentName           string                                       // 选中的文档名
+	SelectedTaskId                 int64                                        // 选中的任务ID
+	KnowledgeBaseSelectionSnapshot *vo.KnowledgeBaseSelectionSnapshot           // 知识库选择快照
+	CurrentDate                    time.Time                                    // 当前日期
+	CurrentDateText                string                                       // 当前日期文本
+	ExecutionPlan                  atomic.Pointer[vo.ConversationExecutionPlan] // 执行计划
+	DebugTrace                     atomic.Pointer[vo.ChatDebugTrace]            // 调试追踪
+	Trace                          *vo.ConversationTrace                        // 追踪记录
+	LeaseKey                       string                                       // 租约锁键
+	Sink                           adapter.Sink                                 // 消息发送器
+	answerBuffer                   strings.Builder                              // 响应内容缓冲区
+	mu                             sync.Mutex                                   // 响应内容缓冲区锁
+	ThinkingSteps                  *list.CopyOnWriteList[string]                // 思考步骤列表
+	References                     *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
+	UsedTools                      *list.CopyOnWriteList[string]                // 已使用的工具集合
+	StartTime                      time.Time                                    // 开始时间（毫秒精度）
+	FirstResponseTimeMs            atomic.Int64                                 // 首次响应耗时（毫秒）
+	Finalized                      atomic.Bool                                  // 是否已完成
+	CancelFunc                     context.CancelFunc                           // 资源释放
 }
 
 // Finalize 完善会话上下文：添加 ExchangeId、TraceId、DebugTrace、Trace、LeaseKey
