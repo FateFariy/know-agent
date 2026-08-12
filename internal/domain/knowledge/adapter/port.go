@@ -19,6 +19,9 @@ type RouteLexicalIndex interface {
 }
 
 type DocumentGateway interface {
-	// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量（返回 map[knowledgeBaseId]count）
-	CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
+	// CountRetrievableDocumentsByKbIds 按知识库ID列表统计可检索文档数量（返回 map[kbId]count）
+	CountRetrievableDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)
+
+	// FindRetrievableByKbIds 根据知识库ID列表查询可检索的文档元数据
+	FindRetrievableByKbIds(ctx context.Context, kbIds []int64) ([]*vo.DocumentMetadata, error)
 }

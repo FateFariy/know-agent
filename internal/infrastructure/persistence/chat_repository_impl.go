@@ -358,7 +358,7 @@ func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.
 		Order("create_time DESC, id DESC").Find(&chatExchanges).Error; err != nil {
 		return nil, err
 	}
-	return utils.SliceToMapBy(chatExchanges, func(item *entity.ChatExchange) (string, *entity.ChatExchange) {
+	return utils.MapBy(chatExchanges, func(item *entity.ChatExchange) (string, *entity.ChatExchange) {
 		return item.ConversationId, item
 	}), nil
 }

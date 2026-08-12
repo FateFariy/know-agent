@@ -215,7 +215,7 @@ func (s *KnowledgeRouteImpl) tokenize(text string) []string {
 	}
 
 	// 限制最大关键词数量
-	return utils.LimitSlice(maputil.Keys(terms), 40)
+	return utils.Limit(maputil.Keys(terms), 40)
 }
 
 // expandChineseNgrams 对中文短片段做 2~maxGram 的滑动窗口扩展（用于提高短实体召回）
@@ -276,7 +276,7 @@ func (s *KnowledgeRouteImpl) rankScopes(ctx context.Context, q *routeQueryContex
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.LimitSlice(candidates, 5)
+	return utils.Limit(candidates, 5)
 }
 
 // deriveScopesFromDocuments 当没有配置 scope 节点时，从文档元数据派生粗略的 scope 候选
@@ -311,7 +311,7 @@ func (s *KnowledgeRouteImpl) deriveScopesFromDocuments(ctx context.Context, q *r
 
 	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.LimitSlice(candidates, 5)
+	return utils.Limit(candidates, 5)
 }
 
 // rankTopics 对主题节点打分：语义 + 词面 + 关键词 + 与当前 scope 命中的加分
@@ -359,7 +359,7 @@ func (s *KnowledgeRouteImpl) rankTopics(ctx context.Context, q *routeQueryContex
 	}
 
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.LimitSlice(candidates, 8)
+	return utils.Limit(candidates, 8)
 }
 
 // deriveTopicsFromProfiles 当 topic 节点未配置时，按文档画像的 CoreTopics 派生主题候选
@@ -407,7 +407,7 @@ func (s *KnowledgeRouteImpl) deriveTopicsFromProfiles(ctx context.Context, q *ro
 
 	candidates := maputil.Values(best)
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.LimitSlice(candidates, 8)
+	return utils.Limit(candidates, 8)
 }
 
 // rankDocuments 对文档进行打分，并将 top-score 的文档返回
@@ -498,11 +498,11 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *routeQueryCon
 	}
 
 	sort.Slice(matched, func(i, j int) bool { return matched[i].Score > matched[j].Score })
-	return utils.LimitSlice(matched, 5)
+	return utils.Limit(matched, 5)
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
-func (s *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.KnowledgeDocument, profile *den.DocumentProfile) string {
+func (s *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.DocumentMetadata, profile *den.DocumentProfile) string {
 	if profile == nil {
 		return utils.JoinNonBlank(" ", doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}

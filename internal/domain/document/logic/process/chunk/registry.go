@@ -1,7 +1,8 @@
 package chunk
 
 import (
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	enum2 "github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/llm"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
@@ -14,7 +15,7 @@ type Registry struct {
 	registry map[int]Chunker
 }
 
-func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template prompt.Renderer) *Registry {
+func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template adapter.Renderer) *Registry {
 	registry := make(map[int]Chunker)
 	// 递归分块
 	registry[enum.StrategyTypeRecursive] = recursive.NewChunker(
@@ -30,7 +31,7 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 	)
 	// 大模型切块
 	registry[enum.StrategyTypeLLM] = llm.NewChunker(chatModel, template,
-		llm.WithLlmSplitPrompt(prompt.DocumentLlmSplit),
+		llm.WithLlmSplitPrompt(enum2.DocumentLlmSplit),
 	)
 
 	return &Registry{registry: registry}

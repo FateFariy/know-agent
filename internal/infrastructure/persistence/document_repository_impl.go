@@ -147,14 +147,29 @@ func (d *DocumentRepositoryImpl) DeleteDocumentById(ctx context.Context, documen
 	return d.dbWithContext(ctx).Where("id = ?", documentId).Delete(&model.Document{}).Error
 }
 
-// SelectRetrievableDocuments 查询可检索的文档
-func (d *DocumentRepositoryImpl) SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
-	var documents []*vo.KnowledgeDocument
+// SelectRetrievableDocumentsByIds 根据ID查询可检索的文档
+func (d *DocumentRepositoryImpl) SelectRetrievableDocumentsByIds(ctx context.Context, documentIds ...int64) ([]*vo.DocumentMetadata, error) {
+	var documents []*vo.DocumentMetadata
 	query := d.dbWithContext(ctx).Model(&model.Document{}).
 		Where("index_status = ? AND last_index_task_id IS NOT NULL", enum.IndexStatusBuildSuccess)
 
 	if len(documentIds) > 0 {
 		query = query.Where("id IN ?", documentIds)
+	}
+	if err := query.Order("update_time DESC, id DESC").Find(&documents).Error; err != nil {
+		return nil, err
+	}
+	return documents, nil
+}
+
+// SelectRetrievableDocumentsByKbIds 根据知识库ID查询可检索的文档
+func (d *DocumentRepositoryImpl) SelectRetrievableDocumentsByKbIds(ctx context.Context, kbIds ...int64) ([]*vo.DocumentMetadata, error) {
+	var documents []*vo.DocumentMetadata
+	query := d.dbWithContext(ctx).Model(&model.Document{}).
+		Where("index_status = ? AND last_index_task_id IS NOT NULL", enum.IndexStatusBuildSuccess)
+
+	if len(kbIds) > 0 {
+		query = query.Where("knowledge_base_id IN ?", kbIds)
 	}
 	if err := query.Order("update_time DESC, id DESC").Find(&documents).Error; err != nil {
 		return nil, err
@@ -663,13 +678,13 @@ func (d *DocumentRepositoryImpl) SelectDocumentBlockPageNumbers(ctx context.Cont
 
 // ========== 知识库统计相关 ==========
 
-// CountDocumentsByKnowledgeBaseIds 按知识库ID列表统计文档数量
-func (d *DocumentRepositoryImpl) CountDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
+// CountDocumentsByKbIds 按知识库ID列表统计文档数量
+func (d *DocumentRepositoryImpl) CountDocumentsByKbIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
 	return d.countByKnowledgeBaseIds(ctx, knowledgeBaseIds, nil)
 }
 
-// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量
-func (d *DocumentRepositoryImpl) CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
+// CountRetrievableDocumentsByKbIds 按知识库ID列表统计可检索文档数量
+func (d *DocumentRepositoryImpl) CountRetrievableDocumentsByKbIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error) {
 	return d.countByKnowledgeBaseIds(ctx, knowledgeBaseIds, func(query *gorm.DB) *gorm.DB {
 		return query.Where("index_status = ? AND last_index_task_id IS NOT NULL", enum.IndexStatusBuildSuccess)
 	})

@@ -101,8 +101,9 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 	combined := combinedText(document, parsedText, sectionTitles)
 	docType := enum.InferDocumentType(combined, supportsItemLookup)
 	coreTopics := p.buildCoreTopics(document, sectionTitles)
-	exampleQuestions := utils.DistinctFilterLimit(coreTopics, 6, func(t string) (string, bool) {
-		return enum.ExampleQuestion(docType, t), true
+	exampleQuestions := utils.FilterUniqueLimit(coreTopics, 6, func(t string) (string, bool) {
+		question := enum.ExampleQuestion(docType, t)
+		return question, question != ""
 	})
 	profile := &entity.DocumentProfile{
 		DocumentId:           document.ID,
@@ -184,7 +185,7 @@ func (p *ProfileGenerateImpl) buildCoreTopics(document *entity.Document, section
 	fileName := strutil.Trim(document.DocumentName)
 	fileTopic := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 	sectionTitles = append(sectionTitles, fileTopic)
-	return utils.DistinctFilterLimit(sectionTitles, 6, func(title string) (string, bool) {
+	return utils.FilterUniqueLimit(sectionTitles, 6, func(title string) (string, bool) {
 		normalized := strutil.Trim(title)
 		if normalized == "" {
 			return normalized, false
@@ -200,7 +201,7 @@ func (p *ProfileGenerateImpl) buildSummary(document *entity.Document, sectionTit
 	builder.WriteString(utils.BlankToDefault(strutil.Trim(document.DocumentName), "未命名文档"))
 	builder.WriteString("》")
 	if len(sectionTitles) > 0 {
-		sectionTitles = utils.LimitSlice(sectionTitles, 4)
+		sectionTitles = utils.Limit(sectionTitles, 4)
 		builder.WriteString("主要涵盖：")
 		builder.WriteString(strings.Join(sectionTitles, "、"))
 		builder.WriteString("。")

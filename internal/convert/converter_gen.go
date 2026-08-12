@@ -1059,7 +1059,7 @@ func ToDocumentTaskModel(source *entity1.DocumentTask) *model.DocumentTask {
 	}
 	return pModelDocumentTask
 }
-func ToKnowledgeDocumentOptionRespList(source []*vo1.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp {
+func ToKnowledgeDocumentOptionRespList(source []*vo1.DocumentMetadata) []*document.KnowledgeDocumentOptionResp {
 	var pDocumentKnowledgeDocumentOptionRespList []*document.KnowledgeDocumentOptionResp
 	if source != nil {
 		pDocumentKnowledgeDocumentOptionRespList = make([]*document.KnowledgeDocumentOptionResp, len(source))
@@ -1328,7 +1328,7 @@ func pTimeTimeToString2(source *time.Time) string {
 	}
 	return xstring
 }
-func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.KnowledgeDocument) *document.KnowledgeDocumentOptionResp {
+func pVoKnowledgeDocumentToPDocumentKnowledgeDocumentOptionResp(source *vo1.DocumentMetadata) *document.KnowledgeDocumentOptionResp {
 	var pDocumentKnowledgeDocumentOptionResp *document.KnowledgeDocumentOptionResp
 	if source != nil {
 		var documentKnowledgeDocumentOptionResp document.KnowledgeDocumentOptionResp

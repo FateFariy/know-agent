@@ -32,7 +32,7 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeConfig(ctx context.Context, conf
 	}
 
 	// 名称唯一性校验
-	existing, err := k.repo.SelectKnowledgeConfigByBaseName(ctx, strutil.Trim(config.BaseName))
+	existing, err := k.repo.SelectKnowledgeBaseByBaseName(ctx, strutil.Trim(config.BaseName))
 	if err != nil && !errors.Is(err, errorx.ErrKnowledgeBaseNotFound) {
 		return nil, err
 	}
@@ -42,17 +42,17 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeConfig(ctx context.Context, conf
 
 	if config.ID > 0 {
 		// 更新：查询现有记录确认存在
-		_, err = k.repo.SelectKnowledgeConfigById(ctx, config.ID)
+		_, err = k.repo.SelectKnowledgeBaseById(ctx, config.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err = k.repo.UpdateKnowledgeConfigById(ctx, config); err != nil {
+		if err = k.repo.UpdateKnowledgeBaseById(ctx, config); err != nil {
 			return nil, err
 		}
 	} else {
 		// 新增：分配雪花ID
 		config.ID = utils.GetSnowflakeNextID()
-		if err = k.repo.InsertKnowledgeConfig(ctx, config); err != nil {
+		if err = k.repo.InsertKnowledgeBase(ctx, config); err != nil {
 			return nil, err
 		}
 	}
@@ -72,7 +72,7 @@ func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeConfig(ctx context.Context, id
 	if id <= 0 {
 		return false, errors.New("id 不能为空")
 	}
-	if err := k.repo.DeleteKnowledgeConfigById(ctx, id); err != nil {
+	if err := k.repo.DeleteKnowledgeBaseById(ctx, id); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -80,7 +80,7 @@ func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeConfig(ctx context.Context, id
 
 // ListKnowledgeConfigs 查询所有知识库配置列表
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
-	return k.repo.SelectKnowledgeConfigs(ctx)
+	return k.repo.SelectKnowledgeBases(ctx)
 }
 
 // GetKnowledgeConfig 根据ID查询知识库配置详情
@@ -88,7 +88,7 @@ func (k *KnowledgeConfigLogicImpl) GetKnowledgeConfig(ctx context.Context, id in
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
-	config, err := k.repo.SelectKnowledgeConfigById(ctx, id)
+	config, err := k.repo.SelectKnowledgeBaseById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Cont
 	}
 
 	// 查询现有记录确认存在
-	existing, err := k.repo.SelectKnowledgeConfigById(ctx, config.ID)
+	existing, err := k.repo.SelectKnowledgeBaseById(ctx, config.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Cont
 	existing.RaptorConfigJson = config.RaptorConfigJson
 	existing.MetadataFilterJson = config.MetadataFilterJson
 
-	if err = k.repo.UpdateKnowledgeConfigById(ctx, existing); err != nil {
+	if err = k.repo.UpdateKnowledgeBaseById(ctx, existing); err != nil {
 		return nil, err
 	}
 	return existing, nil
@@ -121,7 +121,7 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeConfigSetting(ctx context.Cont
 
 // ListEnabledKnowledgeConfigs 查询所有启用的知识库配置
 func (k *KnowledgeConfigLogicImpl) ListEnabledKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
-	return k.repo.SelectKnowledgeConfigs(ctx)
+	return k.repo.SelectKnowledgeBases(ctx)
 }
 
 // ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
@@ -129,7 +129,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigsByIds(ctx context.Context
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	return k.repo.SelectKnowledgeConfigByIds(ctx, ids)
+	return k.repo.SelectKnowledgeBaseByIds(ctx, ids)
 }
 
 // GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置
@@ -137,7 +137,7 @@ func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeConfig(ctx context.Context
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
-	config, err := k.repo.SelectKnowledgeConfigById(ctx, id)
+	config, err := k.repo.SelectKnowledgeBaseById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeConfig(ctx context.Context
 
 // ListKnowledgeConfigOptions 查询知识库选项列表
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeConfigOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
-	configs, err := k.repo.SelectKnowledgeConfigs(ctx)
+	configs, err := k.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
 		return nil, err
 	}

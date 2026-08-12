@@ -23,10 +23,10 @@ type DocumentStrategyStepItem struct {
 
 // NormalizeSteps 归一化步骤类型
 func (c *DocumentStrategyConfirmCmd) NormalizeSteps() bool {
-	parentSteps := utils.DistinctFilterLimit(c.ParentSteps, -1, func(step *DocumentStrategyStepItem) (int, bool) {
+	parentSteps := utils.FilterUniqueLimit(c.ParentSteps, -1, func(step *DocumentStrategyStepItem) (int, bool) {
 		return step.StrategyType, enum.StrategyTypeName(step.StrategyType) != ""
 	})
-	childSteps := utils.DistinctFilterLimit(c.ChildSteps, -1, func(step *DocumentStrategyStepItem) (int, bool) {
+	childSteps := utils.FilterUniqueLimit(c.ChildSteps, -1, func(step *DocumentStrategyStepItem) (int, bool) {
 		return step.StrategyType, enum.StrategyTypeName(step.StrategyType) != ""
 	})
 	normalize := len(parentSteps) != len(c.ParentSteps) || len(childSteps) != len(c.ChildSteps)

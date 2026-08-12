@@ -1,10 +1,11 @@
-package vo
+package entity
 
 import (
 	"encoding/json"
 	"strings"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 type KnowledgeBaseSelectionSnapshot struct {
@@ -12,10 +13,10 @@ type KnowledgeBaseSelectionSnapshot struct {
 	SelectedKnowledgeBaseIds   []int64                         `json:"selectedKnowledgeBaseIds"`
 	SelectedKnowledgeBaseNames []string                        `json:"selectedKnowledgeBaseNames"`
 	SelectedKnowledgeBases     []*KnowledgeBase                `json:"selectedKnowledgeBases"`
-	AllowedDocuments           []*DocumentMetadata             `json:"allowedDocuments"`
+	AllowedDocuments           []*vo.DocumentMetadata          `json:"allowedDocuments"`
 	AllowedDocumentIds         []int64                         `json:"allowedDocumentIds"`
 	AllowedTaskIds             []int64                         `json:"allowedTaskIds"`
-	RagRuntimeOptions          *RagRuntimeOptions              `json:"ragRuntimeOptions,omitempty"`
+	//RagRuntimeOptions        *RagRuntimeOptions           `json:"ragRuntimeOptions,omitempty"`
 }
 
 // SelectionModeName 返回选择模式的名称，若快照或模式为空则返回 enum.KbSelectionModeNone

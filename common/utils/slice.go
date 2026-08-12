@@ -2,7 +2,7 @@ package utils
 
 import "slices"
 
-func SliceToMapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
+func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
 	if slice == nil {
 		return nil
 	}
@@ -19,7 +19,31 @@ func SliceToMapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V))
 	return maps
 }
 
-func LimitSlice[T any](slice []T, limit int) []T {
+func Map[T, V any](slice []T, mapper func(T) V) []V {
+	if slice == nil {
+		return nil
+	}
+	result := make([]V, len(slice))
+	for i, item := range slice {
+		result[i] = mapper(item)
+	}
+	return result
+}
+
+func Filter[T any](slice []T, predicate func(T) bool) []T {
+	if slice == nil {
+		return nil
+	}
+	result := make([]T, 0, len(slice))
+	for _, item := range slice {
+		if predicate(item) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func Limit[T any](slice []T, limit int) []T {
 	if slice == nil {
 		return nil
 	}

@@ -536,7 +536,7 @@ func (r *RouteStage) buildClarificationOptions(candidateDocuments []*klvo.Docume
 	}
 
 	result := make([]string, 0, 3)
-	for _, item := range utils.LimitSlice(candidateDocuments, 3) {
+	for _, item := range utils.Limit(candidateDocuments, 3) {
 		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
 		result = append(result, "我想问《"+name+"》")
 	}
@@ -576,7 +576,7 @@ func (r *RouteStage) extractFallbackTerms(question, rewriteQuestion string) []st
 			}
 		}
 	}
-	return utils.LimitSlice(maputil.Keys(terms), 40)
+	return utils.Limit(maputil.Keys(terms), 40)
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数

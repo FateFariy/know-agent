@@ -605,7 +605,7 @@ func (d *LifecycleLogicImpl) QueryDocumentChunks(ctx context.Context, documentId
 	}
 
 	// 构建父块ID到父块对象的映射
-	parentChunkMap := utils.SliceToMapBy(parentChunks,
+	parentChunkMap := utils.MapBy(parentChunks,
 		func(item *entity.DocumentParentChunk) (int64, *entity.DocumentParentChunk) { return item.ID, item })
 
 	// 填充每个文档块的父块信息和枚举名称
@@ -696,8 +696,8 @@ func (d *LifecycleLogicImpl) QueryTaskLogs(ctx context.Context, taskId int64, pa
 }
 
 // ListRetrievableDocuments 列出可检索的文档
-func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error) {
-	return d.repo.SelectRetrievableDocuments(ctx, documentIds...)
+func (d *LifecycleLogicImpl) ListRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.DocumentMetadata, error) {
+	return d.repo.SelectRetrievableDocumentsByIds(ctx, documentIds...)
 }
 
 // QueryParentChunks 查询父块列表

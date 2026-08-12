@@ -183,72 +183,72 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeRouteTracePage(ctx context.Cont
 	return list, total, nil
 }
 
-// ========== 知识库配置相关 ==========
+// ========== 知识库相关 ==========
 
-// InsertKnowledgeConfig 插入知识库配置
-func (k *KnowledgeRepositoryImpl) InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeBase) error {
-	return k.dbWithContext(ctx).Create(convert.ToKnowledgeBaseModel(config)).Error
+// InsertKnowledgeBase 插入知识库
+func (k *KnowledgeRepositoryImpl) InsertKnowledgeBase(ctx context.Context, base *entity.KnowledgeBase) error {
+	return k.dbWithContext(ctx).Create(convert.ToKnowledgeBaseModel(base)).Error
 }
 
-// UpdateKnowledgeConfigById 根据ID更新知识库配置
-func (k *KnowledgeRepositoryImpl) UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeBase) error {
+// UpdateKnowledgeBaseById 根据ID更新知识库
+func (k *KnowledgeRepositoryImpl) UpdateKnowledgeBaseById(ctx context.Context, base *entity.KnowledgeBase) error {
 	return k.dbWithContext(ctx).Model(&model.KnowledgeBase{}).
-		Where("id = ?", config.ID).
-		Updates(convert.ToKnowledgeBaseModel(config)).Error
+		Where("id = ?", base.ID).
+		Updates(convert.ToKnowledgeBaseModel(base)).Error
 }
 
-// DeleteKnowledgeConfigById 根据ID删除知识库配置
-func (k *KnowledgeRepositoryImpl) DeleteKnowledgeConfigById(ctx context.Context, id int64) error {
+// DeleteKnowledgeBaseById 根据ID删除知识库
+func (k *KnowledgeRepositoryImpl) DeleteKnowledgeBaseById(ctx context.Context, id int64) error {
 	return k.dbWithContext(ctx).Delete(&model.KnowledgeBase{}, id).Error
 }
 
-// SelectKnowledgeConfigById 根据ID查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
-	var config *model.KnowledgeBase
-	if err := k.dbWithContext(ctx).Where("id = ?", id).First(&config).Error; err != nil {
+// SelectKnowledgeBaseById 根据ID查询知识库
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeBaseById(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
+	var base *model.KnowledgeBase
+	if err := k.dbWithContext(ctx).Where("id = ?", id).First(&base).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errorx.ErrKnowledgeBaseNotFound.Format(id)
 		}
 		return nil, err
 	}
-	return convert.ToKnowledgeBaseEntity(config), nil
+	return convert.ToKnowledgeBaseEntity(base), nil
 }
 
-// SelectKnowledgeConfigs 查询所有知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error) {
-	var configs []*model.KnowledgeBase
+// SelectKnowledgeBases 查询所有知识库
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
+	var bases []*model.KnowledgeBase
 	if err := k.dbWithContext(ctx).
 		Order("sort_order ASC, id ASC").
-		Find(&configs).Error; err != nil {
+		Find(&bases).Error; err != nil {
 		return nil, err
 	}
-	return convert.ToKnowledgeBaseEntities(configs), nil
+	return convert.ToKnowledgeBaseEntities(bases), nil
 }
 
-// SelectKnowledgeConfigByIds 根据ID列表查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
+// SelectKnowledgeBaseByIds 根据ID列表查询知识库
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeBaseByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	var configs []*model.KnowledgeBase
+	var bases []*model.KnowledgeBase
 	if err := k.dbWithContext(ctx).
 		Where("id IN ?", ids).
 		Order("sort_order ASC, id ASC").
-		Find(&configs).Error; err != nil {
+		Find(&bases).Error; err != nil {
 		return nil, err
 	}
-	return convert.ToKnowledgeBaseEntities(configs), nil
+	return convert.ToKnowledgeBaseEntities(bases), nil
 }
 
-// SelectKnowledgeConfigByBaseName 根据名称查询知识库配置
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeBase, error) {
-	var config entity.KnowledgeBase
+// SelectKnowledgeBaseByBaseName 根据名称查询知识库
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeBaseByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeBase, error) {
+	var base entity.KnowledgeBase
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeBase{}).
 		Where("base_name = ?", baseName).
-		First(&config).Error; err != nil {
+		First(&base).Error; err != nil {
 		return nil, err
 	}
-	return &config, nil
+	return &base, nil
 }
 
 // ClearOtherDefaults 清除其他知识库的默认标记

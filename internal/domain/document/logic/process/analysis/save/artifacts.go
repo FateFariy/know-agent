@@ -166,7 +166,7 @@ func (p *ArtifactPersistPhase) buildDocumentBlockEntities(ctx context.Context, d
 //	if len(candidates) == 0 {
 //		return nil, nil
 //	}
-//	blocksByNo := utils.SliceToMapBy(blocks, func(item *entity.DocumentBlock) (int, *entity.DocumentBlock) {
+//	blocksByNo := utils.MapBy(blocks, func(item *entity.DocumentBlock) (int, *entity.DocumentBlock) {
 //		return item.BlockNo, item
 //	})
 //	tableNo := 1

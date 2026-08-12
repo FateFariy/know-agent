@@ -60,26 +60,26 @@ type KnowledgeRepository interface {
 
 	// ========== 知识库配置相关 ==========
 
-	// InsertKnowledgeConfig 插入知识库配置
-	InsertKnowledgeConfig(ctx context.Context, config *entity.KnowledgeBase) error
+	// InsertKnowledgeBase 插入知识库
+	InsertKnowledgeBase(ctx context.Context, config *entity.KnowledgeBase) error
 
-	// UpdateKnowledgeConfigById 根据ID更新知识库配置
-	UpdateKnowledgeConfigById(ctx context.Context, config *entity.KnowledgeBase) error
+	// UpdateKnowledgeBaseById 根据ID更新知识库
+	UpdateKnowledgeBaseById(ctx context.Context, config *entity.KnowledgeBase) error
 
-	// DeleteKnowledgeConfigById 根据ID删除知识库配置
-	DeleteKnowledgeConfigById(ctx context.Context, id int64) error
+	// DeleteKnowledgeBaseById 根据ID删除知识库
+	DeleteKnowledgeBaseById(ctx context.Context, id int64) error
 
-	// SelectKnowledgeConfigById 根据ID查询知识库配置
-	SelectKnowledgeConfigById(ctx context.Context, id int64) (*entity.KnowledgeBase, error)
+	// SelectKnowledgeBaseById 根据ID查询知识库
+	SelectKnowledgeBaseById(ctx context.Context, id int64) (*entity.KnowledgeBase, error)
 
-	// SelectKnowledgeConfigs 查询所有知识库配置
-	SelectKnowledgeConfigs(ctx context.Context) ([]*entity.KnowledgeBase, error)
+	// SelectKnowledgeBases 查询所有知识库
+	SelectKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error)
 
-	// SelectKnowledgeConfigByIds 根据ID列表查询知识库配置
-	SelectKnowledgeConfigByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error)
+	// SelectKnowledgeBaseByIds 根据ID列表查询知识库
+	SelectKnowledgeBaseByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error)
 
-	// SelectKnowledgeConfigByBaseName 根据名称查询知识库配置
-	SelectKnowledgeConfigByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeBase, error)
+	// SelectKnowledgeBaseByBaseName 根据名称查询知识库
+	SelectKnowledgeBaseByBaseName(ctx context.Context, baseName string) (*entity.KnowledgeBase, error)
 
 	// ClearOtherDefaults 清除其他知识库的默认标记
 	ClearOtherDefaults(ctx context.Context, currentId int64) error

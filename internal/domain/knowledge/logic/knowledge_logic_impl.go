@@ -84,7 +84,7 @@ func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, top
 	if err != nil {
 		return nil, err
 	}
-	docMap := utils.SliceToMapBy(documents, func(doc *documentvo.KnowledgeDocument) (int64, *documentvo.KnowledgeDocument) {
+	docMap := utils.MapBy(documents, func(doc *documentvo.DocumentMetadata) (int64, *documentvo.DocumentMetadata) {
 		return doc.DocumentId, doc
 	})
 

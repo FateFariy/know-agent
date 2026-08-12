@@ -56,15 +56,15 @@ func NewRetrievalImpl(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, r
 		documentLogic:             documentLogic,
 		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
 		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
-		minVectorSimilarity:       svcCtx.Config.Chat.Rag.MinVectorSimilarity,
-		keywordRelativeScoreFloor: svcCtx.Config.Chat.Rag.KeywordRelativeScoreFloor,
-		rerankScoreThreshold:      svcCtx.Config.Chat.Rag.RerankScoreThreshold,
+		minVectorSimilarity:       svcCtx.Config.Chat.Rag.Vector.MinSimilarity,
+		keywordRelativeScoreFloor: svcCtx.Config.Chat.Rag.Keyword.RelativeScoreFloor,
+		rerankScoreThreshold:      svcCtx.Config.Chat.Rag.Rerank.ScoreThreshold,
 		candidateTopK:             svcCtx.Config.Chat.Rag.CandidateTopK,
 		parentEvidenceMaxChars:    svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars,
-		rerankEnabled:             svcCtx.Config.Chat.Rag.RerankEnabled,
+		rerankEnabled:             svcCtx.Config.Chat.Rag.Rerank.Enabled,
 		finalTopK:                 svcCtx.Config.Chat.Rag.FinalTopK,
-		vectorTopK:                svcCtx.Config.Chat.Rag.VectorTopK,
-		keywordTopK:               svcCtx.Config.Chat.Rag.KeywordTopK,
+		vectorTopK:                svcCtx.Config.Chat.Rag.Vector.TopK,
+		keywordTopK:               svcCtx.Config.Chat.Rag.Keyword.TopK,
 	}
 }
 
@@ -254,7 +254,7 @@ func (e *RetrievalImpl) retrieveChannel(ctx context.Context, ch channel.Retrieva
 	if err != nil {
 		return nil, err
 	}
-	knowledgeMap := utils.SliceToMapBy(documents, func(t *dvo.KnowledgeDocument) (int64, *dvo.KnowledgeDocument) {
+	knowledgeMap := utils.MapBy(documents, func(t *dvo.DocumentMetadata) (int64, *dvo.DocumentMetadata) {
 		return t.DocumentId, t
 	})
 
@@ -304,7 +304,7 @@ func (e *RetrievalImpl) elevateToParentChunks(ctx context.Context, childDocument
 	if err != nil {
 		return nil, err
 	}
-	parentChunkMap := utils.SliceToMapBy(parentChunks, func(item *den.DocumentParentChunk) (int64, *den.DocumentParentChunk) {
+	parentChunkMap := utils.MapBy(parentChunks, func(item *den.DocumentParentChunk) (int64, *den.DocumentParentChunk) {
 		return item.ID, item
 	})
 
@@ -562,10 +562,10 @@ func (e *RetrievalImpl) recordChannelObservations(ctx context.Context, trace *vo
 	executions := make([]*vo.ChatChannelExecution, 0, len(rawResults))
 
 	// 将过滤结果 / 渠道追踪记录转为 map，供按 channelName 快速定位
-	filteredResultsMap := utils.SliceToMapBy(filteredResults, func(r *vo.RetrievalChannelResult) (string, *vo.RetrievalChannelResult) {
+	filteredResultsMap := utils.MapBy(filteredResults, func(r *vo.RetrievalChannelResult) (string, *vo.RetrievalChannelResult) {
 		return r.ChannelName, r
 	})
-	channelTracesMap := utils.SliceToMapBy(channelTraces, func(t *vo.SubQuestionChannelTrace) (string, *vo.SubQuestionChannelTrace) {
+	channelTracesMap := utils.MapBy(channelTraces, func(t *vo.SubQuestionChannelTrace) (string, *vo.SubQuestionChannelTrace) {
 		return t.ChannelName, t
 	})
 

@@ -29,8 +29,11 @@ type DocumentRepository interface {
 	// DeleteDocumentRelatedDataById 删除文档关联数据
 	DeleteDocumentRelatedDataById(ctx context.Context, documentId int64) (string, error)
 
-	// SelectRetrievableDocuments 查询可检索的文档
-	SelectRetrievableDocuments(ctx context.Context, documentIds ...int64) ([]*vo.KnowledgeDocument, error)
+	// SelectRetrievableDocumentsByIds 根据ID查询可检索的文档
+	SelectRetrievableDocumentsByIds(ctx context.Context, documentIds ...int64) ([]*vo.DocumentMetadata, error)
+
+	// SelectRetrievableDocumentsByKbIds 根据知识库ID查询可检索的文档
+	SelectRetrievableDocumentsByKbIds(ctx context.Context, kbIds ...int64) ([]*vo.DocumentMetadata, error)
 
 	// ========== 任务相关 ==========
 
@@ -227,11 +230,11 @@ type DocumentRepository interface {
 
 	// ========== 知识库统计相关 ==========
 
-	// CountDocumentsByKnowledgeBaseIds 按知识库ID列表统计文档数量（返回 map[knowledgeBaseId]count）
-	CountDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
+	// CountDocumentsByKbIds 按知识库ID列表统计文档数量（返回 map[knowledgeBaseId]count）
+	CountDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)
 
-	// CountRetrievableDocumentsByKnowledgeBaseIds 按知识库ID列表统计可检索文档数量（返回 map[knowledgeBaseId]count）
-	CountRetrievableDocumentsByKnowledgeBaseIds(ctx context.Context, knowledgeBaseIds []int64) (map[int64]int64, error)
+	// CountRetrievableDocumentsByKbIds 按知识库ID列表统计可检索文档数量（返回 map[knowledgeBaseId]count）
+	CountRetrievableDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)
 }
 
 type TableRepository interface {

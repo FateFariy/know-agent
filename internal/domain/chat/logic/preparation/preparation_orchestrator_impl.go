@@ -748,7 +748,7 @@ func (o *ConversationPreOrchestratorImpl) buildClarificationOptions(candidateDoc
 	}
 
 	result := make([]string, 0, 3)
-	for _, item := range utils.LimitSlice(candidateDocuments, 3) {
+	for _, item := range utils.Limit(candidateDocuments, 3) {
 		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
 		result = append(result, "我想问《"+name+"》")
 	}
@@ -784,11 +784,11 @@ func (o *ConversationPreOrchestratorImpl) extractFallbackTerms(question, rewrite
 			}
 		}
 	}
-	return utils.LimitSlice(maputil.Keys(terms), 40)
+	return utils.Limit(maputil.Keys(terms), 40)
 }
 
 // fallbackDescriptorScore 计算后备文档匹配分数
-func (o *ConversationPreOrchestratorImpl) fallbackDescriptorScore(descriptor *vo2.KnowledgeDocument, queryTerms []string) float64 {
+func (o *ConversationPreOrchestratorImpl) fallbackDescriptorScore(descriptor *vo2.DocumentMetadata, queryTerms []string) float64 {
 	content := strings.Join([]string{
 		descriptor.DocumentName,
 	}, " ")

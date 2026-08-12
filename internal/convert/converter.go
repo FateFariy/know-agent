@@ -29,7 +29,7 @@ type DocumentConverter interface {
 
 	ToDocumentDetailResp(src *den.Document) *document.DocumentDetailResp
 	ToDocumentDetailRespList(src []*den.Document) []*document.DocumentDetailResp
-	ToKnowledgeDocumentOptionRespList(src []*dvo.KnowledgeDocument) []*document.KnowledgeDocumentOptionResp
+	ToKnowledgeDocumentOptionRespList(src []*dvo.DocumentMetadata) []*document.KnowledgeDocumentOptionResp
 	ToQueryStrategyPlanResp(src *den.Document) *document.QueryStrategyPlanResp
 	ToDocumentStrategyPlan(src *den.DocumentStrategyPlan) *document.DocumentStrategyPlan
 	ToConfirmStrategyResp(plan *den.DocumentStrategyPlan) *document.ConfirmStrategyResp

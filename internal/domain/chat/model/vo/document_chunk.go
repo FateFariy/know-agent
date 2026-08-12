@@ -76,7 +76,7 @@ type DocumentChunk struct {
 	RerankOriginalIndex int     `json:"rerankOriginalIndex"` // 重排原始索引
 }
 
-func (d *DocumentChunk) FillKnowledge(knowledge *vo2.KnowledgeDocument) {
+func (d *DocumentChunk) FillKnowledge(knowledge *vo2.DocumentMetadata) {
 	if knowledge == nil {
 		return
 	}

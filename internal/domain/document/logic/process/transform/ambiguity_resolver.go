@@ -8,15 +8,16 @@ import (
 	"github.com/duke-git/lancet/v2/stream"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/prompt"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type AmbiguityResolver struct {
 	model          model.ChatModel
-	promptTemplate prompt.Renderer
+	promptTemplate adapter.Renderer
 	*ambiguityOption
 }
 
@@ -58,7 +59,7 @@ func WithContextWindowLines(lines int) TransformerOption {
 	})
 }
 
-func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate prompt.Renderer) *AmbiguityResolver {
+func NewAmbiguityResolver(svcCtx *svc.ServiceContext, model model.ChatModel, promptTemplate adapter.Renderer) *AmbiguityResolver {
 	return &AmbiguityResolver{
 		model:          model,
 		promptTemplate: promptTemplate,
@@ -114,7 +115,7 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 	}
 
 	// 渲染用户提示：注入文档标题与候选块
-	userPrompt, err := r.promptTemplate.Render(prompt.DocumentStructureAmbiguity, map[string]any{
+	userPrompt, err := r.promptTemplate.Render(enum.DocumentStructureAmbiguity, map[string]any{
 		"documentTitle":   utils.BlankToDefault(documentTitle, "未命名文档"),
 		"candidateBlocks": candidateBlocks,
 	})
@@ -138,7 +139,7 @@ func (r *AmbiguityResolver) Transform(ctx context.Context, documentTitle string,
 	}
 
 	// 按 LineNo 构建映射
-	resultMap := utils.SliceToMapBy(results, func(result *vo.DisambiguationResult) (int, *vo.DisambiguationResult) {
+	resultMap := utils.MapBy(results, func(result *vo.DisambiguationResult) (int, *vo.DisambiguationResult) {
 		return result.LineNo, result
 	})
 
@@ -188,7 +189,7 @@ func (r *AmbiguityResolver) buildCandidateBlocks(ambiguousSignals []*vo.Document
 		}
 
 		// 将窗口上下文与信号元信息渲染为候选块模板
-		render, err := r.promptTemplate.Render(prompt.DocumentStructureAmbiguityCandidate, map[string]any{
+		render, err := r.promptTemplate.Render(enum.DocumentStructureAmbiguityCandidate, map[string]any{
 			"lineNo":       signal.LineNo,
 			"contextLines": strings.TrimSpace(contextBuilder.String()),
 			"initialKind":  vo.SignalKindName(signal.Kind),
