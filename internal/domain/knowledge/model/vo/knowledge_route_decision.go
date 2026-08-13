@@ -21,8 +21,8 @@ type ScopeRouteCandidate struct {
 	ScopeName string             `json:"scopeName"` // 知识范围名称
 	Score     float64            `json:"score"`     // 分数
 	Reason    string             `json:"reason"`    // 原因
-	Source    string             `json:"source"`    // 源
-	Features  map[string]float64 `json:"features"`  // 特征
+	Source    string             `json:"source"`    // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
+	Features  map[string]float64 `json:"features"`  // 特征分明细
 }
 
 // TopicRouteCandidate 主题（topic）路由候选
@@ -30,9 +30,10 @@ type TopicRouteCandidate struct {
 	TopicId   string             `json:"topicId"`   // 主题ID
 	TopicName string             `json:"topicName"` // 主题名称
 	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
+	Score     float64            `json:"score"`     // 分数
 	Reason    string             `json:"reason"`    // 原因
-	Source    string             `json:"source"`    // 源
-	Features  map[string]float64 `json:"features"`  // 特征
+	Source    string             `json:"source"`    // 来源
+	Features  map[string]float64 `json:"features"`  // 特征分明细
 }
 
 // DocumentRouteCandidate 文档路由候选
@@ -42,8 +43,8 @@ type DocumentRouteCandidate struct {
 	LastIndexTaskId int64              `json:"lastIndexTaskId"` // 最后索引任务ID
 	Score           float64            `json:"score"`           // 分数
 	Reason          string             `json:"reason"`          // 原因
-	Source          string             `json:"source"`          // 源
-	Features        map[string]float64 `json:"features"`        // 特征
+	Source          string             `json:"source"`          // 来源
+	Features        map[string]float64 `json:"features"`        // 特征分明细
 }
 
 // ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三

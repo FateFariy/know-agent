@@ -13,8 +13,8 @@ type KnowledgeRepository interface {
 
 	// ========== 知识范围节点相关 ==========
 
-	// SelectKnowledgeScopeNodes 获取有效的知识范围节点
-	SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error)
+	// SelectKnowledgeScopeNodesByKbIds 根据知识库ID获取有效的知识范围节点
+	SelectKnowledgeScopeNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeScopeNode, error)
 
 	// UpsertKnowledgeScopeNode 保存/更新知识范围节点（按 scopeCode 判重）
 	UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error
@@ -24,11 +24,11 @@ type KnowledgeRepository interface {
 
 	// ========== 主题节点相关 ==========
 
-	// SelectKnowledgeTopicNodes 获取有效的主题节点
-	SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error)
+	// SelectKnowledgeTopicNodesByKbIds 根据知识库ID获取有效的主题节点
+	SelectKnowledgeTopicNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeTopicNode, error)
 
 	// SelectKnowledgeTopicNodesByScopeCode 按 scopeCode 过滤主题节点
-	SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error)
+	SelectKnowledgeTopicNodesByScopeId(ctx context.Context, scopeId int64) ([]*entity.KnowledgeTopicNode, error)
 
 	// UpsertKnowledgeTopicNode 保存/更新主题节点（按 topicCode 判重）
 	UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error

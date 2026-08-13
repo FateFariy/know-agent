@@ -41,3 +41,38 @@ func (a *DocumentAdapter) FindRetrievableByKbIds(ctx context.Context, kbIds []in
 	}
 	return result, nil
 }
+
+func (a *DocumentAdapter) FindRetrieveDocumentByIds(ctx context.Context, ids []int64) ([]*vo.DocumentMetadata, error) {
+	documentMetadata, err := a.repo.SelectRetrievableDocumentsByIds(ctx, ids...)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*vo.DocumentMetadata, 0, len(documentMetadata))
+	for _, metadata := range documentMetadata {
+		result = append(result, &vo.DocumentMetadata{
+			DocumentId:        metadata.DocumentId,
+			DocumentName:      metadata.DocumentName,
+			KnowledgeBaseId:   metadata.KnowledgeBaseId,
+			KnowledgeBaseName: metadata.KnowledgeBaseName,
+			LastIndexTaskId:   metadata.LastIndexTaskId,
+		})
+	}
+	return result, nil
+}
+
+func (a *DocumentAdapter) FindDocumentProfileByDocIds(ctx context.Context, docIds []int64) ([]*vo.DocumentProfile, error) {
+	documentProfile, err := a.repo.SelectDocumentProfilesByDocIds(ctx, docIds)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*vo.DocumentProfile, 0, len(documentProfile))
+	for _, profile := range documentProfile {
+		result = append(result, &vo.DocumentProfile{
+			DocumentId:       profile.DocumentId,
+			DocumentSummary:  profile.DocumentSummary,
+			CoreTopics:       profile.CoreTopics,
+			ExampleQuestions: profile.ExampleQuestions,
+		})
+	}
+	return result, nil
+}

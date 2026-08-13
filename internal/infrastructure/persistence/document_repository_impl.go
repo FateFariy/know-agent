@@ -559,6 +559,18 @@ func (d *DocumentRepositoryImpl) SelectDocumentProfiles(ctx context.Context) ([]
 	return profiles, nil
 }
 
+// SelectDocumentProfilesByDocIds 根据文档ID列表查询文档属性
+func (d *DocumentRepositoryImpl) SelectDocumentProfilesByDocIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentProfile, error) {
+	var profiles []*entity.DocumentProfile
+	if err := d.dbWithContext(ctx).Model(&model.DocumentProfile{}).
+		Where("document_id IN ?", documentIds).
+		Where("profile_status = ?", 2).
+		Find(&profiles).Error; err != nil {
+		return nil, err
+	}
+	return profiles, nil
+}
+
 // ========== 话题关联相关 ==========
 
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联

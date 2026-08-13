@@ -180,6 +180,9 @@ type DocumentRepository interface {
 	// DeleteProfileByDocumentId 根据文档ID删除属性
 	DeleteProfileByDocumentId(ctx context.Context, documentId int64) error
 
+	// SelectDocumentProfilesByDocIds 根据文档ID列表查询文档属性
+	SelectDocumentProfilesByDocIds(ctx context.Context, documentIds []int64) ([]*entity.DocumentProfile, error)
+
 	// SelectDocumentProfiles 查询所有文档属性
 	SelectDocumentProfiles(ctx context.Context) ([]*entity.DocumentProfile, error)
 

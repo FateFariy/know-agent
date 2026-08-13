@@ -32,10 +32,11 @@ func NewKnowledgeRepository(svcCtx *svc.ServiceContext) *KnowledgeRepositoryImpl
 
 // ============ 知识范围节点 ============
 
-// SelectKnowledgeScopeNodes 查询所有知识范围节点
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
+// SelectKnowledgeScopeNodesByKbIds 根据知识库ID获取有效的知识范围节点
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeScopeNode, error) {
 	var nodes []*entity.KnowledgeScopeNode
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).
+		Where("knowledge_base_id IN ?", kbIds).
 		Order("sort_order ASC").
 		Find(&nodes).Error; err != nil {
 		return nil, err
@@ -46,7 +47,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeScopeNodes(ctx context.Context)
 // UpsertKnowledgeScopeNode 插入或更新知识范围节点
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error {
 	nodeModel := convert.ToKnowledgeScopeNodeModel(node)
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Where("scope_code = ?", node.ScopeCode).First(node).Error; err != nil {
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeScopeNode{}).Where("id = ?", node.ID).First(node).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
@@ -66,17 +67,24 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeScopeNode(ctx context.Context, 
 
 // ============ 主题节点 ============
 
-// SelectKnowledgeTopicNodes 查询所有主题节点
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodes(ctx context.Context) ([]*entity.KnowledgeTopicNode, error) {
-	return k.SelectKnowledgeTopicNodesByScopeCode(ctx, "")
+// SelectKnowledgeTopicNodesByKbIds 根据知识库ID获取有效的主题节点
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeTopicNode, error) {
+	var nodes []*entity.KnowledgeTopicNode
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).
+		Where("knowledge_base_id IN ?", kbIds).
+		Order("sort_order ASC").
+		Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
 }
 
-// SelectKnowledgeTopicNodesByScopeCode 根据知识范围节点查询所有主题节点
-func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error) {
+// SelectKnowledgeTopicNodesByScopeId 根据知识范围节点ID查询所有主题节点
+func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeId(ctx context.Context, scopeId int64) ([]*entity.KnowledgeTopicNode, error) {
 	var nodes []*entity.KnowledgeTopicNode
 	builder := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).Order("sort_order ASC")
-	if strutil.IsNotBlank(scopeCode) {
-		builder = builder.Where("scope_code = ?", scopeCode)
+	if scopeId != 0 {
+		builder = builder.Where("scope_id = ?", scopeId)
 	}
 	if err := builder.Find(&nodes).Error; err != nil {
 		return nil, err
@@ -88,7 +96,7 @@ func (k *KnowledgeRepositoryImpl) SelectKnowledgeTopicNodesByScopeCode(ctx conte
 func (k *KnowledgeRepositoryImpl) UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error {
 	nodeModel := convert.ToKnowledgeTopicNodeModel(node)
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicNode{}).
-		Where("topic_code = ?", node.TopicCode).
+		Where("id = ?", node.ID).
 		First(node).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -135,7 +143,7 @@ func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelationsByTopicCode(ctx co
 func (k *KnowledgeRepositoryImpl) UpsertTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) error {
 	relModel := convert.ToKnowledgeTopicDocumentRelationModel(relation)
 	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).
-		Where("topic_code = ? AND document_id = ?", relation.TopicCode, relation.DocumentId).
+		Where("id = ?", relation.ID).
 		First(relation).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err

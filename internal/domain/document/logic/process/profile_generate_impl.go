@@ -17,7 +17,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 

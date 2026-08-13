@@ -39,7 +39,7 @@ func (k *KnowledgeLogicImpl) DeleteScope(ctx context.Context, scopeCode string) 
 }
 
 func (k *KnowledgeLogicImpl) ListScopes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error) {
-	return k.repo.SelectKnowledgeScopeNodes(ctx)
+	return k.repo.SelectKnowledgeScopeNodesByKbIds(ctx, nil)
 }
 
 // ============ Topic ============
@@ -63,9 +63,9 @@ func (k *KnowledgeLogicImpl) ListTopics(ctx context.Context, scopeCode string) (
 	var err error
 
 	if strutil.IsBlank(scopeCode) {
-		nodes, err = k.repo.SelectKnowledgeTopicNodes(ctx)
+		nodes, err = k.repo.SelectKnowledgeTopicNodesByKbIds(ctx, nil)
 	} else {
-		nodes, err = k.repo.SelectKnowledgeTopicNodesByScopeCode(ctx, strutil.Trim(scopeCode))
+		nodes, err = k.repo.SelectKnowledgeTopicNodesByScopeId(ctx, strutil.Trim(scopeCode))
 	}
 	if err != nil {
 		return nil, err

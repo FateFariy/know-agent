@@ -37,7 +37,7 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, ch
 	resolvedMode := utils.BlankToDefault(selectionMode, enum.KbSelectionModeNone)
 
 	snapshot := &aggregate.KnowledgeBaseSelectionSnapshot{
-		SelectionMode:     resolvedMode,
+		SelectionMode:     enum.KbSelectionModeNone,
 		RagRuntimeOptions: s.resolver.Resolve(nil),
 	}
 	// 开放式聊天或无选择模式时返回空快照
@@ -92,8 +92,12 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, ch
 		}
 	}
 	selectedBases = selectedBases[:i]
+	if len(selectedBases) == 0 {
+		return snapshot, nil
+	}
 
 	// 构建快照
+	snapshot.SelectionMode = resolvedMode
 	snapshot.SelectedKnowledgeBaseIds = selectedBaseIds
 	snapshot.SelectedKnowledgeBaseNames = selectedBaseNames
 	snapshot.SelectedKnowledgeBases = selectedBases
