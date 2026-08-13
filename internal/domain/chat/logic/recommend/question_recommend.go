@@ -25,11 +25,11 @@ const (
 // QuestionRecommendImpl 追问推荐实现
 type QuestionRecommendImpl struct {
 	properties     config.RecommendationConf
-	promptTemplate adapter.Renderer
+	promptTemplate adapter.PromptRenderer
 	chatModel      model.ChatModel
 }
 
-func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate adapter.Renderer, chatModel model.ChatModel) *QuestionRecommendImpl {
+func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate adapter.PromptRenderer, chatModel model.ChatModel) *QuestionRecommendImpl {
 	return &QuestionRecommendImpl{
 		properties:     svcCtx.Config.Chat.Recommendation,
 		promptTemplate: promptTemplate,

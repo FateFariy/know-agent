@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 )
 
@@ -72,7 +73,7 @@ type KnowledgeConfigLogic interface {
 // KnowledgeBaseRetrievalLogic 知识库检索范围
 type KnowledgeBaseRetrievalLogic interface {
 	// Resolve 根据聊天模式和知识库选择模式解析检索范围
-	Resolve(ctx context.Context, chatMode, selectionMode string, selectedKnowledgeBaseIds []string) (*entity.KnowledgeBaseSelectionSnapshot, error)
+	Resolve(ctx context.Context, chatMode, selectionMode string, selectedKnowledgeBaseIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
 }
 
 // KnowledgeConfigOption 知识库选项（用于下拉选择等场景）

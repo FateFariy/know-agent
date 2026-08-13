@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -37,7 +38,7 @@ const (
 type ConversationLogicImpl struct {
 	repo                  adapter.ChatRepository
 	preOrchestrator       preparation.ConversationPreOrchestrator
-	renderer              adapter.Renderer
+	renderer              adapter.PromptRenderer
 	knowledgeBaseResolver adapter.KnowledgeBaseResolver
 	runtimeRegistry       *conversation.ChatRuntimeRegistry
 	executorRegistry      *executor.Registry
@@ -57,7 +58,7 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	executorRegistry *executor.Registry,
 	knowledgeBaseResolver adapter.KnowledgeBaseResolver,
 	preOrchestrator preparation.ConversationPreOrchestrator,
-	renderer adapter.Renderer,
+	renderer adapter.PromptRenderer,
 	recommender recommend.QuestionRecommender,
 	memoryManager memory.SessionMemoryManager,
 	distributedLock adapter.DistributedLock,
@@ -261,10 +262,13 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 	}
 	// 构建启动计划，填充问题、会话 ID、聊天模式
 	convCtx := &conversation.Context{
-		Question:                       cmd.Question,
 		ConversationId:                 conversationId,
+		Question:                       cmd.Question,
 		ChatMode:                       enum.ToChatQueryMode(cmd.ChatMode),
 		KnowledgeBaseSelectionSnapshot: selectionSnapshot,
+	}
+	if selectionSnapshot.SelectionModeName() == enum.KbSelectionModeNone {
+		convCtx.ChatMode = enum.ChatQueryModeOpenChat
 	}
 
 	// 当命令指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID

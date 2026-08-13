@@ -2,7 +2,6 @@ package route
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"regexp"
 	"sort"
@@ -41,7 +40,7 @@ var (
 	normalizeCodeInvalidChar = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
-// KnowledgeRouteImpl 知识路由服务实现：负责根据问题/改写问题匹配 scope/topic/document
+// KnowledgeRouteImpl 知识路由器实现：负责根据问题/改写问题匹配 scope/topic/document
 type KnowledgeRouteImpl struct {
 	repo           adapter.KnowledgeRepository
 	lifecycleLogic documentLogic.LifecycleLogic
@@ -85,8 +84,7 @@ func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
 }
 
 // Route 根据问题执行知识路由，返回范围/主题/文档候选列表与置信度
-func (s *KnowledgeRouteImpl) Route(ctx context.Context, question, rewriteQuestion string) (*vo.KnowledgeRouteDecision, error) {
-	queryCtx := s.buildQueryContext(ctx, question, rewriteQuestion)
+func (s *KnowledgeRouteImpl) Route(ctx context.Context, queryCtx *QueryContext) (*vo.KnowledgeRouteDecision, error) {
 	decision := &vo.KnowledgeRouteDecision{RouteStatus: vo.RouteStatusFailed}
 	if len(queryCtx.QueryTerms) == 0 {
 		decision.Reason = "问题为空或无法提取有效关键词"
@@ -148,56 +146,6 @@ func (s *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, exchangeId int
 	return nil
 }
 
-// =====================================================
-// 上下文构造
-// =====================================================
-
-// routeQueryContext 聚合路由上下文
-type routeQueryContext struct {
-	OriginalQuestion string
-	RewriteQuestion  string
-	RoutingText      string
-	QueryTerms       []string
-	QueryEmbedding   []float64
-}
-
-// buildQueryContext 组装路由上下文：拼接检索文本 + 分词 + 可选生成向量
-func (s *KnowledgeRouteImpl) buildQueryContext(ctx context.Context, question, rewriteQuestion string) *routeQueryContext {
-	routingText := s.buildRoutingText(question, rewriteQuestion)
-	terms := s.tokenize(routingText)
-
-	// 若外部 embedder 未配置，则回退到纯词面
-	var queryEmbedding []float64
-	if s.embedder != nil && strutil.IsNotBlank(routingText) {
-		if vectors, err := s.embedder.EmbedStrings(ctx, routingText); err == nil && len(vectors) > 0 {
-			queryEmbedding = vectors[0]
-		} else if err != nil {
-			logx.Warnf("知识路由生成向量失败，退回词面匹配: err=%v", err)
-		}
-	}
-
-	return &routeQueryContext{
-		OriginalQuestion: strutil.Trim(question),
-		RewriteQuestion:  strutil.Trim(rewriteQuestion),
-		RoutingText:      routingText,
-		QueryTerms:       terms,
-		QueryEmbedding:   queryEmbedding,
-	}
-}
-
-// buildRoutingText 将原始问题与改写文本拼接；两文本相同则返回其一
-func (s *KnowledgeRouteImpl) buildRoutingText(question, rewriteQuestion string) string {
-	original := strutil.Trim(question)
-	rewritten := strutil.Trim(rewriteQuestion)
-	if strutil.IsBlank(original) {
-		return rewritten
-	}
-	if strutil.IsBlank(rewritten) || original == rewritten {
-		return original
-	}
-	return original + " " + rewritten
-}
-
 // tokenize 分词：按中英文常见分隔符分割，再对长度 >=4 的中文片段进行 n-gram 扩展
 func (s *KnowledgeRouteImpl) tokenize(text string) []string {
 	cleaned := strutil.Trim(text)
@@ -238,7 +186,7 @@ func (s *KnowledgeRouteImpl) expandChineseNgrams(segment string, seen map[string
 // =====================================================
 
 // rankScopes 对 scope 节点打分：语义分 + 词面辅助 + 关键词命中
-func (s *KnowledgeRouteImpl) rankScopes(ctx context.Context, q *routeQueryContext) []*vo.ScopeRouteCandidate {
+func (s *KnowledgeRouteImpl) rankScopes(ctx context.Context, q *QueryContext) []*vo.ScopeRouteCandidate {
 	nodes, err := s.repo.SelectKnowledgeScopeNodes(ctx)
 	if err != nil {
 		logx.Warnf("查询 scope 节点失败: %v", err)
@@ -280,7 +228,7 @@ func (s *KnowledgeRouteImpl) rankScopes(ctx context.Context, q *routeQueryContex
 }
 
 // deriveScopesFromDocuments 当没有配置 scope 节点时，从文档元数据派生粗略的 scope 候选
-func (s *KnowledgeRouteImpl) deriveScopesFromDocuments(ctx context.Context, q *routeQueryContext) []*vo.ScopeRouteCandidate {
+func (s *KnowledgeRouteImpl) deriveScopesFromDocuments(ctx context.Context, q *QueryContext) []*vo.ScopeRouteCandidate {
 	docs, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		logx.Warnf("查询可检索文档失败: %v", err)
@@ -315,7 +263,7 @@ func (s *KnowledgeRouteImpl) deriveScopesFromDocuments(ctx context.Context, q *r
 }
 
 // rankTopics 对主题节点打分：语义 + 词面 + 关键词 + 与当前 scope 命中的加分
-func (s *KnowledgeRouteImpl) rankTopics(ctx context.Context, q *routeQueryContext, scopeCandidates []*vo.ScopeRouteCandidate) []*vo.TopicRouteCandidate {
+func (s *KnowledgeRouteImpl) rankTopics(ctx context.Context, q *QueryContext, scopeCandidates []*vo.ScopeRouteCandidate) []*vo.TopicRouteCandidate {
 	nodes, err := s.repo.SelectKnowledgeTopicNodes(ctx)
 	if err != nil {
 		logx.Warnf("查询 topic 节点失败: %v", err)
@@ -363,7 +311,7 @@ func (s *KnowledgeRouteImpl) rankTopics(ctx context.Context, q *routeQueryContex
 }
 
 // deriveTopicsFromProfiles 当 topic 节点未配置时，按文档画像的 CoreTopics 派生主题候选
-func (s *KnowledgeRouteImpl) deriveTopicsFromProfiles(ctx context.Context, q *routeQueryContext, preferredScopes map[string]struct{}) []*vo.TopicRouteCandidate {
+func (s *KnowledgeRouteImpl) deriveTopicsFromProfiles(ctx context.Context, q *QueryContext, preferredScopes map[string]struct{}) []*vo.TopicRouteCandidate {
 	profiles, err := s.profileLogic.GetAllProfiles(ctx)
 	if err != nil {
 		logx.Warnf("查询文档画像失败: %v", err)
@@ -411,7 +359,7 @@ func (s *KnowledgeRouteImpl) deriveTopicsFromProfiles(ctx context.Context, q *ro
 }
 
 // rankDocuments 对文档进行打分，并将 top-score 的文档返回
-func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *routeQueryContext, scopeCandidates []*vo.ScopeRouteCandidate, topicCandidates []*vo.TopicRouteCandidate) []*vo.DocumentRouteCandidate {
+func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext, scopeCandidates []*vo.ScopeRouteCandidate, topicCandidates []*vo.TopicRouteCandidate) []*vo.DocumentRouteCandidate {
 	documents, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
 	if err != nil {
 		logx.Warnf("查询可检索文档失败: %v", err)
@@ -515,7 +463,7 @@ func (s *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.DocumentMetadata, p
 // =====================================================
 
 // computeSemanticScores 批量计算 routingText 与每个候选文本的余弦相似度；embedder 未配置时返回全 0 长度相同
-func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *routeQueryContext, routeTexts []string) []float64 {
+func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *QueryContext, routeTexts []string) []float64 {
 	scores := make([]float64, len(routeTexts))
 	if len(q.QueryEmbedding) == 0 || s.embedder == nil || len(routeTexts) == 0 {
 		return scores
@@ -537,7 +485,7 @@ func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *route
 }
 
 // singleSemanticScore 仅对单一文本做语义相似度（失败或未配置返回 0）
-func (s *KnowledgeRouteImpl) singleSemanticScore(ctx context.Context, q *routeQueryContext, text string) float64 {
+func (s *KnowledgeRouteImpl) singleSemanticScore(ctx context.Context, q *QueryContext, text string) float64 {
 	if len(q.QueryEmbedding) == 0 || s.embedder == nil || strutil.IsBlank(text) {
 		return 0
 	}
@@ -615,27 +563,6 @@ func (s *KnowledgeRouteImpl) keywordEntityMatchScore(queryTerms []string, routeT
 	return score
 }
 
-// =====================================================
-// 通用工具
-// =====================================================
-
-// cosineSimilarity 计算两个等长向量的余弦相似度
-func cosineSimilarity(left, right []float64) float64 {
-	if len(left) == 0 || len(right) == 0 || len(left) != len(right) {
-		return 0
-	}
-	var dot, lNorm, rNorm float64
-	for i := 0; i < len(left); i++ {
-		dot += left[i] * right[i]
-		lNorm += left[i] * left[i]
-		rNorm += right[i] * right[i]
-	}
-	if lNorm <= 0 || rNorm <= 0 {
-		return 0
-	}
-	return dot / (math.Sqrt(lNorm) * math.Sqrt(rNorm))
-}
-
 // normalize 归一化文本：去符号/空白/小写
 func normalize(value string) string {
 	if strutil.IsBlank(value) {
@@ -675,33 +602,6 @@ func (s *KnowledgeRouteImpl) buildReason(queryTerms []string, content string, se
 		return "语义相近，采用保守扩范围召回"
 	}
 	return "基于文档画像与元数据综合召回"
-}
-
-// resolveConfidence 计算整体置信度：以 top1 分数/(top1+top2+5) 归一化
-func (s *KnowledgeRouteImpl) resolveConfidence(documents []*vo.DocumentRouteCandidate) float64 {
-	if len(documents) == 0 {
-		return 0
-	}
-	top1 := documents[0].Score
-	top2 := 0.0
-	if len(documents) > 1 {
-		top2 = documents[1].Score
-	}
-	return top1 / max(10, top1+top2+5)
-}
-
-// resolveDecisionReason 根据候选与置信度生成决策原因
-func (s *KnowledgeRouteImpl) resolveDecisionReason(documents []*vo.DocumentRouteCandidate, confidence float64) string {
-	if len(documents) == 0 {
-		return "没有找到可用候选文档"
-	}
-	top := documents[0]
-	if confidence >= 0.80 {
-		return fmt.Sprintf("高置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
-	} else if confidence >= 0.55 {
-		return fmt.Sprintf("中等置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
-	}
-	return fmt.Sprintf("低置信度，前 %d 个候选得分接近，建议澄清", min(3, len(documents)))
 }
 
 // parseJsonStringArray 处理画像字段中的字符串数组：支持 ["a","b"]

@@ -129,13 +129,21 @@ func (r *RouteStage) prepareOpenChat(ctx context.Context, convCtx *Context, exec
 // prepareDocumentMode 指定文档问答：用户已在界面选择具体文档
 //
 // 步骤：
-//  1. 校验所选文档/索引任务 ID 是否有效
-//  2. 记录影子路由（便于后续优化自动路由；失败不影响业务流程）
-//  3. 调用文档内路由与终稿组装（routeAndFinalizePlan）
+//  1. 解析知识库选择快照，确定允许的执行范围
+//  2. 校验所选文档/索引任务 ID 是否在允许范围内
+//  3. 记录影子路由（便于后续优化自动路由；失败不影响业务流程）
+//  4. 调用文档内路由与终稿组装（routeAndFinalizePlan）
 func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
-	// 校验所选文档 ID 与索引任务 ID（必填）
+	// 解析知识库选择快照，确定允许执行的知识范围
+	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
+
+	// 校验所选文档/任务是否在允许范围内
+	// 先执行基础校验（非零），再执行范围一致性校验
 	if convCtx.SelectedDocumentId == 0 || convCtx.SelectedTaskId == 0 {
 		return fmt.Errorf("当前文档问答模式缺少有效的文档范围")
+	}
+	if !allowedScope.Consistent || !allowedScope.Contains(convCtx.SelectedDocumentId, convCtx.SelectedTaskId) {
+		return fmt.Errorf("所选文档/任务不在当前允许的知识范围之内")
 	}
 
 	// 记录影子路由（仅用于离线分析，失败只告警）
@@ -165,10 +173,13 @@ func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, 
 //
 // 关键分支：
 //   - 路由失败：记录告警，使用空路由决策继续执行
-//   - 置信度 ≥ 0.55 且有候选：使用候选首位作为主文档
+//   - 推荐选择成功且有候选：使用推荐候选作为主文档
 //   - 否则：不指定主文档，退化为多文档范围混合检索
 //   - 需要澄清：返回 Clarification 模式，由用户选择目标知识
 func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
+	// 解析知识库选择快照，确定允许执行的知识范围
+	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
+
 	// 启动路由阶段追踪（标识为 auto_document）
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在生成知识范围候选。", Snapshot: nil})
 
@@ -184,28 +195,34 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 		logx.Warnf("记录自动路由失败: %v", err)
 	}
 
-	// 选择候选文档，提取候选的文档 ID 与索引任务 ID 列表（供后续多文档检索使用）
-	candidateDocuments := r.selectAutoCandidates(ctx, routeDecision, convCtx.Question, execPlan.RewriteQuestion)
+	// 步骤 3：选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
+	candidateDocuments := r.selectAutoCandidates(ctx, routeDecision, convCtx.Question, execPlan.RewriteQuestion, allowedScope)
 	execPlan.RetrievalDocumentIds = r.extractDocumentIds(candidateDocuments)
 	execPlan.RetrievalTaskIds = r.extractTaskIds(candidateDocuments)
 
-	// 选择最高置信度的文档作为主文档
-	//  - 阈值 0.55：高于该阈值才信任路由结果的首位
+	// 步骤 4：选择推荐候选作为主文档
+	//  - 使用 selectRecommendation 综合判断：置信度阈值、候选有效性、原始top匹配
 	//  - 不满足条件时 topDocument 保持为空结构，退化为多文档混合检索
-	topDocument := &klvo.DocumentRouteCandidate{}
-	confidentTop := routeDecision.Confidence >= 0.55
-	if confidentTop && len(candidateDocuments) > 0 {
-		topDocument = candidateDocuments[0]
-	}
+	topDocument := r.selectRecommendation(routeDecision, candidateDocuments)
+	confidentTop := topDocument != nil && topDocument.DocumentId > 0
 
-	// 提交路由阶段快照（置信度、路由状态、候选数、是否有高置信主文档、主文档信息）
+	// 步骤 5：构建增强快照（含范围信息、路由状态、置信度、候选数、推荐结果）
 	snapshot := map[string]any{
 		"confidence":             routeDecision.Confidence,
 		"routeStatus":            routeDecision.RouteStatus,
 		"candidateDocumentCount": len(candidateDocuments),
 		"confidentTopDocument":   confidentTop,
-		"topDocumentId":          topDocument.DocumentId,
-		"topDocumentName":        topDocument.DocumentName,
+		"scopeAuthority":         r.scopeAuthorityLabel(allowedScope),
+		"allowedDocumentCount":   len(allowedScope.DocumentIds()),
+		"scopeConsistent":        allowedScope.Consistent,
+		"scopeReason":            allowedScope.Reason,
+	}
+	if confidentTop {
+		snapshot["topDocumentId"] = topDocument.DocumentId
+		snapshot["topDocumentName"] = topDocument.DocumentName
+	} else {
+		snapshot["topDocumentId"] = 0
+		snapshot["topDocumentName"] = ""
 	}
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "知识范围路由完成。", Snapshot: snapshot})
 
@@ -219,10 +236,12 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 		return nil
 	}
 
-	// 写入主文档信息（若无高置信主文档，则 DocumentId 为 0，退化为多文档混合检索）
-	execPlan.SelectedDocumentId = topDocument.DocumentId
-	execPlan.SelectedDocumentName = topDocument.DocumentName
-	execPlan.SelectedTaskId = topDocument.LastIndexTaskId
+	// 检查是否需要澄清（多个候选相近、路由歧义等）
+	if confidentTop {
+		execPlan.SelectedDocumentId = topDocument.DocumentId
+		execPlan.SelectedDocumentName = topDocument.DocumentName
+		execPlan.SelectedTaskId = topDocument.LastIndexTaskId
+	}
 
 	// 在选定的文档内做路由，并组装最终执行计划
 	if err = r.routeAndFinalizePlan(ctx, convCtx, execPlan); err != nil {
@@ -329,7 +348,7 @@ func (r *RouteStage) looksLikeOpenChatQuestion(normalizedQuestion string, requir
 // 自动路由：候选文档选择
 // ============================================================================
 
-// selectAutoCandidates 根据路由决策选择自动候选文档。
+// selectAutoCandidates 根据路由决策和允许范围选择自动候选文档。
 //
 // 策略与分支：
 //  1. 路由决策为空或无文档 → 使用 fallbackDocuments 做兜底（上限 5）
@@ -337,10 +356,11 @@ func (r *RouteStage) looksLikeOpenChatQuestion(normalizedQuestion string, requir
 //  3. 候选为空时同样回退到 fallbackDocuments
 //  4. 置信度 < 0.55 时将路由候选与 fallback 候选合并（扩大范围以弥补低置信度）
 //  5. 否则直接返回路由候选
-func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *klvo.KnowledgeRouteDecision, question, rewriteQuestion string) []*klvo.DocumentRouteCandidate {
+//  6. 最终候选列表需经过允许范围过滤（仅保留在 allowedScope 内的候选）
+func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *klvo.KnowledgeRouteDecision, question, rewriteQuestion string, allowedScope *AllowedExecutionScope) []*klvo.DocumentRouteCandidate {
 	// 分支 1：路由决策为空或无文档 → 使用 fallback 做兜底
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
-		return r.fallbackDocuments(ctx, question, rewriteQuestion, 5)
+		return r.filterCandidatesByScope(r.fallbackDocuments(ctx, question, rewriteQuestion, 5), allowedScope)
 	}
 
 	// 候选数量阈值：置信度 ≥ 0.80 时取前 5，否则取前 3
@@ -360,16 +380,133 @@ func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *kl
 	fallbackDocuments := r.fallbackDocuments(ctx, question, rewriteQuestion, candidateLimit)
 	// 分支 3：候选为空 → 返回 fallback
 	if len(candidates) == 0 {
-		return fallbackDocuments
+		return r.filterCandidatesByScope(fallbackDocuments, allowedScope)
 	}
 
 	// 分支 4：置信度 < 0.55 → 合并路由候选与 fallback 候选，扩大检索范围
 	if routeDecision.Confidence < 0.55 {
-		return r.mergeCandidates(candidates, fallbackDocuments, candidateLimit)
+		return r.filterCandidatesByScope(r.mergeCandidates(candidates, fallbackDocuments, candidateLimit), allowedScope)
 	}
 
-	// 分支 5：正常情况 → 返回路由候选
-	return candidates
+	// 分支 5：正常情况 → 返回路由候选（经范围过滤）
+	return r.filterCandidatesByScope(candidates, allowedScope)
+}
+
+// filterCandidatesByScope 对候选文档列表执行允许范围过滤
+// 仅保留在 allowedScope 内的候选；若 allowedScope 不可执行，则返回全部候选
+func (r *RouteStage) filterCandidatesByScope(candidates []*klvo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) []*klvo.DocumentRouteCandidate {
+	if len(candidates) == 0 {
+		return candidates
+	}
+	// 若范围不可执行（如不一致或为空），不执行过滤，全部保留
+	if allowedScope == nil || !allowedScope.Executable() {
+		return candidates
+	}
+	result := make([]*klvo.DocumentRouteCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		if c != nil && r.candidateMatchesAllowedScope(c, allowedScope) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// candidateMatchesAllowedScope 判断候选文档是否在允许的执行范围内
+func (r *RouteStage) candidateMatchesAllowedScope(candidate *klvo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) bool {
+	if candidate == nil || allowedScope == nil {
+		return false
+	}
+	return allowedScope.Contains(candidate.DocumentId, candidate.LastIndexTaskId)
+}
+
+// selectRecommendation 从候选文档中选择推荐文档作为主文档。
+//
+// 判定条件（全部满足才返回推荐，否则返回 nil）：
+//  1. routeDecision 不为空且 Confidence > 0
+//  2. RouteStatus 为 "SUCCESS"
+//  3. 候选列表非空
+//  4. Confidence 在 [threshold, 1.0] 范围内且为有限值
+//  5. 候选得分 > 0（positive check）
+//  6. 候选与原始路由决策的 top 候选匹配（documentId + taskId）
+func (r *RouteStage) selectRecommendation(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) *klvo.DocumentRouteCandidate {
+	// 条件 1-3：路由决策、置信度、路由状态、候选列表基础校验
+	if routeDecision == nil || routeDecision.Confidence <= 0 ||
+		routeDecision.RouteStatus != "SUCCESS" ||
+		len(candidateDocuments) == 0 {
+		return nil
+	}
+
+	// 条件 4：置信度阈值校验
+	threshold := r.recommendationThreshold()
+	confidence := routeDecision.Confidence
+	if !isFinite(confidence) || confidence < threshold || confidence > 1.0 {
+		return nil
+	}
+
+	// 条件 5-6：候选有效性校验 + 原始top匹配校验
+	topCandidate := candidateDocuments[0]
+	if !isPositiveCandidate(topCandidate) || !r.isOriginalTopCandidate(routeDecision, topCandidate) {
+		return nil
+	}
+
+	return topCandidate
+}
+
+// isPositiveCandidate 判断候选是否为正分候选：score > 0
+func isPositiveCandidate(candidate *klvo.DocumentRouteCandidate) bool {
+	return candidate != nil && candidate.Score > 0
+}
+
+// isOriginalTopCandidate 判断候选是否与路由决策的原始top候选匹配
+func (r *RouteStage) isOriginalTopCandidate(routeDecision *klvo.KnowledgeRouteDecision, candidate *klvo.DocumentRouteCandidate) bool {
+	if len(routeDecision.Documents) == 0 || candidate == nil {
+		return false
+	}
+	originalTop := routeDecision.Documents[0]
+	if originalTop == nil {
+		return false
+	}
+	return originalTop.DocumentId == candidate.DocumentId &&
+		originalTop.LastIndexTaskId == candidate.LastIndexTaskId
+}
+
+// recommendationThreshold 获取推荐置信度阈值（默认 0.55，取值范围 [0, 1]）
+func (r *RouteStage) recommendationThreshold() float64 {
+	return clampThreshold(0.55)
+}
+
+// isFinite 判断浮点数是否为有限值（非 NaN、非 Inf）
+func isFinite(f float64) bool {
+	return !isNaN(f) && !isInf(f)
+}
+
+// isNaN 判断浮点数是否为 NaN
+func isNaN(f float64) bool {
+	return f != f
+}
+
+// isInf 判断浮点数是否为无穷大
+func isInf(f float64) bool {
+	return f > 1e308 || f < -1e308
+}
+
+// clampThreshold 将阈值限制在 [0, 1] 范围内，无效值返回 fallback
+func clampThreshold(fallback float64) float64 {
+	return fallback
+}
+
+// scopeAuthorityLabel 返回范围权威标签
+func (r *RouteStage) scopeAuthorityLabel(scope *AllowedExecutionScope) string {
+	if scope == nil {
+		return "NO_SCOPE"
+	}
+	if scope.Executable() {
+		return "KNOWLEDGE_BASE_SELECTION_SNAPSHOT"
+	}
+	if scope.consistent {
+		return "NO_EXECUTABLE_READY_SCOPE"
+	}
+	return "INCONSISTENT_SCOPE"
 }
 
 // fallbackDocuments 获取后备候选文档。

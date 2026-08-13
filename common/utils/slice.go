@@ -140,3 +140,29 @@ func ContainsAny[T comparable](slice []T, elements ...T) bool {
 	}
 	return false
 }
+
+func EqualUnordered[T comparable](a []T, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[T]int, len(a))
+	for _, v := range a {
+		counts[v]++
+	}
+	for _, v := range b {
+		counts[v]--
+		if counts[v] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func Copy[T comparable](src []T) []T {
+	if len(src) == 0 {
+		return nil
+	}
+	dest := make([]T, len(src))
+	copy(dest, src)
+	return dest
+}

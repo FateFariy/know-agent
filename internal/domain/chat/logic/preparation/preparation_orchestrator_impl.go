@@ -23,7 +23,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/domain/chat/support"
 	doclog "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"

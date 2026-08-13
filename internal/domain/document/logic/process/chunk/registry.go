@@ -15,7 +15,7 @@ type Registry struct {
 	registry map[int]Chunker
 }
 
-func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template adapter.Renderer) *Registry {
+func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template adapter.PromptRenderer) *Registry {
 	registry := make(map[int]Chunker)
 	// 递归分块
 	registry[enum.StrategyTypeRecursive] = recursive.NewChunker(

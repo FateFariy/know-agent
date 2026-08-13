@@ -38,7 +38,7 @@ type SummaryCompressionStrategy struct {
 	baseMemoryStrategy
 	repo                      adapter.ChatRepository
 	chatModel                 model.ChatModel
-	promptTemplate            adapter.Renderer
+	promptTemplate            adapter.PromptRenderer
 	refreshingConversationIds sync.Map
 	historySummary            config.HistorySummaryConf
 	questionHistoryMaxChars   int
@@ -46,7 +46,7 @@ type SummaryCompressionStrategy struct {
 }
 
 // NewSummaryCompressionStrategy 创建摘要压缩策略实例
-func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate adapter.Renderer) *SummaryCompressionStrategy {
+func NewSummaryCompressionStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, chatModel model.ChatModel, promptTemplate adapter.PromptRenderer) *SummaryCompressionStrategy {
 	return &SummaryCompressionStrategy{
 		repo:                     repo,
 		historySummary:           svcCtx.Config.Chat.Memory.HistorySummary,

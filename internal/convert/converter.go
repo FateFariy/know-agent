@@ -10,6 +10,7 @@ import (
 	dagg "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	aggregate2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/aggregate"
 	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 )
@@ -165,5 +166,5 @@ type KnowledgeConverter interface {
 	ToKnowledgeBaseModel(src *klen.KnowledgeBase) *model.KnowledgeBase
 	ToKnowledgeBaseModelList(src []*klen.KnowledgeBase) []*model.KnowledgeBase
 
-	ToKnowledgeBaseSelectionSnapshot(src *klen.KnowledgeBaseSelectionSnapshot) *cvo.KnowledgeBaseSelectionSnapshot
+	ToKnowledgeBaseSelectionSnapshot(src *aggregate2.KnowledgeBaseSelectionSnapshot) *cvo.KnowledgeBaseSelectionSnapshot
 }

@@ -1,10 +1,11 @@
-package entity
+package aggregate
 
 import (
 	"encoding/json"
 	"strings"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -12,10 +13,8 @@ type KnowledgeBaseSelectionSnapshot struct {
 	SelectionMode              enum.KnowledgeBaseSelectionMode `json:"selectionMode"`
 	SelectedKnowledgeBaseIds   []int64                         `json:"selectedKnowledgeBaseIds"`
 	SelectedKnowledgeBaseNames []string                        `json:"selectedKnowledgeBaseNames"`
-	SelectedKnowledgeBases     []*KnowledgeBase                `json:"selectedKnowledgeBases"`
+	SelectedKnowledgeBases     []*entity.KnowledgeBase         `json:"selectedKnowledgeBases"`
 	AllowedDocuments           []*vo.DocumentMetadata          `json:"allowedDocuments"`
-	AllowedDocumentIds         []int64                         `json:"allowedDocumentIds"`
-	AllowedTaskIds             []int64                         `json:"allowedTaskIds"`
 	RagRuntimeOptions          *vo.RagRuntimeOptions           `json:"ragRuntimeOptions,omitempty"`
 }
 

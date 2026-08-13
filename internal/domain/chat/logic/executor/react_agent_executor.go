@@ -48,7 +48,7 @@ package executor
 // 	agentStage, err := e.tracer.OnStart(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
 // 		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
 //
-// 	streamCh, err := e.reactAgent.Stream(ctx, plan.OriginalQuestion)
+// 	streamCh, err := e.reactAgent.Stream(ctx, plan.Question)
 // 	if err != nil {
 // 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
 // 		e.tracer.OnErr(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)

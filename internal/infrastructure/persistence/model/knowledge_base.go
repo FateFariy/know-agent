@@ -15,6 +15,6 @@ type KnowledgeBase struct {
 	GraphRagConfigJson  datatypes.JSON `gorm:"column:graph_rag_config_json;type:json"`   // 图谱RAG配置JSON
 	RaptorConfigJson    datatypes.JSON `gorm:"column:raptor_config_json;type:json"`      // Raptor配置JSON
 	MetadataFilterJson  datatypes.JSON `gorm:"column:metadata_filter_json;type:json"`    // 元数据过滤JSON
-	IsDefault           int            `gorm:"column:is_default;type:tinyint"`           // 是否默认
+	IsDefault           *int           `gorm:"column:is_default;type:tinyint"`           // 是否默认
 	SortOrder           int            `gorm:"column:sort_order;type:int"`               // 排序顺序
 }

@@ -18,14 +18,14 @@ import (
 // QueryRewriteImpl 问题改写逻辑实现
 type QueryRewriteImpl struct {
 	chatModel       model.ChatModel
-	promptTemplate  adapter.Renderer
+	promptTemplate  adapter.PromptRenderer
 	maxSubQuestions int
 	options         []model.Option
 }
 
 // NewQueryRewriteImpl 创建问题改写逻辑实例
 func NewQueryRewriteImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
-	promptTemplate adapter.Renderer) *QueryRewriteImpl {
+	promptTemplate adapter.PromptRenderer) *QueryRewriteImpl {
 	return &QueryRewriteImpl{
 		chatModel:       chatModel,
 		promptTemplate:  promptTemplate,

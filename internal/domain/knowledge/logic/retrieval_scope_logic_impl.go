@@ -6,6 +6,8 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/config"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
@@ -16,24 +18,27 @@ import (
 type KnowledgeBaseRetrievalScopeServiceImpl struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
+	resolver   *config.Resolver
 }
 
 // NewKnowledgeBaseRetrievalScopeServiceImpl 创建知识库检索范围服务实例
-func NewKnowledgeBaseRetrievalScopeServiceImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway) *KnowledgeBaseRetrievalScopeServiceImpl {
+func NewKnowledgeBaseRetrievalScopeServiceImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, global config.GlobalRagRuntimeConfigProvider) *KnowledgeBaseRetrievalScopeServiceImpl {
 	return &KnowledgeBaseRetrievalScopeServiceImpl{
 		repo:       repo,
 		docGateway: docGateway,
+		resolver:   config.NewResolver(global),
 	}
 }
 
 // Resolve 根据聊天模式和知识库选择模式解析检索范围
 // 对应 Java resolve() 方法
-func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, chatMode string, selectionMode string, selectedKnowledgeBaseIds []string) (*entity.KnowledgeBaseSelectionSnapshot, error) {
+func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, chatMode string, selectionMode string, selectedKnowledgeBaseIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error) {
 	// 解析选择模式
 	resolvedMode := utils.BlankToDefault(selectionMode, enum.KbSelectionModeNone)
 
-	snapshot := &entity.KnowledgeBaseSelectionSnapshot{
-		SelectionMode: resolvedMode,
+	snapshot := &aggregate.KnowledgeBaseSelectionSnapshot{
+		SelectionMode:     resolvedMode,
+		RagRuntimeOptions: s.resolver.Resolve(nil),
 	}
 	// 开放式聊天或无选择模式时返回空快照
 	if chatMode == "open_chat" || resolvedMode == enum.KbSelectionModeNone {
@@ -74,29 +79,26 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, ch
 		return doc.KnowledgeBaseId, struct{}{}
 	})
 
-	// 收集选中的知识库ID
+	// 收集选中的知识库
 	selectedBaseIds := make([]int64, 0, len(selectedBases))
 	selectedBaseNames := make([]string, 0, len(selectedBases))
+	i := 0
 	for _, base := range selectedBases {
 		if _, exists := mapBy[base.ID]; exists {
 			selectedBaseIds = append(selectedBaseIds, base.ID)
 			selectedBaseNames = append(selectedBaseNames, base.BaseName)
+			selectedBases[i] = base
+			i++
 		}
 	}
+	selectedBases = selectedBases[:i]
 
 	// 构建快照
 	snapshot.SelectedKnowledgeBaseIds = selectedBaseIds
 	snapshot.SelectedKnowledgeBaseNames = selectedBaseNames
 	snapshot.SelectedKnowledgeBases = selectedBases
 	snapshot.AllowedDocuments = allowedDocuments
-
-	// 提取允许的文档ID和任务ID
-	snapshot.AllowedDocumentIds = utils.FilterMapUniqueLimit(allowedDocuments, -1, func(doc *vo.DocumentMetadata) (int64, int64, bool) {
-		return doc.DocumentId, doc.DocumentId, doc.DocumentId > 0
-	})
-	snapshot.AllowedTaskIds = utils.FilterMapUniqueLimit(allowedDocuments, -1, func(doc *vo.DocumentMetadata) (int64, int64, bool) {
-		return doc.LastIndexTaskId, doc.LastIndexTaskId, doc.LastIndexTaskId > 0
-	})
+	snapshot.RagRuntimeOptions = s.resolver.Resolve(selectedBases)
 
 	return snapshot, nil
 }

@@ -13,6 +13,6 @@ type KnowledgeBase struct {
 	GraphRagConfigJson  json.RawMessage
 	RaptorConfigJson    json.RawMessage
 	MetadataFilterJson  json.RawMessage
-	IsDefault           int
+	IsDefault           *int
 	SortOrder           int
 }

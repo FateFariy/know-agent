@@ -5,6 +5,10 @@ package convert
 
 import (
 	"encoding/json"
+	"time"
+
+	datatypes "gorm.io/datatypes"
+
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
@@ -15,11 +19,10 @@ import (
 	aggregate1 "github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	entity1 "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	vo1 "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	aggregate2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/aggregate"
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
-	datatypes "gorm.io/datatypes"
-	"time"
 )
 
 func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
@@ -1444,7 +1447,7 @@ func ToKnowledgeBaseModelList(source []*entity2.KnowledgeBase) []*model.Knowledg
 	}
 	return pModelKnowledgeBaseList
 }
-func ToKnowledgeBaseSelectionSnapshot(source *entity2.KnowledgeBaseSelectionSnapshot) *vo.KnowledgeBaseSelectionSnapshot {
+func ToKnowledgeBaseSelectionSnapshot(source *aggregate2.KnowledgeBaseSelectionSnapshot) *vo.KnowledgeBaseSelectionSnapshot {
 	var pVoKnowledgeBaseSelectionSnapshot *vo.KnowledgeBaseSelectionSnapshot
 	if source != nil {
 		var voKnowledgeBaseSelectionSnapshot vo.KnowledgeBaseSelectionSnapshot
@@ -1463,8 +1466,6 @@ func ToKnowledgeBaseSelectionSnapshot(source *entity2.KnowledgeBaseSelectionSnap
 				voKnowledgeBaseSelectionSnapshot.AllowedDocuments[j] = pVoDocumentMetadataToPVoDocumentMetadata((*source).AllowedDocuments[j])
 			}
 		}
-		voKnowledgeBaseSelectionSnapshot.AllowedDocumentIds = (*source).AllowedDocumentIds
-		voKnowledgeBaseSelectionSnapshot.AllowedTaskIds = (*source).AllowedTaskIds
 		voKnowledgeBaseSelectionSnapshot.RagRuntimeOptions = pVoRagRuntimeOptionsToPVoRagRuntimeOptions((*source).RagRuntimeOptions)
 		pVoKnowledgeBaseSelectionSnapshot = &voKnowledgeBaseSelectionSnapshot
 	}

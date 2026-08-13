@@ -80,7 +80,7 @@ type Sink interface {
 	Finish(conversationId string, exchangeId int64) error
 }
 
-type Renderer interface {
+type PromptRenderer interface {
 	Render(templateName string, variables map[string]any) (string, error)
 }
 
