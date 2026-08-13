@@ -76,3 +76,21 @@ func (a *DocumentAdapter) FindDocumentProfileByDocIds(ctx context.Context, docId
 	}
 	return result, nil
 }
+
+// FindDocumentProfiles 查询所有文档元数据
+func (a *DocumentAdapter) FindDocumentProfiles(ctx context.Context) ([]*vo.DocumentProfile, error) {
+	documentProfiles, err := a.repo.SelectDocumentProfiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*vo.DocumentProfile, 0, len(documentProfiles))
+	for _, profile := range documentProfiles {
+		result = append(result, &vo.DocumentProfile{
+			DocumentId:       profile.DocumentId,
+			DocumentSummary:  profile.DocumentSummary,
+			CoreTopics:       profile.CoreTopics,
+			ExampleQuestions: profile.ExampleQuestions,
+		})
+	}
+	return result, nil
+}

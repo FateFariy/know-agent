@@ -39,7 +39,7 @@ type KnowledgeRepository interface {
 	// ========== 主题-文档关系相关 ==========
 
 	// SelectTopicDocumentRelations 获取主题-文档映射关系
-	SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error)
+	SelectTopicDocumentRelations(ctx context.Context, where any) ([]*entity.KnowledgeTopicDocumentRelation, error)
 
 	// SelectTopicDocumentRelationsByTopicCode 按主题查询关联关系
 	SelectTopicDocumentRelationsByTopicCode(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error)

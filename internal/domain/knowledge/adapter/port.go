@@ -15,7 +15,7 @@ type Embedder interface {
 // RouteLexicalIndex 路由侧的词面索引能力
 type RouteLexicalIndex interface {
 	// Search 在指定实体类型下进行词面检索，返回命中 (entityCode/documentId, score) 列表
-	Search(ctx context.Context, routingText string, entityType string, size int) ([]*vo.RouteLexicalHit, error)
+	Search(ctx context.Context, routingText, entityType string, size int, kbIds []int64) ([]*vo.RouteLexicalHit, error)
 }
 
 type DocumentGateway interface {
@@ -30,4 +30,7 @@ type DocumentGateway interface {
 
 	// FindDocumentProfileByDocIds 根据文档ID列表获取文档属性
 	FindDocumentProfileByDocIds(ctx context.Context, docIds []int64) ([]*vo.DocumentProfile, error)
+
+	// FindDocumentProfiles 获取所有文档属性
+	FindDocumentProfiles(ctx context.Context) ([]*vo.DocumentProfile, error)
 }

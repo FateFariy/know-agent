@@ -18,12 +18,12 @@ type ScopeRanker struct {
 	base
 }
 
-func NewScopeRanker(repo adapter.KnowledgeRepository, embedder adapter.Embedder,
+func NewScopeRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, embedder adapter.Embedder,
 	lexicalIndex adapter.RouteLexicalIndex, scorer score.Scorer) *ScopeRanker {
 	return &ScopeRanker{
 		repo:   repo,
 		scorer: scorer,
-		base:   newBaseRanker(embedder, lexicalIndex),
+		base:   newBaseRanker(docGateway, embedder, lexicalIndex),
 	}
 }
 
@@ -40,7 +40,7 @@ func (r *ScopeRanker) Rank(ctx context.Context, rankCtx *Context) error {
 		return utils.JoinNonBlank(" ", node.ScopeName, node.Description, node.Aliases, node.Examples)
 	})
 	semanticScores := r.computeSemanticScores(ctx, rankCtx, routeTexts)
-	lexicalScores, _ := r.searchLexicalScores(ctx, rankCtx.RoutingText, "scope", 5)
+	lexicalScores := r.searchLexicalScores(ctx, rankCtx, "scope", 5)
 
 	candidates := make([]*vo.ScopeRouteCandidate, 0, len(nodes))
 	for i, node := range nodes {

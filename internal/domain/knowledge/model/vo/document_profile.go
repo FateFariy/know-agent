@@ -5,4 +5,5 @@ type DocumentProfile struct {
 	DocumentSummary  string // 文档摘要
 	CoreTopics       string // 核心话题
 	ExampleQuestions string // 示例问题
+	DocumentType     string // 文档类型
 }

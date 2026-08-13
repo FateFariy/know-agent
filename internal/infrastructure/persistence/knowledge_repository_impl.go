@@ -118,9 +118,9 @@ func (k *KnowledgeRepositoryImpl) DeleteKnowledgeTopicNode(ctx context.Context, 
 // ============ 主题-文档关系 ============
 
 // SelectTopicDocumentRelations 查询所有主题-文档关系
-func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context) ([]*entity.KnowledgeTopicDocumentRelation, error) {
+func (k *KnowledgeRepositoryImpl) SelectTopicDocumentRelations(ctx context.Context, where any) ([]*entity.KnowledgeTopicDocumentRelation, error) {
 	var relations []*entity.KnowledgeTopicDocumentRelation
-	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Find(&relations).Error; err != nil {
+	if err := k.dbWithContext(ctx).Model(&model.KnowledgeTopicDocumentRelation{}).Where(where).Find(&relations).Error; err != nil {
 		return nil, err
 	}
 	return relations, nil

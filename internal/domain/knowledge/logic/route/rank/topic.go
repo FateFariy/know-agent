@@ -1,12 +1,13 @@
 package rank
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
-	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/score"
@@ -19,19 +20,17 @@ const (
 )
 
 type TopicRanker struct {
-	repo       adapter.KnowledgeRepository
-	docGateway adapter.DocumentGateway
-	scorer     score.Scorer
+	repo   adapter.KnowledgeRepository
+	scorer score.Scorer
 	base
 }
 
 func NewTopicRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, embedder adapter.Embedder,
 	lexicalIndex adapter.RouteLexicalIndex, scorer score.Scorer) *TopicRanker {
 	return &TopicRanker{
-		repo:       repo,
-		docGateway: docGateway,
-		scorer:     scorer,
-		base:       newBaseRanker(embedder, lexicalIndex),
+		repo:   repo,
+		scorer: scorer,
+		base:   newBaseRanker(docGateway, embedder, lexicalIndex),
 	}
 }
 
@@ -53,7 +52,7 @@ func (r *TopicRanker) Rank(ctx context.Context, rankCtx *Context) error {
 	})
 
 	semanticScores := r.computeSemanticScores(ctx, rankCtx, routeTexts)
-	lexicalScores, _ := r.searchLexicalScores(ctx, rankCtx.RoutingText, "topic", 8)
+	lexicalScores := r.searchLexicalScores(ctx, rankCtx, "topic", 8)
 
 	candidates := make([]*vo.TopicRouteCandidate, 0, len(nodes))
 	for i, node := range nodes {
@@ -64,6 +63,7 @@ func (r *TopicRanker) Rank(ctx context.Context, rankCtx *Context) error {
 		})
 		if scoreResult.TotalScore > 0 {
 			candidates = append(candidates, &vo.TopicRouteCandidate{
+				TopicId:   node.ID,
 				TopicName: node.TopicName,
 				Score:     scoreResult.TotalScore,
 				Reason:    scoreResult.Reason,
@@ -72,7 +72,7 @@ func (r *TopicRanker) Rank(ctx context.Context, rankCtx *Context) error {
 			})
 		}
 	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
+	slices.SortFunc(candidates, func(a, b *vo.TopicRouteCandidate) int { return -cmp.Compare(a.Source, b.Source) })
 	rankCtx.TopicCandidates = candidates
 	return nil
 }
@@ -83,6 +83,7 @@ func (r *TopicRanker) deriveTopicsFromProfiles(ctx context.Context, rankCtx *Con
 	if len(docs) == 0 {
 		return nil, nil
 	}
+	slices.SortFunc(docs, func(a, b *vo.DocumentMetadata) int { return cmp.Compare(a.DocumentId, b.DocumentId) })
 
 	docIds := utils.Map(docs, func(d *vo.DocumentMetadata) int64 { return d.DocumentId })
 	profiles, err := r.docGateway.FindDocumentProfileByDocIds(ctx, docIds)
@@ -111,25 +112,6 @@ func (r *TopicRanker) deriveTopicsFromProfiles(ctx context.Context, rankCtx *Con
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
 
 	return utils.Limit(candidates, candidatesLimit), nil
-}
-
-// listRetrievableDocuments 查询可检索的文档
-func (r *TopicRanker) listRetrievableDocuments(ctx context.Context, rankCtx *Context) ([]*vo.DocumentMetadata, error) {
-	var docs []*vo.DocumentMetadata
-	var err error
-	if len(rankCtx.AllowedDocumentIds) != 0 {
-		docs, err = r.docGateway.FindRetrieveDocumentByIds(ctx, rankCtx.AllowedDocumentIds)
-		if err != nil {
-			logx.Warnf("查询可检索文档失败: %v", err)
-		}
-	}
-	if len(docs) == 0 {
-		docs, err = r.docGateway.FindRetrievableByKbIds(ctx, rankCtx.SelectedKnowledgeBaseIds)
-		if err != nil {
-			logx.Warnf("查询可检索文档失败: %v", err)
-		}
-	}
-	return docs, err
 }
 
 // parseJsonStringArray 处理画像字段中的字符串数组：支持 ["a","b"]

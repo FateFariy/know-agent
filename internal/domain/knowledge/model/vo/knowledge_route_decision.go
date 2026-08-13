@@ -1,18 +1,20 @@
 package vo
 
-import "fmt"
+import (
+	"github.com/swiftbit/know-agent/common/utils"
+)
 
 // KnowledgeRouteDecision 知识路由决策
 type KnowledgeRouteDecision struct {
-	RouteStatus     string
-	Confidence      float64
-	Scopes          []*ScopeRouteCandidate
-	Topics          []*TopicRouteCandidate
-	Documents       []*DocumentRouteCandidate
-	Source          string
-	Reason          string
-	IsDegraded      bool
-	DegradedReasons []string
+	RouteStatus     string                    // 路由状态（SUCCESS/FAILED）
+	Confidence      float64                   // 置信度（0-1）
+	Scopes          []*ScopeRouteCandidate    // 知识范围（scope）路由候选
+	Topics          []*TopicRouteCandidate    // 主题（topic）路由候选
+	Documents       []*DocumentRouteCandidate // 文档路由候选
+	Source          string                    // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
+	Reason          string                    // 原因
+	IsDegraded      bool                      // 是否降级
+	DegradedReasons []string                  // 降级原因
 }
 
 // ScopeRouteCandidate 知识范围（scope）路由候选
@@ -27,7 +29,7 @@ type ScopeRouteCandidate struct {
 
 // TopicRouteCandidate 主题（topic）路由候选
 type TopicRouteCandidate struct {
-	TopicId   string             `json:"topicId"`   // 主题ID
+	TopicId   int64              `json:"topicId"`   // 主题ID
 	TopicName string             `json:"topicName"` // 主题名称
 	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
 	Score     float64            `json:"score"`     // 分数
@@ -47,13 +49,46 @@ type DocumentRouteCandidate struct {
 	Features        map[string]float64 `json:"features"`        // 特征分明细
 }
 
+// ComputeConfidence 从候选列表计算置信度：top1/(top1+top2+5) 归一化
+func (d *KnowledgeRouteDecision) ComputeConfidence() float64 {
+	if d == nil || len(d.Documents) == 0 {
+		return 0
+	}
+	top := d.Documents[0].Score
+	second := 0.0
+	if len(d.Documents) > 1 {
+		second = d.Documents[1].Score
+	}
+	return top / max(10, top+second+5)
+}
+
+// ResolveSource 从文档候选中解析决策来源
+func (d *KnowledgeRouteDecision) ResolveSource() string {
+	if d == nil || len(d.Documents) == 0 {
+		return "NONE"
+	}
+	sourceSet := utils.FilterMapUniqueLimit(d.Documents, -1, func(c *DocumentRouteCandidate) (string, string, bool) {
+		if c != nil && utils.IsNotBlank(c.Source) {
+			return c.Source, c.Source, true
+		}
+		return "", "", false
+	})
+	if len(sourceSet) == 1 {
+		return sourceSet[0]
+	}
+	if len(sourceSet) > 1 {
+		return "COMPOSITE"
+	}
+	return "NONE"
+}
+
 // ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三
-func (k *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) int {
-	if selectedDocumentId == 0 || len(k.Documents) == 0 {
+func (d *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) int {
+	if d == nil || selectedDocumentId == 0 || len(d.Documents) == 0 {
 		return 0
 	}
 	for idx := 0; idx < 3; idx++ {
-		if k.Documents[idx].DocumentId == selectedDocumentId {
+		if d.Documents[idx].DocumentId == selectedDocumentId {
 			return 1
 		}
 	}
@@ -61,28 +96,36 @@ func (k *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId i
 }
 
 // ResolveConfidence 计算整体置信度：以 top1 分数/(top1+top2+5) 归一化
-func (k *KnowledgeRouteDecision) ResolveConfidence() float64 {
-	if k == nil || len(k.Documents) == 0 {
+func (d *KnowledgeRouteDecision) ResolveConfidence() float64 {
+	if d == nil || len(d.Documents) == 0 {
 		return 0
 	}
-	top1 := k.Documents[0].Score
+	top1 := d.Documents[0].Score
 	top2 := 0.0
-	if len(k.Documents) > 1 {
-		top2 = k.Documents[1].Score
+	if len(d.Documents) > 1 {
+		top2 = d.Documents[1].Score
 	}
 	return top1 / max(10, top1+top2+5)
 }
 
-// ResolveDecisionReason 根据候选与置信度生成决策原因
-func (k *KnowledgeRouteDecision) ResolveDecisionReason(confidence float64) string {
-	if len(k.Documents) == 0 {
+// ResolveReason 根据候选与置信度生成决策原因
+func (d *KnowledgeRouteDecision) ResolveReason(lowConfidenceThreshold float64) string {
+	if d == nil || len(d.Documents) == 0 {
 		return "没有找到可用候选文档"
 	}
-	top := k.Documents[0]
-	if confidence >= 0.80 {
-		return fmt.Sprintf("高置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
-	} else if confidence >= 0.55 {
-		return fmt.Sprintf("中等置信度路由到《%s》，置信度 %.2f", top.DocumentName, confidence)
+	top := d.Documents[0]
+	if d.Confidence < lowConfidenceThreshold {
+		return utils.BlankToDefault(top.Reason, "低置信度，已进入保守扩范围候选")
 	}
-	return fmt.Sprintf("低置信度，前 %d 个候选得分接近，建议澄清", min(3, len(k.Documents)))
+	return top.Reason
+}
+
+func (d *KnowledgeRouteDecision) ResolveRouteStatus(lowConfidenceThreshold float64) string {
+	if len(d.Documents) == 0 {
+		return "FAILED"
+	} else if d.Confidence < lowConfidenceThreshold {
+		return "LOW_CONFIDENCE"
+	} else {
+		return "SUCCESS"
+	}
 }

@@ -15,12 +15,14 @@ const (
 )
 
 type base struct {
+	docGateway   adapter.DocumentGateway
 	embedder     adapter.Embedder
 	lexicalIndex adapter.RouteLexicalIndex
 }
 
-func newBaseRanker(embedder adapter.Embedder, lexicalIndex adapter.RouteLexicalIndex) base {
+func newBaseRanker(docGateway adapter.DocumentGateway, embedder adapter.Embedder, lexicalIndex adapter.RouteLexicalIndex) base {
 	return base{
+		docGateway:   docGateway,
 		embedder:     embedder,
 		lexicalIndex: lexicalIndex,
 	}
@@ -58,18 +60,48 @@ func (b *base) computeSemanticScores(ctx context.Context, rankCtx *Context, rout
 }
 
 // searchLexicalScores 调用外部词面索引；未配置或失败时回退到本地计算
-func (b *base) searchLexicalScores(ctx context.Context, routingText, entityType string, size int) (map[int64]float64, error) {
+func (b *base) searchLexicalScores(ctx context.Context, rankCtx *Context, entityType string, size int) map[int64]float64 {
 	if b.lexicalIndex == nil {
-		return nil, nil
+		rankCtx.Diagnostics["ROUTE_INDEX_NOT_CONFIGURED"] = struct{}{}
+		return nil
 	}
-	hits, err := b.lexicalIndex.Search(ctx, routingText, entityType, size)
-	if err != nil || len(hits) == 0 {
-		return nil, err
+	hits, err := b.lexicalIndex.Search(ctx, rankCtx.RoutingText, entityType, size, rankCtx.SelectedKnowledgeBaseIds)
+
+	if err != nil {
+		rankCtx.Diagnostics["ROUTE_INDEX_UNAVAILABLE"] = struct{}{}
+		return nil
+	}
+	if len(hits) == 0 {
+		return nil
+	}
+	if len(rankCtx.AllowedDocumentIds) != 0 {
+		hits = utils.Filter(hits, func(hit *vo.RouteLexicalHit) bool {
+			return utils.ContainsAny(rankCtx.AllowedDocumentIds, hit.DocumentId)
+		})
 	}
 	keyFunc := func(hit *vo.RouteLexicalHit) (int64, float64) {
 		return hit.EntityId, hit.Score
 	}
-	return utils.MapBy(hits, keyFunc), nil
+	return utils.MapBy(hits, keyFunc)
+}
+
+// listRetrievableDocuments 查询可检索的文档
+func (b *base) listRetrievableDocuments(ctx context.Context, rankCtx *Context) ([]*vo.DocumentMetadata, error) {
+	var docs []*vo.DocumentMetadata
+	var err error
+	if len(rankCtx.AllowedDocumentIds) != 0 {
+		docs, err = b.docGateway.FindRetrieveDocumentByIds(ctx, rankCtx.AllowedDocumentIds)
+		if err != nil {
+			logx.Warnf("查询可检索文档失败: %v", err)
+		}
+	}
+	if len(docs) == 0 {
+		docs, err = b.docGateway.FindRetrievableByKbIds(ctx, rankCtx.SelectedKnowledgeBaseIds)
+		if err != nil {
+			logx.Warnf("查询可检索文档失败: %v", err)
+		}
+	}
+	return docs, err
 }
 
 // cosineSimilarity 计算两个等长向量的余弦相似度
