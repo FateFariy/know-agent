@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -72,7 +71,7 @@ func (r *TopicRanker) Rank(ctx context.Context, rankCtx *Context) error {
 			})
 		}
 	}
-	slices.SortFunc(candidates, func(a, b *vo.TopicRouteCandidate) int { return -cmp.Compare(a.Source, b.Source) })
+	slices.SortFunc(candidates, func(a, b *vo.TopicRouteCandidate) int { return -cmp.Compare(a.Score, b.Score) })
 	rankCtx.TopicCandidates = candidates
 	return nil
 }
@@ -109,7 +108,7 @@ func (r *TopicRanker) deriveTopicsFromProfiles(ctx context.Context, rankCtx *Con
 		}
 	}
 	candidates := utils.MapValues(best)
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
+	slices.SortFunc(candidates, func(a, b *vo.TopicRouteCandidate) int { return -cmp.Compare(a.Score, b.Score) })
 
 	return utils.Limit(candidates, candidatesLimit), nil
 }

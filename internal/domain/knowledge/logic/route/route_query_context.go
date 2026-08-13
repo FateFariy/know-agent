@@ -8,8 +8,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 )
 
-// QueryContext 路由上下文
-type QueryContext struct {
+// RouteContext 路由上下文
+type RouteContext struct {
 	Question                 string
 	RewriteQuestion          string
 	RoutingText              string
@@ -22,8 +22,8 @@ type QueryContext struct {
 	DocumentCandidates       []*vo.DocumentRouteCandidate
 }
 
-func NewQueryContext(question, rewriteQuestion string, selectedKnowledgeBaseIds []int64, allowedDocumentIds []int64) *QueryContext {
-	r := &QueryContext{
+func NewQueryContext(question, rewriteQuestion string, selectedKnowledgeBaseIds []int64, allowedDocumentIds []int64) *RouteContext {
+	r := &RouteContext{
 		Question:        utils.Trim(question),
 		RewriteQuestion: utils.Trim(rewriteQuestion),
 		Diagnostics:     make(map[string]struct{}),
@@ -37,7 +37,7 @@ func NewQueryContext(question, rewriteQuestion string, selectedKnowledgeBaseIds 
 	return r
 }
 
-func (r *QueryContext) Embedding(ctx context.Context, embedder adapter.Embedder) error {
+func (r *RouteContext) Embedding(ctx context.Context, embedder adapter.Embedder) error {
 	if embedder != nil && r.RoutingText != "" {
 		vectors, err := embedder.EmbedStrings(ctx, r.RoutingText)
 		if err != nil || len(vectors) == 0 {
@@ -49,7 +49,7 @@ func (r *QueryContext) Embedding(ctx context.Context, embedder adapter.Embedder)
 }
 
 // buildRoutingText 将原始问题与改写文本拼接；两文本相同则返回其一
-func (r *QueryContext) buildRoutingText() string {
+func (r *RouteContext) buildRoutingText() string {
 	if r.Question == "" {
 		return r.RewriteQuestion
 	}

@@ -1,8 +1,17 @@
 package score
 
-import "github.com/swiftbit/know-agent/common/utils"
+import (
+	"github.com/swiftbit/know-agent/common"
+	"github.com/swiftbit/know-agent/common/utils"
+)
 
 type DefaultScorer struct {
+	*options
+}
+
+type Option = common.Option
+
+type options struct {
 	SemanticThreshold float64 // 语义有效阈值，低于此值不计分，默认 0.20
 	SemanticWeight    float64 // 语义分放大系数，默认 50
 	LexicalWeight     float64 // 词索引分放大系数，默认 1.6
@@ -10,19 +19,27 @@ type DefaultScorer struct {
 	RelationWeight    float64 // 关系分权重（不同场景可设置不同值，如 scope 用 8，topic 用 20）
 }
 
+func WithRelationWeight(weight float64) Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
+		o.RelationWeight = weight
+	})
+}
+
 // NewDefaultScorer 返回带默认参数的评分器，调用方可按需覆盖。
 func NewDefaultScorer() *DefaultScorer {
-	return &DefaultScorer{
+	return &DefaultScorer{&options{
 		SemanticThreshold: 0.20,
 		SemanticWeight:    50.0,
 		LexicalWeight:     1.6,
 		LexicalMax:        10.0,
 		RelationWeight:    8.0,
-	}
+	}}
 }
 
 // Score 实现 Scorer 接口。
-func (s *DefaultScorer) Score(features *Features) *Result {
+func (s *DefaultScorer) Score(features *Features, opts ...common.Option) *Result {
+	s.options = common.GetImplSpecificOptions(s.options, opts...)
+
 	semMain := s.semanticMainScore(features.SemanticScore)
 	lex := s.lexicalAssist(features.LexicalScore)
 	rel := features.RelationScore * s.RelationWeight

@@ -6,60 +6,30 @@ import (
 
 // KnowledgeRouteDecision 知识路由决策
 type KnowledgeRouteDecision struct {
-	RouteStatus     string                    // 路由状态（SUCCESS/FAILED）
-	Confidence      float64                   // 置信度（0-1）
-	Scopes          []*ScopeRouteCandidate    // 知识范围（scope）路由候选
-	Topics          []*TopicRouteCandidate    // 主题（topic）路由候选
-	Documents       []*DocumentRouteCandidate // 文档路由候选
-	Source          string                    // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
-	Reason          string                    // 原因
-	IsDegraded      bool                      // 是否降级
-	DegradedReasons []string                  // 降级原因
+	RouteStatus     string                  // 路由状态（SUCCESS/FAILED）
+	Confidence      float64                 // 置信度（0-1）
+	Scopes          []*ScopeRouteCandidate  // 知识范围（scope）路由候选
+	Topics          []*TopicRouteCandidate  // 主题（topic）路由候选
+	Documents       DocumentRouteCandidates // 文档路由候选
+	Source          string                  // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
+	Reason          string                  // 原因
+	IsDegraded      bool                    // 是否降级
+	DegradedReasons []string                // 降级原因
 }
 
-// ScopeRouteCandidate 知识范围（scope）路由候选
-type ScopeRouteCandidate struct {
-	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
-	ScopeName string             `json:"scopeName"` // 知识范围名称
-	Score     float64            `json:"score"`     // 分数
-	Reason    string             `json:"reason"`    // 原因
-	Source    string             `json:"source"`    // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
-	Features  map[string]float64 `json:"features"`  // 特征分明细
-}
-
-// TopicRouteCandidate 主题（topic）路由候选
-type TopicRouteCandidate struct {
-	TopicId   int64              `json:"topicId"`   // 主题ID
-	TopicName string             `json:"topicName"` // 主题名称
-	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
-	Score     float64            `json:"score"`     // 分数
-	Reason    string             `json:"reason"`    // 原因
-	Source    string             `json:"source"`    // 来源
-	Features  map[string]float64 `json:"features"`  // 特征分明细
-}
-
-// DocumentRouteCandidate 文档路由候选
-type DocumentRouteCandidate struct {
-	DocumentId      int64              `json:"documentId"`      // 文档ID
-	DocumentName    string             `json:"documentName"`    // 文档名称
-	LastIndexTaskId int64              `json:"lastIndexTaskId"` // 最后索引任务ID
-	Score           float64            `json:"score"`           // 分数
-	Reason          string             `json:"reason"`          // 原因
-	Source          string             `json:"source"`          // 来源
-	Features        map[string]float64 `json:"features"`        // 特征分明细
-}
-
-// ComputeConfidence 从候选列表计算置信度：top1/(top1+top2+5) 归一化
-func (d *KnowledgeRouteDecision) ComputeConfidence() float64 {
-	if d == nil || len(d.Documents) == 0 {
-		return 0
+// Resolve 填充决策对象的置信度、来源、路由状态、原因
+func (d *KnowledgeRouteDecision) Resolve(lowConfidenceThreshold float64) {
+	if d == nil {
+		return
 	}
-	top := d.Documents[0].Score
-	second := 0.0
-	if len(d.Documents) > 1 {
-		second = d.Documents[1].Score
-	}
-	return top / max(10, top+second+5)
+	// 计算置信度
+	d.Confidence = d.ResolveConfidence()
+	// 解析决策来源
+	d.Source = d.ResolveSource()
+	// 解析路由状态
+	d.RouteStatus = d.ResolveRouteStatus(lowConfidenceThreshold)
+	// 解析决策原因
+	d.Reason = d.ResolveReason(lowConfidenceThreshold)
 }
 
 // ResolveSource 从文档候选中解析决策来源
@@ -100,12 +70,7 @@ func (d *KnowledgeRouteDecision) ResolveConfidence() float64 {
 	if d == nil || len(d.Documents) == 0 {
 		return 0
 	}
-	top1 := d.Documents[0].Score
-	top2 := 0.0
-	if len(d.Documents) > 1 {
-		top2 = d.Documents[1].Score
-	}
-	return top1 / max(10, top1+top2+5)
+	return d.Documents.ComputeConfidence()
 }
 
 // ResolveReason 根据候选与置信度生成决策原因
@@ -128,4 +93,51 @@ func (d *KnowledgeRouteDecision) ResolveRouteStatus(lowConfidenceThreshold float
 	} else {
 		return "SUCCESS"
 	}
+}
+
+// ScopeRouteCandidate 知识范围（scope）路由候选
+type ScopeRouteCandidate struct {
+	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
+	ScopeName string             `json:"scopeName"` // 知识范围名称
+	Score     float64            `json:"score"`     // 分数
+	Reason    string             `json:"reason"`    // 原因
+	Source    string             `json:"source"`    // 来源（SEMANTIC/ROUTE_INDEX/PERSISTED_RELATION/COMPOSITE）
+	Features  map[string]float64 `json:"features"`  // 特征分明细
+}
+
+// TopicRouteCandidate 主题（topic）路由候选
+type TopicRouteCandidate struct {
+	TopicId   int64              `json:"topicId"`   // 主题ID
+	TopicName string             `json:"topicName"` // 主题名称
+	ScopeId   int64              `json:"scopeId"`   // 知识范围ID
+	Score     float64            `json:"score"`     // 分数
+	Reason    string             `json:"reason"`    // 原因
+	Source    string             `json:"source"`    // 来源
+	Features  map[string]float64 `json:"features"`  // 特征分明细
+}
+
+// DocumentRouteCandidate 文档路由候选
+type DocumentRouteCandidate struct {
+	DocumentId      int64              `json:"documentId"`      // 文档ID
+	DocumentName    string             `json:"documentName"`    // 文档名称
+	LastIndexTaskId int64              `json:"lastIndexTaskId"` // 最后索引任务ID
+	Score           float64            `json:"score"`           // 分数
+	Reason          string             `json:"reason"`          // 原因
+	Source          string             `json:"source"`          // 来源
+	Features        map[string]float64 `json:"features"`        // 特征分明细
+}
+
+type DocumentRouteCandidates []*DocumentRouteCandidate
+
+// ComputeConfidence 从候选列表计算置信度：top1/(top1+top2+5) 归一化
+func (d DocumentRouteCandidates) ComputeConfidence() float64 {
+	if len(d) == 0 {
+		return 0
+	}
+	top := d[0].Score
+	second := 0.0
+	if len(d) > 1 {
+		second = d[1].Score
+	}
+	return top / max(10, top+second+5)
 }

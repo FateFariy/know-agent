@@ -1,9 +1,10 @@
 package rank
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
@@ -59,7 +60,7 @@ func (r *ScopeRanker) Rank(ctx context.Context, rankCtx *Context) error {
 			})
 		}
 	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
+	slices.SortFunc(candidates, func(a, b *vo.ScopeRouteCandidate) int { return -cmp.Compare(a.Score, b.Score) })
 	rankCtx.ScopeCandidates = utils.Limit(candidates, 5)
 	return nil
 }

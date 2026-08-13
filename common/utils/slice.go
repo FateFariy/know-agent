@@ -174,3 +174,7 @@ func Copy[T comparable](src []T) []T {
 func MapValues[K comparable, V any](m map[K]V) []V {
 	return maputil.Values(m)
 }
+
+func MapKeys[K comparable, V any](m map[K]V) []K {
+	return maputil.Keys(m)
+}
