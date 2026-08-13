@@ -3,6 +3,7 @@ package entity
 // KnowledgeTopicNode 主题节点
 type KnowledgeTopicNode struct {
 	ID                  int64  `gorm:"column:id"`                   // 主键
+	TopicName           string `gorm:"column:topic_name"`           // 主题名称
 	KnowledgeBaseId     int64  `gorm:"column:knowledge_base_id"`    // 知识库ID
 	ScopeId             int64  `gorm:"column:scope_id"`             // 范围ID
 	Description         string `gorm:"column:description"`          // 描述

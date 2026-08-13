@@ -3,6 +3,7 @@ package route
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -16,4 +17,10 @@ type KnowledgeRouter interface {
 
 	// RecordShadowRoute 记录影子路由结果
 	RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error
+}
+
+// Ranker 统一排名器
+type Ranker interface {
+	// Order() int
+	Rank(ctx context.Context, rankCtx *rank.Context) error
 }

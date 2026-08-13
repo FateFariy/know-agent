@@ -12,10 +12,10 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	documentLogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	den "github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/score"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
@@ -42,10 +42,10 @@ var (
 
 // KnowledgeRouteImpl 知识路由器实现：负责根据问题/改写问题匹配 scope/topic/document
 type KnowledgeRouteImpl struct {
-	repo         adapter.KnowledgeRepository
-	docGateway   adapter.DocumentGateway
-	profileLogic documentLogic.ProfileLogic
-	scorer       score.Scorer
+	repo       adapter.KnowledgeRepository
+	docGateway adapter.DocumentGateway
+	scorer     score.Scorer
+	rankers    []Ranker
 	*options
 }
 
@@ -57,17 +57,16 @@ type options struct {
 type Option func(*options)
 
 // NewKnowledgeRouteImpl 创建路由服务实例
-func NewKnowledgeRouteImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, profileLogic documentLogic.ProfileLogic, opts ...Option) *KnowledgeRouteImpl {
+func NewKnowledgeRouteImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, opts ...Option) *KnowledgeRouteImpl {
 	base := new(options)
 	for _, opt := range opts {
 		opt(base)
 	}
 	return &KnowledgeRouteImpl{
-		repo:         repo,
-		docGateway:   docGateway,
-		profileLogic: profileLogic,
-		scorer:       score.NewDefaultScorer(),
-		options:      base,
+		repo:       repo,
+		docGateway: docGateway,
+		scorer:     score.NewDefaultScorer(),
+		options:    base,
 	}
 }
 
@@ -86,24 +85,32 @@ func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
 }
 
 // Route 根据问题执行知识路由，返回范围/主题/文档候选列表与置信度
-func (s *KnowledgeRouteImpl) Route(ctx context.Context, queryCtx *QueryContext) (*vo.KnowledgeRouteDecision, error) {
+func (r *KnowledgeRouteImpl) Route(ctx context.Context, queryCtx *QueryContext) (*vo.KnowledgeRouteDecision, error) {
 	decision := &vo.KnowledgeRouteDecision{RouteStatus: vo.RouteStatusFailed}
 	if queryCtx.RoutingText == "" {
 		decision.Reason = "问题为空或无法提取有效关键词"
 		return decision, nil
 	}
+	rankCtx := &rank.Context{
+		Question:                 queryCtx.Question,
+		RewriteQuestion:          queryCtx.RewriteQuestion,
+		RoutingText:              queryCtx.RoutingText,
+		QueryEmbedding:           queryCtx.QueryEmbedding,
+		SelectedKnowledgeBaseIds: nil,
+		AllowedDocumentIds:       nil,
+		Diagnostics:              make(map[string]struct{}),
+	}
+	for _, ranker := range r.rankers {
+		_ = ranker.Rank(ctx, rankCtx)
+	}
 
-	scopeCandidates := s.rankScopes(ctx, queryCtx)
-	topicCandidates := s.rankTopics(ctx, queryCtx, scopeCandidates)
-	documentCandidates := s.rankDocuments(ctx, queryCtx, scopeCandidates, topicCandidates)
-
-	decision.Scopes = scopeCandidates
-	decision.Topics = topicCandidates
-	decision.Documents = documentCandidates
-	decision.Confidence = s.computeConfidence(documentCandidates)
+	decision.Scopes = rankCtx.ScopeCandidates
+	decision.Topics = rankCtx.TopicCandidates
+	decision.Documents = rankCtx.DocumentCandidates
+	decision.Confidence = r.computeConfidence(rankCtx.DocumentCandidates)
 
 	// 设置决策来源（从文档候选中解析）
-	decision.Source = s.resolveDecisionSource(documentCandidates)
+	decision.Source = r.resolveDecisionSource(rankCtx.DocumentCandidates)
 
 	// 设置降级状态与原因
 	decision.IsDegraded = len(queryCtx.Diagnostics) > 0
@@ -112,7 +119,7 @@ func (s *KnowledgeRouteImpl) Route(ctx context.Context, queryCtx *QueryContext) 
 	}
 
 	switch {
-	case len(documentCandidates) == 0:
+	case len(rankCtx.DocumentCandidates) == 0:
 		decision.RouteStatus = vo.RouteStatusFailed
 		decision.Reason = "没有找到可用候选文档"
 	case decision.Confidence < lowConfidenceThreshold:
@@ -121,74 +128,54 @@ func (s *KnowledgeRouteImpl) Route(ctx context.Context, queryCtx *QueryContext) 
 		decision.RouteStatus = vo.RouteStatusSuccess
 	}
 	if decision.RouteStatus != vo.RouteStatusFailed {
-		decision.Reason = s.resolveDecisionReason(documentCandidates, decision.Confidence)
+		decision.Reason = r.resolveDecisionReason(rankCtx.DocumentCandidates, decision.Confidence)
 	}
 
 	topDocName := ""
-	if len(documentCandidates) > 0 {
-		topDocName = documentCandidates[0].DocumentName
+	if len(rankCtx.DocumentCandidates) > 0 {
+		topDocName = rankCtx.DocumentCandidates[0].DocumentName
 	}
-	logx.Infof("知识范围路由完成: question='%s', rewriteQuestion='%s', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f, source=%s, degraded=%v, topDocument='%s'",
+	logx.Infof("知识范围路由完成: question='%r', rewriteQuestion='%r', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f, source=%r, degraded=%v, topDocument='%r'",
 		strutil.Trim(queryCtx.Question), strutil.Trim(queryCtx.RewriteQuestion),
-		len(scopeCandidates), len(topicCandidates), len(documentCandidates),
+		len(rankCtx.ScopeCandidates), len(rankCtx.TopicCandidates), len(rankCtx.DocumentCandidates),
 		decision.Confidence, decision.Source, decision.IsDegraded, topDocName)
 	return decision, nil
 }
 
 // RecordShadowRoute 记录影子路由结果（后台写入不影响主流程）
-func (s *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error {
+func (r *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error {
 	queryCtx := NewQueryContext(question, rewriteQuestion, nil, nil)
-	decision, err := s.Route(ctx, queryCtx)
+	decision, err := r.Route(ctx, queryCtx)
 	if err != nil {
-		logx.Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", conversationId, err)
+		logx.Warnf("知识路由[shadow]失败: conversationId=%r, err=%v", conversationId, err)
 		return err
 	}
-	trace := s.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeShadow, decision)
+	trace := r.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeShadow, decision)
 	trace.SelectedDocumentId = documentId
 	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(documentId)
-	if err = s.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[shadow]失败: conversationId=%s, exchangeId=%d, err=%v", conversationId, exchangeId, err)
+	if err = r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
+		logx.Warnf("记录知识路由[shadow]失败: conversationId=%r, exchangeId=%d, err=%v", conversationId, exchangeId, err)
 		return err
 	}
 	return nil
 }
 
 // RecordAutoRoute 记录自动路由结果
-func (s *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, exchangeId int64, conversationId, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error {
-	trace := s.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeAuto, decision)
+func (r *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, exchangeId int64, conversationId, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error {
+	trace := r.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeAuto, decision)
 	if len(decision.Documents) > 0 {
 		trace.SelectedDocumentId = decision.Documents[0].DocumentId
 	}
 	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(trace.SelectedDocumentId)
-	if err := s.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", conversationId, err)
+	if err := r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
+		logx.Warnf("记录知识路由[auto]失败: conversationId=%r, err=%v", conversationId, err)
 		return err
 	}
 	return nil
 }
 
-// tokenize 分词：按中英文常见分隔符分割，再对长度 >=4 的中文片段进行 n-gram 扩展
-func (s *KnowledgeRouteImpl) tokenize(text string) []string {
-	cleaned := strutil.Trim(text)
-	if strutil.IsBlank(cleaned) {
-		return nil
-	}
-
-	terms := make(map[string]struct{})
-	for _, part := range tokenSplitPattern.Split(cleaned, -1) {
-		trimmed := strutil.Trim(part)
-		if utils.Len(trimmed) > 1 {
-			terms[trimmed] = struct{}{}
-			s.expandChineseNgrams(trimmed, terms)
-		}
-	}
-
-	// 限制最大关键词数量
-	return utils.Limit(maputil.Keys(terms), 40)
-}
-
 // expandChineseNgrams 对中文短片段做 2~maxGram 的滑动窗口扩展（用于提高短实体召回）
-func (s *KnowledgeRouteImpl) expandChineseNgrams(segment string, seen map[string]struct{}) {
+func (r *KnowledgeRouteImpl) expandChineseNgrams(segment string, seen map[string]struct{}) {
 	runes := []rune(segment)
 	if len(runes) < 4 {
 		return
@@ -202,172 +189,6 @@ func (s *KnowledgeRouteImpl) expandChineseNgrams(segment string, seen map[string
 	}
 }
 
-// =====================================================
-// 评分与候选构造
-// =====================================================
-
-// rankScopes 对 scope 节点打分：语义分 + 词面辅助 + 关键词命中
-func (s *KnowledgeRouteImpl) rankScopes(ctx context.Context, q *QueryContext) []*vo.ScopeRouteCandidate {
-	nodes, err := s.repo.SelectKnowledgeScopeNodesByKbIds(ctx, q.SelectedKnowledgeBaseIds)
-	if err != nil {
-		logx.Warnf("查询 scope 节点失败: %v", err)
-	}
-	if len(nodes) == 0 {
-		return nil
-	}
-
-	// 生成 routeText 列表
-	routeTexts := utils.Map(nodes, func(node *entity.KnowledgeScopeNode) string {
-		return utils.JoinNonBlank(" ", node.ScopeName, node.Description, node.Aliases, node.Examples)
-	})
-	semanticScores := s.computeSemanticScores(ctx, q, routeTexts)
-	lexicalScores := s.searchLexicalScores(ctx, q.RoutingText, "scope", 5)
-
-	// 组装候选
-	candidates := make([]*vo.ScopeRouteCandidate, 0, len(nodes))
-	for i, node := range nodes {
-		scoreResult := s.scorer.Score(&score.Features{
-			SemanticScore: semanticScores[i],
-			LexicalScore:  lexicalScores[node.ID],
-		})
-
-		if scoreResult.TotalScore > 0 {
-			candidates = append(candidates, &vo.ScopeRouteCandidate{
-				ScopeId:   node.ID,
-				ScopeName: node.ScopeName,
-				Score:     scoreResult.TotalScore,
-				Reason:    scoreResult.Reason,
-				Source:    scoreResult.Source,
-				Features:  scoreResult.Features,
-			})
-		}
-	}
-
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.Limit(candidates, 5)
-}
-
-// rankTopics 对主题节点打分：语义 + 词面 + 关键词 + 与当前 scope 命中的加分
-func (s *KnowledgeRouteImpl) rankTopics(ctx context.Context, q *QueryContext, scopeCandidates []*vo.ScopeRouteCandidate) []*vo.TopicRouteCandidate {
-	nodes, err := s.repo.SelectKnowledgeTopicNodesByKbIds(ctx, nil)
-	if err != nil {
-		logx.Warnf("查询 topic 节点失败: %v", err)
-	}
-	preferredScopes := utils.MapBy(nodes, func(node *entity.KnowledgeTopicNode) (int64, *entity.KnowledgeTopicNode) {
-		return node.ScopeId, node
-	})
-
-	if len(nodes) == 0 {
-		return s.deriveTopicsFromProfiles(ctx, q)
-	}
-
-	routeTexts := make([]string, 0, len(nodes))
-	for _, node := range nodes {
-		routeTexts = append(routeTexts, utils.JoinNonBlank(" ", node.TopicName, node.Description, node.Aliases, node.Examples, node.AnswerShape, node.ExecutionPreference))
-	}
-	semanticScores := s.computeSemanticScores(ctx, q, routeTexts)
-	lexicalScores := s.searchLexicalScores(ctx, q.RoutingText, "topic", 8)
-
-	candidates := make([]*vo.TopicRouteCandidate, 0, len(nodes))
-	for i, node := range nodes {
-		semantic := 0.0
-		if i < len(semanticScores) {
-			semantic = semanticScores[i]
-		}
-		lexical := lexicalScores[node.TopicCode]
-		score := semanticMainScore(semantic) + lexicalAssistScore(lexical)
-
-		// 与预选 scope 匹配加分
-		scopeRelationScore := 0.0
-		if _, preferred := preferredScopes[node.ScopeCode]; preferred {
-			scopeRelationScore = 8
-			score += scopeRelationScore
-		}
-
-		if score > 0 || len(q.QueryEmbedding) > 0 {
-			candidates = append(candidates, &vo.TopicRouteCandidate{
-				TopicName: node.TopicName,
-				Score:     score,
-				Reason:    s.buildCandidateReason(semantic, lexical, scopeRelationScore),
-				Source:    s.resolveCandidateSource(semantic, lexical, scopeRelationScore),
-				Features: map[string]float64{
-					"semanticScore":      max(0, semantic),
-					"routeIndexScore":    max(0, lexical),
-					"scopeRelationScore": scopeRelationScore,
-				},
-			})
-		}
-	}
-
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.Limit(candidates, 8)
-}
-
-// deriveTopicsFromProfiles 当 topic 节点未配置时，按文档画像的 CoreTopics 派生主题候选
-func (s *KnowledgeRouteImpl) deriveTopicsFromProfiles(ctx context.Context, q *QueryContext) []*vo.TopicRouteCandidate {
-	docs, _ := s.listRetrievableDocuments(ctx, q)
-	if len(docs) == 0 {
-		return nil
-	}
-
-	docIds := utils.Map(docs, func(d *vo.DocumentMetadata) int64 { return d.DocumentId })
-	profiles, err := s.docGateway.FindDocumentProfileByDocIds(ctx, docIds)
-	if err != nil {
-		logx.Warnf("查询文档画像失败: %v", err)
-		return nil
-	}
-
-	best := make(map[string]*vo.TopicRouteCandidate)
-	for _, profile := range profiles {
-		for _, topic := range parseJsonStringArray(profile.CoreTopics) {
-			routeText := utils.JoinNonBlank(" ", topic, profile.DocumentSummary, profile.ExampleQuestions)
-			semanticScore := s.singleSemanticScore(ctx, q, routeText)
-			scopeRelationScore := 0.0
-			if _, preferred := preferredScopes[scopeCode]; preferred {
-				scopeRelationScore = 6
-			}
-			finalScore := keywordScore + s.semanticMainScore(semanticScore) + scopeRelationScore
-			if existing, ok := best[topic]; !ok || existing.Score < finalScore {
-				best[topic] = &vo.TopicRouteCandidate{
-					TopicCode: normalizeCode(topic),
-					TopicName: topic,
-					ScopeCode: scopeCode,
-					Score:     finalScore,
-					Reason:    s.buildCandidateReason(semanticScore, 0, scopeRelationScore),
-					Source:    s.resolveCandidateSource(semanticScore, 0, scopeRelationScore),
-					Features: map[string]float64{
-						"semanticScore":      max(0, semanticScore),
-						"scopeRelationScore": scopeRelationScore,
-					},
-				}
-			}
-		}
-	}
-
-	candidates := maputil.Values(best)
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Score > candidates[j].Score })
-	return utils.Limit(candidates, 8)
-}
-
-// listRetrievableDocuments 查询可检索的文档
-func (s *KnowledgeRouteImpl) listRetrievableDocuments(ctx context.Context, q *QueryContext) ([]*vo.DocumentMetadata, error) {
-	var docs []*vo.DocumentMetadata
-	var err error
-	if len(q.AllowedDocumentIds) != 0 {
-		docs, err = s.docGateway.FindRetrieveDocumentByIds(ctx, q.AllowedDocumentIds)
-		if err != nil {
-			logx.Warnf("查询可检索文档失败: %v", err)
-		}
-	}
-	if len(docs) == 0 {
-		docs, err = s.docGateway.FindRetrievableByKbIds(ctx, q.SelectedKnowledgeBaseIds)
-		if err != nil {
-			logx.Warnf("查询可检索文档失败: %v", err)
-		}
-	}
-	return docs, err
-}
-
 const (
 	documentCandidateLimit = 5
 	lowConfidenceThreshold = 0.55
@@ -377,18 +198,18 @@ const (
 //
 // 打分策略：语义分 + 词面辅助分 + 关键词命中分 + 与 topScope 匹配加分 + 主题关系加分
 // 低置信度扩展：当置信度 < 阈值时，将允许范围内的文档作为零分候选补充
-func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext, scopeCandidates []*vo.ScopeRouteCandidate, topicCandidates []*vo.TopicRouteCandidate) []*vo.DocumentRouteCandidate {
-	documents, err := s.lifecycleLogic.ListRetrievableDocuments(ctx)
+func (r *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext) {
+	documents, err := r.docGateway.FindRetrieveDocumentByIds(ctx, q.AllowedDocumentIds)
 	if err != nil {
 		logx.Warnf("查询可检索文档失败: %v", err)
-		return nil
+		return
 	}
 	if len(documents) == 0 {
-		return nil
+		return
 	}
 
 	// 加载文档画像
-	profiles, err := s.profileLogic.GetAllProfiles(ctx)
+	profiles, err := r.profileLogic.GetAllProfiles(ctx)
 	if err != nil {
 		logx.Warnf("查询文档画像失败: %v", err)
 	}
@@ -398,7 +219,7 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext,
 	}
 
 	// 加载主题-文档关系
-	relations, err := s.repo.SelectTopicDocumentRelations(ctx)
+	relations, err := r.repo.SelectTopicDocumentRelations(ctx)
 	if err != nil {
 		logx.Warnf("查询 topic-document 关系失败: %v", err)
 	}
@@ -423,10 +244,10 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext,
 	// 为每个文档准备文本与语义分
 	routeTexts := make([]string, 0, len(documents))
 	for _, doc := range documents {
-		routeTexts = append(routeTexts, s.buildDocumentRouteText(doc, profileByDoc[doc.DocumentId]))
+		routeTexts = append(routeTexts, r.buildDocumentRouteText(doc, profileByDoc[doc.DocumentId]))
 	}
-	semanticScores := s.computeSemanticScores(ctx, q, routeTexts)
-	lexicalScores := s.searchDocumentLexicalScores(ctx, q.RoutingText, documentCandidateLimit)
+	semanticScores := r.computeSemanticScores(ctx, q, routeTexts)
+	lexicalScores := r.searchDocumentLexicalScores(ctx, q.RoutingText, documentCandidateLimit)
 
 	// 打分：语义分 + 词面辅助分 + 关键词命中分
 	matched := make([]*vo.DocumentRouteCandidate, 0, len(documents))
@@ -437,7 +258,7 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext,
 			semantic = semanticScores[i]
 		}
 		lexical := lexicalScores[doc.DocumentId]
-		score := s.semanticMainScore(semantic) + s.lexicalAssistScore(lexical) + s.keywordEntityMatchScore(q.QueryTerms, routeText)
+		score := r.semanticMainScore(semantic) + r.lexicalAssistScore(lexical) + r.keywordEntityMatchScore(q.QueryTerms, routeText)
 
 		// 与 top scope 匹配加分
 		if strutil.IsNotBlank(topScopeCode) && topScopeCode == doc.KnowledgeScopeCode {
@@ -459,17 +280,13 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext,
 			continue
 		}
 		matched = append(matched, &vo.DocumentRouteCandidate{
-			DocumentId:         doc.DocumentId,
-			DocumentName:       doc.DocumentName,
-			LastIndexTaskId:    doc.LastIndexTaskId,
-			KnowledgeScopeCode: strutil.Trim(doc.KnowledgeScopeCode),
-			KnowledgeScopeName: strutil.Trim(doc.KnowledgeScopeName),
-			BusinessCategory:   strutil.Trim(doc.BusinessCategory),
-			DocumentTags:       strutil.Trim(doc.DocumentTags),
-			Score:              score,
-			Reason:             s.buildCandidateReason(semantic, lexical, topicRelationScore),
-			Source:             s.resolveCandidateSource(semantic, lexical, topicRelationScore),
-			Features:           s.buildFeatures(semantic, lexical, topicRelationScore),
+			DocumentId:      doc.DocumentId,
+			DocumentName:    doc.DocumentName,
+			LastIndexTaskId: doc.LastIndexTaskId,
+			Score:           score,
+			Reason:          r.buildCandidateReason(semantic, lexical, topicRelationScore),
+			Source:          r.resolveCandidateSource(semantic, lexical, topicRelationScore),
+			Features:        r.buildFeatures(semantic, lexical, topicRelationScore),
 		})
 	}
 
@@ -478,19 +295,19 @@ func (s *KnowledgeRouteImpl) rankDocuments(ctx context.Context, q *QueryContext,
 	candidates := utils.Limit(matched, documentCandidateLimit)
 
 	// 低置信度扩展：当无候选或置信度低时，补充允许范围内的文档
-	if len(candidates) == 0 || (len(candidates) > 0 && s.computeConfidence(candidates) < lowConfidenceThreshold) {
-		expanded := s.expandCandidatesWithAllowedScope(candidates, documents, q, documentCandidateLimit)
+	if len(candidates) == 0 || (len(candidates) > 0 && r.computeConfidence(candidates) < lowConfidenceThreshold) {
+		expanded := r.expandCandidatesWithAllowedScope(candidates, documents, q, documentCandidateLimit)
 		if len(expanded) > len(candidates) {
 			q.Diagnostics["LOW_CONFIDENCE_ALLOWED_SCOPE_EXPANSION"] = struct{}{}
 		}
 		candidates = expanded
 	}
 
-	return candidates
+	return
 }
 
 // computeConfidence 从候选列表计算置信度：top1/(top1+top2+5) 归一化
-func (s *KnowledgeRouteImpl) computeConfidence(candidates []*vo.DocumentRouteCandidate) float64 {
+func (r *KnowledgeRouteImpl) computeConfidence(candidates []*vo.DocumentRouteCandidate) float64 {
 	if len(candidates) == 0 {
 		return 0
 	}
@@ -504,7 +321,7 @@ func (s *KnowledgeRouteImpl) computeConfidence(candidates []*vo.DocumentRouteCan
 
 // expandCandidatesWithAllowedScope 将允许范围内的文档作为零分候选补充
 // 当置信度不足时，通过增加候选池提升召回率
-func (s *KnowledgeRouteImpl) expandCandidatesWithAllowedScope(ranked []*vo.DocumentRouteCandidate, documents []*dvo.DocumentMetadata, q *QueryContext, limit int) []*vo.DocumentRouteCandidate {
+func (r *KnowledgeRouteImpl) expandCandidatesWithAllowedScope(ranked []*vo.DocumentRouteCandidate, documents []*dvo.DocumentMetadata, q *QueryContext, limit int) []*vo.DocumentRouteCandidate {
 	// 复制已排序的高分候选
 	merged := make([]*vo.DocumentRouteCandidate, 0, limit)
 	seenIds := make(map[int64]struct{}, limit)
@@ -560,7 +377,7 @@ func (s *KnowledgeRouteImpl) expandCandidatesWithAllowedScope(ranked []*vo.Docum
 }
 
 // buildDocumentRouteText 拼接文档元数据 + 画像作为路由文本
-func (s *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.DocumentMetadata, profile *den.DocumentProfile) string {
+func (r *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.DocumentMetadata, profile *den.DocumentProfile) string {
 	if profile == nil {
 		return utils.JoinNonBlank(" ", doc.DocumentName, doc.KnowledgeScopeName, doc.KnowledgeScopeCode, doc.BusinessCategory, doc.DocumentTags)
 	}
@@ -573,12 +390,12 @@ func (s *KnowledgeRouteImpl) buildDocumentRouteText(doc *dvo.DocumentMetadata, p
 // =====================================================
 
 // computeSemanticScores 批量计算 routingText 与每个候选文本的余弦相似度；embedder 未配置时返回全 0 长度相同
-func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *QueryContext, routeTexts []string) []float64 {
+func (r *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *QueryContext, routeTexts []string) []float64 {
 	scores := make([]float64, len(routeTexts))
 	if len(q.QueryEmbedding) == 0 || len(routeTexts) == 0 {
 		return scores
 	}
-	if s.embedder == nil {
+	if r.embedder == nil {
 		q.Diagnostics["SEMANTIC_ROUTE_NOT_CONFIGURED"] = struct{}{}
 		return scores
 	}
@@ -586,7 +403,7 @@ func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *Query
 	for start := 0; start < len(routeTexts); start += routeEmbeddingBatchSize {
 		end := min(start+routeEmbeddingBatchSize, len(routeTexts))
 		batch := routeTexts[start:end]
-		embeddings, err := s.embedder.EmbedStrings(ctx, batch...)
+		embeddings, err := r.embedder.EmbedStrings(ctx, batch...)
 		if err != nil {
 			logx.Warnf("知识路由批量向量计算失败: batchStart=%d, size=%d, err=%v", start, len(batch), err)
 			q.Diagnostics["SEMANTIC_CANDIDATE_EMBEDDING_UNAVAILABLE"] = struct{}{}
@@ -604,39 +421,23 @@ func (s *KnowledgeRouteImpl) computeSemanticScores(ctx context.Context, q *Query
 }
 
 // singleSemanticScore 仅对单一文本做语义相似度（失败或未配置返回 0）
-func (s *KnowledgeRouteImpl) singleSemanticScore(ctx context.Context, q *QueryContext, text string) float64 {
-	if len(q.QueryEmbedding) == 0 || s.embedder == nil || utils.IsBlank(text) {
+func (r *KnowledgeRouteImpl) singleSemanticScore(ctx context.Context, q *QueryContext, text string) float64 {
+	if len(q.QueryEmbedding) == 0 || r.embedder == nil || utils.IsBlank(text) {
 		return 0
 	}
-	vectors, _ := s.embedder.EmbedStrings(ctx, text)
+	vectors, _ := r.embedder.EmbedStrings(ctx, text)
 	if len(vectors) == 0 {
 		return 0
 	}
 	return cosineSimilarity(q.QueryEmbedding, vectors[0])
 }
 
-// searchLexicalScores 调用外部词面索引；未配置或失败时回退到本地计算
-func (s *KnowledgeRouteImpl) searchLexicalScores(ctx context.Context, routingText, entityType string, size int) map[int64]float64 {
-	if s.lexicalIndex == nil {
-		return nil
-	}
-	hits, err := s.lexicalIndex.Search(ctx, routingText, entityType, size)
-	if err != nil || len(hits) == 0 {
-		return nil
-	}
-	result := make(map[int64]float64, len(hits))
-	for _, hit := range hits {
-		result[hit.EntityCode] = hit.Score
-	}
-	return result
-}
-
 // searchDocumentLexicalScores 词面检索文档维度分数（同上）
-func (s *KnowledgeRouteImpl) searchDocumentLexicalScores(ctx context.Context, routingText string, size int) map[int64]float64 {
-	if s.lexicalIndex == nil {
+func (r *KnowledgeRouteImpl) searchDocumentLexicalScores(ctx context.Context, routingText string, size int) map[int64]float64 {
+	if r.lexicalIndex == nil {
 		return nil
 	}
-	hits, err := s.lexicalIndex.Search(ctx, routingText, "document", size)
+	hits, err := r.lexicalIndex.Search(ctx, routingText, "document", size)
 	if err != nil || len(hits) == 0 {
 		return nil
 	}
@@ -645,28 +446,6 @@ func (s *KnowledgeRouteImpl) searchDocumentLexicalScores(ctx context.Context, ro
 		result[hit.DocumentId] = hit.Score
 	}
 	return result
-}
-
-// keywordEntityMatchScore 对具有“实体感”的关键词加分：包含字母/数字或较短的中文短语
-func (s *KnowledgeRouteImpl) keywordEntityMatchScore(queryTerms []string, routeText string) float64 {
-	if len(queryTerms) == 0 {
-		return 0
-	}
-	normalizedContent := normalize(routeText)
-	var score float64
-	for _, term := range queryTerms {
-		if !alpNumPattern.MatchString(term) && utils.Len(term) > 4 {
-			continue
-		}
-		termNorm := normalize(term)
-		if utils.Len(termNorm) < 2 {
-			continue
-		}
-		if strings.Contains(normalizedContent, termNorm) {
-			score += 6
-		}
-	}
-	return score
 }
 
 // normalize 归一化文本：去符号/空白/小写
@@ -687,7 +466,7 @@ func normalizeCode(value string) string {
 }
 
 // buildReason 根据关键词命中和语义得分生成原因说明
-func (s *KnowledgeRouteImpl) buildReason(queryTerms []string, content string, semanticScore float64) string {
+func (r *KnowledgeRouteImpl) buildReason(queryTerms []string, content string, semanticScore float64) string {
 	matched := make([]string, 0, 3)
 	normalizedContent := normalize(content)
 	for _, term := range queryTerms {
@@ -710,43 +489,8 @@ func (s *KnowledgeRouteImpl) buildReason(queryTerms []string, content string, se
 	return "基于文档画像与元数据综合召回"
 }
 
-// buildCandidateReason 根据语义分、词面分、关系分构建候选原因
-func (s *KnowledgeRouteImpl) buildCandidateReason(semanticScore, lexicalScore, relationScore float64) string {
-	semanticMatched := semanticMainScore(semanticScore) > 0
-	lexicalMatched := lexicalScore > 0
-	relationMatched := relationScore > 0
-
-	switch {
-	case semanticMatched && lexicalMatched && relationMatched:
-		return "语义、路由索引与持久化关系特征共同召回"
-	case semanticMatched && lexicalMatched:
-		return "语义与路由索引特征共同召回"
-	case lexicalMatched && relationMatched:
-		return "路由索引与持久化关系特征共同召回"
-	case semanticMatched && relationMatched:
-		return "语义与持久化关系特征共同召回"
-	case lexicalMatched:
-		return "由路由索引 BM25 特征召回"
-	case semanticMatched:
-		return "由持久化画像的语义相似度召回"
-	case relationMatched:
-		return "由持久化关系特征召回"
-	default:
-		return "没有形成有效路由特征"
-	}
-}
-
-// buildFeatures 构建候选特征Map
-func (s *KnowledgeRouteImpl) buildFeatures(semanticScore, lexicalScore, relationScore float64) map[string]float64 {
-	features := make(map[string]float64, 3)
-	features["semanticScore"] = max(0, semanticScore)
-	features["routeIndexScore"] = max(0, lexicalScore)
-	features["topicRelationScore"] = max(0, relationScore)
-	return features
-}
-
 // resolveDecisionSource 从文档候选中解析决策来源
-func (s *KnowledgeRouteImpl) resolveDecisionSource(documentCandidates []*vo.DocumentRouteCandidate) string {
+func (r *KnowledgeRouteImpl) resolveDecisionSource(documentCandidates []*vo.DocumentRouteCandidate) string {
 	if len(documentCandidates) == 0 {
 		return "NONE"
 	}
@@ -768,7 +512,7 @@ func (s *KnowledgeRouteImpl) resolveDecisionSource(documentCandidates []*vo.Docu
 }
 
 // resolveDecisionReason 根据候选与置信度生成决策原因
-func (s *KnowledgeRouteImpl) resolveDecisionReason(documentCandidates []*vo.DocumentRouteCandidate, confidence float64) string {
+func (r *KnowledgeRouteImpl) resolveDecisionReason(documentCandidates []*vo.DocumentRouteCandidate, confidence float64) string {
 	if len(documentCandidates) == 0 {
 		return "没有找到可用候选文档"
 	}
@@ -787,32 +531,12 @@ func (s *KnowledgeRouteImpl) resolveDecisionReason(documentCandidates []*vo.Docu
 	}
 }
 
-// parseJsonStringArray 处理画像字段中的字符串数组：支持 ["a","b"]
-func parseJsonStringArray(raw string) []string {
-	cleaned := strutil.Trim(raw)
-	if strutil.IsBlank(cleaned) || cleaned == "[]" {
-		return nil
-	}
-
-	// 优先尝试 JSON 解析
-	var items []string
-	if err := utils.Unmarshal(cleaned, &items); err == nil {
-		return items
-	}
-
-	// 回退到手工解析
-	inner := strings.TrimPrefix(strings.TrimSuffix(cleaned, "]"), "[")
-	return stream.FromSlice(strings.Split(inner, ",")).
-		Map(func(item string) string { return strutil.Trim(strutil.Trim(item), "\"") }).
-		Filter(func(item string) bool { return strutil.IsNotBlank(item) }).ToSlice()
-}
-
 // =====================================================
 // Trace 写入
 // =====================================================
 
 // buildTrace 组装路由跟踪结构（不含选中文档与命中标记，由各路由模式补充）
-func (s *KnowledgeRouteImpl) buildTrace(exchangeId int64, conversationId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
+func (r *KnowledgeRouteImpl) buildTrace(exchangeId int64, conversationId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
 	trace := &entity.KnowledgeRouteTrace{
 		ConversationId:  conversationId,
 		ExchangeId:      exchangeId,

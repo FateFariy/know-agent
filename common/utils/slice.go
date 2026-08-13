@@ -1,6 +1,10 @@
 package utils
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/duke-git/lancet/v2/maputil"
+)
 
 func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
 	if slice == nil {
@@ -165,4 +169,8 @@ func Copy[T comparable](src []T) []T {
 	dest := make([]T, len(src))
 	copy(dest, src)
 	return dest
+}
+
+func MapValues[K comparable, V any](m map[K]V) []V {
+	return maputil.Values(m)
 }
