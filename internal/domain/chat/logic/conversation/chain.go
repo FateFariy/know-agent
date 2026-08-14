@@ -19,7 +19,7 @@ type Chain struct {
 	repo            adapter.ChatRepository
 	stages          []Stage
 	runtimeRegistry *ChatRuntimeRegistry
-	documentFetcher adapter.DocumentFetcher
+	documentFetcher adapter.DocumentGateway
 	memoryManager   memory.SessionMemoryManager
 	distributedLock adapter.DistributedLock
 	checkPointStore adapter.CheckPointStore

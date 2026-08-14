@@ -22,11 +22,7 @@ type RagChatExecutor struct {
 }
 
 // NewRagChatExecutor 构造知识问答执行器
-func NewRagChatExecutor(
-	retriever rag.Retriever,
-	ragPromptAssembler RagPromptAssembler,
-	chatModel model.ChatModel,
-) *RagChatExecutor {
+func NewRagChatExecutor(retriever rag.Retriever, ragPromptAssembler RagPromptAssembler, chatModel model.ChatModel) *RagChatExecutor {
 	return &RagChatExecutor{
 		retriever:       retriever,
 		promptAssembler: ragPromptAssembler,
@@ -63,42 +59,10 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *conversation.Con
 		return nil, err
 	}
 
-	subQuestions := make([]map[string]any, len(retrievalCtx.SubQuestionEvidenceList))
-	for i, sq := range retrievalCtx.SubQuestionEvidenceList {
-		subQuestions[i] = map[string]any{
-			"index":                  sq.SubQuestionIndex,
-			"question":               sq.SubQuestion,
-			"referenceCount":         len(sq.References),
-			"documentCount":          len(sq.Documents),
-			"fusedCandidateCount":    sq.FusedCandidateCount,
-			"parentCandidateCount":   sq.ParentCandidateCount,
-			"rerankedCandidateCount": sq.RerankedCandidateCount,
-			"channelTraces":          sq.GetChannelTraceMaps(),
-			"references":             sq.GetReferenceMaps(),
-		}
-	}
-
-	references := retrievalCtx.FlattenReferences()
-	refDetails := make([]map[string]any, len(references))
-	for i, ref := range references {
-		refDetails[i] = map[string]any{
-			"referenceId":  ref.ReferenceId,
-			"documentName": utils.BlankToDefault(ref.DocumentName, ref.Title),
-			"sectionPath":  ref.SectionPath,
-			"channel":      ref.Channel,
-		}
-	}
-
-	snapshot := map[string]any{
-		"retrievalQuestion": retrievalCtx.RetrievalQuestion,
-		"usedChannels":      retrievalCtx.UsedChannels(),
-		"retrievalNotes":    retrievalCtx.RetrievalNotes(),
-		"referenceCount":    len(references),
-		"subQuestionCount":  len(retrievalCtx.SubQuestionEvidenceList),
-		"subQuestions":      subQuestions,
-		"references":        refDetails,
-	}
-	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "RAG 检索完成。", Snapshot: snapshot})
+	_ = vo.OnEnd(ctx, &vo.StageOutput{
+		SummaryText: "RAG 检索完成。",
+		Snapshot:    retrievalCtx.ToSnapshot(plan),
+	})
 
 	return e.streamFromRetrievalContext(ctx, convCtx, plan, retrievalCtx)
 }
@@ -151,19 +115,19 @@ func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCt
 		return nil, err
 	}
 
-	snapshot := map[string]any{
-		"totalBudget":              promptResult.TotalBudget,
-		"perSubQuestionBudget":     promptResult.PerSubQuestionBudget,
-		"renderedReferenceCount":   promptResult.RenderedReferenceCount,
-		"omittedReferenceCount":    promptResult.OmittedReferenceCount,
-		"renderedReferenceDetails": promptResult.RenderedReferenceDetails,
-		"omittedReferenceDetails":  promptResult.OmittedReferenceDetails,
-		"systemPrompt":             promptResult.SystemPrompt,
-		"userPrompt":               promptResult.UserPrompt,
+	// 填充调试轨迹
+	if debugTrace := convCtx.DebugTrace.Load(); debugTrace != nil {
+		debugTrace.RagSystemPrompt = promptResult.SystemPrompt
+		debugTrace.RagUserPrompt = promptResult.UserPrompt
 	}
-	_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "证据预算与 Prompt 组装完成。", Snapshot: snapshot})
 
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, e.Mode().String(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
+	_ = vo.OnEnd(ctx, &vo.StageOutput{
+		SummaryText: "证据预算与 Prompt 组装完成。",
+		Snapshot:    promptResult.ToSnapshot(retrievalCtx),
+	})
+
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, e.Mode().String(),
+		&vo.StageInput{SummaryText: "正在基于证据生成回答。"})
 
 	callbackOpt := model.WithCallback(func() {
 		vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "答案生成完成。", Snapshot: map[string]any{

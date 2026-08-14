@@ -1,6 +1,7 @@
 package vo
 
 import (
+	"errors"
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -24,6 +25,8 @@ type ConversationExecutionPlan struct {
 	RecentQuestionTranscript     string                      // 最近问题转录
 	QuestionHistoryContext       *QuestionHistoryContext     // 问题历史上下文
 	NavigationDecision           *DocumentNavigationDecision // 导航决策
+	RecognitionResult            *IntentRecognitionResult    // 意图识别结果
+	RetrievalPlan                *RetrievalPlan              // 检索执行计划
 	HistoryCompressionApplied    bool                        // 是否应用历史压缩
 	HistoryCoveredExchangeId     int64                       // 覆盖的历史记录交换ID
 	HistoryCoveredExchangeCount  int                         // 覆盖的历史记录交换计数
@@ -43,10 +46,32 @@ type ConversationExecutionPlan struct {
 	NoEvidenceReply              string                      // 无证据回复文本
 }
 
+func (p *ConversationExecutionPlan) Validate() error {
+	if p == nil {
+		return errors.New("conversation execution plan is nil")
+	}
+	if p.RetrievalPlan == nil {
+		return errors.New("retrieval plan is nil")
+	}
+	return p.RetrievalPlan.ValidateForExecution()
+}
+
 // ExecutionModeName 获取执行模式名称
 func (p *ConversationExecutionPlan) ExecutionModeName() string {
 	if p.Mode == nil {
 		return ""
 	}
 	return p.Mode.Name()
+}
+
+func (p *ConversationExecutionPlan) BuildRetrievalPlanSnapshot() map[string]any {
+	if p == nil {
+		return nil
+	}
+	return map[string]any{
+		"mode":              p.ExecutionModeName(),
+		"retrievalQuestion": p.RetrievalQuestion,
+		"subQuestions":      p.RetrievalSubQuestions,
+		"selectedDocument":  p.SelectedDocumentName,
+	}
 }

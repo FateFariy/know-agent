@@ -5,8 +5,8 @@ import (
 	"github.com/google/wire"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	reranker2 "github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
-	parse2 "github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/rerank"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
@@ -46,7 +46,7 @@ var ProviderSet = wire.NewSet(
 	lock.NewRedisMutexLock,
 	wire.Bind(new(chatadapter.DistributedLock), new(*lock.RedisMutexLock)),
 	reranker.NewDashScope,
-	wire.Bind(new(reranker2.Reranker), new(*reranker.DashScope)),
+	wire.Bind(new(rerank.Reranker), new(*reranker.DashScope)),
 	llm.NewChatModelImpl,
 	wire.Bind(new(model.ChatModel), new(*llm.ChatModelImpl[*schema.AgenticMessage])),
 	check.NewMemoryCheckPointStore,
@@ -54,13 +54,13 @@ var ProviderSet = wire.NewSet(
 	NewParserRegistry,
 )
 
-func NewParserRegistry() *parse2.Registry {
+func NewParserRegistry() *parse.Registry {
 	fallbackParser := &parser.TextParser{}
-	parsers := []parse2.Parser{
+	parsers := []parse.Parser{
 		&parser.HTMLParser{},
 		&parser.TextParser{},
 		&parser.PDFParser{},
 		&markdown.GoldmarkParser{},
 	}
-	return parse2.NewRegistry(fallbackParser, parsers...)
+	return parse.NewRegistry(fallbackParser, parsers...)
 }

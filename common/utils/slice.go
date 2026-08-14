@@ -164,6 +164,20 @@ func EqualUnordered[T comparable](a []T, b []T) bool {
 	return true
 }
 
+// ContainsAll 判断 src 是否包含 target 中的所有元素
+func ContainsAll[T comparable](src, target []T) bool {
+	set := make(map[T]struct{}, len(src))
+	for _, v := range src {
+		set[v] = struct{}{}
+	}
+	for _, v := range target {
+		if _, ok := set[v]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // Copy 复制切片
 func Copy[T comparable](src []T) []T {
 	if len(src) == 0 {

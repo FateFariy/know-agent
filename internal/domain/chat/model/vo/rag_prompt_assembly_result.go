@@ -11,3 +11,22 @@ type RagPromptAssemblyResult struct {
 	RenderedReferenceDetails []string `json:"renderedReferenceDetails"`
 	OmittedReferenceDetails  []string `json:"omittedReferenceDetails"`
 }
+
+// ToSnapshot 构建证据预算阶段快照
+func (r *RagPromptAssemblyResult) ToSnapshot(retrievalCtx *RagRetrievalContext) map[string]any {
+	evidence := retrievalCtx.SubQuestionEvidenceList
+	_ = retrievalCtx.ValidateEvidenceBudgetScope()
+
+	return map[string]any{
+		"subQuestionCount":         len(evidence),
+		"totalBudget":              r.TotalBudget,
+		"perSubQuestionBudget":     r.PerSubQuestionBudget,
+		"renderedReferenceCount":   r.RenderedReferenceCount,
+		"omittedReferenceCount":    r.OmittedReferenceCount,
+		"renderedReferenceDetails": r.RenderedReferenceDetails,
+		"omittedReferenceDetails":  r.OmittedReferenceDetails,
+		"systemPrompt":             r.SystemPrompt,
+		"userPrompt":               r.UserPrompt,
+		"subQuestionBudgetDetails": retrievalCtx.BuildSubQuestionBudgetDetails(r),
+	}
+}

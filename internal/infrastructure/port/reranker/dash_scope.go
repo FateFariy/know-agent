@@ -14,7 +14,7 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpc"
 
 	"github.com/swiftbit/know-agent/common"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/reranker"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/rerank"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -52,16 +52,16 @@ type rerankUsage struct {
 type DashScope struct {
 	URL    string
 	ApiKey string
-	*reranker.Options
+	*rerank.Options
 }
 
-var _ reranker.Reranker = (*DashScope)(nil)
+var _ rerank.Reranker = (*DashScope)(nil)
 
 func NewDashScope(svcCtx *svc.ServiceContext) *DashScope {
 	return &DashScope{
 		URL:    svcCtx.Config.Chat.Rag.Rerank.URL,
 		ApiKey: svcCtx.Config.Chat.Rag.Rerank.ApiKey,
-		Options: &reranker.Options{
+		Options: &rerank.Options{
 			Model: svcCtx.Config.Chat.Rag.Rerank.Model,
 			TopN:  svcCtx.Config.Chat.Rag.Rerank.TopN,
 		},

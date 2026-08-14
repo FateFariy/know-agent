@@ -37,7 +37,7 @@ var (
 type RouteStage struct {
 	knowledgeRouter kelog.KnowledgeRouter
 	documentRouter  intent.DocumentRouter
-	fetcher         adapter.DocumentFetcher
+	fetcher         adapter.DocumentGateway
 	noEvidenceReply string
 }
 
@@ -46,7 +46,7 @@ var _ Stage = (*RouteStage)(nil)
 func NewRouteStage(
 	knowledgeRouter kelog.KnowledgeRouter,
 	documentRouter intent.DocumentRouter,
-	fetcher adapter.DocumentFetcher,
+	fetcher adapter.DocumentGateway,
 	noEvidenceReply string,
 ) *RouteStage {
 	return &RouteStage{

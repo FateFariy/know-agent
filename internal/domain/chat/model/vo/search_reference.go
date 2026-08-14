@@ -111,6 +111,42 @@ func (r *SearchReference) HasUsableAnchor() bool {
 		r.SectionPath != ""
 }
 
+// ToSnapshot 将单个搜索引用转换为快照
+func (r *SearchReference) ToSnapshot() map[string]any {
+	return map[string]any{
+		"referenceId":        r.ReferenceId,
+		"sourceType":         r.SourceType,
+		"documentId":         r.DocumentId,
+		"documentName":       utils.BlankToDefault(r.DocumentName, r.Title),
+		"chunkId":            r.ChunkId,
+		"chunkNo":            r.ChunkNo,
+		"parentBlockId":      r.ParentBlockId,
+		"parentBlockNo":      r.ParentBlockNo,
+		"sectionPath":        r.SectionPath,
+		"channel":            r.Channel,
+		"score":              r.Score,
+		"subQuestionIndex":   r.SubQuestionIndex,
+		"subQuestion":        r.SubQuestion,
+		"toolName":           r.ToolName,
+		"knowledgeScopeCode": r.KnowledgeScopeCode,
+		"knowledgeScopeName": r.KnowledgeScopeName,
+		"structureNodeId":    r.StructureNodeId,
+		"canonicalPath":      r.CanonicalPath,
+		"itemIndex":          r.ItemIndex,
+		"title":              r.Title,
+		"url":                r.Url,
+	}
+}
+
+// ToRefSnapshotList 将引用列表转换为快照列表
+func ToRefSnapshotList(references []*SearchReference) []map[string]any {
+	refDetails := make([]map[string]any, len(references))
+	for i, ref := range references {
+		refDetails[i] = ref.ToSnapshot()
+	}
+	return refDetails
+}
+
 // ToEvidenceAnchor 将搜索引用转换为证据锚点
 func (r *SearchReference) ToEvidenceAnchor(maxSnippetChars int) *EvidenceAnchor {
 	if r == nil || !r.HasUsableAnchor() {

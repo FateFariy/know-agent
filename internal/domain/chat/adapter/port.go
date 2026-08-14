@@ -48,12 +48,12 @@ type VectorRetriever interface {
 	SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
 
-type DocumentFetcher interface {
+type DocumentGateway interface {
 	// FetchRetrieveDocuments 获取文档
-	FetchRetrieveDocuments(ctx context.Context) ([]*vo.DocumentMetadata, error)
+	FetchRetrieveDocuments(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error)
 
 	// QueryParentChunks 查询父块
-	QueryParentChunks(ctx context.Context, id string) ([]*vo.DocumentChunk, error)
+	QueryParentChunks(ctx context.Context, ids []int64) ([]*vo.DocumentChunk, error)
 }
 
 // Sink 面向客户端的事件输出端口
