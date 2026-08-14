@@ -18,6 +18,6 @@ type KnowledgeRouteTrace struct {
 	SelectedDocumentId             int64   `gorm:"column:selected_document_id"`               // 选中文档ID
 	HitSelectedDocument            *int    `gorm:"column:hit_selected_document"`              // 是否命中选中文档（1是，0否）
 	Confidence                     float64 `gorm:"column:confidence"`                         // 置信度
-	RouteStatus                    *int    `gorm:"column:route_status"`                       // 路由状态（1成功，0失败）
+	RouteStatus                    int     `gorm:"column:route_status"`                       // 路由状态
 	ErrorMsg                       string  `gorm:"column:error_msg"`                          // 错误信息
 }

@@ -8,15 +8,6 @@ type Features struct {
 	ScopeRelationScore float64 // 可选，如 topic 与 scope 的匹配关系（0/1 或加权）
 }
 
-func NewFeatures(semanticScore, lexicalScore, relationScore, scopeRelationScore float64) *Features {
-	return &Features{
-		SemanticScore:      max(0, semanticScore),
-		LexicalScore:       max(0, lexicalScore),
-		RelationScore:      max(0, relationScore),
-		ScopeRelationScore: max(0, scopeRelationScore),
-	}
-}
-
 // Result 评分结果
 type Result struct {
 	TotalScore float64            // 最终总分

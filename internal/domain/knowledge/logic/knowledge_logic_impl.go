@@ -91,10 +91,6 @@ func (k *KnowledgeLogicImpl) ListTopicDocumentRelations(ctx context.Context, top
 	for _, rel := range relations {
 		if doc := docMap[rel.DocumentId]; doc != nil {
 			rel.DocumentName = doc.DocumentName
-			rel.KnowledgeScopeCode = doc.KnowledgeScopeCode
-			rel.KnowledgeScopeName = doc.KnowledgeScopeName
-			rel.BusinessCategory = doc.BusinessCategory
-			rel.DocumentTags = doc.DocumentTags
 		}
 	}
 	return relations, nil

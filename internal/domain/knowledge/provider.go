@@ -13,7 +13,7 @@ var ProviderSet = wire.NewSet(
 	knowledgelogic.NewKnowledgeLogicImpl,
 	wire.Bind(new(knowledgelogic.KnowledgeLogic), new(*knowledgelogic.KnowledgeLogicImpl)),
 	knowledgelogic.NewKnowledgeConfigLogicImpl,
-	wire.Bind(new(knowledgelogic.KnowledgeConfigLogic), new(*knowledgelogic.KnowledgeConfigLogicImpl)),
+	wire.Bind(new(knowledgelogic.KnowledgeBaseLogic), new(*knowledgelogic.KnowledgeConfigLogicImpl)),
 	ProvideKnowledgeOptions,
 )
 

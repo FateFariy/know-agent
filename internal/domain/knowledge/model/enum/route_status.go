@@ -1,4 +1,4 @@
-package vo
+package enum
 
 type RouteStatus = string
 

@@ -11,6 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/score"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -65,8 +66,8 @@ func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
 }
 
 // Route 根据问题执行知识路由，返回范围/主题/文档候选列表与置信度
-func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *RouteContext) (*vo.KnowledgeRouteDecision, error) {
-	decision := &vo.KnowledgeRouteDecision{RouteStatus: vo.RouteStatusFailed}
+func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *Context) (*vo.KnowledgeRouteDecision, error) {
+	decision := &vo.KnowledgeRouteDecision{RouteStatus: enum.RouteStatusFailed}
 	if routeCtx.RoutingText == "" {
 		decision.Reason = "问题为空或无法提取有效关键词"
 		return decision, nil
@@ -104,55 +105,52 @@ func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *RouteContext) 
 }
 
 // RecordShadowRoute 记录影子路由结果（后台写入不影响主流程）
-func (r *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error {
-	queryCtx := NewQueryContext(question, rewriteQuestion, nil, nil)
-	decision, err := r.Route(ctx, queryCtx)
+func (r *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, routeCtx *Context) error {
+	decision, err := r.Route(ctx, routeCtx)
 	if err != nil {
-		logx.Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", conversationId, err)
+		logx.Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", routeCtx.ConversationId, err)
 		return err
 	}
-	trace := r.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeShadow, decision)
-	trace.SelectedDocumentId = documentId
-	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(documentId)
+	trace := r.buildTrace(routeCtx, decision)
 	if err = r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[shadow]失败: conversationId=%r, exchangeId=%d, err=%v", conversationId, exchangeId, err)
+		logx.Warnf("记录知识路由[shadow]失败: conversationId=%s, exchangeId=%d, err=%v", routeCtx.ConversationId, routeCtx.ExchangeId, err)
 		return err
 	}
 	return nil
 }
 
 // RecordAutoRoute 记录自动路由结果
-func (r *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, exchangeId int64, conversationId, question, rewriteQuestion string, decision *vo.KnowledgeRouteDecision) error {
-	trace := r.buildTrace(exchangeId, conversationId, question, rewriteQuestion, routeModeAuto, decision)
-	if len(decision.Documents) > 0 {
-		trace.SelectedDocumentId = decision.Documents[0].DocumentId
-	}
-	trace.HitSelectedDocument = decision.ResolveHitSelectedDocument(trace.SelectedDocumentId)
+func (r *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, routeCtx *Context, decision *vo.KnowledgeRouteDecision) error {
+	trace := r.buildTrace(routeCtx, decision)
 	if err := r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[auto]失败: conversationId=%r, err=%v", conversationId, err)
+		logx.Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", routeCtx.ConversationId, err)
 		return err
 	}
 	return nil
 }
 
 // buildTrace 组装路由跟踪结构（不含选中文档与命中标记，由各路由模式补充）
-func (r *KnowledgeRouteImpl) buildTrace(exchangeId int64, conversationId, question, rewriteQuestion, mode string, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
+func (r *KnowledgeRouteImpl) buildTrace(routeCtx *Context, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
 	trace := &entity.KnowledgeRouteTrace{
-		ConversationId:  conversationId,
-		ExchangeId:      exchangeId,
-		Question:        strutil.Trim(question),
-		RewriteQuestion: strutil.Trim(rewriteQuestion),
-		Mode:            mode,
+		ConversationId:             routeCtx.ConversationId,
+		ExchangeId:                 routeCtx.ExchangeId,
+		Question:                   routeCtx.Question,
+		RewriteQuestion:            routeCtx.RewriteQuestion,
+		Mode:                       routeCtx.Mode,
+		KnowledgeBaseSelectionMode: routeCtx.KnowledgeBaseSelectionMode,
+		SelectedDocumentId:         routeCtx.SelectedDocumentId,
+		HitSelectedDocument:        decision.ResolveHitSelectedDocument(routeCtx.SelectedDocumentId),
+		RouteStatus:                decision.ResolveRouteStatusCode(),
 	}
-	if decision == nil {
-		trace.RouteStatus = vo.RouteStatusCode(vo.RouteStatusFailed)
-		return trace
+	if decision != nil {
+		trace.Confidence = decision.Confidence
+		trace.ErrorMsg = strutil.Trim(decision.Reason)
+		trace.SelectedKnowledgeBaseIdsJson = utils.ToCompactJSON(routeCtx.SelectedKnowledgeBaseIds)
+		trace.SelectedKnowledgeBaseNamesJson = utils.ToCompactJSON(routeCtx.SelectedKnowledgeBaseNames)
+		trace.AllowedDocumentIdsJson = utils.ToCompactJSON(routeCtx.AllowedDocumentIds)
+		trace.TopScopesJson = utils.ToCompactJSON(decision.Scopes)
+		trace.TopTopicsJson = utils.ToCompactJSON(decision.Topics)
+		trace.TopDocumentsJson = utils.ToCompactJSON(decision.Documents)
 	}
-	trace.Confidence = decision.Confidence
-	trace.RouteStatus = vo.RouteStatusCode(decision.RouteStatus)
-	trace.ErrorMsg = strutil.Trim(decision.Reason)
-	trace.TopScopesJson = utils.ToCompactJSON(decision.Scopes)
-	trace.TopTopicsJson = utils.ToCompactJSON(decision.Topics)
-	trace.TopDocumentsJson = utils.ToCompactJSON(decision.Documents)
 	return trace
 }

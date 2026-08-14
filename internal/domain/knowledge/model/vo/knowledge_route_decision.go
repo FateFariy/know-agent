@@ -2,11 +2,12 @@ package vo
 
 import (
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 )
 
 // KnowledgeRouteDecision 知识路由决策
 type KnowledgeRouteDecision struct {
-	RouteStatus     string                  // 路由状态（SUCCESS/FAILED）
+	RouteStatus     enum.RouteStatus        // 路由状态（SUCCESS/FAILED）
 	Confidence      float64                 // 置信度（0-1）
 	Scopes          []*ScopeRouteCandidate  // 知识范围（scope）路由候选
 	Topics          []*TopicRouteCandidate  // 主题（topic）路由候选
@@ -53,16 +54,18 @@ func (d *KnowledgeRouteDecision) ResolveSource() string {
 }
 
 // ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三
-func (d *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) int {
+func (d *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) *int {
+	hit := 0
 	if d == nil || selectedDocumentId == 0 || len(d.Documents) == 0 {
-		return 0
+		return &hit
 	}
 	for idx := 0; idx < 3; idx++ {
 		if d.Documents[idx].DocumentId == selectedDocumentId {
-			return 1
+			hit = 1
+			return &hit
 		}
 	}
-	return 0
+	return &hit
 }
 
 // ResolveConfidence 计算整体置信度：以 top1 分数/(top1+top2+5) 归一化
@@ -93,6 +96,13 @@ func (d *KnowledgeRouteDecision) ResolveRouteStatus(lowConfidenceThreshold float
 	} else {
 		return "SUCCESS"
 	}
+}
+
+func (d *KnowledgeRouteDecision) ResolveRouteStatusCode() int {
+	if d == nil {
+		return enum.RouteStatusCode(enum.RouteStatusFailed)
+	}
+	return enum.RouteStatusCode(d.RouteStatus)
 }
 
 // ScopeRouteCandidate 知识范围（scope）路由候选

@@ -13,7 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 )
 
 func TimeToString(t time.Time) string {

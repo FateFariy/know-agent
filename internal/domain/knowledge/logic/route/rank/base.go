@@ -74,6 +74,11 @@ func (b *base) searchLexicalScores(ctx context.Context, rankCtx *Context, entity
 	if len(hits) == 0 {
 		return nil
 	}
+	if len(rankCtx.SelectedKnowledgeBaseIds) != 0 {
+		hits = utils.Filter(hits, func(hit *vo.RouteLexicalHit) bool {
+			return utils.ContainsAny(rankCtx.SelectedKnowledgeBaseIds, hit.KnowledgeBaseId)
+		})
+	}
 	if len(rankCtx.AllowedDocumentIds) != 0 {
 		hits = utils.Filter(hits, func(hit *vo.RouteLexicalHit) bool {
 			return utils.ContainsAny(rankCtx.AllowedDocumentIds, hit.DocumentId)
