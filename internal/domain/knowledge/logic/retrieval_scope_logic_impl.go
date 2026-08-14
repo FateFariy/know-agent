@@ -14,27 +14,25 @@ import (
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
-// KnowledgeBaseRetrievalScopeServiceImpl 知识库检索范围服务实现
-type KnowledgeBaseRetrievalScopeServiceImpl struct {
+// KnowledgeBaseRetrievalScopeLogicImpl 知识库检索范围
+type KnowledgeBaseRetrievalScopeLogicImpl struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
 	resolver   *config.Resolver
 }
 
-// NewKnowledgeBaseRetrievalScopeServiceImpl 创建知识库检索范围服务实例
-func NewKnowledgeBaseRetrievalScopeServiceImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, global config.GlobalRagRuntimeConfigProvider) *KnowledgeBaseRetrievalScopeServiceImpl {
-	return &KnowledgeBaseRetrievalScopeServiceImpl{
+func NewKnowledgeBaseRetrievalScopeLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, global config.GlobalRagRuntimeConfigProvider) *KnowledgeBaseRetrievalScopeLogicImpl {
+	return &KnowledgeBaseRetrievalScopeLogicImpl{
 		repo:       repo,
 		docGateway: docGateway,
 		resolver:   config.NewResolver(global),
 	}
 }
 
-// Resolve 根据聊天模式和知识库选择模式解析检索范围
-// 对应 Java resolve() 方法
-func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, chatMode string, selectionMode string, selectedKnowledgeBaseIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error) {
+// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
+func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error) {
 	// 解析选择模式
-	resolvedMode := utils.BlankToDefault(selectionMode, enum.KbSelectionModeNone)
+	resolvedMode := utils.BlankToDefault(selectMode, enum.KbSelectionModeNone)
 
 	snapshot := &aggregate.KnowledgeBaseSelectionSnapshot{
 		SelectionMode:     enum.KbSelectionModeNone,
@@ -52,7 +50,7 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, ch
 	case enum.KbSelectionModeAll:
 		selectedBases, err = s.selectAllWithRetrievableDocuments(ctx)
 	case enum.KbSelectionModeSelected:
-		selectedBases, err = s.selectExplicit(ctx, selectedKnowledgeBaseIds)
+		selectedBases, err = s.selectExplicit(ctx, kbIds)
 	default:
 		selectedBases = nil
 	}
@@ -108,7 +106,7 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) Resolve(ctx context.Context, ch
 }
 
 // selectAllWithRetrievableDocuments 选择所有启用且有可检索文档的知识库
-func (s *KnowledgeBaseRetrievalScopeServiceImpl) selectAllWithRetrievableDocuments(ctx context.Context) ([]*entity.KnowledgeBase, error) {
+func (s *KnowledgeBaseRetrievalScopeLogicImpl) selectAllWithRetrievableDocuments(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	enabledBases, err := s.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
 		return nil, err
@@ -117,7 +115,7 @@ func (s *KnowledgeBaseRetrievalScopeServiceImpl) selectAllWithRetrievableDocumen
 }
 
 // selectExplicit 根据用户选择的ID列表选择知识库
-func (s *KnowledgeBaseRetrievalScopeServiceImpl) selectExplicit(ctx context.Context, selectedKnowledgeBaseIds []string) ([]*entity.KnowledgeBase, error) {
+func (s *KnowledgeBaseRetrievalScopeLogicImpl) selectExplicit(ctx context.Context, selectedKnowledgeBaseIds []string) ([]*entity.KnowledgeBase, error) {
 	// 解析并去重知识库ID
 	ids := utils.FilterMapUniqueLimit(selectedKnowledgeBaseIds, -1, func(rawId string) (int64, int64, bool) {
 		id, _ := strconv.ParseInt(rawId, 10, 64)

@@ -12,9 +12,9 @@ type (
 	// 保存知识范围请求
 	KnowledgeScopeSaveReq {
 		ID              string `json:"id,optional"` // 主键ID
-		ScopeCode       string `json:"scopeCode"` // 范围编码
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 		ScopeName       string `json:"scopeName"` // 范围名称
-		ParentScopeCode string `json:"parentScopeCode,optional"` // 上级范围编码
+		ParentScopeId   string `json:"parentScopeId,optional"` // 上级范围ID
 		Description     string `json:"description,optional"` // 描述
 		Aliases         string `json:"aliases,optional"` // 别名
 		Examples        string `json:"examples,optional"` // 示例
@@ -23,15 +23,20 @@ type (
 	}
 	// 删除知识范围请求
 	KnowledgeScopeDeleteReq {
-		ScopeCode  string `json:"scopeCode"` // 范围编码
-		OperatorId string `json:"operatorId,optional"` // 操作人ID
+		ID              string `json:"id,optional"` // 主键ID
+		KnowledgeBaseId string `json:"knowledgeBaseId,optional"` // 知识库ID
+		OperatorId      string `json:"operatorId,optional"` // 操作人ID
+	}
+	// 查询知识范围列表请求
+	KnowledgeScopeListReq {
+		KnowledgeBaseId string `json:"knowledgeBaseId,optional"` // 知识库ID
 	}
 	// 保存知识主题请求
 	KnowledgeTopicSaveReq {
 		ID                  string `json:"id,optional"` // 主键ID
-		TopicCode           string `json:"topicCode"` // 主题编码
+		KnowledgeBaseId     string `json:"knowledgeBaseId"` // 知识库ID
+		ScopeId             string `json:"scopeId"` // 范围ID
 		TopicName           string `json:"topicName"` // 主题名称
-		ScopeCode           string `json:"scopeCode"` // 所属范围编码
 		Description         string `json:"description,optional"` // 描述
 		Aliases             string `json:"aliases,optional"` // 别名
 		Examples            string `json:"examples,optional"` // 示例
@@ -42,35 +47,40 @@ type (
 	}
 	// 删除知识主题请求
 	KnowledgeTopicDeleteReq {
-		TopicCode  string `json:"topicCode"` // 主题编码
-		OperatorId string `json:"operatorId,optional"` // 操作人ID
+		ID              string `json:"id"` // 主键ID
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
+		OperatorId      string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 查询知识主题列表请求
 	KnowledgeTopicListReq {
-		ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
+		ScopeId         string `json:"scopeId"` // 范围ID
 	}
 	// 查询主题文档关联列表请求
 	TopicDocumentRelationListReq {
-		TopicCode string `json:"topicCode"` // 主题编码
+		TopicId         string `json:"topicId"` // 主题ID
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 	}
 	// 保存主题文档关联请求
 	TopicDocumentRelationSaveReq {
-		TopicCode      string  `json:"topicCode"` // 主题编码
-		DocumentId     string  `json:"documentId"` // 文档ID
-		RelationScore  float64 `json:"relationScore,optional"` // 关联分数
-		RelationSource string  `json:"relationSource,optional"` // 关联来源
-		Reason         string  `json:"reason,optional"` // 理由
-		OperatorId     string  `json:"operatorId,optional"` // 操作人ID
+		TopicId         string  `json:"topicId"` // 主题ID
+		KnowledgeBaseId string  `json:"knowledgeBaseId"` // 知识库ID
+		DocumentId      string  `json:"documentId"` // 文档ID
+		RelationScore   float64 `json:"relationScore,optional"` // 关联分数
+		RelationSource  string  `json:"relationSource,optional"` // 关联来源
+		Reason          string  `json:"reason,optional"` // 理由
+		OperatorId      string  `json:"operatorId,optional"` // 操作人ID
 	}
 	// 移除主题文档关联请求
 	TopicDocumentRelationRemoveReq {
-		TopicCode  string `json:"topicCode"` // 主题编码
-		DocumentId string `json:"documentId"` // 文档ID
-		OperatorId string `json:"operatorId,optional"` // 操作人ID
+		TopicId         string `json:"topicId"` // 主题ID
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
+		DocumentId      string `json:"documentId"` // 文档ID
+		OperatorId      string `json:"operatorId,optional"` // 操作人ID
 	}
 	// 分页查询知识路由追踪请求
 	KnowledgeRouteTracePageReq {
-		ConversationId string `json:"conversationId,optional"` // 会话ID
+		ConversationId string `json:"conversationId"` // 会话ID
 		Mode           string `json:"mode,optional"` // 模式
 		RouteStatus    int    `json:"routeStatus,optional"` // 路由状态
 		PageNo         int    `json:"pageNo,optional,default=1"` // 页码
@@ -83,9 +93,9 @@ type (
 	// 知识范围响应
 	KnowledgeScopeResp {
 		ID              string `json:"id"` // 主键ID
-		ScopeCode       string `json:"scopeCode"` // 范围编码
+		KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 		ScopeName       string `json:"scopeName"` // 范围名称
-		ParentScopeCode string `json:"parentScopeCode"` // 上级范围编码
+		ParentScopeId   string `json:"parentScopeId"` // 上级范围ID
 		Description     string `json:"description"` // 描述
 		Aliases         string `json:"aliases"` // 别名
 		Examples        string `json:"examples"` // 示例
@@ -94,9 +104,9 @@ type (
 	// 知识主题响应
 	KnowledgeTopicResp {
 		ID                  string `json:"id"` // 主键ID
-		TopicCode           string `json:"topicCode"` // 主题编码
+		KnowledgeBaseId     string `json:"knowledgeBaseId"` // 知识库ID
 		TopicName           string `json:"topicName"` // 主题名称
-		ScopeCode           string `json:"scopeCode"` // 所属范围编码
+		ScopeId             string `json:"scopeId"` // 所属范围ID
 		Description         string `json:"description"` // 描述
 		Aliases             string `json:"aliases"` // 别名
 		Examples            string `json:"examples"` // 示例
@@ -106,16 +116,16 @@ type (
 	}
 	// 主题文档关联响应
 	TopicDocumentRelationResp {
-		TopicCode          string  `json:"topicCode"` // 主题编码
-		DocumentId         string  `json:"documentId"` // 文档ID
-		DocumentName       string  `json:"documentName"` // 文档名称
-		KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围编码
-		KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
-		BusinessCategory   string  `json:"businessCategory"` // 业务分类
-		DocumentTags       string  `json:"documentTags"` // 文档标签
-		RelationScore      float64 `json:"relationScore"` // 关联分数
-		RelationSource     string  `json:"relationSource"` // 关联来源
-		Reason             string  `json:"reason"` // 理由
+		KnowledgeBaseId string  `json:"knowledgeBaseId"` // 知识库ID
+		TopicId         string  `json:"topicId"` // 主题ID
+		TopicName       string  `json:"topicName"` // 主题名称
+		ScopeId         string  `json:"scopeId"` // 所属范围ID
+		ScopeName       string  `json:"scopeName"` // 所属范围名称
+		DocumentId      string  `json:"documentId"` // 文档ID
+		DocumentName    string  `json:"documentName"` // 文档名称
+		RelationScore   float64 `json:"relationScore"` // 关联分数
+		RelationSource  string  `json:"relationSource"` // 关联来源
+		Reason          string  `json:"reason"` // 理由
 	}
 	// 分页查询知识路由追踪响应
 	KnowledgeRouteTracePageResp {
@@ -143,6 +153,29 @@ type (
 		ErrorMsg            string  `json:"errorMsg"` // 错误信息
 		CreateTime          string  `json:"createTime"` // 创建时间
 	}
+	// 知识库明细响应
+	KnowledgeBaseItemResp {
+		ID                       string `json:"id"` // 主键ID
+		BaseName                 string `json:"baseName"` // 知识库名称
+		Description              string `json:"description"` // 描述
+		EmbeddingModel           string `json:"embeddingModel"` // 嵌入模型
+		RetrievalConfigJson      string `json:"retrievalConfigJson"` // 检索配置JSON
+		GraphRagConfigJson       string `json:"graphRagConfigJson"` // 图谱RAG配置JSON
+		RaptorConfigJson         string `json:"raptorConfigJson"` // RAPTOR配置JSON
+		MetadataFilterJson       string `json:"metadataFilterJson"` // 元数据过滤JSON
+		IsDefault                int    `json:"isDefault"` // 是否默认
+		SortOrder                int    `json:"sortOrder"` // 排序
+		DocumentCount            int    `json:"documentCount"` // 文档数量
+		RetrievableDocumentCount int    `json:"retrievableDocumentCount"` // 可检索文档数量
+	}
+	// 知识库选项响应
+	KnowledgeBaseOptionResp {
+		ID                       string `json:"id"` // 主键ID
+		BaseName                 string `json:"baseName"` // 知识库名称
+		Description              string `json:"description"` // 描述
+		IsDefault                int    `json:"isDefault"` // 是否默认
+		RetrievableDocumentCount int    `json:"retrievableDocumentCount"` // 可检索文档数量
+	}
 )
 
 // ==================== 知识管理服务====================
@@ -162,7 +195,7 @@ service knowledge {
 
 	@doc "查询知识范围列表"
 	@handler ListKnowledgeScope
-	post /scope/list returns ([]*KnowledgeScopeResp)
+	post /scope/list (KnowledgeScopeListReq) returns ([]*KnowledgeScopeResp)
 
 	@doc "保存知识主题节点"
 	@handler SaveKnowledgeTopic

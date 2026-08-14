@@ -42,7 +42,7 @@ func (a *DocumentAdapter) FindRetrievableByKbIds(ctx context.Context, kbIds []in
 	return result, nil
 }
 
-func (a *DocumentAdapter) FindRetrieveDocumentByIds(ctx context.Context, ids []int64) ([]*vo.DocumentMetadata, error) {
+func (a *DocumentAdapter) FindRetrieveDocumentByIds(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error) {
 	documentMetadata, err := a.repo.SelectRetrievableDocumentsByIds(ctx, ids...)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (a *DocumentAdapter) FindDocumentProfileByDocIds(ctx context.Context, docId
 	return result, nil
 }
 
-// FindDocumentProfiles 查询所有文档元数据
+// FindDocumentProfiles 查询所有文档画像元数据
 func (a *DocumentAdapter) FindDocumentProfiles(ctx context.Context) ([]*vo.DocumentProfile, error) {
 	documentProfiles, err := a.repo.SelectDocumentProfiles(ctx)
 	if err != nil {

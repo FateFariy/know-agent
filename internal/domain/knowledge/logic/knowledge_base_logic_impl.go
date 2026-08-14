@@ -26,45 +26,45 @@ func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository, docGateway ad
 }
 
 // SaveKnowledgeBase 保存/更新知识库
-func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
-	if strutil.IsBlank(config.BaseName) {
+func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, base *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
+	if strutil.IsBlank(base.BaseName) {
 		return nil, errors.New("baseName 不能为空")
 	}
 
 	// 名称唯一性校验
-	existing, err := k.repo.SelectKnowledgeBaseByBaseName(ctx, strutil.Trim(config.BaseName))
+	existing, err := k.repo.SelectKnowledgeBaseByBaseName(ctx, strutil.Trim(base.BaseName))
 	if err != nil && !errors.Is(err, errorx.ErrKnowledgeBaseNotFound) {
 		return nil, err
 	}
-	if existing.ID != config.ID {
+	if existing.ID != base.ID {
 		return nil, errors.New("知识库名称已存在")
 	}
 
-	if config.ID > 0 {
+	if base.ID > 0 {
 		// 更新：查询现有记录确认存在
-		_, err = k.repo.SelectKnowledgeBaseById(ctx, config.ID)
+		_, err = k.repo.SelectKnowledgeBaseById(ctx, base.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err = k.repo.UpdateKnowledgeBaseById(ctx, config); err != nil {
+		if err = k.repo.UpdateKnowledgeBaseById(ctx, base); err != nil {
 			return nil, err
 		}
 	} else {
 		// 新增：分配雪花ID
-		config.ID = utils.GetSnowflakeNextID()
-		if err = k.repo.InsertKnowledgeBase(ctx, config); err != nil {
+		base.ID = utils.GetSnowflakeNextID()
+		if err = k.repo.InsertKnowledgeBase(ctx, base); err != nil {
 			return nil, err
 		}
 	}
 
 	// 如果标记为默认，清除其他默认标记
-	if config.IsDefault == utils.Pointer(1) {
-		if err = k.repo.ClearOtherDefaults(ctx, config.ID); err != nil {
+	if base.IsDefault == utils.Pointer(1) {
+		if err = k.repo.ClearOtherDefaults(ctx, base.ID); err != nil {
 			return nil, err
 		}
 	}
 
-	return config, nil
+	return base, nil
 }
 
 // DeleteKnowledgeBase 删除知识库
@@ -88,11 +88,11 @@ func (k *KnowledgeConfigLogicImpl) GetKnowledgeBase(ctx context.Context, id int6
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
-	config, err := k.repo.SelectKnowledgeBaseById(ctx, id)
+	base, err := k.repo.SelectKnowledgeBaseById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return config, nil
+	return base, nil
 }
 
 // UpdateKnowledgeBaseSetting 更新知识库
@@ -137,26 +137,26 @@ func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, 
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
-	config, err := k.repo.SelectKnowledgeBaseById(ctx, id)
+	base, err := k.repo.SelectKnowledgeBaseById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return config, nil
+	return base, nil
 }
 
 // ListKnowledgeBaseOptions 查询知识库选项列表
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
-	configs, err := k.repo.SelectKnowledgeBases(ctx)
+	bases, err := k.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(configs) == 0 {
+	if len(bases) == 0 {
 		return []*KnowledgeConfigOption{}, nil
 	}
 
 	// 收集所有知识库ID
-	kbIds := make([]int64, 0, len(configs))
-	for _, c := range configs {
+	kbIds := make([]int64, 0, len(bases))
+	for _, c := range bases {
 		kbIds = append(kbIds, c.ID)
 	}
 
@@ -167,8 +167,8 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context)
 	}
 
 	// 构建选项列表
-	options := make([]*KnowledgeConfigOption, 0, len(configs))
-	for _, c := range configs {
+	options := make([]*KnowledgeConfigOption, 0, len(bases))
+	for _, c := range bases {
 		option := &KnowledgeConfigOption{
 			ID:               c.ID,
 			BaseName:         c.BaseName,

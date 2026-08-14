@@ -12,31 +12,31 @@ type KnowledgeLogic interface {
 	// SaveScope 保存/更新知识范围节点
 	SaveScope(ctx context.Context, scopeNode *entity.KnowledgeScopeNode) (*entity.KnowledgeScopeNode, error)
 
-	// DeleteScope 删除知识范围节点
-	DeleteScope(ctx context.Context, scopeCode string) (bool, error)
+	// DeleteScope 删除知识范围节点（通过ID和知识库ID）
+	DeleteScope(ctx context.Context, id int64, kbId int64) (bool, error)
 
-	// ListScopes 查询知识范围列表
-	ListScopes(ctx context.Context) ([]*entity.KnowledgeScopeNode, error)
+	// ListScopes 查询指定知识库下的知识范围列表
+	ListScopes(ctx context.Context, kbId int64) ([]*entity.KnowledgeScopeNode, error)
 
 	// SaveTopic 保存/更新主题节点
 	SaveTopic(ctx context.Context, topicNode *entity.KnowledgeTopicNode) (*entity.KnowledgeTopicNode, error)
 
-	// DeleteTopic 删除主题节点
-	DeleteTopic(ctx context.Context, topicCode string) (bool, error)
+	// DeleteTopic 删除主题节点（通过ID和知识库ID）
+	DeleteTopic(ctx context.Context, id int64, kbId int64) (bool, error)
 
-	// ListTopics 查询主题列表（支持按 scopeCode 过滤）
-	ListTopics(ctx context.Context, scopeCode string) ([]*entity.KnowledgeTopicNode, error)
+	// ListTopics 查询指定知识库下某个范围（scopeId）的主题列表
+	ListTopics(ctx context.Context, kbId int64, scopeId int64) ([]*entity.KnowledgeTopicNode, error)
 
-	// ListTopicDocumentRelations 查询主题文档关联
-	ListTopicDocumentRelations(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error)
+	// ListTopicDocumentRelations 查询指定主题下的文档关联列表
+	ListTopicDocumentRelations(ctx context.Context, kbId int64, topicId int64) ([]*entity.KnowledgeTopicDocumentRelation, error)
 
-	// SaveTopicDocumentRelation 保存主题文档关联
+	// SaveTopicDocumentRelation 保存/更新主题文档关联
 	SaveTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) (*entity.KnowledgeTopicDocumentRelation, error)
 
-	// RemoveTopicDocumentRelation 移除主题文档关联
-	RemoveTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) (bool, error)
+	// RemoveTopicDocumentRelation 移除主题文档关联（通过ID）
+	RemoveTopicDocumentRelation(ctx context.Context, kbId int64, topicId int64, documentId int64) (bool, error)
 
-	// QueryRouteTracePage 分页查询知识路由追踪
+	// QueryRouteTracePage 分页查询知识路由追踪记录
 	QueryRouteTracePage(ctx context.Context, conversationId, mode string, routeStatus, pageNo, pageSize int) ([]*entity.KnowledgeRouteTrace, int64, error)
 }
 
@@ -72,8 +72,8 @@ type KnowledgeBaseLogic interface {
 
 // KnowledgeBaseRetrievalLogic 知识库检索范围
 type KnowledgeBaseRetrievalLogic interface {
-	// Resolve 根据聊天模式和知识库选择模式解析检索范围
-	Resolve(ctx context.Context, chatMode, selectionMode string, selectedKnowledgeBaseIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
+	// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
+	DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
 }
 
 // KnowledgeConfigOption 知识库选项（用于下拉选择等场景）

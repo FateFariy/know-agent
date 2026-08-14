@@ -24,7 +24,7 @@ var (
 	ErrDistributedLockNotFound  = common.NewBizError(20019, "分布式锁[%s]不存在")
 	ErrSessionNotFound          = common.NewBizError(20020, "会话不存在: %d")
 	ErrExchangeNotFound         = common.NewBizError(20021, "对话记录不存在: %d")
-	ErrKnowledgeBaseNotFound    = common.NewBizError(20022, "知识库配置不存在: %d")
+	ErrKnowledgeBaseNotFound    = common.NewBizError(20022, "知识库不存在: %d")
 	ErrSessionRunning           = common.NewBizError(20023, "该会话当前正在执行中，请稍后再试")
 	ErrKnowledgeBaseDisabled    = common.NewBizError(20024, "知识库不存在或已停用: %d")
 	ErrKnowledgeBaseMissing     = common.NewBizError(20025, "请选择至少一个知识库")

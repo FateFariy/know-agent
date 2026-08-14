@@ -3,6 +3,29 @@
 
 package knowledge
 
+type KnowledgeBaseItemResp struct {
+	ID                       string `json:"id"`                       // 主键ID
+	BaseName                 string `json:"baseName"`                 // 知识库名称
+	Description              string `json:"description"`              // 描述
+	EmbeddingModel           string `json:"embeddingModel"`           // 嵌入模型
+	RetrievalConfigJson      string `json:"retrievalConfigJson"`      // 检索配置JSON
+	GraphRagConfigJson       string `json:"graphRagConfigJson"`       // 图谱RAG配置JSON
+	RaptorConfigJson         string `json:"raptorConfigJson"`         // RAPTOR配置JSON
+	MetadataFilterJson       string `json:"metadataFilterJson"`       // 元数据过滤JSON
+	IsDefault                int    `json:"isDefault"`                // 是否默认
+	SortOrder                int    `json:"sortOrder"`                // 排序
+	DocumentCount            int    `json:"documentCount"`            // 文档数量
+	RetrievableDocumentCount int    `json:"retrievableDocumentCount"` // 可检索文档数量
+}
+
+type KnowledgeBaseOptionResp struct {
+	ID                       string `json:"id"`                       // 主键ID
+	BaseName                 string `json:"baseName"`                 // 知识库名称
+	Description              string `json:"description"`              // 描述
+	IsDefault                int    `json:"isDefault"`                // 是否默认
+	RetrievableDocumentCount int    `json:"retrievableDocumentCount"` // 可检索文档数量
+}
+
 type KnowledgeRouteTraceItem struct {
 	ID                  string  `json:"id"`                  // 主键ID
 	ConversationId      string  `json:"conversationId"`      // 会话ID
@@ -38,15 +61,20 @@ type KnowledgeRouteTracePageResp struct {
 }
 
 type KnowledgeScopeDeleteReq struct {
-	ScopeCode  string `json:"scopeCode"`           // 范围编码
-	OperatorId string `json:"operatorId,optional"` // 操作人ID
+	ID              string `json:"id"`                  // 主键ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"`     // 知识库ID
+	OperatorId      string `json:"operatorId,optional"` // 操作人ID
+}
+
+type KnowledgeScopeListReq struct {
+	KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 }
 
 type KnowledgeScopeResp struct {
 	ID              string `json:"id"`              // 主键ID
-	ScopeCode       string `json:"scopeCode"`       // 范围编码
+	KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 	ScopeName       string `json:"scopeName"`       // 范围名称
-	ParentScopeCode string `json:"parentScopeCode"` // 上级范围编码
+	ParentScopeId   string `json:"parentScopeId"`   // 上级范围ID
 	Description     string `json:"description"`     // 描述
 	Aliases         string `json:"aliases"`         // 别名
 	Examples        string `json:"examples"`        // 示例
@@ -54,31 +82,33 @@ type KnowledgeScopeResp struct {
 }
 
 type KnowledgeScopeSaveReq struct {
-	ID              string `json:"id,optional"`              // 主键ID
-	ScopeCode       string `json:"scopeCode"`                // 范围编码
-	ScopeName       string `json:"scopeName"`                // 范围名称
-	ParentScopeCode string `json:"parentScopeCode,optional"` // 上级范围编码
-	Description     string `json:"description,optional"`     // 描述
-	Aliases         string `json:"aliases,optional"`         // 别名
-	Examples        string `json:"examples,optional"`        // 示例
-	SortOrder       int    `json:"sortOrder,optional"`       // 排序
-	OperatorId      string `json:"operatorId,optional"`      // 操作人ID
+	ID              string `json:"id,optional"`            // 主键ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"`        // 知识库ID
+	ScopeName       string `json:"scopeName"`              // 范围名称
+	ParentScopeId   string `json:"parentScopeId,optional"` // 上级范围ID
+	Description     string `json:"description,optional"`   // 描述
+	Aliases         string `json:"aliases,optional"`       // 别名
+	Examples        string `json:"examples,optional"`      // 示例
+	SortOrder       int    `json:"sortOrder,optional"`     // 排序
+	OperatorId      string `json:"operatorId,optional"`    // 操作人ID
 }
 
 type KnowledgeTopicDeleteReq struct {
-	TopicCode  string `json:"topicCode"`           // 主题编码
-	OperatorId string `json:"operatorId,optional"` // 操作人ID
+	ID              string `json:"id,optional"`         // 主键ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"`     // 知识库ID
+	OperatorId      string `json:"operatorId,optional"` // 操作人ID
 }
 
 type KnowledgeTopicListReq struct {
-	ScopeCode string `json:"scopeCode,optional"` // 所属范围编码
+	KnowledgeBaseId string `json:"knowledgeBaseId"`  // 知识库ID
+	ScopeId         string `json:"scopeId,optional"` // 范围ID
 }
 
 type KnowledgeTopicResp struct {
 	ID                  string `json:"id"`                  // 主键ID
-	TopicCode           string `json:"topicCode"`           // 主题编码
+	KnowledgeBaseId     string `json:"knowledgeBaseId"`     // 知识库ID
 	TopicName           string `json:"topicName"`           // 主题名称
-	ScopeCode           string `json:"scopeCode"`           // 所属范围编码
+	ScopeId             string `json:"scopeId"`             // 所属范围ID
 	Description         string `json:"description"`         // 描述
 	Aliases             string `json:"aliases"`             // 别名
 	Examples            string `json:"examples"`            // 示例
@@ -89,9 +119,9 @@ type KnowledgeTopicResp struct {
 
 type KnowledgeTopicSaveReq struct {
 	ID                  string `json:"id,optional"`                  // 主键ID
-	TopicCode           string `json:"topicCode"`                    // 主题编码
+	KnowledgeBaseId     string `json:"knowledgeBaseId"`              // 知识库ID
+	ScopeId             string `json:"scopeId"`                      // 范围ID
 	TopicName           string `json:"topicName"`                    // 主题名称
-	ScopeCode           string `json:"scopeCode"`                    // 所属范围编码
 	Description         string `json:"description,optional"`         // 描述
 	Aliases             string `json:"aliases,optional"`             // 别名
 	Examples            string `json:"examples,optional"`            // 示例
@@ -102,33 +132,36 @@ type KnowledgeTopicSaveReq struct {
 }
 
 type TopicDocumentRelationListReq struct {
-	TopicCode string `json:"topicCode"` // 主题编码
+	TopicId         string `json:"topicId"`         // 主题ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"` // 知识库ID
 }
 
 type TopicDocumentRelationRemoveReq struct {
-	TopicCode  string `json:"topicCode"`           // 主题编码
-	DocumentId string `json:"documentId"`          // 文档ID
-	OperatorId string `json:"operatorId,optional"` // 操作人ID
+	TopicId         string `json:"topicId"`             // 主题ID
+	KnowledgeBaseId string `json:"knowledgeBaseId"`     // 知识库ID
+	DocumentId      string `json:"documentId"`          // 文档ID
+	OperatorId      string `json:"operatorId,optional"` // 操作人ID
 }
 
 type TopicDocumentRelationResp struct {
-	TopicCode          string  `json:"topicCode"`          // 主题编码
-	DocumentId         string  `json:"documentId"`         // 文档ID
-	DocumentName       string  `json:"documentName"`       // 文档名称
-	KnowledgeScopeCode string  `json:"knowledgeScopeCode"` // 知识范围编码
-	KnowledgeScopeName string  `json:"knowledgeScopeName"` // 知识范围名称
-	BusinessCategory   string  `json:"businessCategory"`   // 业务分类
-	DocumentTags       string  `json:"documentTags"`       // 文档标签
-	RelationScore      float64 `json:"relationScore"`      // 关联分数
-	RelationSource     string  `json:"relationSource"`     // 关联来源
-	Reason             string  `json:"reason"`             // 理由
+	KnowledgeBaseId string  `json:"knowledgeBaseId"` // 知识库ID
+	TopicId         string  `json:"topicId"`         // 主题ID
+	TopicName       string  `json:"topicName"`       // 主题名称
+	ScopeId         string  `json:"scopeId"`         // 所属范围ID
+	ScopeName       string  `json:"scopeName"`       // 所属范围名称
+	DocumentId      string  `json:"documentId"`      // 文档ID
+	DocumentName    string  `json:"documentName"`    // 文档名称
+	RelationScore   float64 `json:"relationScore"`   // 关联分数
+	RelationSource  string  `json:"relationSource"`  // 关联来源
+	Reason          string  `json:"reason"`          // 理由
 }
 
 type TopicDocumentRelationSaveReq struct {
-	TopicCode      string  `json:"topicCode"`               // 主题编码
-	DocumentId     string  `json:"documentId"`              // 文档ID
-	RelationScore  float64 `json:"relationScore,optional"`  // 关联分数
-	RelationSource string  `json:"relationSource,optional"` // 关联来源
-	Reason         string  `json:"reason,optional"`         // 理由
-	OperatorId     string  `json:"operatorId,optional"`     // 操作人ID
+	TopicId         string  `json:"topicId"`                 // 主题ID
+	KnowledgeBaseId string  `json:"knowledgeBaseId"`         // 知识库ID
+	DocumentId      string  `json:"documentId"`              // 文档ID
+	RelationScore   float64 `json:"relationScore,optional"`  // 关联分数
+	RelationSource  string  `json:"relationSource,optional"` // 关联来源
+	Reason          string  `json:"reason,optional"`         // 理由
+	OperatorId      string  `json:"operatorId,optional"`     // 操作人ID
 }

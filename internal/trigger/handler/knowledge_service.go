@@ -3,8 +3,6 @@ package handler
 import (
 	"context"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
 	"github.com/swiftbit/know-agent/api/knowledge"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/convert"
@@ -35,11 +33,11 @@ func (k *KnowledgeService) SaveKnowledgeScope(ctx context.Context, req *knowledg
 }
 
 func (k *KnowledgeService) DeleteKnowledgeScope(ctx context.Context, req *knowledge.KnowledgeScopeDeleteReq) (bool, error) {
-	return k.l.DeleteScope(ctx, strutil.Trim(req.ScopeCode))
+	return k.l.DeleteScope(ctx, utils.StringToInt64(req.ID), utils.StringToInt64(req.KnowledgeBaseId))
 }
 
 func (k *KnowledgeService) ListKnowledgeScope(ctx context.Context) ([]*knowledge.KnowledgeScopeResp, error) {
-	nodes, err := k.l.ListScopes(ctx)
+	nodes, err := k.l.ListScopes(ctx, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +56,11 @@ func (k *KnowledgeService) SaveKnowledgeTopic(ctx context.Context, req *knowledg
 }
 
 func (k *KnowledgeService) DeleteKnowledgeTopic(ctx context.Context, req *knowledge.KnowledgeTopicDeleteReq) (bool, error) {
-	return k.l.DeleteTopic(ctx, strutil.Trim(req.TopicCode))
+	return k.l.DeleteTopic(ctx, utils.StringToInt64(req.ID), utils.StringToInt64(req.KnowledgeBaseId))
 }
 
 func (k *KnowledgeService) ListKnowledgeTopic(ctx context.Context, req *knowledge.KnowledgeTopicListReq) ([]*knowledge.KnowledgeTopicResp, error) {
-	nodes, err := k.l.ListTopics(ctx, strutil.Trim(req.ScopeCode))
+	nodes, err := k.l.ListTopics(ctx, utils.StringToInt64(req.KnowledgeBaseId), utils.StringToInt64(req.ScopeId))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +71,7 @@ func (k *KnowledgeService) ListKnowledgeTopic(ctx context.Context, req *knowledg
 
 // ListTopicDocumentRelation 列表主题文档关联
 func (k *KnowledgeService) ListTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationListReq) ([]*knowledge.TopicDocumentRelationResp, error) {
-	relations, err := k.l.ListTopicDocumentRelations(ctx, req.TopicCode)
+	relations, err := k.l.ListTopicDocumentRelations(ctx, utils.StringToInt64(req.KnowledgeBaseId), utils.StringToInt64(req.TopicId))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +90,10 @@ func (k *KnowledgeService) SaveTopicDocumentRelation(ctx context.Context, req *k
 
 // RemoveTopicDocumentRelation 移除主题文档关联
 func (k *KnowledgeService) RemoveTopicDocumentRelation(ctx context.Context, req *knowledge.TopicDocumentRelationRemoveReq) (bool, error) {
-	return k.l.RemoveTopicDocumentRelation(ctx, req.TopicCode, utils.StringToInt64(req.DocumentId))
+	return k.l.RemoveTopicDocumentRelation(ctx,
+		utils.StringToInt64(req.KnowledgeBaseId),
+		utils.StringToInt64(req.TopicId),
+		utils.StringToInt64(req.DocumentId))
 }
 
 // ==================== 路由追踪 ====================

@@ -20,9 +20,8 @@ func NewKnowledgeBaseResolverImpl(l logic.KnowledgeBaseRetrievalLogic) *Knowledg
 	}
 }
 
-// Resolve 根据聊天模式和知识库选择模式解析检索范围
-func (r *KnowledgeBaseResolverImpl) Resolve(ctx context.Context, chatMode, kbSelectionMode string,
-	selectedKnowledgeBaseIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error) {
-	snapshot, err := r.l.Resolve(ctx, chatMode, kbSelectionMode, selectedKnowledgeBaseIds)
+// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
+func (r *KnowledgeBaseResolverImpl) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error) {
+	snapshot, err := r.l.DetermineKnowledgeScope(ctx, chatMode, selectMode, kbIds)
 	return convert.ToKnowledgeBaseSelectionSnapshot(snapshot), err
 }

@@ -5,10 +5,6 @@ package convert
 
 import (
 	"encoding/json"
-	"time"
-
-	datatypes "gorm.io/datatypes"
-
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
@@ -23,6 +19,8 @@ import (
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
+	datatypes "gorm.io/datatypes"
+	"time"
 )
 
 func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
@@ -1347,9 +1345,9 @@ func FromKnowledgeScopeSaveReq(source *knowledge.KnowledgeScopeSaveReq) *entity2
 	if source != nil {
 		var entityKnowledgeScopeNode entity2.KnowledgeScopeNode
 		entityKnowledgeScopeNode.ID = StringToInt64((*source).ID)
-		entityKnowledgeScopeNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		entityKnowledgeScopeNode.KnowledgeBaseId = StringToInt64((*source).KnowledgeBaseId)
 		entityKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
-		entityKnowledgeScopeNode.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		entityKnowledgeScopeNode.ParentScopeId = StringToInt64((*source).ParentScopeId)
 		entityKnowledgeScopeNode.Description = NormalizeString((*source).Description)
 		entityKnowledgeScopeNode.Aliases = NormalizeString((*source).Aliases)
 		entityKnowledgeScopeNode.Examples = NormalizeString((*source).Examples)
@@ -1363,7 +1361,8 @@ func FromKnowledgeTopicDocumentRelationSaveReq(source *knowledge.TopicDocumentRe
 	var pEntityKnowledgeTopicDocumentRelation *entity2.KnowledgeTopicDocumentRelation
 	if source != nil {
 		var entityKnowledgeTopicDocumentRelation entity2.KnowledgeTopicDocumentRelation
-		entityKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
+		entityKnowledgeTopicDocumentRelation.KnowledgeBaseId = StringToInt64((*source).KnowledgeBaseId)
+		entityKnowledgeTopicDocumentRelation.TopicId = StringToInt64((*source).TopicId)
 		entityKnowledgeTopicDocumentRelation.DocumentId = StringToInt64((*source).DocumentId)
 		entityKnowledgeTopicDocumentRelation.RelationScore = (*source).RelationScore
 		entityKnowledgeTopicDocumentRelation.RelationSource = NormalizeString((*source).RelationSource)
@@ -1377,16 +1376,15 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	if source != nil {
 		var entityKnowledgeTopicNode entity2.KnowledgeTopicNode
 		entityKnowledgeTopicNode.ID = StringToInt64((*source).ID)
-		entityKnowledgeTopicNode.TopicCode = NormalizeString((*source).TopicCode)
 		entityKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
-		entityKnowledgeTopicNode.ScopeCode = NormalizeString((*source).ScopeCode)
+		entityKnowledgeTopicNode.KnowledgeBaseId = StringToInt64((*source).KnowledgeBaseId)
+		entityKnowledgeTopicNode.ScopeId = StringToInt64((*source).ScopeId)
 		entityKnowledgeTopicNode.Description = NormalizeString((*source).Description)
 		entityKnowledgeTopicNode.Aliases = NormalizeString((*source).Aliases)
 		entityKnowledgeTopicNode.Examples = NormalizeString((*source).Examples)
 		entityKnowledgeTopicNode.AnswerShape = NormalizeString((*source).AnswerShape)
 		entityKnowledgeTopicNode.ExecutionPreference = NormalizeString((*source).ExecutionPreference)
 		entityKnowledgeTopicNode.SortOrder = (*source).SortOrder
-		entityKnowledgeTopicNode.OperatorId = NormalizeString((*source).OperatorId)
 		pEntityKnowledgeTopicNode = &entityKnowledgeTopicNode
 	}
 	return pEntityKnowledgeTopicNode
@@ -1485,7 +1483,9 @@ func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.K
 		knowledgeKnowledgeRouteTraceItem.TopTopicsJson = NormalizeString((*source).TopTopicsJson)
 		knowledgeKnowledgeRouteTraceItem.TopDocumentsJson = NormalizeString((*source).TopDocumentsJson)
 		knowledgeKnowledgeRouteTraceItem.SelectedDocumentId = Int64ToString((*source).SelectedDocumentId)
-		knowledgeKnowledgeRouteTraceItem.HitSelectedDocument = (*source).HitSelectedDocument
+		if (*source).HitSelectedDocument != nil {
+			knowledgeKnowledgeRouteTraceItem.HitSelectedDocument = *(*source).HitSelectedDocument
+		}
 		knowledgeKnowledgeRouteTraceItem.Confidence = (*source).Confidence
 		knowledgeKnowledgeRouteTraceItem.RouteStatus = ToRouteStatus((*source).RouteStatus)
 		knowledgeKnowledgeRouteTraceItem.ErrorMsg = NormalizeString((*source).ErrorMsg)
@@ -1513,6 +1513,10 @@ func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.Know
 		modelKnowledgeRouteTrace.Question = NormalizeString((*source).Question)
 		modelKnowledgeRouteTrace.RewriteQuestion = NormalizeString((*source).RewriteQuestion)
 		modelKnowledgeRouteTrace.Mode = NormalizeString((*source).Mode)
+		modelKnowledgeRouteTrace.KnowledgeBaseSelectionMode = NormalizeString((*source).KnowledgeBaseSelectionMode)
+		modelKnowledgeRouteTrace.SelectedKnowledgeBaseIdsJson = NormalizeString((*source).SelectedKnowledgeBaseIdsJson)
+		modelKnowledgeRouteTrace.SelectedKnowledgeBaseNamesJson = NormalizeString((*source).SelectedKnowledgeBaseNamesJson)
+		modelKnowledgeRouteTrace.AllowedDocumentIdsJson = NormalizeString((*source).AllowedDocumentIdsJson)
 		modelKnowledgeRouteTrace.TopScopesJson = NormalizeString((*source).TopScopesJson)
 		modelKnowledgeRouteTrace.TopTopicsJson = NormalizeString((*source).TopTopicsJson)
 		modelKnowledgeRouteTrace.TopDocumentsJson = NormalizeString((*source).TopDocumentsJson)
@@ -1530,7 +1534,9 @@ func ToKnowledgeScopeNodeModel(source *entity2.KnowledgeScopeNode) *model.Knowle
 	if source != nil {
 		var modelKnowledgeScopeNode model.KnowledgeScopeNode
 		modelKnowledgeScopeNode.Model = entityKnowledgeScopeNodeToCommonModel((*source))
+		modelKnowledgeScopeNode.KnowledgeBaseId = (*source).KnowledgeBaseId
 		modelKnowledgeScopeNode.ScopeName = NormalizeString((*source).ScopeName)
+		modelKnowledgeScopeNode.ParentScopeId = (*source).ParentScopeId
 		modelKnowledgeScopeNode.Description = NormalizeString((*source).Description)
 		modelKnowledgeScopeNode.Aliases = NormalizeString((*source).Aliases)
 		modelKnowledgeScopeNode.Examples = NormalizeString((*source).Examples)
@@ -1544,9 +1550,9 @@ func ToKnowledgeScopeResp(source *entity2.KnowledgeScopeNode) *knowledge.Knowled
 	if source != nil {
 		var knowledgeKnowledgeScopeResp knowledge.KnowledgeScopeResp
 		knowledgeKnowledgeScopeResp.ID = Int64ToString((*source).ID)
-		knowledgeKnowledgeScopeResp.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeScopeResp.KnowledgeBaseId = Int64ToString((*source).KnowledgeBaseId)
 		knowledgeKnowledgeScopeResp.ScopeName = NormalizeString((*source).ScopeName)
-		knowledgeKnowledgeScopeResp.ParentScopeCode = NormalizeString((*source).ParentScopeCode)
+		knowledgeKnowledgeScopeResp.ParentScopeId = Int64ToString((*source).ParentScopeId)
 		knowledgeKnowledgeScopeResp.Description = NormalizeString((*source).Description)
 		knowledgeKnowledgeScopeResp.Aliases = NormalizeString((*source).Aliases)
 		knowledgeKnowledgeScopeResp.Examples = NormalizeString((*source).Examples)
@@ -1570,7 +1576,8 @@ func ToKnowledgeTopicDocumentRelationModel(source *entity2.KnowledgeTopicDocumen
 	if source != nil {
 		var modelKnowledgeTopicDocumentRelation model.KnowledgeTopicDocumentRelation
 		modelKnowledgeTopicDocumentRelation.Model = entityKnowledgeTopicDocumentRelationToCommonModel((*source))
-		modelKnowledgeTopicDocumentRelation.TopicCode = NormalizeString((*source).TopicCode)
+		modelKnowledgeTopicDocumentRelation.KnowledgeBaseId = (*source).KnowledgeBaseId
+		modelKnowledgeTopicDocumentRelation.TopicId = (*source).TopicId
 		modelKnowledgeTopicDocumentRelation.DocumentId = (*source).DocumentId
 		modelKnowledgeTopicDocumentRelation.RelationScore = (*source).RelationScore
 		modelKnowledgeTopicDocumentRelation.RelationSource = NormalizeString((*source).RelationSource)
@@ -1584,7 +1591,9 @@ func ToKnowledgeTopicNodeModel(source *entity2.KnowledgeTopicNode) *model.Knowle
 	if source != nil {
 		var modelKnowledgeTopicNode model.KnowledgeTopicNode
 		modelKnowledgeTopicNode.Model = entityKnowledgeTopicNodeToCommonModel((*source))
+		modelKnowledgeTopicNode.KnowledgeBaseId = (*source).KnowledgeBaseId
 		modelKnowledgeTopicNode.TopicName = NormalizeString((*source).TopicName)
+		modelKnowledgeTopicNode.ScopeId = (*source).ScopeId
 		modelKnowledgeTopicNode.Description = NormalizeString((*source).Description)
 		modelKnowledgeTopicNode.Aliases = NormalizeString((*source).Aliases)
 		modelKnowledgeTopicNode.Examples = NormalizeString((*source).Examples)
@@ -1600,9 +1609,9 @@ func ToKnowledgeTopicResp(source *entity2.KnowledgeTopicNode) *knowledge.Knowled
 	if source != nil {
 		var knowledgeKnowledgeTopicResp knowledge.KnowledgeTopicResp
 		knowledgeKnowledgeTopicResp.ID = Int64ToString((*source).ID)
-		knowledgeKnowledgeTopicResp.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeKnowledgeTopicResp.KnowledgeBaseId = Int64ToString((*source).KnowledgeBaseId)
 		knowledgeKnowledgeTopicResp.TopicName = NormalizeString((*source).TopicName)
-		knowledgeKnowledgeTopicResp.ScopeCode = NormalizeString((*source).ScopeCode)
+		knowledgeKnowledgeTopicResp.ScopeId = Int64ToString((*source).ScopeId)
 		knowledgeKnowledgeTopicResp.Description = NormalizeString((*source).Description)
 		knowledgeKnowledgeTopicResp.Aliases = NormalizeString((*source).Aliases)
 		knowledgeKnowledgeTopicResp.Examples = NormalizeString((*source).Examples)
@@ -1627,13 +1636,10 @@ func ToTopicDocumentRelationResp(source *entity2.KnowledgeTopicDocumentRelation)
 	var pKnowledgeTopicDocumentRelationResp *knowledge.TopicDocumentRelationResp
 	if source != nil {
 		var knowledgeTopicDocumentRelationResp knowledge.TopicDocumentRelationResp
-		knowledgeTopicDocumentRelationResp.TopicCode = NormalizeString((*source).TopicCode)
+		knowledgeTopicDocumentRelationResp.KnowledgeBaseId = Int64ToString((*source).KnowledgeBaseId)
+		knowledgeTopicDocumentRelationResp.TopicId = Int64ToString((*source).TopicId)
 		knowledgeTopicDocumentRelationResp.DocumentId = Int64ToString((*source).DocumentId)
 		knowledgeTopicDocumentRelationResp.DocumentName = NormalizeString((*source).DocumentName)
-		knowledgeTopicDocumentRelationResp.KnowledgeScopeCode = NormalizeString((*source).KnowledgeScopeCode)
-		knowledgeTopicDocumentRelationResp.KnowledgeScopeName = NormalizeString((*source).KnowledgeScopeName)
-		knowledgeTopicDocumentRelationResp.BusinessCategory = NormalizeString((*source).BusinessCategory)
-		knowledgeTopicDocumentRelationResp.DocumentTags = NormalizeString((*source).DocumentTags)
 		knowledgeTopicDocumentRelationResp.RelationScore = (*source).RelationScore
 		knowledgeTopicDocumentRelationResp.RelationSource = NormalizeString((*source).RelationSource)
 		knowledgeTopicDocumentRelationResp.Reason = NormalizeString((*source).Reason)
@@ -1711,7 +1717,9 @@ func pEntityKnowledgeBaseToPVoKnowledgeBase(source *entity2.KnowledgeBase) *vo.K
 		voKnowledgeBase.GraphRagConfigJson = jsonRawMessageToJsonRawMessage((*source).GraphRagConfigJson)
 		voKnowledgeBase.RaptorConfigJson = jsonRawMessageToJsonRawMessage((*source).RaptorConfigJson)
 		voKnowledgeBase.MetadataFilterJson = jsonRawMessageToJsonRawMessage((*source).MetadataFilterJson)
-		voKnowledgeBase.IsDefault = (*source).IsDefault
+		if (*source).IsDefault != nil {
+			voKnowledgeBase.IsDefault = *(*source).IsDefault
+		}
 		voKnowledgeBase.SortOrder = (*source).SortOrder
 		pVoKnowledgeBase = &voKnowledgeBase
 	}

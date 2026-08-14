@@ -16,25 +16,58 @@ type KnowledgeRepository interface {
 	// SelectKnowledgeScopeNodesByKbIds 根据知识库ID获取有效的知识范围节点
 	SelectKnowledgeScopeNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeScopeNode, error)
 
-	// UpsertKnowledgeScopeNode 保存/更新知识范围节点（按 scopeCode 判重）
+	// SelectScopesByKbId 按知识库ID查询知识范围列表
+	SelectScopesByKbId(ctx context.Context, kbId int64) ([]*entity.KnowledgeScopeNode, error)
+
+	// SelectScopeById 根据ID查询知识范围节点
+	SelectScopeById(ctx context.Context, id int64, kbId int64) (*entity.KnowledgeScopeNode, error)
+
+	// SelectScopeByName 按名称查询知识范围（用于唯一性校验，excludeId 为排除的ID）
+	SelectScopeByName(ctx context.Context, kbId int64, scopeName string, excludeId int64) (*entity.KnowledgeScopeNode, error)
+
+	// CountChildScopes 统计子级知识范围数量
+	CountChildScopes(ctx context.Context, kbId int64, parentId int64) (int64, error)
+
+	// CountTopicsByScope 统计范围下的主题数量
+	CountTopicsByScope(ctx context.Context, kbId int64, scopeId int64) (int64, error)
+
+	// UpsertKnowledgeScopeNode 保存/更新知识范围节点
 	UpsertKnowledgeScopeNode(ctx context.Context, node *entity.KnowledgeScopeNode) error
 
-	// DeleteKnowledgeScopeNode 按 scopeCode 删除知识范围节点
-	DeleteKnowledgeScopeNode(ctx context.Context, scopeCode string) error
+	// DeleteKnowledgeScopeNode 按ID删除知识范围节点
+	DeleteKnowledgeScopeNode(ctx context.Context, id int64) error
+
+	// DeleteScope 删除知识范围
+	DeleteScope(ctx context.Context, id int64, kbId int64) error
 
 	// ========== 主题节点相关 ==========
 
 	// SelectKnowledgeTopicNodesByKbIds 根据知识库ID获取有效的主题节点
 	SelectKnowledgeTopicNodesByKbIds(ctx context.Context, kbIds []int64) ([]*entity.KnowledgeTopicNode, error)
 
-	// SelectKnowledgeTopicNodesByScopeCode 按 scopeCode 过滤主题节点
+	// SelectKnowledgeTopicNodesByScopeId 按范围ID过滤主题节点
 	SelectKnowledgeTopicNodesByScopeId(ctx context.Context, scopeId int64) ([]*entity.KnowledgeTopicNode, error)
 
-	// UpsertKnowledgeTopicNode 保存/更新主题节点（按 topicCode 判重）
+	// ListTopics 按知识库ID和范围ID查询主题列表
+	ListTopics(ctx context.Context, kbId int64, scopeId int64) ([]*entity.KnowledgeTopicNode, error)
+
+	// SelectTopicByID 根据ID查询主题节点
+	SelectTopicByID(ctx context.Context, id int64, kbId int64) (*entity.KnowledgeTopicNode, error)
+
+	// SelectTopicByName 按名称查询主题（用于唯一性校验，excludeId 为排除的ID）
+	SelectTopicByName(ctx context.Context, kbId int64, scopeId int64, topicName string, excludeId int64) (*entity.KnowledgeTopicNode, error)
+
+	// CountRelationsByTopic 统计主题下的文档关联数量
+	CountRelationsByTopic(ctx context.Context, kbId int64, topicId int64) (int64, error)
+
+	// UpsertKnowledgeTopicNode 保存/更新主题节点
 	UpsertKnowledgeTopicNode(ctx context.Context, node *entity.KnowledgeTopicNode) error
 
-	// DeleteKnowledgeTopicNode 按 topicCode 删除主题节点
-	DeleteKnowledgeTopicNode(ctx context.Context, topicCode string) error
+	// DeleteKnowledgeTopicNode 按ID删除主题节点
+	DeleteKnowledgeTopicNode(ctx context.Context, id int64) error
+
+	// DeleteTopic 软删除主题（设置状态为无效）
+	DeleteTopic(ctx context.Context, id int64, kbId int64) error
 
 	// ========== 主题-文档关系相关 ==========
 
@@ -44,11 +77,17 @@ type KnowledgeRepository interface {
 	// SelectTopicDocumentRelationsByTopicCode 按主题查询关联关系
 	SelectTopicDocumentRelationsByTopicCode(ctx context.Context, topicCode string) ([]*entity.KnowledgeTopicDocumentRelation, error)
 
+	// ListTopicDocumentRelations 按知识库ID和主题ID查询主题-文档关系列表
+	ListTopicDocumentRelations(ctx context.Context, kbId int64, topicId int64) ([]*entity.KnowledgeTopicDocumentRelation, error)
+
+	// SelectTopicDocumentRelation 查询已存在的主题-文档关系
+	SelectTopicDocumentRelation(ctx context.Context, kbId int64, topicId int64, documentId int64) (*entity.KnowledgeTopicDocumentRelation, error)
+
 	// UpsertTopicDocumentRelation 保存/更新主题-文档关联
 	UpsertTopicDocumentRelation(ctx context.Context, relation *entity.KnowledgeTopicDocumentRelation) error
 
-	// DeleteTopicDocumentRelation 按 topicCode+documentId 删除主题-文档关联
-	DeleteTopicDocumentRelation(ctx context.Context, topicCode string, documentId int64) error
+	// DeleteTopicDocumentRelation 软删除主题-文档关联
+	DeleteTopicDocumentRelation(ctx context.Context, kbId int64, topicId int64, documentId int64) error
 
 	// ========== 路由跟踪相关 ==========
 
