@@ -2,14 +2,8 @@ package intent
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
-	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
@@ -99,8 +93,6 @@ type structureNavigationAdvice struct {
 	Confidence            float64  `json:"confidence"`
 }
 
-// ============ 解析方法 ============
-
 // parseAdvice 解析 LLM 返回的建议
 func (r *LlmAdvisorRecognizer) parseAdvice(raw string) (*vo.IntentRecognitionResult, error) {
 	var payload queryUnderstandingAdvicePayload
@@ -111,10 +103,6 @@ func (r *LlmAdvisorRecognizer) parseAdvice(raw string) (*vo.IntentRecognitionRes
 		trim := utils.Trim(entity)
 		return trim, trim, trim != ""
 	}
-
-	structureNavigationIntent := parseStructureNavigationIntent(payload.StructureNavigationIntent)
-	answerShapePlan := parseAnswerShapePlan(payload.AnswerShape)
-	confidence := normalizeConfidence(payload.Confidence)
 
 	reasons := utils.FilterMapUniqueLimit(payload.Reasons, 8, keyOf)
 	if len(reasons) == 0 {
@@ -128,18 +116,18 @@ func (r *LlmAdvisorRecognizer) parseAdvice(raw string) (*vo.IntentRecognitionRes
 		TargetEntities:            utils.FilterMapUniqueLimit(payload.TargetEntities, 8, keyOf),
 		ExcludedEntities:          utils.FilterMapUniqueLimit(payload.ExcludedEntities, 8, keyOf),
 		SectionAnchors:            utils.FilterMapUniqueLimit(payload.SectionAnchors, 8, keyOf),
-		StructureNavigationIntent: structureNavigationIntent,
+		StructureNavigationIntent: payload.StructureNavigationIntent.parseStructureNavigationIntent(),
 		TableOps:                  utils.FilterMapUniqueLimit(payload.TableOps, 8, keyOf),
-		AnswerShapePlan:           answerShapePlan,
-		Confidence:                confidence,
+		AnswerShapePlan:           enum.ParseAnswerShapes(payload.AnswerShape),
+		Confidence:                normalizeConfidence(payload.Confidence),
 		Reasons:                   reasons,
 		Source:                    r.Name(),
 	}, nil
 }
 
 // parseStructureNavigationIntent 解析结构导航意图
-func parseStructureNavigationIntent(advice *structureNavigationAdvice) *vo.StructureNavigationIntent {
-	if advice == nil {
+func (ad *structureNavigationAdvice) parseStructureNavigationIntent() *vo.StructureNavigationIntent {
+	if ad == nil {
 		return nil
 	}
 	keyOf := func(entity string) (string, string, bool) {
@@ -147,50 +135,13 @@ func parseStructureNavigationIntent(advice *structureNavigationAdvice) *vo.Struc
 		return trim, trim, trim != ""
 	}
 
-	operations := enum.ParseStructureOperations(advice.Operations)
-	confidence := normalizeConfidence(advice.Confidence)
-
 	return &vo.StructureNavigationIntent{
-		Operations:            operations,
-		AnchorStructureNodeId: advice.AnchorStructureNodeId,
-		AnchorSectionPath:     strutil.Trim(advice.AnchorSectionPath),
-		AnchorCanonicalPath:   strutil.Trim(advice.AnchorCanonicalPath),
-		SectionAnchors:        utils.FilterMapUniqueLimit(advice.SectionAnchors, 8, keyOf),
-		Confidence:            confidence,
-		Source:                "llm-query-understanding",
+		Operations:            enum.ParseStructureOperations(ad.Operations),
+		AnchorStructureNodeId: utils.PointerOrDefault(ad.AnchorStructureNodeId, 0),
+		AnchorSectionPath:     utils.Trim(ad.AnchorSectionPath),
+		AnchorCanonicalPath:   utils.Trim(ad.AnchorCanonicalPath),
+		SectionAnchors:        utils.FilterMapUniqueLimit(ad.SectionAnchors, 8, keyOf),
+		Confidence:            normalizeConfidence(ad.Confidence),
+		Source:                "llm-intent-recognize",
 	}
-}
-
-// parseAnswerShapePlan 解析答案形态计划
-func parseAnswerShapePlan(answerShapeRaw []string) []enum.AnswerShapeRequirement {
-	if len(answerShapeRaw) == 0 {
-		return nil
-	}
-
-	seen := make(map[string]bool)
-	var requirements []enum.AnswerShapeRequirement
-
-	for _, raw := range answerShapeRaw {
-		normalized := strings.ToUpper(strutil.Trim(raw))
-		if strutil.IsBlank(normalized) {
-			continue
-		}
-
-		switch normalized {
-		case string(enum.AnswerShapeRequirementCompare),
-			string(enum.AnswerShapeRequirementList),
-			string(enum.AnswerShapeRequirementSteps),
-			string(enum.AnswerShapeRequirementNegativeBoundary),
-			string(enum.AnswerShapeRequirementCategoryTableRowCoverage):
-			if !seen[normalized] {
-				seen[normalized] = true
-				requirements = append(requirements, enum.AnswerShapeRequirement(normalized))
-			}
-		default:
-			// 遇到未知值时返回空列表
-			return nil
-		}
-	}
-
-	return requirements
 }

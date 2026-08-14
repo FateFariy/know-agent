@@ -27,7 +27,7 @@ type SlidingWindowStrategy struct {
 func NewSlidingWindowStrategy(svcCtx *svc.ServiceContext, repo adapter.ChatRepository) *SlidingWindowStrategy {
 	return &SlidingWindowStrategy{
 		repo:                     repo,
-		keepRecentTurns:          svcCtx.Config.Chat.Memory.RewriteHistoryTurns,
+		keepRecentTurns:          svcCtx.Config.Chat.Memory.HistorySummary.KeepRecentTurns,
 		questionHistoryMaxChars:  svcCtx.Config.Chat.Memory.QuestionHistoryMaxChars,
 		recentTranscriptMaxChars: svcCtx.Config.Chat.Memory.RecentTranscriptMaxChars,
 	}

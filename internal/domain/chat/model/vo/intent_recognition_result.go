@@ -32,3 +32,43 @@ func (q *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
 	}
 	return queryType == "FOLLOW_UP"
 }
+
+// IsStructureNavigationConfident 判断结构导航意图是否置信度高
+func (q *IntentRecognitionResult) IsStructureNavigationConfident(threshold float64) bool {
+	if q != nil && q.QueryType == enum.QueryTypeStructureNavigation &&
+		q.StructureNavigationIntent.IsConfident(threshold) {
+		return true
+	}
+	return false
+}
+
+func (q *IntentRecognitionResult) PrimaryRetrievalIntent() enum.RetrievalIntent {
+	if q == nil {
+		return enum.RetrievalIntentGeneral
+	}
+	queryType := utils.BlankToDefault(q.QueryType, enum.QueryTypeDocumentQA)
+	switch queryType {
+	case enum.QueryTypeStructureNavigation:
+		return enum.RetrievalIntentStructure
+	case enum.QueryTypeTableQuery:
+		return enum.RetrievalIntentTable
+	case enum.QueryTypeGraphRelation:
+		return enum.RetrievalIntentGraphRAG
+	case enum.QueryTypeGlobalSummary:
+		return enum.RetrievalIntentRaptor
+	}
+	// 从通道列表获取
+	for _, ch := range q.Channels {
+		switch ch {
+		case enum.RetrievalIntentTable:
+			return enum.RetrievalIntentTable
+		case enum.RetrievalIntentGraphRAG:
+			return enum.RetrievalIntentGraphRAG
+		case enum.RetrievalIntentRaptor:
+			return enum.RetrievalIntentRaptor
+		case enum.RetrievalIntentStructure:
+			return enum.RetrievalIntentStructure
+		}
+	}
+	return enum.RetrievalIntentGeneral
+}
