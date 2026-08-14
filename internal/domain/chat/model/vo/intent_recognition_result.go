@@ -5,8 +5,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
-// QueryUnderstandingResult 查询理解结果
-type QueryUnderstandingResult struct {
+// IntentRecognitionResult 意图识别结果
+type IntentRecognitionResult struct {
 	QueryType                 enum.QueryType                `json:"queryType,omitempty"`
 	Channels                  []enum.RetrievalIntent        `json:"channels,omitempty"`
 	Entities                  []string                      `json:"entities,omitempty"`
@@ -22,7 +22,7 @@ type QueryUnderstandingResult struct {
 }
 
 // IsFollowUpQuestion 判断是否为追问
-func (q *QueryUnderstandingResult) IsFollowUpQuestion(question string) bool {
+func (q *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
 	if utils.IsBlank(question) {
 		return false
 	}

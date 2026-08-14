@@ -18,16 +18,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-var (
-	sectionCodePattern             = regexp.MustCompile(`(\d+(?:\.\d+)+)`)                          // 1.2 / 3.4.5
-	chineseSectionReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(章|节|小节)`)       // 第 3 章 / 第三节 / 第 4 小节
-	stepReferencePattern           = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)              // "第几步"，用于结构图定位取证
-	ordinalReferencePattern        = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*([条点项个])`)       // 第几条/点/项/个
-	quotedTextPattern              = regexp.MustCompile(`[“"']([^”"']{2,40})[”"']`)                 // 引号包裹的标题短语
-	normalizePattern               = regexp.MustCompile(`[\s>\` + "`" + `*#_\\-，,。；;：:（）()“”\"']+`) // 中文标点符号
-	querySplitPattern              = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)                  // 中文分隔符
-)
-
 // graphOnlyThreshold 判断进入 GRAPH_ONLY 模式的置信度阈值，低于该值统一回退到 RAG
 const graphOnlyThreshold = 0.75
 

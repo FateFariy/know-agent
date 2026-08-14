@@ -42,6 +42,7 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 			return err
 		}
 	}
+	c.finishSuccessfully(ctx, convCtx)
 	return nil
 }
 

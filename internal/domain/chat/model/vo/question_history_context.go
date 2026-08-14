@@ -26,7 +26,7 @@ type QuestionHistoryContext struct {
 //   - queryUnderstanding: 查询理解结果（可为 nil）
 //   - recentEvidenceAnchors: 最近的证据锚点（可为 nil）
 //   - maxChars: 总预算字符数（应 > 0）
-func NewQuestionHistoryContext(question, recentQuestionTranscript string, queryUnderstanding *QueryUnderstandingResult,
+func NewQuestionHistoryContext(question, recentQuestionTranscript string, queryUnderstanding *IntentRecognitionResult,
 	recentEvidenceAnchors EvidenceAnchors, maxChars int) *QuestionHistoryContext {
 	normalizedQuestion := strings.TrimSpace(question)
 	recentUserContext := extractRecentUserQuestions(recentQuestionTranscript)

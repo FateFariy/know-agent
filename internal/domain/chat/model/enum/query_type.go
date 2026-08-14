@@ -1,5 +1,11 @@
 package enum
 
+import (
+	"strings"
+
+	"github.com/swiftbit/know-agent/common/utils"
+)
+
 // QueryType 查询类型枚举
 type QueryType = string
 
@@ -13,3 +19,20 @@ const (
 	QueryTypeOpenChat            QueryType = "OPEN_CHAT"            // 开放闲聊: 非知识库依赖的通用对话
 	QueryTypeCapabilityQuery     QueryType = "CAPABILITY_QUERY"     // 能力查询: 系统/模型能力探测
 )
+
+func ParseQueryType(raw string) QueryType {
+	normalized := strings.ToUpper(utils.Trim(raw))
+	if normalized == "" {
+		return QueryTypeDocumentQA
+	}
+	// 检查是否属于已知类型
+	switch normalized {
+	case QueryTypeDocumentQA, QueryTypeStructureNavigation,
+		QueryTypeTableQuery, QueryTypeGraphRelation,
+		QueryTypeGlobalSummary, QueryTypeOpenChat,
+		QueryTypeFollowUp, QueryTypeCapabilityQuery:
+		return normalized
+	default:
+		return QueryTypeDocumentQA
+	}
+}

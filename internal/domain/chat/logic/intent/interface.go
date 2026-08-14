@@ -17,3 +17,12 @@ type NavigationIndexService interface {
 	// SearchSections 按关键词+维度检索匹配的章节命中
 	SearchSections(ctx context.Context, documentId int64, topic, facet, informationNeed, question string, topK int) ([]*NavigationSectionHit, error)
 }
+
+// Recognizer 意图识别策略接口
+type Recognizer interface {
+	// Name 返回提供者名称，用于日志和溯源
+	Name() string
+
+	// Recognize 根据输入的意图识别输入，返回意图识别结果
+	Recognize(ctx context.Context, input *RecognitionInput) (*vo.IntentRecognitionResult, error)
+}

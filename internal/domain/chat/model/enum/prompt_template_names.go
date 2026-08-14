@@ -8,6 +8,7 @@ const (
 	ConversationSummarySystem           = "conversation-summary-system"
 	DocumentGraphOnlyIntent             = "document-graph-only-intent"
 	DocumentLlmSplit                    = "document-llm-split"
+	DocumentQueryUnderstanding          = "document-query-understanding"
 	DocumentStructureAmbiguity          = "document-structure-ambiguity"
 	DocumentStructureAmbiguityCandidate = "document-structure-ambiguity-candidate"
 	RagAnswerDocumentReference          = "rag-answer-document-reference"
