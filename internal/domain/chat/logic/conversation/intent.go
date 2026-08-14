@@ -5,6 +5,7 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type IntentRecognizeStage struct {
@@ -26,14 +27,22 @@ func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) er
 	if execPlan == nil {
 		return nil
 	}
-	input := intent.RecognitionInput{
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageIntent,
+		enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在分析用户意图。"})
+
+	input := &intent.RecognitionInput{
 		OriginalQuestion:         execPlan.OriginalQuestion,
 		RewrittenQuestion:        execPlan.RewriteQuestion,
 		SubQuestions:             execPlan.RewriteSubQuestions,
 		HistorySummary:           execPlan.HistorySummary,
 		RecentQuestionTranscript: execPlan.RecentQuestionTranscript,
 	}
-	result, _ := i.recognizer.Recognize(ctx, &input)
+	result, err := i.recognizer.Recognize(ctx, input)
+	if err != nil {
+		ctx = vo.OnError(ctx, "意图分析失败。", err)
+		return err
+	}
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "意图分析结果：", Snapshot: result})
 
 	return nil
 }

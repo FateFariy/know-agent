@@ -98,7 +98,7 @@ type questionIntentDecision struct {
 type DocumentQuestionRouteImpl struct {
 	chatModel          model.ChatModel        // 可选：兜底意图分类用的对话模型
 	graphQuerier       graph.GraphQuerier     // 结构图谱查询
-	navigationIndexSvc NavigationIndexService // 可选：章节索引服务；非 nil 时用于章节定位
+	navigationIndexSvc NavigationIndexer      // 可选：章节索引服务；非 nil 时用于章节定位
 	renderer           adapter.PromptRenderer // 可选：LLM 用的 Prompt 模板渲染
 }
 
@@ -110,7 +110,7 @@ type NavigationSectionHit struct {
 
 // NewDocumentQuestionRouteImpl 构造文档问题路由器
 func NewDocumentQuestionRouteImpl(chatModel model.ChatModel, graphQuerier graph.GraphQuerier,
-	navigationIndexSvc NavigationIndexService, renderer adapter.PromptRenderer) *DocumentQuestionRouteImpl {
+	navigationIndexSvc NavigationIndexer, renderer adapter.PromptRenderer) *DocumentQuestionRouteImpl {
 	return &DocumentQuestionRouteImpl{
 		chatModel:          chatModel,
 		graphQuerier:       graphQuerier,

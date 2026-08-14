@@ -1,8 +1,6 @@
 package entity
 
 import (
-	"github.com/duke-git/lancet/v2/strutil"
-
 	"github.com/swiftbit/know-agent/common/utils"
 )
 
@@ -26,11 +24,14 @@ type GraphSection struct {
 
 // DisplayTitle 返回节点的展示标题
 func (s *GraphSection) DisplayTitle() string {
-	if strutil.IsNotBlank(s.CanonicalPath) {
-		return strutil.Trim(s.SectionPath)
+	if s == nil {
+		return ""
 	}
-	if strutil.IsNotBlank(s.NodeCode) && strutil.IsNotBlank(s.Title) {
-		return strutil.Trim(s.NodeCode + " " + s.Title)
+	if utils.IsNotBlank(s.CanonicalPath) {
+		return utils.Trim(s.SectionPath)
+	}
+	if utils.IsNotBlank(s.NodeCode) && utils.IsNotBlank(s.Title) {
+		return utils.Trim(s.NodeCode + " " + s.Title)
 	}
 	return s.Title
 }

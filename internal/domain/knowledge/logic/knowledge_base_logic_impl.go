@@ -12,7 +12,7 @@ import (
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
-// KnowledgeConfigLogicImpl 知识库配置管理
+// KnowledgeConfigLogicImpl 知识库管理
 type KnowledgeConfigLogicImpl struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
@@ -25,7 +25,7 @@ func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository, docGateway ad
 	}
 }
 
-// SaveKnowledgeConfig 保存/更新知识库配置
+// SaveKnowledgeBase 保存/更新知识库
 func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if strutil.IsBlank(config.BaseName) {
 		return nil, errors.New("baseName 不能为空")
@@ -58,7 +58,7 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, config
 	}
 
 	// 如果标记为默认，清除其他默认标记
-	if config.IsDefault == 1 {
+	if config.IsDefault == utils.Pointer(1) {
 		if err = k.repo.ClearOtherDefaults(ctx, config.ID); err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, config
 	return config, nil
 }
 
-// DeleteKnowledgeConfig 删除知识库配置
+// DeleteKnowledgeBase 删除知识库
 func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeBase(ctx context.Context, id int64) (bool, error) {
 	if id <= 0 {
 		return false, errors.New("id 不能为空")
@@ -78,12 +78,12 @@ func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeBase(ctx context.Context, id i
 	return true, nil
 }
 
-// ListKnowledgeConfigs 查询所有知识库配置列表
+// ListKnowledgeBases 查询所有知识库列表
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeBases(ctx)
 }
 
-// GetKnowledgeConfig 根据ID查询知识库配置详情
+// GetKnowledgeBase 根据ID查询知识库详情
 func (k *KnowledgeConfigLogicImpl) GetKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
@@ -95,7 +95,7 @@ func (k *KnowledgeConfigLogicImpl) GetKnowledgeBase(ctx context.Context, id int6
 	return config, nil
 }
 
-// UpdateKnowledgeConfigSetting 更新知识库配置
+// UpdateKnowledgeBaseSetting 更新知识库
 func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeBaseSetting(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if config.ID <= 0 {
 		return nil, errors.New("id 不能为空")
@@ -119,12 +119,12 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeBaseSetting(ctx context.Contex
 	return existing, nil
 }
 
-// ListEnabledKnowledgeConfigs 查询所有启用的知识库配置
+// ListEnabledKnowledgeBases 查询所有启用的知识库
 func (k *KnowledgeConfigLogicImpl) ListEnabledKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeBases(ctx)
 }
 
-// ListKnowledgeConfigsByIds 根据ID列表查询知识库配置
+// ListKnowledgeBasesByIds 根据ID列表查询知识库
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeBasesByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -132,7 +132,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeBasesByIds(ctx context.Context, 
 	return k.repo.SelectKnowledgeBaseByIds(ctx, ids)
 }
 
-// GetEnabledKnowledgeConfig 根据ID获取启用的知识库配置
+// GetEnabledKnowledgeBase 根据ID获取启用的知识库
 func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
@@ -144,7 +144,7 @@ func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, 
 	return config, nil
 }
 
-// ListKnowledgeConfigOptions 查询知识库选项列表
+// ListKnowledgeBaseOptions 查询知识库选项列表
 func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
 	configs, err := k.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
@@ -161,7 +161,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context)
 	}
 
 	// 批量统计可检索文档数量
-	retrievableCounts, err := k.docGateway.CountRetrievableDocumentsByKnowledgeBaseIds(ctx, kbIds)
+	retrievableCounts, err := k.docGateway.CountRetrievableDocumentsByKbIds(ctx, kbIds)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context)
 			ID:               c.ID,
 			BaseName:         c.BaseName,
 			Description:      c.Description,
-			IsDefault:        c.IsDefault,
+			IsDefault:        utils.PointerOrDefault(c.IsDefault, 0),
 			RetrievableCount: retrievableCounts[c.ID],
 		}
 		options = append(options, option)

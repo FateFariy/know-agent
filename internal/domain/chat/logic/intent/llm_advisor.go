@@ -42,11 +42,11 @@ func (r *LlmAdvisorRecognizer) Recognize(ctx context.Context, input *Recognition
 	}
 
 	prompt, err := r.renderer.Render(enum.DocumentIntentRecognition, map[string]any{
-		"originalQuestion":       input.OriginalQuestion,
-		"rewrittenQuestion":      input.RewrittenQuestion,
-		"subQuestions":           subQuestionsList,
-		"historySummary":         input.HistorySummary,
-		"answerRecentTranscript": input.RecentQuestionTranscript,
+		"originalQuestion":         input.OriginalQuestion,
+		"rewrittenQuestion":        input.RewrittenQuestion,
+		"subQuestions":             subQuestionsList,
+		"historySummary":           input.HistorySummary,
+		"recentQuestionTranscript": input.RecentQuestionTranscript,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("渲染 Prompt 失败: %w", err)

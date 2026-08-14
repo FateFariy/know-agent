@@ -42,12 +42,38 @@ func (m *MemoryLoadStage) Name() string {
 }
 
 func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
+
+	memoryContext, err := m.summarizeHistory(ctx, convCtx)
+	if err != nil {
+		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
+		return err
+	}
+
+	// 写入快照（压缩状态、覆盖的 exchange 信息、长期/近期摘要）
+	snapshot := map[string]any{
+		"compressionApplied":       memoryContext.CompressionApplied,
+		"coveredExchangeId":        memoryContext.CoveredExchangeId,
+		"coveredExchangeCount":     memoryContext.CoveredExchangeCount,
+		"compressionCount":         memoryContext.CompressionCount,
+		"longTermSummary":          strutil.Trim(memoryContext.LongTermSummary),
+		"recentTranscript":         strutil.Trim(memoryContext.RecentTranscript),
+		"RecentQuestionTranscript": strutil.Trim(memoryContext.RecentQuestionTranscript),
+	}
+	// 提交记忆追踪阶段，成功后返回记忆上下文
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: snapshot})
+
+	return nil
+}
+
+// summarizeHistory 构建会话记忆，装载长期摘要与近期转录（含压缩状态）
+func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context) (*aggregate.Conversation, error) {
 	question := strutil.Trim(convCtx.Question)
 
 	// 装载会话记忆（含长期摘要、近期转录、压缩信息）
-	memoryContext, err := m.summarizeHistory(ctx, convCtx)
+	memoryContext, err := m.memoryManager.LoadMemoryContext(ctx, convCtx.ConversationId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 聚合长期记忆，供 Agent 做规划引用
@@ -89,36 +115,7 @@ func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
 		NoEvidenceReply:              m.noEvidenceReply,
 	}
 	convCtx.SetExecutePlan(execPlan)
-	return nil
-}
 
-// summarizeHistory 构建会话记忆
-//
-// 执行步骤：
-//  1. 调用 memoryManager 装载长期摘要与近期转录（含压缩状态）
-//  2. 失败时记录失败追踪并返回
-//  3. 成功时写入快照（压缩状态、覆盖的 exchange、摘要内容），提交追踪后返回
-func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context) (*aggregate.Conversation, error) {
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
-
-	// 调用 memoryManager 装载记忆上下文（含长期摘要、近期转录、压缩状态）
-	memoryContext, err := m.memoryManager.LoadMemoryContext(ctx, convCtx.ConversationId)
-	if err != nil {
-		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
-		return nil, err
-	}
-	// 写入快照（压缩状态、覆盖的 exchange 信息、长期/近期摘要）
-	snapshot := map[string]any{
-		"compressionApplied":       memoryContext.CompressionApplied,
-		"coveredExchangeId":        memoryContext.CoveredExchangeId,
-		"coveredExchangeCount":     memoryContext.CoveredExchangeCount,
-		"compressionCount":         memoryContext.CompressionCount,
-		"longTermSummary":          strutil.Trim(memoryContext.LongTermSummary),
-		"recentTranscript":         strutil.Trim(memoryContext.RecentTranscript),
-		"RecentQuestionTranscript": strutil.Trim(memoryContext.RecentQuestionTranscript),
-	}
-	// 提交记忆追踪阶段，成功后返回记忆上下文
-	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: snapshot})
 	return memoryContext, nil
 }
 

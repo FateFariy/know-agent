@@ -35,7 +35,7 @@ var ProviderSet = wire.NewSet(
 	graph.NewDefaultStructureGraphQuerier,
 	wire.Bind(new(graph.GraphQuerier), new(*graph.DefaultStructureGraphQuerier)),
 	intent.NewDefaultNavigationIndexService,
-	wire.Bind(new(intent.NavigationIndexService), new(*intent.DefaultNavigationIndexService)),
+	wire.Bind(new(intent.NavigationIndexer), new(*intent.DefaultNavigationIndexService)),
 	graph.NewDefaultAnswerRender,
 	wire.Bind(new(graph.AnswerRender), new(*graph.DefaultAnswerRender)),
 	rag.NewPromptAssembler,
