@@ -22,31 +22,53 @@ type IntentRecognitionResult struct {
 }
 
 // IsFollowUpQuestion 判断是否为追问
-func (q *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
+func (i *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
 	if utils.IsBlank(question) {
 		return false
 	}
 	queryType := ""
-	if q != nil {
-		queryType = q.QueryType
+	if i != nil {
+		queryType = i.QueryType
 	}
 	return queryType == "FOLLOW_UP"
 }
 
 // IsStructureNavigationConfident 判断结构导航意图是否置信度高
-func (q *IntentRecognitionResult) IsStructureNavigationConfident(threshold float64) bool {
-	if q != nil && q.QueryType == enum.QueryTypeStructureNavigation &&
-		q.StructureNavigationIntent.IsConfident(threshold) {
+func (i *IntentRecognitionResult) IsStructureNavigationConfident(threshold float64) bool {
+	if i != nil && i.QueryType == enum.QueryTypeStructureNavigation &&
+		i.StructureNavigationIntent.IsConfident(threshold) {
 		return true
 	}
 	return false
 }
 
-func (q *IntentRecognitionResult) PrimaryRetrievalIntent() enum.RetrievalIntent {
-	if q == nil {
+// ResolveAction 解析结构导航动作
+func (i *IntentRecognitionResult) ResolveAction(threshold float64) string {
+	if i == nil || !i.IsStructureNavigationConfident(threshold) {
+		return ""
+	}
+	return i.StructureNavigationIntent.ResolveAction(threshold)
+}
+
+// HasSectionAnchor 判断是否包含有效的章节锚点
+func (i *IntentRecognitionResult) HasSectionAnchor() bool {
+	if i == nil || len(i.SectionAnchors) == 0 {
+		return false
+	}
+	for _, anchor := range i.SectionAnchors {
+		if utils.IsNotBlank(anchor) {
+			return true
+		}
+	}
+	return false
+}
+
+// PrimaryRetrievalIntent 获取主要检索意图
+func (i *IntentRecognitionResult) PrimaryRetrievalIntent() enum.RetrievalIntent {
+	if i == nil {
 		return enum.RetrievalIntentGeneral
 	}
-	queryType := utils.BlankToDefault(q.QueryType, enum.QueryTypeDocumentQA)
+	queryType := utils.BlankToDefault(i.QueryType, enum.QueryTypeDocumentQA)
 	switch queryType {
 	case enum.QueryTypeStructureNavigation:
 		return enum.RetrievalIntentStructure
@@ -58,7 +80,7 @@ func (q *IntentRecognitionResult) PrimaryRetrievalIntent() enum.RetrievalIntent 
 		return enum.RetrievalIntentRaptor
 	}
 	// 从通道列表获取
-	for _, ch := range q.Channels {
+	for _, ch := range i.Channels {
 		switch ch {
 		case enum.RetrievalIntentTable:
 			return enum.RetrievalIntentTable

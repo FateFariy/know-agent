@@ -2,7 +2,6 @@ package intent
 
 import (
 	"context"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -538,14 +537,6 @@ func resolveModelGraphOnlyAction(rawAction, intentType string) string {
 		return enum.DocumentNavigationActionChildSectionDescend
 	}
 	return ""
-}
-
-// normalizeConfidence 将模型返回的可能超出 0-1 的置信度规范化到 [0, 1)，再由调用方与阈值比较
-func normalizeConfidence(confidence float64) float64 {
-	if confidence > 1 {
-		return confidence / 100.0
-	}
-	return max(0, confidence)
 }
 
 // ============================================================

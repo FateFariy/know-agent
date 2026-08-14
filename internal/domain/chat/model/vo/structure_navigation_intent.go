@@ -1,6 +1,9 @@
 package vo
 
-import "github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+import (
+	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+)
 
 // StructureNavigationIntent 结构导航意图
 type StructureNavigationIntent struct {
@@ -14,17 +17,45 @@ type StructureNavigationIntent struct {
 }
 
 // IsConfident 判断结构导航意图是否有效且置信度足够
-func (intent *StructureNavigationIntent) IsConfident(confidenceThreshold float64) bool {
-	if intent == nil || len(intent.Operations) == 0 {
+func (i *StructureNavigationIntent) IsConfident(confidenceThreshold float64) bool {
+	if i == nil || len(i.Operations) == 0 {
 		return false
 	}
-	return normalizeConfidence(intent.Confidence) >= confidenceThreshold
+	return i.NormalizeConfidence() >= confidenceThreshold
 }
 
-// normalizeConfidence 将模型返回的可能超出 0-1 的置信度规范化到 [0, 1)，再由调用方与阈值比较
-func normalizeConfidence(confidence float64) float64 {
-	if confidence > 1 {
-		return confidence / 100.0
+// ResolveAction 解析结构导航动作
+func (i *StructureNavigationIntent) ResolveAction(threshold float64) string {
+	if i == nil || !i.IsConfident(threshold) {
+		return ""
 	}
-	return max(0, confidence)
+
+	contains := func(ops ...enum.StructureNavigationOperation) bool {
+		return utils.ContainsAny(i.Operations, ops...)
+	}
+	// 目录展开
+	if contains(enum.SectionWithChildren, enum.DirectChildren) {
+		return enum.DocumentNavigationActionChildSectionDescend
+	}
+	// 相邻章节
+	if contains(enum.SectionWithSiblings, enum.PreviousSibling, enum.NextSibling) {
+		return enum.DocumentNavigationActionSectionAdjacencyLookup
+	}
+	// 父章节
+	if contains(enum.ParentSection) {
+		return enum.DocumentNavigationActionAncestorSectionReturn
+	}
+	// 当前章节
+	if contains(enum.CurrentSection) {
+		return enum.DocumentNavigationActionFreshTopic
+	}
+	return ""
+}
+
+// NormalizeConfidence 将模型返回的可能超出 0-1 的置信度规范化到 [0, 1)，再由调用方与阈值比较
+func (i *StructureNavigationIntent) NormalizeConfidence() float64 {
+	if i.Confidence > 1 {
+		return i.Confidence / 100.0
+	}
+	return max(0, i.Confidence)
 }

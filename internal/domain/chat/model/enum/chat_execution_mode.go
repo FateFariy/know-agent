@@ -42,8 +42,8 @@ const (
 
 var (
 	ConversationTraceStageMemory         = &ConversationTraceStage{memory, "会话记忆", 10}
-	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 20}
-	ConversationTraceStageRewrite        = &ConversationTraceStage{rewrite, "问题改写", 30}
+	ConversationTraceStageRewrite        = &ConversationTraceStage{rewrite, "问题改写", 20}
+	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageGraphQuery     = &ConversationTraceStage{graphQuery, "结构图查询", 45}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}

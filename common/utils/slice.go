@@ -136,6 +136,7 @@ func FilterLimit[T any](items []T, n int, filter func(T) bool) []T {
 	return result
 }
 
+// ContainsAny 判断切片是否包含任意一个元素
 func ContainsAny[T comparable](slice []T, elements ...T) bool {
 	for _, element := range elements {
 		if slices.Index(slice, element) != -1 {
@@ -145,6 +146,7 @@ func ContainsAny[T comparable](slice []T, elements ...T) bool {
 	return false
 }
 
+// EqualUnordered 判断两个切片是否包含相同元素，与顺序无关
 func EqualUnordered[T comparable](a []T, b []T) bool {
 	if len(a) != len(b) {
 		return false
@@ -162,6 +164,7 @@ func EqualUnordered[T comparable](a []T, b []T) bool {
 	return true
 }
 
+// Copy 复制切片
 func Copy[T comparable](src []T) []T {
 	if len(src) == 0 {
 		return nil
@@ -171,10 +174,12 @@ func Copy[T comparable](src []T) []T {
 	return dest
 }
 
+// MapValues 获取 map 的所有值
 func MapValues[K comparable, V any](m map[K]V) []V {
 	return maputil.Values(m)
 }
 
+// MapKeys 获取 map 的所有键
 func MapKeys[K comparable, V any](m map[K]V) []K {
 	return maputil.Keys(m)
 }
