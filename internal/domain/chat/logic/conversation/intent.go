@@ -42,6 +42,8 @@ func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) er
 		ctx = vo.OnError(ctx, "意图分析失败。", err)
 		return err
 	}
+	execPlan.RecognitionResult = result
+
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "意图分析结果：", Snapshot: result})
 
 	return nil

@@ -62,14 +62,15 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 	if execPlan == nil {
 		return nil
 	}
-
-	question := strutil.Trim(convCtx.Question)
+	question := utils.Trim(convCtx.Question)
 	historySummary := execPlan.HistorySummary
 
 	// 启动改写追踪阶段
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(),
-		&vo.StageInput{SummaryText: "正在生成检索友好的问题表达。",
-			Snapshot: q.buildRewriteStageSnapshot(question, historySummary, nil)})
+	input := &vo.StageInput{
+		SummaryText: "正在生成检索友好的问题表达。",
+		Snapshot:    q.buildRewriteStageSnapshot(question, historySummary, nil),
+	}
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(), input)
 
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := q.rewriter.Rewrite(ctx, question, historySummary)
@@ -78,27 +79,24 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 		return err
 	}
 
-	// 提交改写追踪（包含改写结果快照以便离线分析）
-	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "问题改写完成。",
-		Snapshot: q.buildRewriteStageSnapshot(question, historySummary, rewriteResult)})
-
-	// 对改写结果做兜底处理
-	//  - RewrittenQuestion 为空时回退到原始问题
-	//  - SubQuestions 为空时使用改写问题作为单元素列表
-	rewriteResult.RewrittenQuestion = utils.BlankToDefault(rewriteResult.RewrittenQuestion, question)
-	if len(rewriteResult.SubQuestions) == 0 {
-		rewriteResult.SubQuestions = []string{rewriteResult.RewrittenQuestion}
-	}
-
 	// 更新执行计划
-	execPlan.RewriteQuestion = rewriteResult.RewrittenQuestion
+	execPlan.RewriteQuestion = utils.BlankToDefault(rewriteResult.RewrittenQuestion, question)
 	execPlan.RewriteSubQuestions = rewriteResult.SubQuestions
-	execPlan.RetrievalQuestion = rewriteResult.RewrittenQuestion
-	execPlan.RetrievalSubQuestions = rewriteResult.SubQuestions
+	if len(rewriteResult.SubQuestions) == 0 {
+		execPlan.RewriteSubQuestions = []string{rewriteResult.RewrittenQuestion}
+	}
 	convCtx.SetExecutePlan(execPlan)
+
+	// 提交改写追踪（包含改写结果快照以便离线分析）
+	output := &vo.StageOutput{
+		SummaryText: "问题改写完成。",
+		Snapshot:    q.buildRewriteStageSnapshot(question, historySummary, rewriteResult),
+	}
+	ctx = vo.OnEnd(ctx, output)
 
 	logx.Infof("问题改写完成: question='%s', rewritten='%s', subQuestions=%v",
 		question, rewriteResult.RewrittenQuestion, rewriteResult.SubQuestions)
+
 	return nil
 }
 

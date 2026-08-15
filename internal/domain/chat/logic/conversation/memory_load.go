@@ -85,8 +85,6 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 		AgentQuestion:                convCtx.Question,
 		RewriteQuestion:              convCtx.Question,
 		RewriteSubQuestions:          []string{convCtx.Question},
-		RetrievalQuestion:            convCtx.Question,
-		RetrievalSubQuestions:        []string{convCtx.Question},
 		HistorySummary:               historySummary,
 		LongTermSummary:              memoryContext.LongTermSummary,
 		HistoryPlanningContext:       historyPlanningContext,

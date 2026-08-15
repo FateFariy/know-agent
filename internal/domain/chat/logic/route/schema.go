@@ -40,7 +40,7 @@ func (d *DocumentRouteInput) RouteText() string {
 	if d == nil {
 		return ""
 	}
-	return utils.Trim(utils.Trim(d.OriginalQuestion) + " " + d.RewrittenQuestion())
+	return utils.Trim(d.OriginalQuestion) + " " + d.RewrittenQuestion()
 }
 
 type navigationExtractor struct {

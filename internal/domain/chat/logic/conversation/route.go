@@ -151,16 +151,6 @@ func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, 
 		logx.Warnf("记录影子路由失败: %v", err)
 	}
 
-	execPlan.SelectedDocumentId = convCtx.SelectedDocumentId
-	execPlan.SelectedDocumentName = convCtx.SelectedDocumentName
-	execPlan.SelectedTaskId = convCtx.SelectedTaskId
-	if convCtx.SelectedDocumentId > 0 {
-		execPlan.RetrievalDocumentIds = []int64{convCtx.SelectedDocumentId}
-	}
-	if convCtx.SelectedTaskId > 0 {
-		execPlan.RetrievalTaskIds = []int64{convCtx.SelectedTaskId}
-	}
-
 	// 在选定的文档内做路由，并组装最终执行计划
 	return r.routeAndFinalizePlan(ctx, convCtx, execPlan)
 }
@@ -184,7 +174,6 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在执行知识范围、主题、候选文档路由。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
-	//  - 路由失败时仅告警，并以空决策对象兜底（避免后续代码 panic）
 	routeDecision, err := r.knowledgeRouter.Route(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion))
 	if err != nil {
 		routeDecision = vo.NewUnavailableRouteDecision("ROUTE_ADVISOR_FAILURE")
@@ -194,9 +183,7 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	// 选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
 	inScopeCandidates := r.selectAutoCandidates(routeDecision, allowedScope)
 
-	// 选择推荐候选作为主文档
-	//  - 使用 selectRecommendation 综合判断：置信度阈值、候选有效性、原始top匹配
-	//  - 不满足条件时 topDocument 保持为空结构，退化为多文档混合检索
+	// 选择推荐候选作为主文档，使用 selectRecommendation 综合判断：置信度阈值、候选有效性、原始top匹配
 	topDocument := r.selectRecommendation(routeDecision, inScopeCandidates)
 	confidentTop := topDocument != nil && topDocument.DocumentId > 0
 
@@ -204,19 +191,20 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	snapshot := map[string]any{
 		"confidence":             routeDecision.Confidence,
 		"routeStatus":            routeDecision.RouteStatus,
+		"routeSource":            routeDecision.Source,
+		"degraded":               routeDecision.Degraded,
 		"candidateDocumentCount": len(inScopeCandidates),
-		"confidentTopDocument":   confidentTop,
-		"scopeAuthority":         r.scopeAuthorityLabel(allowedScope),
 		"allowedDocumentCount":   len(allowedScope.DocumentIds()),
+		"allowedDocumentIds":     allowedScope.DocumentIds(),
+		"allowedTaskIds":         allowedScope.TaskIds(),
 		"scopeConsistent":        allowedScope.Consistent,
 		"scopeReason":            allowedScope.Reason,
 	}
 	if confidentTop {
 		snapshot["topDocumentId"] = topDocument.DocumentId
+		snapshot["topDocumentTaskId"] = topDocument.LastIndexTaskId
+		snapshot["topDocumentScore"] = topDocument.Score
 		snapshot["topDocumentName"] = topDocument.DocumentName
-	} else {
-		snapshot["topDocumentId"] = 0
-		snapshot["topDocumentName"] = ""
 	}
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "知识范围路由完成。", Snapshot: snapshot})
 
@@ -225,13 +213,6 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 		execPlan.ClarificationReply = "当前选择的知识范围没有可检索的已就绪文档，请重新选择知识库或等待文档完成索引。"
 		execPlan.ClarificationReason = allowedScope.Reason
 		return nil
-	}
-
-	// 检查是否需要澄清（多个候选相近、路由歧义等）
-	if confidentTop {
-		execPlan.SelectedDocumentId = topDocument.DocumentId
-		execPlan.SelectedDocumentName = topDocument.DocumentName
-		execPlan.SelectedTaskId = topDocument.LastIndexTaskId
 	}
 
 	// 在选定的文档内做路由，并组装最终执行计划
@@ -255,12 +236,13 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 //  5. 组装最终执行计划（执行模式 / 导航决策 / 无证据回复提示）
 //  6. 打印关键编排结果并返回
 func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
+
 	// 启动文档内路由阶段追踪，并以 "混合检索" 为默认模式名
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
-	navigationDecision, err := r.documentRouter.Route(ctx, execPlan.SelectedDocumentId, convCtx.Question, rewriteResult)
+	navigationDecision, err := r.documentRouter.Route(ctx, convCtx.SelectedDocumentId, convCtx.Question, rewriteResult)
 	if err != nil {
 		ctx = vo.OnError(ctx, "执行路由失败。", err)
 		return err
@@ -269,22 +251,11 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	// 构造路由结果快照（执行模式 / 章节提示 / 条目编号 / 摘要文本），写入追踪
 	snapshot := map[string]any{
 		"executionMode":     navigationDecision.ExecutionModeName,
-		"targetSectionHint": strutil.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
-		"navigationSummary": strutil.Trim(navigationDecision.SummaryText),
+		"targetSectionHint": utils.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
+		"navigationSummary": utils.Trim(navigationDecision.SummaryText),
 	}
 	if navigationDecision.ItemAnchor != nil {
 		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
-	}
-	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
-
-	// 从路由结果中选取检索问题与子问题列表
-	//  - RetrievalQuestion 优先取自路由计划，为空则回退到改写问题
-	//  - RetrievalSubQuestions 仅在路由计划提供时才覆盖；否则保留上层已有值
-	if navigationDecision.RetrievalPlan != nil {
-		execPlan.RetrievalQuestion = utils.BlankToDefault(navigationDecision.RetrievalPlan.RetrievalQuestion, execPlan.RewriteQuestion)
-		if len(navigationDecision.RetrievalPlan.SubQuestions) > 0 {
-			execPlan.RetrievalSubQuestions = navigationDecision.RetrievalPlan.SubQuestions
-		}
 	}
 
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示
@@ -293,9 +264,11 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	execPlan.NoEvidenceReply = execPlan.RequiresRealTimeSearch
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
-	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s, targetSection='%s",
+	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', executionMode=%s, targetSection='%s",
 		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), strutil.Trim(convCtx.Question),
-		execPlan.RewriteQuestion, execPlan.RetrievalQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
+		execPlan.RewriteQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
+
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
 
 	return nil
 }
@@ -347,20 +320,6 @@ func (r *RouteStage) isOriginalTopCandidate(routeDecision *vo.KnowledgeRouteDeci
 	}
 	return originalTop.DocumentId == candidate.DocumentId &&
 		originalTop.LastIndexTaskId == candidate.LastIndexTaskId
-}
-
-// scopeAuthorityLabel 返回范围权威标签
-func (r *RouteStage) scopeAuthorityLabel(scope *vo.AllowedExecutionScope) string {
-	if scope == nil {
-		return "NO_SCOPE"
-	}
-	if scope.Executable() {
-		return "KNOWLEDGE_BASE_SELECTION_SNAPSHOT"
-	}
-	if scope.Consistent {
-		return "NO_EXECUTABLE_READY_SCOPE"
-	}
-	return "INCONSISTENT_SCOPE"
 }
 
 // fallbackDocuments 获取后备候选文档

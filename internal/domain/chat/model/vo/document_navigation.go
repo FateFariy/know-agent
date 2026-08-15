@@ -4,16 +4,15 @@ import "github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 
 // DocumentNavigationDecision 文档问答路由结果
 type DocumentNavigationDecision struct {
-	NavigationAction        enum.DocumentNavigationAction `json:"navigationAction"` // 导航动作
-	ExecutionMode           enum.ExecutionMode            // 执行模式
-	StructureAnchor         *ConversationStructureAnchor  `json:"structureAnchor"`         // 结构锚点
-	ItemAnchor              *ConversationItemAnchor       `json:"itemAnchor"`              // 项目锚点
-	RetrievalPlan           *RetrievalQuestionPlan        `json:"retrievalPlan"`           // 检索问题计划
-	IntentRecognitionResult *IntentRecognitionResult      `json:"intentRecognitionResult"` // 意图识别结果
-	SummaryText             string                        `json:"summaryText"`             // 摘要文本
-	QueryContextHints       []string                      `json:"queryContextHints"`       // 查询上下文提示
-	SoftSectionHints        []string                      `json:"softSectionHints"`        // 软章节提示
-	ExecutionModeName       string                        `json:"executionMode"`           // 执行模式
+	NavigationAction  enum.DocumentNavigationAction `json:"navigationAction"` // 导航动作
+	ExecutionMode     enum.ExecutionMode            // 执行模式
+	StructureAnchor   *ConversationStructureAnchor  `json:"structureAnchor"`   // 结构锚点
+	ItemAnchor        *ConversationItemAnchor       `json:"itemAnchor"`        // 项目锚点
+	RetrievalPlan     *RetrievalQuestionPlan        `json:"retrievalPlan"`     // 检索问题计划(已弃用）
+	SummaryText       string                        `json:"summaryText"`       // 摘要文本
+	QueryContextHints []string                      `json:"queryContextHints"` // 查询上下文提示
+	SoftSectionHints  []string                      `json:"softSectionHints"`  // 软章节提示
+	ExecutionModeName string                        `json:"executionMode"`     // 执行模式
 }
 
 // ConversationStructureAnchor 会话结构锚点

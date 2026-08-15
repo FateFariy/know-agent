@@ -6,12 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/duke-git/lancet/v2/strutil"
-	"github.com/zeromicro/go-zero/core/logx"
-
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -47,15 +44,15 @@ const structureNavigationConfidenceThreshold = 0.65
 // 所有文档问答统一输出 ExecutionMode.Retrieval，进入统一多通道混合检索；
 // 结构导航结果只作为检索上下文和观测信号，不得绕过混合检索。
 type DocumentQuestionRouter struct {
-	graphQuerier       graph.GraphQuerier       // 结构图谱查询
-	navigationIndexSvc intent.NavigationIndexer // 可选：章节索引服务
+	querier graph.GraphQuerier // 结构图谱查询
+	indexer NavigationIndexer  // 可选：章节索引服务
 }
 
 // NewDocumentQuestionRouter 创建文档问答路由器
-func NewDocumentQuestionRouter(graphQuerier graph.GraphQuerier, navigationIndexSvc intent.NavigationIndexer) *DocumentQuestionRouter {
+func NewDocumentQuestionRouter(querier graph.GraphQuerier, indexer NavigationIndexer) *DocumentQuestionRouter {
 	return &DocumentQuestionRouter{
-		graphQuerier:       graphQuerier,
-		navigationIndexSvc: navigationIndexSvc,
+		querier: querier,
+		indexer: indexer,
 	}
 }
 
@@ -133,27 +130,24 @@ func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.Gr
 	itemIndex *int, recognitionResult *vo.IntentRecognitionResult,
 	retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
 
-	decision := &vo.DocumentNavigationDecision{}
-
-	// 设置导航动作
-	decision.NavigationAction = action
-
-	// 设置执行模式：统一使用 RETRIEVAL
 	mode := enum.ExecutionModeRetrieval
-	decision.ExecutionMode = mode
-	decision.ExecutionModeName = mode.Name()
+	decision := &vo.DocumentNavigationDecision{
+		NavigationAction:  action,
+		ExecutionMode:     mode,
+		ExecutionModeName: mode.Name(),
+	}
 
 	// 构建结构锚点
+	displayTitle := section.DisplayTitle()
 	if section != nil {
 		decision.StructureAnchor = &vo.ConversationStructureAnchor{
 			RootSectionCode:   utils.Trim(section.NodeCode),
 			RootSectionTitle:  utils.Trim(section.Title),
-			TargetSectionHint: utils.Trim(section.DisplayTitle()),
+			TargetSectionHint: utils.Trim(displayTitle),
 			StructureNodeId:   section.NodeId,
 			CanonicalPath:     section.CanonicalPath,
 			ScopeMode:         "SOFT",
 		}
-		decision.SoftSectionHints = []string{section.DisplayTitle()}
 	} else {
 		decision.StructureAnchor = &vo.ConversationStructureAnchor{
 			ScopeMode: "NONE",
@@ -167,39 +161,32 @@ func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.Gr
 		}
 	}
 
-	// 构建检索计划
-	decision.RetrievalPlan = &vo.RetrievalQuestionPlan{
-		RetrievalQuestion: "",
-		SubQuestions:      nil,
+	queryTypeStr := ""
+	source := ""
+	if recognitionResult != nil {
+		queryTypeStr = recognitionResult.QueryType
+		source = recognitionResult.Source
 	}
 
 	// 构建摘要文本
-	effectiveIntent := retrievalIntent
-	if effectiveIntent == "" {
-		effectiveIntent = enum.RetrievalIntentGeneral
-	}
+	var sb strings.Builder
+	sb.WriteString("mode=" + mode.Name())
+	sb.WriteString("; retrievalIntent=")
+	sb.WriteString(utils.BlankToDefault(retrievalIntent, enum.RetrievalIntentGeneral))
+	sb.WriteString("; queryType=")
+	sb.WriteString(queryTypeStr)
+	sb.WriteString("; intentRecognitionSource=")
+	sb.WriteString(source)
+	sb.WriteString("; reason=")
+	sb.WriteString(reason)
+	sb.WriteString("; section=")
+	sb.WriteString(displayTitle)
+	sb.WriteString("; itemIndex=")
+	sb.WriteString(fmt.Sprintf("%d", utils.PointerOrDefault(itemIndex, 0)))
+	decision.SummaryText = sb.String()
 
-	queryTypeStr := ""
-	if recognitionResult != nil && recognitionResult.QueryType != "" {
-		queryTypeStr = recognitionResult.QueryType
-	}
-	sourceStr := ""
-	if recognitionResult != nil {
-		sourceStr = utils.BlankToDefault(recognitionResult.Source, "")
-	}
-
-	decision.SummaryText = "mode=RETRIEVAL" +
-		"; retrievalIntent=" + string(effectiveIntent) +
-		"; queryType=" + queryTypeStr +
-		"; queryUnderstandingSource=" + sourceStr +
-		"; reason=" + reason +
-		"; section=" + section.DisplayTitle() +
-		"; itemIndex=" + itemIndexStr(itemIndex)
-
-	logx.Infof("文档问答路由完成: mode=RETRIEVAL, action=%s, section='%s', itemIndex=%s, reason='%s'",
-		action, section.DisplayTitle(), itemIndexStr(itemIndex), reason)
-
-	decision.QueryContextHints = []string{}
+	logx.Infof("文档问答路由完成: mode=RETRIEVAL, action=%s, section='%s', reason='%s'",
+		action, displayTitle, reason)
 
 	return decision
 }
@@ -237,7 +224,7 @@ func (r *DocumentQuestionRouter) resolveSection(ctx context.Context, documentId 
 	}
 
 	// 如果原始问题和改写问题相同，直接返回 nil
-	if strings.TrimSpace(strutil.Trim(originalQuestion)) == strings.TrimSpace(strutil.Trim(rewrittenQuestion)) {
+	if utils.Trim(originalQuestion) == utils.Trim(rewrittenQuestion) {
 		return nil
 	}
 
@@ -246,8 +233,8 @@ func (r *DocumentQuestionRouter) resolveSection(ctx context.Context, documentId 
 }
 
 // resolveSectionByQuestion 根据问题定位章节
-func (r *DocumentQuestionRouter) resolveSectionByQuestion(ctx context.Context, documentId int64,
-	question string) *entity.GraphSection {
+func (r *DocumentQuestionRouter) resolveSectionByQuestion(ctx context.Context,
+	documentId int64, question string) *entity.GraphSection {
 
 	// 按章节编号定位
 	byCode := r.resolveBySectionCode(ctx, documentId, question)
@@ -269,13 +256,9 @@ func (r *DocumentQuestionRouter) resolveSectionByQuestion(ctx context.Context, d
 func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
 
-	if r.graphQuerier == nil {
-		return nil
-	}
-
-	normalized := strutil.Trim(question)
+	normalized := utils.Trim(question)
 	for _, code := range sectionCodePattern.FindAllString(normalized, -1) {
-		section, err := r.graphQuerier.FindSectionByCode(ctx, documentId, code)
+		section, err := r.querier.FindSectionByCode(ctx, documentId, code)
 		if err == nil && section != nil {
 			return section
 		}
@@ -287,10 +270,6 @@ func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, docum
 // resolveByQuotedTitle 按引号标题定位
 func (r *DocumentQuestionRouter) resolveByQuotedTitle(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
-
-	if r.graphQuerier == nil {
-		return nil
-	}
 	extractor := newNavigationExtractor(question)
 
 	quotedPhrases := extractor.collectQuotedPhrases()
@@ -298,7 +277,7 @@ func (r *DocumentQuestionRouter) resolveByQuotedTitle(ctx context.Context, docum
 		return nil
 	}
 
-	sections, err := r.graphQuerier.ListSections(ctx, documentId)
+	sections, err := r.querier.ListSections(ctx, documentId)
 	if err != nil || len(sections) == 0 {
 		return nil
 	}
@@ -329,12 +308,12 @@ func (r *DocumentQuestionRouter) resolveByQuotedTitle(ctx context.Context, docum
 func (r *DocumentQuestionRouter) resolveByNavigationIndex(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
 
-	if r.navigationIndexSvc == nil || r.graphQuerier == nil {
+	if r.indexer == nil {
 		return nil
 	}
 	extractor := newNavigationExtractor(question)
 	normalized := utils.Trim(question)
-	input := &intent.SearchInput{
+	input := &SearchInput{
 		DocumentId: documentId,
 		Topic:      normalized,
 		Facet:      extractor.detectFacet(),
@@ -342,18 +321,23 @@ func (r *DocumentQuestionRouter) resolveByNavigationIndex(ctx context.Context, d
 		TopK:       5,
 	}
 
-	hits, err := r.navigationIndexSvc.SearchSections(ctx, input)
+	hits, err := r.indexer.SearchSections(ctx, input)
 	if err != nil || len(hits) == 0 {
 		return nil
 	}
 
-	return r.graphQuerier.FindSectionById(ctx, documentId, hits[0].NodeId)
+	graphSection, err := r.querier.FindSectionById(ctx, documentId, hits[0].NodeId)
+	if err != nil {
+		return nil
+	}
+
+	return graphSection
 }
 
 // normalizeText 归一化文本用于精确匹配
 func normalizeText(text string) string {
-	normalized := strutil.Trim(text)
-	if strutil.IsBlank(normalized) {
+	normalized := utils.Trim(text)
+	if normalized == "" {
 		return ""
 	}
 

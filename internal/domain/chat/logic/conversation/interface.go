@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -66,5 +67,5 @@ func NewRouteInput(convCtx *Context, rewriteQuestion string) *RouteInput {
 // DocumentRouter 文档路由器
 type DocumentRouter interface {
 	// Route 根据文档ID和问题进行文档内路由
-	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
+	Route(ctx context.Context, input *route.DocumentRouteInput) (*vo.DocumentNavigationDecision, error)
 }
