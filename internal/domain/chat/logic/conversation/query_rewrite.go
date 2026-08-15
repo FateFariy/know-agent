@@ -14,10 +14,10 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// QuestionRewriteStage 问题改写阶段
+// QueryRewriteStage 问题改写阶段
 // 负责对所有非 OpenChat 模式的问题进行改写，生成检索友好的问题表达和子问题拆分。
 // 仅当 RAG 开启时执行，OpenChat 模式跳过。
-type QuestionRewriteStage struct {
+type QueryRewriteStage struct {
 	rewriter        rewrite.QueryRewriter
 	enabled         bool
 	ragEnabled      bool
@@ -27,10 +27,10 @@ type QuestionRewriteStage struct {
 	thinking        bool
 }
 
-var _ Stage = (*QuestionRewriteStage)(nil)
+var _ Stage = (*QueryRewriteStage)(nil)
 
-func NewQuestionRewriteStage(svcCtx *svc.ServiceContext, rewriter rewrite.QueryRewriter) *QuestionRewriteStage {
-	return &QuestionRewriteStage{
+func NewQueryRewriteStage(svcCtx *svc.ServiceContext, rewriter rewrite.QueryRewriter) *QueryRewriteStage {
+	return &QueryRewriteStage{
 		rewriter:        rewriter,
 		enabled:         svcCtx.Config.Chat.Rewrite.Enabled,
 		ragEnabled:      svcCtx.Config.Chat.Rag.Enabled,
@@ -42,12 +42,12 @@ func NewQuestionRewriteStage(svcCtx *svc.ServiceContext, rewriter rewrite.QueryR
 }
 
 // Name 阶段名称
-func (q *QuestionRewriteStage) Name() string {
+func (q *QueryRewriteStage) Name() string {
 	return enum.ConversationTraceStageRewrite.Name
 }
 
 // Execute 执行问题改写
-func (q *QuestionRewriteStage) Execute(ctx context.Context, convCtx *Context) error {
+func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	// OpenChat 模式不需要问题改写, 且未选择任何库时也不执行
 	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
 		return nil

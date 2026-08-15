@@ -11,6 +11,7 @@ import (
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -52,6 +53,7 @@ type Context struct {
 	ThinkingSteps                  *list.CopyOnWriteList[string]                // 思考步骤列表
 	References                     *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
 	UsedTools                      *list.CopyOnWriteList[string]                // 已使用的工具集合
+	Recommendations                []string                                     // 推荐追问列表
 	StartTime                      time.Time                                    // 开始时间（毫秒精度）
 	FirstResponseTimeMs            atomic.Int64                                 // 首次响应耗时（毫秒）
 	Finalized                      atomic.Bool                                  // 是否已完成
@@ -72,6 +74,28 @@ func (c *Context) Finalize(exchange *entity.ChatExchange) {
 	loc, _ := time.LoadLocation(Zone)
 	c.CurrentDate = time.Now().In(loc)
 	c.CurrentDateText = fmt.Sprintf("%s（%s）", c.CurrentDate.Format(time.DateOnly), weekdayMap[c.CurrentDate.Weekday()])
+}
+
+// BuildChatExchange 构建会话交换对象
+func (c *Context) BuildChatExchange(turnStatus int, errorMsg string) *entity.ChatExchange {
+	return &entity.ChatExchange{
+		ID:                             c.ExchangeId,
+		ConversationId:                 c.ConversationId,
+		Question:                       c.Question,
+		Answer:                         c.Answer(),
+		ThinkingSteps:                  common.ToJSONArray(c.SnapshotThinkingSteps()),
+		References:                     common.ToJSONArray(c.UniqueReferences()),
+		UsedTools:                      common.ToJSONArray(c.SnapshotUsedTools()),
+		DebugTrace:                     c.DebugTraceJSON(),
+		TurnStatus:                     turnStatus,
+		ErrorMessage:                   errorMsg,
+		FirstResponseTimeMs:            c.FirstResponseTimeMs.Load(),
+		TotalResponseTimeMs:            time.Since(c.StartTime).Milliseconds(),
+		KnowledgeBaseSelectionMode:     c.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
+		SelectedKnowledgeBaseIdsJson:   c.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
+		SelectedKnowledgeBaseNamesJson: c.KnowledgeBaseSelectionSnapshot.SelectionNames(),
+		RetrievalConfigSnapshot:        c.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
+	}
 }
 
 func (c *Context) SetExecutePlan(plan *vo.ConversationExecutionPlan) {

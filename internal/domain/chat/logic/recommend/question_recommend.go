@@ -38,10 +38,10 @@ func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate adapter
 }
 
 // Generate 生成推荐追问
-func (r *QuestionRecommendImpl) Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) []string {
+func (r *QuestionRecommendImpl) Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) ([]string, error) {
 	// 检查是否启用推荐且回答不为空
 	if !r.properties.Enabled || strutil.IsBlank(answer) {
-		return []string{}
+		return []string{}, nil
 	}
 
 	// 使用通道处理超时
@@ -73,7 +73,7 @@ func (r *QuestionRecommendImpl) Generate(ctx context.Context, question, answer s
 	case <-ctx.Done():
 		logx.Warnf("生成推荐问题被取消: %v", ctx.Err())
 	}
-	return result
+	return result, nil
 }
 
 // generateRecommendations 生成推荐追问
