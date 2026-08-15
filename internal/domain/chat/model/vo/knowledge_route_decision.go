@@ -1,14 +1,20 @@
 package vo
 
+import (
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
+)
+
 // KnowledgeRouteDecision 知识路由决策
 type KnowledgeRouteDecision struct {
-	RouteStatus           string
-	Confidence            float64
-	Scopes                []*ScopeRouteCandidate
-	Topics                []*TopicRouteCandidate
-	Documents             []*DocumentRouteCandidate
-	Reason                string
-	RequiresClarification bool
+	Scopes          []*ScopeRouteCandidate    // 候选Scope列表
+	Topics          []*TopicRouteCandidate    // 候选Topic列表
+	Documents       []*DocumentRouteCandidate // 候选文档列表
+	Confidence      float64                   // 路由决策置信度
+	RouteStatus     enum.RouteStatus          // 路由状态（如SUCCESS/FAILED）
+	Reason          string                    // 决策原因
+	Source          string                    // 决策来源
+	Degraded        bool                      // 是否降级
+	DegradedReasons []string                  // 降级原因列表
 }
 
 // ScopeRouteCandidate 知识范围（scope）路由候选
@@ -41,7 +47,21 @@ type DocumentRouteCandidate struct {
 	Reason             string  `json:"reason"`          // 原因
 }
 
-// ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否在候选前三
+func (d *DocumentRouteCandidate) IsValidScore() bool {
+	return d != nil && d.Score > 0
+}
+
+func NewUnavailableRouteDecision(degradedReasons ...string) *KnowledgeRouteDecision {
+	return &KnowledgeRouteDecision{
+		RouteStatus:     enum.RouteStatusFailed,
+		Reason:          "Route advice is unavailable; ordinary retrieval keeps the explicit knowledge scope",
+		Source:          enum.KbSelectionModeNone,
+		Degraded:        true,
+		DegradedReasons: degradedReasons,
+	}
+}
+
+// ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否候选前三
 func (k *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) int {
 	if selectedDocumentId == 0 || len(k.Documents) == 0 {
 		return 0

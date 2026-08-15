@@ -17,23 +17,23 @@ const (
 	structureNavigationConfidenceThreshold = 0.65 // 结构导航置信度阈值
 )
 
-// LlmIntentRecognizer 基于大模型（LLM）的意图识别器
+// CompositeIntentRecognizer 基于大模型（LLM）的意图识别器
 // 将散落在路由、表格、GraphRAG、RAPTOR 的主链路关键词硬判收口成受控建议。
-type LlmIntentRecognizer struct {
+type CompositeIntentRecognizer struct {
 	fallback Recognizer
 	advisor  Recognizer
 }
 
-// NewLlmIntentRecognizer 创建意图识器
-func NewLlmIntentRecognizer(chatModel model.ChatModel, renderer adapter.PromptRenderer) *LlmIntentRecognizer {
-	return &LlmIntentRecognizer{
+// NewCompositeIntentRecognizer 创建意图识器
+func NewCompositeIntentRecognizer(chatModel model.ChatModel, renderer adapter.PromptRenderer) *CompositeIntentRecognizer {
+	return &CompositeIntentRecognizer{
 		fallback: NewDeterministicFallbackRecognizer(),
 		advisor:  NewLlmAdvisorRecognizer(chatModel, renderer),
 	}
 }
 
 // Recognize 统一意图识别入口, 确定性回退 → LLM advisor 增强 → 验证合并
-func (s *LlmIntentRecognizer) Recognize(ctx context.Context, input *RecognitionInput) *vo.IntentRecognitionResult {
+func (s *CompositeIntentRecognizer) Recognize(ctx context.Context, input *RecognitionInput) *vo.IntentRecognitionResult {
 	fallback, _ := s.fallback.Recognize(ctx, input)
 	advised, err := s.advisor.Recognize(ctx, input)
 	if err != nil {
@@ -45,7 +45,7 @@ func (s *LlmIntentRecognizer) Recognize(ctx context.Context, input *RecognitionI
 // validate 验证并合并 advisor 和 fallback 结果，生成最终意图识别结果。
 // 核心策略：优先采纳 advisor 的高置信度建议，但确定性结构导航（如锚点语法）具有最高优先级，
 // 同时确保 fallback 作为安全兜底，最终结果始终包含通用检索通道。
-func (s *LlmIntentRecognizer) validate(advised, fallback *vo.IntentRecognitionResult) *vo.IntentRecognitionResult {
+func (s *CompositeIntentRecognizer) validate(advised, fallback *vo.IntentRecognitionResult) *vo.IntentRecognitionResult {
 	if advised == nil {
 		return fallback
 	}

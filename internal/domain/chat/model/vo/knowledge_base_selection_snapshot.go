@@ -107,10 +107,10 @@ func (s *KnowledgeBaseSelectionSnapshot) ResolveAllowedExecutionScope() *Allowed
 // AllowedExecutionScope 允许执行的知识范围
 // 通过知识库选择快照解析得到，用于约束文档路由和检索范围
 type AllowedExecutionScope struct {
-	documentIds []int64
-	taskIds     []int64
-	Consistent  bool
-	Reason      string
+	documentIds []int64 //  文档ID列表
+	taskIds     []int64 //  任务ID列表
+	Consistent  bool    //  是否一致
+	Reason      string  //  原因
 }
 
 // newEmptyScope 创建空的允许范围（已就绪但无数据）
@@ -131,12 +131,12 @@ func newInconsistentScope(reason string) *AllowedExecutionScope {
 
 // Executable 判断范围是否可执行：一致且非空且文档与任务ID数量一致
 func (s *AllowedExecutionScope) Executable() bool {
-	return s.Consistent && len(s.documentIds) > 0 && len(s.documentIds) == len(s.taskIds)
+	return s != nil || s.Consistent && len(s.documentIds) > 0 && len(s.documentIds) == len(s.taskIds)
 }
 
 // Contains 判断指定的文档ID与任务ID是否在当前范围内
 func (s *AllowedExecutionScope) Contains(documentId, taskId int64) bool {
-	if documentId <= 0 || taskId <= 0 {
+	if s == nil || documentId <= 0 || taskId <= 0 {
 		return false
 	}
 	for i, docID := range s.documentIds {
@@ -149,10 +149,16 @@ func (s *AllowedExecutionScope) Contains(documentId, taskId int64) bool {
 
 // DocumentIds 返回文档ID列表副本
 func (s *AllowedExecutionScope) DocumentIds() []int64 {
+	if s == nil {
+		return nil
+	}
 	return utils.Copy(s.documentIds)
 }
 
 // TaskIds 返回任务ID列表副本
 func (s *AllowedExecutionScope) TaskIds() []int64 {
+	if s == nil {
+		return nil
+	}
 	return utils.Copy(s.taskIds)
 }

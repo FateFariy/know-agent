@@ -12,6 +12,7 @@ import (
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	aggregate2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/aggregate"
 	klen "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
+	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 )
 
@@ -167,4 +168,5 @@ type KnowledgeConverter interface {
 	ToKnowledgeBaseModelList(src []*klen.KnowledgeBase) []*model.KnowledgeBase
 
 	ToKnowledgeBaseSelectionSnapshot(src *aggregate2.KnowledgeBaseSelectionSnapshot) *cvo.KnowledgeBaseSelectionSnapshot
+	ToKnowledgeRouteDecision(src *klvo.KnowledgeRouteDecision) *cvo.KnowledgeRouteDecision
 }

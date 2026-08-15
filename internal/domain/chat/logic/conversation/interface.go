@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -48,14 +49,22 @@ type KnowledgeRouter interface {
 }
 
 func NewRouteInput(convCtx *Context, rewriteQuestion string) *RouteInput {
+	mapper := func(doc *vo.DocumentMetadata) int64 { return doc.DocumentId }
 	return &RouteInput{
-		Question:                   convCtx.Question,
-		RewriteQuestion:            rewriteQuestion,
 		ConversationId:             convCtx.ConversationId,
 		ExchangeId:                 convCtx.ExchangeId,
+		Question:                   convCtx.Question,
+		RewriteQuestion:            rewriteQuestion,
+		KnowledgeBaseSelectionMode: convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
 		SelectedDocumentId:         convCtx.SelectedDocumentId,
-		SelectedKnowledgeBaseNames: convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
 		SelectedKnowledgeBaseIds:   convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds,
-		AllowedDocumentIds:         convCtx.KnowledgeBaseSelectionSnapshot.AllowedDocumentIds,
+		SelectedKnowledgeBaseNames: convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
+		AllowedDocumentIds:         utils.Map(convCtx.KnowledgeBaseSelectionSnapshot.AllowedDocuments, mapper),
 	}
+}
+
+// DocumentRouter 文档路由器
+type DocumentRouter interface {
+	// Route 根据文档ID和问题进行文档内路由
+	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
 }

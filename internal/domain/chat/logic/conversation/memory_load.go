@@ -7,6 +7,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -73,7 +74,7 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 	questionHistoryContext := vo.NewQuestionHistoryContext(recentQuestions, m.planningHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断）
-	analyzer := vo.NewQueryAnalyzer(question)
+	analyzer := intent.NewQueryAnalyzer(question)
 	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
 	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 

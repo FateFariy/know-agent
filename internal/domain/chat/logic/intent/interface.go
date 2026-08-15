@@ -6,12 +6,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-// DocumentRouter 文档路由器
-type DocumentRouter interface {
-	// Route 根据文档ID和问题进行文档内路由
-	Route(ctx context.Context, documentId int64, question string, rewriteResult *vo.QuestionRewriteResult) (*vo.DocumentNavigationDecision, error)
-}
-
 // NavigationIndexer 章节索引器（与结构图谱并列定位章节）
 type NavigationIndexer interface {
 	// SearchSections 按关键词+维度检索匹配的章节命中

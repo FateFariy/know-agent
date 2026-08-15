@@ -156,7 +156,7 @@ func (o *ConversationPreOrchestratorImpl) prepareCommon(ctx context.Context, con
 	questionHistoryContext := vo.NewQuestionHistoryContext(question, strutil.Trim(memoryContext.RecentTranscript), o.questionHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断，无外部调用）
-	analyzer := vo.NewQueryAnalyzer(question)
+	analyzer := intent.NewQueryAnalyzer(question)
 	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
 	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 

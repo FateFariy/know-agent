@@ -16,8 +16,8 @@ type ConversationExecutionPlan struct {
 	AgentQuestion                string                      // 代理问题
 	RewriteQuestion              string                      // 问题改写结果
 	RewriteSubQuestions          []string                    // 问题改写子问题列表
-	RetrievalQuestion            string                      // 检索问题
-	RetrievalSubQuestions        []string                    // 检索子问题列表
+	RetrievalQuestion            string                      // 检索问题(Deprecated）
+	RetrievalSubQuestions        []string                    // 检索子问题列表(Deprecated）
 	HistorySummary               string                      // 历史摘要
 	LongTermSummary              string                      // 长期摘要
 	HistoryPlanningContext       *HistoryPlanningContext     // 历史规划上下文
@@ -35,15 +35,16 @@ type ConversationExecutionPlan struct {
 	CurrentDateText              string                      // 当前日期文本表示
 	RequiresRealTimeSearch       bool                        // 是否需要实时搜索
 	RequiresCurrentDateAnchoring bool                        // 是否需要当前日期锚定
-	SelectedDocumentId           int64                       // 选中的文档ID
-	SelectedDocumentName         string                      // 选中的文档名称
-	SelectedTaskId               int64                       // 选中的任务ID
-	RetrievalDocumentIds         []int64                     // 检索文档ID列表
-	RetrievalTaskIds             []int64                     // 检索任务ID列表
+	SelectedDocumentId           int64                       // 选中的文档ID(Deprecated）
+	SelectedDocumentName         string                      // 选中的文档名称(Deprecated）
+	SelectedTaskId               int64                       // 选中的任务ID(Deprecated）
+	RetrievalDocumentIds         []int64                     // 检索文档ID列表(Deprecated）
+	RetrievalTaskIds             []int64                     // 检索任务ID列表(Deprecated）
 	ClarificationReply           string                      // 澄清回复
 	ClarificationOptions         []string                    // 澄清选项列表
 	ClarificationReason          string                      // 澄清原因文本
 	NoEvidenceReply              string                      // 无证据回复文本
+	ScopedEvidenceAnchors        []*EvidenceAnchor           // 作用域内的证据锚点
 }
 
 func (p *ConversationExecutionPlan) Validate() error {

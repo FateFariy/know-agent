@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/maputil"
@@ -14,7 +13,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -27,6 +25,10 @@ var (
 	fallbackSplitRegex = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)
 )
 
+const (
+	recommendationThreshold = 0.55
+)
+
 // RouteStage 路由判定阶段
 // 负责根据 chatMode 分发到对应的路由策略：
 //   - OpenChat：直接走 ReactAgent 模式
@@ -34,7 +36,7 @@ var (
 //   - AutoDocument：自动知识路由 + 选文档 + 文档内导航
 type RouteStage struct {
 	knowledgeRouter KnowledgeRouter
-	documentRouter  intent.DocumentRouter
+	documentRouter  DocumentRouter
 	docGateway      adapter.DocumentGateway
 	noEvidenceReply string
 }
@@ -43,7 +45,7 @@ var _ Stage = (*RouteStage)(nil)
 
 func NewRouteStage(
 	knowledgeRouter KnowledgeRouter,
-	documentRouter intent.DocumentRouter,
+	documentRouter DocumentRouter,
 	docGateway adapter.DocumentGateway,
 	noEvidenceReply string,
 ) *RouteStage {
@@ -179,32 +181,30 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
 
 	// 启动路由阶段追踪（标识为 auto_document）
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在生成知识范围候选。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在执行知识范围、主题、候选文档路由。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
 	//  - 路由失败时仅告警，并以空决策对象兜底（避免后续代码 panic）
 	routeDecision, err := r.knowledgeRouter.Route(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion))
 	if err != nil {
-		routeDecision = &vo.KnowledgeRouteDecision{}
+		routeDecision = vo.NewUnavailableRouteDecision("ROUTE_ADVISOR_FAILURE")
 		logx.Warnf("知识路由失败: %v", err)
 	}
 
-	// 步骤 3：选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
-	candidateDocuments := r.selectAutoCandidates(ctx, routeDecision, convCtx.Question, execPlan.RewriteQuestion, allowedScope)
-	execPlan.RetrievalDocumentIds = r.extractDocumentIds(candidateDocuments)
-	execPlan.RetrievalTaskIds = r.extractTaskIds(candidateDocuments)
+	// 选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
+	inScopeCandidates := r.selectAutoCandidates(routeDecision, allowedScope)
 
-	// 步骤 4：选择推荐候选作为主文档
+	// 选择推荐候选作为主文档
 	//  - 使用 selectRecommendation 综合判断：置信度阈值、候选有效性、原始top匹配
 	//  - 不满足条件时 topDocument 保持为空结构，退化为多文档混合检索
-	topDocument := r.selectRecommendation(routeDecision, candidateDocuments)
+	topDocument := r.selectRecommendation(routeDecision, inScopeCandidates)
 	confidentTop := topDocument != nil && topDocument.DocumentId > 0
 
-	// 步骤 5：构建增强快照（含范围信息、路由状态、置信度、候选数、推荐结果）
+	// 构建增强快照（含范围信息、路由状态、置信度、候选数、推荐结果）
 	snapshot := map[string]any{
 		"confidence":             routeDecision.Confidence,
 		"routeStatus":            routeDecision.RouteStatus,
-		"candidateDocumentCount": len(candidateDocuments),
+		"candidateDocumentCount": len(inScopeCandidates),
 		"confidentTopDocument":   confidentTop,
 		"scopeAuthority":         r.scopeAuthorityLabel(allowedScope),
 		"allowedDocumentCount":   len(allowedScope.DocumentIds()),
@@ -220,13 +220,10 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	}
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "知识范围路由完成。", Snapshot: snapshot})
 
-	// 检查是否需要澄清（多个候选相近、路由歧义等）
-	//  - 需要澄清时直接返回 Clarification 模式执行计划（含回复文案、选项、理由）
-	if r.shouldAskClarification(routeDecision, candidateDocuments) {
+	if !allowedScope.Executable() {
 		execPlan.Mode = enum.ExecutionModeClarification
-		execPlan.ClarificationReply = r.buildClarificationReply(candidateDocuments)
-		execPlan.ClarificationOptions = r.buildClarificationOptions(candidateDocuments)
-		execPlan.ClarificationReason = r.buildClarificationReason(routeDecision, candidateDocuments)
+		execPlan.ClarificationReply = "当前选择的知识范围没有可检索的已就绪文档，请重新选择知识库或等待文档完成索引。"
+		execPlan.ClarificationReason = allowedScope.Reason
 		return nil
 	}
 
@@ -293,7 +290,7 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示
 	execPlan.Mode = navigationDecision.ExecutionMode
 	execPlan.NavigationDecision = navigationDecision
-	execPlan.NoEvidenceReply = r.buildDocumentModeNoEvidenceReply(convCtx.Question, execPlan.RequiresRealTimeSearch)
+	execPlan.NoEvidenceReply = execPlan.RequiresRealTimeSearch
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', retrievalQuestion='%s', executionMode=%s, targetSection='%s",
@@ -304,151 +301,39 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 }
 
 // ============================================================================
-// 文档模式无证据回复
-// ============================================================================
-
-// buildDocumentModeNoEvidenceReply 构建文档模式无证据回复
-func (r *RouteStage) buildDocumentModeNoEvidenceReply(question string, requiresRealTimeSearch bool) string {
-	normalizedQuestion := strutil.Trim(question)
-
-	if r.looksLikeCapabilityQuestion(normalizedQuestion) {
-		return `当前你正在使用"当前文档问答"模式，我会优先基于所选文档回答。这个问题更像是在询问助手能力，而不是当前文档内容。如果你想了解我能做什么，请切换到"开放式提问"模式。`
-	}
-
-	if r.looksLikeOpenChatQuestion(normalizedQuestion, requiresRealTimeSearch) {
-		return `当前你正在使用"当前文档问答"模式，我只能基于所选文档回答。这个问题更像开放式提问，例如天气、最新信息或一般交流。如果你想继续问这类问题，请切换到"开放式提问"模式。`
-	}
-
-	return utils.BlankToDefault(r.noEvidenceReply, "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。")
-}
-
-// looksLikeCapabilityQuestion 判断是否为能力询问
-func (r *RouteStage) looksLikeCapabilityQuestion(normalizedQuestion string) bool {
-	if normalizedQuestion == "" {
-		return false
-	}
-	return strutil.ContainsAny(normalizedQuestion, capabilityHints)
-}
-
-// looksLikeOpenChatQuestion 判断是否为开放式聊天问题
-func (r *RouteStage) looksLikeOpenChatQuestion(normalizedQuestion string, requiresRealTimeSearch bool) bool {
-	if normalizedQuestion == "" {
-		return false
-	}
-	return requiresRealTimeSearch || strutil.ContainsAny(normalizedQuestion, openChatHints) || strutil.ContainsAny(normalizedQuestion, chitchatHints)
-}
-
-// ============================================================================
 // 自动路由：候选文档选择
 // ============================================================================
 
-// selectAutoCandidates 根据路由决策和允许范围选择自动候选文档。
-//
-// 策略与分支：
-//  1. 路由决策为空或无文档 → 使用 fallbackDocuments 做兜底（上限 5）
-//  2. 候选数量阈值：置信度 ≥ 0.80 时取前 5，否则取前 3（高置信度更保守，低置信度多给候选以召回）
-//  3. 候选为空时同样回退到 fallbackDocuments
-//  4. 置信度 < 0.55 时将路由候选与 fallback 候选合并（扩大范围以弥补低置信度）
-//  5. 否则直接返回路由候选
-//  6. 最终候选列表需经过允许范围过滤（仅保留在 allowedScope 内的候选）
-func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *vo.KnowledgeRouteDecision, question, rewriteQuestion string, allowedScope *AllowedExecutionScope) []*vo.DocumentRouteCandidate {
-	// 分支 1：路由决策为空或无文档 → 使用 fallback 做兜底
-	if routeDecision == nil || len(routeDecision.Documents) == 0 {
-		return r.filterCandidatesByScope(r.fallbackDocuments(ctx, question, rewriteQuestion, 5), allowedScope)
+// selectAutoCandidates 根据路由决策和允许范围选择自动候选文档
+func (r *RouteStage) selectAutoCandidates(routeDecision *vo.KnowledgeRouteDecision, allowedScope *vo.AllowedExecutionScope) []*vo.DocumentRouteCandidate {
+	if routeDecision == nil || len(routeDecision.Documents) == 0 || !allowedScope.Executable() {
+		return nil
 	}
 
-	// 候选数量阈值：置信度 ≥ 0.80 时取前 5，否则取前 3
-	candidateLimit := utils.Ternary(routeDecision.Confidence >= 0.80, 5, 3)
-	var candidates []*vo.DocumentRouteCandidate
-	for _, doc := range routeDecision.Documents {
-		// 仅保留具有有效 DocumentId 与 LastIndexTaskId 的候选
-		if doc.DocumentId > 0 && doc.LastIndexTaskId > 0 {
-			candidates = append(candidates, doc)
-			if len(candidates) >= candidateLimit {
-				break
-			}
-		}
-	}
-
-	// 预先拉取 fallback 候选（用于分支 3 与 4）
-	fallbackDocuments := r.fallbackDocuments(ctx, question, rewriteQuestion, candidateLimit)
-	// 分支 3：候选为空 → 返回 fallback
-	if len(candidates) == 0 {
-		return r.filterCandidatesByScope(fallbackDocuments, allowedScope)
-	}
-
-	// 分支 4：置信度 < 0.55 → 合并路由候选与 fallback 候选，扩大检索范围
-	if routeDecision.Confidence < 0.55 {
-		return r.filterCandidatesByScope(r.mergeCandidates(candidates, fallbackDocuments, candidateLimit), allowedScope)
-	}
-
-	// 分支 5：正常情况 → 返回路由候选（经范围过滤）
-	return r.filterCandidatesByScope(candidates, allowedScope)
+	return utils.Filter(routeDecision.Documents, func(c *vo.DocumentRouteCandidate) bool {
+		return c != nil && allowedScope.Contains(c.DocumentId, c.LastIndexTaskId)
+	})
 }
 
-// filterCandidatesByScope 对候选文档列表执行允许范围过滤
-// 仅保留在 allowedScope 内的候选；若 allowedScope 不可执行，则返回全部候选
-func (r *RouteStage) filterCandidatesByScope(candidates []*vo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) []*vo.DocumentRouteCandidate {
-	if len(candidates) == 0 {
-		return candidates
-	}
-	// 若范围不可执行（如不一致或为空），不执行过滤，全部保留
-	if allowedScope == nil || !allowedScope.Executable() {
-		return candidates
-	}
-	result := make([]*vo.DocumentRouteCandidate, 0, len(candidates))
-	for _, c := range candidates {
-		if c != nil && r.candidateMatchesAllowedScope(c, allowedScope) {
-			result = append(result, c)
-		}
-	}
-	return result
-}
-
-// candidateMatchesAllowedScope 判断候选文档是否在允许的执行范围内
-func (r *RouteStage) candidateMatchesAllowedScope(candidate *vo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) bool {
-	if candidate == nil || allowedScope == nil {
-		return false
-	}
-	return allowedScope.Contains(candidate.DocumentId, candidate.LastIndexTaskId)
-}
-
-// selectRecommendation 从候选文档中选择推荐文档作为主文档。
-//
-// 判定条件（全部满足才返回推荐，否则返回 nil）：
-//  1. routeDecision 不为空且 Confidence > 0
-//  2. RouteStatus 为 "SUCCESS"
-//  3. 候选列表非空
-//  4. Confidence 在 [threshold, 1.0] 范围内且为有限值
-//  5. 候选得分 > 0（positive check）
-//  6. 候选与原始路由决策的 top 候选匹配（documentId + taskId）
+// selectRecommendation 从候选文档中选择推荐文档作为主文档
 func (r *RouteStage) selectRecommendation(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) *vo.DocumentRouteCandidate {
-	// 条件 1-3：路由决策、置信度、路由状态、候选列表基础校验
 	if routeDecision == nil || routeDecision.Confidence <= 0 ||
-		routeDecision.RouteStatus != "SUCCESS" ||
+		routeDecision.RouteStatus != enum.RouteStatusSuccess ||
 		len(candidateDocuments) == 0 {
 		return nil
 	}
 
-	// 条件 4：置信度阈值校验
-	threshold := r.recommendationThreshold()
 	confidence := routeDecision.Confidence
-	if !isFinite(confidence) || confidence < threshold || confidence > 1.0 {
+	if confidence < recommendationThreshold || confidence > 1.0 {
 		return nil
 	}
 
-	// 条件 5-6：候选有效性校验 + 原始top匹配校验
 	topCandidate := candidateDocuments[0]
-	if !isPositiveCandidate(topCandidate) || !r.isOriginalTopCandidate(routeDecision, topCandidate) {
+	if !topCandidate.IsValidScore() || !r.isOriginalTopCandidate(routeDecision, topCandidate) {
 		return nil
 	}
 
 	return topCandidate
-}
-
-// isPositiveCandidate 判断候选是否为正分候选：score > 0
-func isPositiveCandidate(candidate *vo.DocumentRouteCandidate) bool {
-	return candidate != nil && candidate.Score > 0
 }
 
 // isOriginalTopCandidate 判断候选是否与路由决策的原始top候选匹配
@@ -464,46 +349,21 @@ func (r *RouteStage) isOriginalTopCandidate(routeDecision *vo.KnowledgeRouteDeci
 		originalTop.LastIndexTaskId == candidate.LastIndexTaskId
 }
 
-// recommendationThreshold 获取推荐置信度阈值（默认 0.55，取值范围 [0, 1]）
-func (r *RouteStage) recommendationThreshold() float64 {
-	return clampThreshold(0.55)
-}
-
-// isFinite 判断浮点数是否为有限值（非 NaN、非 Inf）
-func isFinite(f float64) bool {
-	return !isNaN(f) && !isInf(f)
-}
-
-// isNaN 判断浮点数是否为 NaN
-func isNaN(f float64) bool {
-	return f != f
-}
-
-// isInf 判断浮点数是否为无穷大
-func isInf(f float64) bool {
-	return f > 1e308 || f < -1e308
-}
-
-// clampThreshold 将阈值限制在 [0, 1] 范围内，无效值返回 fallback
-func clampThreshold(fallback float64) float64 {
-	return fallback
-}
-
 // scopeAuthorityLabel 返回范围权威标签
-func (r *RouteStage) scopeAuthorityLabel(scope *AllowedExecutionScope) string {
+func (r *RouteStage) scopeAuthorityLabel(scope *vo.AllowedExecutionScope) string {
 	if scope == nil {
 		return "NO_SCOPE"
 	}
 	if scope.Executable() {
 		return "KNOWLEDGE_BASE_SELECTION_SNAPSHOT"
 	}
-	if scope.consistent {
+	if scope.Consistent {
 		return "NO_EXECUTABLE_READY_SCOPE"
 	}
 	return "INCONSISTENT_SCOPE"
 }
 
-// fallbackDocuments 获取后备候选文档。
+// fallbackDocuments 获取后备候选文档
 //
 // 在路由决策不可用或置信度偏低时，从全部可检索文档中基于元数据（名称/标签等）匹配查询词，
 // 返回得分最高的前 limit 个候选，理由统一标注为"低置信度时基于文档元数据进行保守扩范围候选"。
@@ -577,110 +437,6 @@ func (r *RouteStage) mergeCandidates(primary, secondary []*vo.DocumentRouteCandi
 		result = append(result, merged[id])
 	}
 	return result
-}
-
-// ============================================================================
-// 自动路由：澄清判断
-// ============================================================================
-
-// shouldAskClarification 判断是否需要向用户澄清知识范围
-//
-// 判定逻辑（任一成立则需要澄清）：
-//  1. 候选文档为空 —— 无任何可检索范围，需要用户补充
-//  2. 路由决策为空或无文档 —— 路由失败，可能因问题宽泛或模型响应异常
-//  3. 路由决策置信度 < 0.55 —— 低置信度，需要用户在多个可能方向中选择
-//  4. 候选数量 < 2 —— 无法进行多方向对比，跳过澄清（返回 false）
-//  5. 前两名候选得分差 ≤ 3 且分属不同知识范围（KnowledgeScopeCode 不同）—— 存在真正的歧义
-//
-// 特别例外：前两名候选得分均为 0（说明打分完全失败）时不做澄清，以避免无意义的空选项提示。
-func (r *RouteStage) shouldAskClarification(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) bool {
-	// 判定 1：候选为空 —— 需要澄清
-	if len(candidateDocuments) == 0 {
-		return true
-	}
-	// 判定 2：路由决策为空或无文档 —— 需要澄清
-	if routeDecision == nil || len(routeDecision.Documents) == 0 {
-		return true
-	}
-	// 判定 3：低置信度（< 0.55）—— 需要澄清
-	if routeDecision.Confidence < 0.55 {
-		return true
-	}
-	// 判定 4：候选数量不足 2 —— 不足以形成多选项对比，跳过
-	if len(candidateDocuments) < 2 {
-		return false
-	}
-
-	// 取前两名候选的得分与知识范围
-	topScore := candidateDocuments[0].Score
-	secondScore := candidateDocuments[1].Score
-	topScope := candidateDocuments[0].KnowledgeScopeCode
-	secondScope := candidateDocuments[1].KnowledgeScopeCode
-
-	// 特别例外：打分完全失败时不发起澄清，避免给出无意义的多选项提示
-	if topScore == 0 && secondScore == 0 {
-		return false
-	}
-
-	// 判定 5：得分差 ≤ 3 且分属不同知识范围 → 存在真正的歧义，需要澄清
-	return topScore-secondScore <= 3 && topScope != secondScope
-}
-
-// buildClarificationReply 构建澄清回复
-func (r *RouteStage) buildClarificationReply(candidateDocuments []*vo.DocumentRouteCandidate) string {
-	topCandidates := candidateDocuments
-	if len(topCandidates) > 3 {
-		topCandidates = topCandidates[:3]
-	}
-
-	if len(topCandidates) == 0 {
-		return `当前我还不能稳定判断你想问哪份知识文档。请补充更具体的文档名、主题词，或者直接切换到"当前文档问答"后指定文档。`
-	}
-
-	var sb strings.Builder
-	sb.WriteString("这个问题目前存在文档范围歧义，我先确认你想问哪一份：\n")
-
-	for i, item := range topCandidates {
-		sb.WriteString(strconv.Itoa(i + 1))
-		sb.WriteString(". 《")
-		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
-		sb.WriteString(name)
-		sb.WriteString("》")
-
-		scope := utils.BlankToDefault(item.KnowledgeScopeName, item.KnowledgeScopeCode)
-		if strutil.IsNotBlank(scope) {
-			sb.WriteString("（")
-			sb.WriteString(scope)
-			sb.WriteString("）")
-		}
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString(`你可以直接回复文档名，或者改用"当前文档问答"模式明确指定文档。`)
-	return sb.String()
-}
-
-// buildClarificationOptions 构建澄清选项
-func (r *RouteStage) buildClarificationOptions(candidateDocuments []*vo.DocumentRouteCandidate) []string {
-	if len(candidateDocuments) == 0 {
-		return nil
-	}
-
-	result := make([]string, 0, 3)
-	for _, item := range utils.Limit(candidateDocuments, 3) {
-		name := utils.BlankToDefault(item.DocumentName, strconv.FormatInt(item.DocumentId, 10))
-		result = append(result, "我想问《"+name+"》")
-	}
-	return result
-}
-
-// buildClarificationReason 构建澄清原因
-func (r *RouteStage) buildClarificationReason(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
-	if routeDecision == nil || len(routeDecision.Documents) == 0 {
-		return "当前自动知识路由没有形成稳定候选，已改为先向用户确认文档范围。"
-	}
-
-	return fmt.Sprintf("当前自动知识路由置信度为 %.2f，候选文档数为 %d，为避免误选文档，先返回澄清问题。", routeDecision.Confidence, len(candidateDocuments))
 }
 
 // ============================================================================
@@ -766,26 +522,4 @@ func (r *RouteStage) normalizeFallbackText(value string) string {
 	}
 	cleaned := fallbackCleanRegex.ReplaceAllString(value, "")
 	return strings.ToLower(cleaned)
-}
-
-// extractDocumentIds 提取文档ID列表
-func (r *RouteStage) extractDocumentIds(candidates []*vo.DocumentRouteCandidate) []int64 {
-	result := make([]int64, 0, len(candidates))
-	for _, item := range candidates {
-		if item.DocumentId > 0 {
-			result = append(result, item.DocumentId)
-		}
-	}
-	return result
-}
-
-// extractTaskIds 提取任务ID列表
-func (r *RouteStage) extractTaskIds(candidates []*vo.DocumentRouteCandidate) []int64 {
-	result := make([]int64, 0, len(candidates))
-	for _, item := range candidates {
-		if item.LastIndexTaskId > 0 {
-			result = append(result, item.LastIndexTaskId)
-		}
-	}
-	return result
 }

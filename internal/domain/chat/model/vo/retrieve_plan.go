@@ -8,35 +8,35 @@ import (
 )
 
 type RetrievalPlan struct {
-	QuestionPlan         *RetrievalQuestionPlan // 检索问题计划
-	ChatMode             string                 // 对话查询模式
-	PrimaryIntent        string                 // 主要检索意图
-	SuggestedIntents     []string               // 建议的检索意图列表
-	ScopeMode            string                 // 知识库选择模式
-	KnowledgeBaseIds     []int64                // 知识库ID列表
-	AllowedDocumentScope []int64                // 允许的文档范围ID列表
-	DocumentScope        []int64                // 文档范围ID列表
-	TaskScope            []int64                // 任务范围ID列表
-	//MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件
-	//EvidenceApplicabilityPlan *EvidenceApplicabilityPlan   // 证据适用性计划
-	//Channels                  []RetrievalChannelPlan       // 检索通道计划列表
-	StructureNavigation *StructureNavigationIntent // 结构导航意图
-	NavigationAction    string                     // 文档导航动作
-	//StructureNavigationResult *StructureNavigationResult   // 结构导航结果
-	StructureAnchor *ConversationStructureAnchor // 会话结构锚点
-	ItemAnchor      *ConversationItemAnchor      // 会话条目锚点
-	//TableIntent               *TableIntent                 // 表格检索意图
-	//GraphIntent               *GraphIntent                 // 图谱检索意图
-	//RaptorIntent              *RaptorIntent                // RAPTOR检索意图
-	//RoutePlan                 *RetrievalRoutePlan          // 路由计划
-	//RankFeatures              *RankFeatureBundle           // 排序特征包
-	CandidateWindow      int      // 候选窗口大小
-	RerankWindow         int      // 重排序窗口大小
-	RerankRequested      bool     // 是否请求重排序
-	FinalEvidenceBudget  int      // 最终证据预算
-	SubQuestionTimeoutMs int64    // 子问题超时时间（毫秒）
-	Reasons              []string // 决策原因列表
-	Source               string   // 来源标识
+	QuestionPlan              *RetrievalQuestionPlan       // 检索问题计划
+	ChatMode                  string                       // 对话查询模式
+	PrimaryIntent             string                       // 主要检索意图
+	SuggestedIntents          []string                     // 建议的检索意图列表
+	ScopeMode                 string                       // 知识库选择模式
+	KnowledgeBaseIds          []int64                      // 知识库ID列表
+	AllowedDocumentScope      []int64                      // 允许的文档范围ID列表
+	DocumentScope             []int64                      // 文档范围ID列表
+	TaskScope                 []int64                      // 任务范围ID列表
+	MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件
+	EvidenceApplicabilityPlan *EvidenceApplicabilityPlan   // 证据适用性计划
+	Channels                  []RetrievalChannelPlan       // 检索通道计划列表
+	StructureNavigation       *StructureNavigationIntent   // 结构导航意图
+	NavigationAction          string                       // 文档导航动作
+	StructureNavigationResult *StructureNavigationResult   // 结构导航结果
+	StructureAnchor           *ConversationStructureAnchor // 会话结构锚点
+	ItemAnchor                *ConversationItemAnchor      // 会话条目锚点
+	TableIntent               *TableIntent                 // 表格检索意图
+	GraphIntent               *GraphIntent                 // 图谱检索意图
+	RaptorIntent              *RaptorIntent                // RAPTOR检索意图
+	RoutePlan                 *RetrievalRoutePlan          // 路由计划
+	RankFeatures              *RankFeatureBundle           // 排序特征包
+	CandidateWindow           int                          // 候选窗口大小
+	RerankWindow              int                          // 重排序窗口大小
+	RerankRequested           bool                         // 是否请求重排序
+	FinalEvidenceBudget       int                          // 最终证据预算
+	SubQuestionTimeoutMs      int64                        // 子问题超时时间（毫秒）
+	Reasons                   []string                     // 决策原因列表
+	Source                    string                       // 来源标识
 }
 
 // ValidateForExecution 校验执行计划的完整性和合法性
@@ -172,13 +172,6 @@ func requirePositiveIDs(values []int64, field string) error {
 		}
 	}
 	return nil
-}
-
-// isFiniteAndNonNegative 检查浮点数是否非负（简化版，实际应使用 math.IsNaN/IsInf）
-func isFiniteAndNonNegative(v float64) bool {
-	// 在 Go 中，NaN 和 Inf 需要导入 math 包，此处用简单逻辑示意
-	// 实际项目应结合 math.IsNaN 和 math.IsInf
-	return v >= 0 // 假设调用方已保证非 NaN/Inf，或在此添加 math 校验
 }
 
 func (p *RetrievalPlan) validateRouteAuthorization() error {

@@ -1469,6 +1469,32 @@ func ToKnowledgeBaseSelectionSnapshot(source *aggregate2.KnowledgeBaseSelectionS
 	}
 	return pVoKnowledgeBaseSelectionSnapshot
 }
+func ToKnowledgeRouteDecision(source *vo2.KnowledgeRouteDecision) *vo.KnowledgeRouteDecision {
+	var pVoKnowledgeRouteDecision *vo.KnowledgeRouteDecision
+	if source != nil {
+		var voKnowledgeRouteDecision vo.KnowledgeRouteDecision
+		if (*source).Scopes != nil {
+			voKnowledgeRouteDecision.Scopes = make([]*vo.ScopeRouteCandidate, len((*source).Scopes))
+			for i := 0; i < len((*source).Scopes); i++ {
+				voKnowledgeRouteDecision.Scopes[i] = pVoScopeRouteCandidateToPVoScopeRouteCandidate((*source).Scopes[i])
+			}
+		}
+		if (*source).Topics != nil {
+			voKnowledgeRouteDecision.Topics = make([]*vo.TopicRouteCandidate, len((*source).Topics))
+			for j := 0; j < len((*source).Topics); j++ {
+				voKnowledgeRouteDecision.Topics[j] = pVoTopicRouteCandidateToPVoTopicRouteCandidate((*source).Topics[j])
+			}
+		}
+		voKnowledgeRouteDecision.Documents = voDocumentRouteCandidatesToPVoDocumentRouteCandidateList((*source).Documents)
+		voKnowledgeRouteDecision.Confidence = (*source).Confidence
+		voKnowledgeRouteDecision.RouteStatus = NormalizeString((*source).RouteStatus)
+		voKnowledgeRouteDecision.Reason = NormalizeString((*source).Reason)
+		voKnowledgeRouteDecision.Source = NormalizeString((*source).Source)
+		voKnowledgeRouteDecision.DegradedReasons = (*source).DegradedReasons
+		pVoKnowledgeRouteDecision = &voKnowledgeRouteDecision
+	}
+	return pVoKnowledgeRouteDecision
+}
 func ToKnowledgeRouteTraceItem(source *entity2.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem {
 	var pKnowledgeKnowledgeRouteTraceItem *knowledge.KnowledgeRouteTraceItem
 	if source != nil {
@@ -1738,6 +1764,19 @@ func pVoDocumentMetadataToPVoDocumentMetadata(source *vo2.DocumentMetadata) *vo.
 	}
 	return pVoDocumentMetadata
 }
+func pVoDocumentRouteCandidateToPVoDocumentRouteCandidate(source *vo2.DocumentRouteCandidate) *vo.DocumentRouteCandidate {
+	var pVoDocumentRouteCandidate *vo.DocumentRouteCandidate
+	if source != nil {
+		var voDocumentRouteCandidate vo.DocumentRouteCandidate
+		voDocumentRouteCandidate.DocumentId = (*source).DocumentId
+		voDocumentRouteCandidate.DocumentName = NormalizeString((*source).DocumentName)
+		voDocumentRouteCandidate.LastIndexTaskId = (*source).LastIndexTaskId
+		voDocumentRouteCandidate.Score = (*source).Score
+		voDocumentRouteCandidate.Reason = NormalizeString((*source).Reason)
+		pVoDocumentRouteCandidate = &voDocumentRouteCandidate
+	}
+	return pVoDocumentRouteCandidate
+}
 func pVoHybridOptionsToPVoHybridOptions(source *vo2.HybridOptions) *vo.HybridOptions {
 	var pVoHybridOptions *vo.HybridOptions
 	if source != nil {
@@ -1783,6 +1822,38 @@ func pVoRagRuntimeOptionsToPVoRagRuntimeOptions(source *vo2.RagRuntimeOptions) *
 	}
 	return pVoRagRuntimeOptions
 }
+func pVoScopeRouteCandidateToPVoScopeRouteCandidate(source *vo2.ScopeRouteCandidate) *vo.ScopeRouteCandidate {
+	var pVoScopeRouteCandidate *vo.ScopeRouteCandidate
+	if source != nil {
+		var voScopeRouteCandidate vo.ScopeRouteCandidate
+		voScopeRouteCandidate.ScopeName = NormalizeString((*source).ScopeName)
+		voScopeRouteCandidate.Score = (*source).Score
+		voScopeRouteCandidate.Reason = NormalizeString((*source).Reason)
+		pVoScopeRouteCandidate = &voScopeRouteCandidate
+	}
+	return pVoScopeRouteCandidate
+}
+func pVoTopicRouteCandidateToPVoTopicRouteCandidate(source *vo2.TopicRouteCandidate) *vo.TopicRouteCandidate {
+	var pVoTopicRouteCandidate *vo.TopicRouteCandidate
+	if source != nil {
+		var voTopicRouteCandidate vo.TopicRouteCandidate
+		voTopicRouteCandidate.TopicName = NormalizeString((*source).TopicName)
+		voTopicRouteCandidate.Score = (*source).Score
+		voTopicRouteCandidate.Reason = NormalizeString((*source).Reason)
+		pVoTopicRouteCandidate = &voTopicRouteCandidate
+	}
+	return pVoTopicRouteCandidate
+}
 func timeDurationToTimeDuration(source time.Duration) time.Duration {
 	return source
+}
+func voDocumentRouteCandidatesToPVoDocumentRouteCandidateList(source vo2.DocumentRouteCandidates) []*vo.DocumentRouteCandidate {
+	var pVoDocumentRouteCandidateList []*vo.DocumentRouteCandidate
+	if source != nil {
+		pVoDocumentRouteCandidateList = make([]*vo.DocumentRouteCandidate, len(source))
+		for i := 0; i < len(source); i++ {
+			pVoDocumentRouteCandidateList[i] = pVoDocumentRouteCandidateToPVoDocumentRouteCandidate(source[i])
+		}
+	}
+	return pVoDocumentRouteCandidateList
 }
