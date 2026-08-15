@@ -48,6 +48,14 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectionNames() string {
 	return string(marshal)
 }
 
+func (s *KnowledgeBaseSelectionSnapshot) RagRuntimeConfigSnapshot() string {
+	if s == nil || s.RagRuntimeOptions == nil {
+		return ""
+	}
+	snapshot, _ := json.Marshal(s.RagRuntimeOptions)
+	return string(snapshot)
+}
+
 // ResolveAllowedExecutionScope 从知识库选择快照解析允许的执行范围
 //
 // 检查逻辑：

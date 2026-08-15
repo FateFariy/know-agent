@@ -7,8 +7,10 @@ import (
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -18,18 +20,19 @@ import (
 type Chain struct {
 	repo            adapter.ChatRepository
 	stages          []Stage
-	runtimeRegistry *ChatRuntimeRegistry
-	documentFetcher adapter.DocumentGateway
+	runtime         *ChatRuntimeRegistry
+	docGateway      adapter.DocumentGateway
 	memoryManager   memory.SessionMemoryManager
+	recommender     recommend.QuestionRecommender
 	distributedLock adapter.DistributedLock
 	checkPointStore adapter.CheckPointStore
 }
 
-func NewChain(repo adapter.ChatRepository, runtimeRegistry *ChatRuntimeRegistry, stages ...Stage) *Chain {
+func NewChain(repo adapter.ChatRepository, runtime *ChatRuntimeRegistry, stages ...Stage) *Chain {
 	return &Chain{
-		repo:            repo,
-		stages:          stages,
-		runtimeRegistry: runtimeRegistry,
+		repo:    repo,
+		stages:  stages,
+		runtime: runtime,
 	}
 }
 
@@ -37,7 +40,11 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 	for _, stage := range c.stages {
 		if err := stage.Execute(ctx, convCtx); err != nil {
 			if errors.Is(err, errorx.ErrSessionRunning) {
-				return c.startFailed(ctx, convCtx)
+				_ = c.startFailed(ctx, convCtx)
+			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				c.stop(ctx, convCtx, "客户端已取消请求")
+			} else {
+				c.finishFailed(ctx, convCtx, err)
 			}
 			return err
 		}
@@ -47,19 +54,19 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 }
 
 func (c *Chain) Stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
-	convCtx, ok := c.runtimeRegistry.Get(conversationId)
+	convCtx, ok := c.runtime.Get(conversationId)
 	if !ok {
 		return "没有找到正在执行的会话", false
 	}
-	return c.stopTask(ctx, convCtx, reason)
+	return c.stop(ctx, convCtx, reason)
 }
 
-// stopTask 停止任务：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
-func (c *Chain) stopTask(ctx context.Context, convCtx *Context, reason string) (string, bool) {
+// stop 停止：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
+func (c *Chain) stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return "会话已停止", false
 	}
-	if curr, exists := c.runtimeRegistry.Get(convCtx.ConversationId); exists && curr != convCtx {
+	if curr, exists := c.runtime.Get(convCtx.ConversationId); exists && curr != convCtx {
 		return "会话已由新的执行接管", false
 	}
 	// defer 中刷新会话摘要 + 执行清理
@@ -92,7 +99,7 @@ func (c *Chain) stopTask(ctx context.Context, convCtx *Context, reason string) (
 
 	// 构造停止态 exchange 并落库
 	stopExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusStopped, reason)
-	if err := c.completeExchange(ctx, stopExchange); err == nil {
+	if err = c.completeExchange(ctx, stopExchange); err == nil {
 		metadata := map[string]any{
 			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusStopped),
 			"reason":       reason,
@@ -201,7 +208,7 @@ func (c *Chain) finishSuccessfully(ctx context.Context, convCtx *Context) {
 	}
 }
 
-// finishWithFailure 以失败状态收尾当前会话交互（exchange）。
+// finishFailed 以失败状态收尾当前会话交互（exchange）
 //
 // 执行流程：
 //  1. 原子检查 Finalized 标志（CAS：false → true），确保仅首次调用生效，避免重复收尾
@@ -211,7 +218,7 @@ func (c *Chain) finishSuccessfully(ctx context.Context, convCtx *Context) {
 //  5. 发送失败事件与流 Complete 到客户端（失败不影响主流程）
 //  6. 刷新 DebugTrace 的运行时统计
 //  7. 组装失败态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记追踪阶段
-func (c *Chain) finishWithFailure(ctx context.Context, convCtx *Context, err error) {
+func (c *Chain) finishFailed(ctx context.Context, convCtx *Context, err error) {
 	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return
@@ -244,7 +251,6 @@ func (c *Chain) finishWithFailure(ctx context.Context, convCtx *Context, err err
 	// 组装失败 ChatExchange（保留已生成的答案/引用/思考链），调用 completeExchange 落库
 	failExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusFailed, errorMessage)
 	if err = c.completeExchange(ctx, failExchange); err == nil {
-		// 落库成功：完成 finalize 追踪阶段，写入失败快照
 		snapshot := map[string]any{
 			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusFailed),
 			"errorMessage": errorMessage,
@@ -277,9 +283,20 @@ func (c *Chain) refreshDebugTraceRuntimeStats(convCtx *Context) {
 
 // cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
 func (c *Chain) cleanup(convCtx *Context) {
-	c.releaseConversationLock(convCtx.LeaseKey)
-	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
+	c.runtime.Remove(convCtx.ConversationId, convCtx)
 	convCtx.ReleaseResources()
+}
+
+// fetchRecentExchanges 获取最近的历史轮次（排除当前）
+func (c *Chain) fetchRecentExchanges(ctx context.Context, conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
+	recent, err := c.repo.ListRecentExchanges(ctx, conversationId, c.options.historyPreviewTurns)
+	if err != nil {
+		logx.Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
+		return nil
+	}
+	return utils.Filter(recent, func(ex *entity.ChatExchange) bool {
+		return ex != nil && ex.ID != excludeExchangeId
+	})
 }
 
 // completeExchange 完成会话交互（exchange）
@@ -307,17 +324,21 @@ func (c *Chain) completeExchange(ctx context.Context, exchange *entity.ChatExcha
 // buildCurrentChatExchange 构建当前会话交互（exchange）
 func (c *Chain) buildCurrentChatExchange(convCtx *Context, turnStatus int, errorMsg string) *entity.ChatExchange {
 	return &entity.ChatExchange{
-		ID:                  convCtx.ExchangeId,
-		ConversationId:      convCtx.ConversationId,
-		Question:            convCtx.Question,
-		Answer:              convCtx.Answer(),
-		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
-		References:          common.ToJSONArray(convCtx.UniqueReferences()),
-		UsedTools:           common.ToJSONArray(convCtx.SnapshotUsedTools()),
-		DebugTrace:          convCtx.DebugTraceJSON(),
-		TurnStatus:          turnStatus,
-		ErrorMessage:        errorMsg,
-		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
-		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
+		ID:                             convCtx.ExchangeId,
+		ConversationId:                 convCtx.ConversationId,
+		Question:                       convCtx.Question,
+		Answer:                         convCtx.Answer(),
+		ThinkingSteps:                  common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
+		References:                     common.ToJSONArray(convCtx.UniqueReferences()),
+		UsedTools:                      common.ToJSONArray(convCtx.SnapshotUsedTools()),
+		DebugTrace:                     convCtx.DebugTraceJSON(),
+		TurnStatus:                     turnStatus,
+		ErrorMessage:                   errorMsg,
+		FirstResponseTimeMs:            convCtx.FirstResponseTimeMs.Load(),
+		TotalResponseTimeMs:            time.Since(convCtx.StartTime).Milliseconds(),
+		KnowledgeBaseSelectionMode:     convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
+		SelectedKnowledgeBaseIdsJson:   convCtx.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
+		SelectedKnowledgeBaseNamesJson: convCtx.KnowledgeBaseSelectionSnapshot.SelectionNames(),
+		RetrievalConfigSnapshot:        convCtx.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
 	}
 }

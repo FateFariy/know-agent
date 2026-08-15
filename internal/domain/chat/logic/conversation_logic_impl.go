@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync/atomic"
 	"time"
 
-	"github.com/duke-git/lancet/v2/slice"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
@@ -36,17 +34,17 @@ const (
 
 // ConversationLogicImpl 聊天业务逻辑实现
 type ConversationLogicImpl struct {
-	repo                  adapter.ChatRepository
-	preOrchestrator       preparation.ConversationPreOrchestrator
-	renderer              adapter.PromptRenderer
-	knowledgeBaseResolver adapter.KnowledgeBaseResolver
-	runtimeRegistry       *conversation.ChatRuntimeRegistry
-	executorRegistry      *executor.Registry
-	recommender           recommend.QuestionRecommender
-	memoryManager         memory.SessionMemoryManager
-	distributedLock       adapter.DistributedLock
-	checkPointStore       adapter.CheckPointStore
-	chain                 *conversation.Chain
+	repo             adapter.ChatRepository
+	preOrchestrator  preparation.ConversationPreOrchestrator
+	renderer         adapter.PromptRenderer
+	baseGateway      adapter.KnowledgeBaseGateway
+	runtimeRegistry  *conversation.ChatRuntimeRegistry
+	executorRegistry *executor.Registry
+	recommender      recommend.QuestionRecommender
+	memoryManager    memory.SessionMemoryManager
+	distributedLock  adapter.DistributedLock
+	checkPointStore  adapter.CheckPointStore
+	chain            *conversation.Chain
 	*options
 }
 
@@ -56,7 +54,7 @@ var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	executorRegistry *executor.Registry,
-	knowledgeBaseResolver adapter.KnowledgeBaseResolver,
+	baseGateway adapter.KnowledgeBaseGateway,
 	preOrchestrator preparation.ConversationPreOrchestrator,
 	renderer adapter.PromptRenderer,
 	recommender recommend.QuestionRecommender,
@@ -65,16 +63,16 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	checkPointStore adapter.CheckPointStore,
 ) *ConversationLogicImpl {
 	return &ConversationLogicImpl{
-		repo:                  repo,
-		executorRegistry:      executorRegistry,
-		knowledgeBaseResolver: knowledgeBaseResolver,
-		preOrchestrator:       preOrchestrator,
-		renderer:              renderer,
-		runtimeRegistry:       &conversation.ChatRuntimeRegistry{},
-		recommender:           recommender,
-		memoryManager:         memoryManager,
-		distributedLock:       distributedLock,
-		checkPointStore:       checkPointStore,
+		repo:             repo,
+		executorRegistry: executorRegistry,
+		baseGateway:      baseGateway,
+		preOrchestrator:  preOrchestrator,
+		renderer:         renderer,
+		runtimeRegistry:  &conversation.ChatRuntimeRegistry{},
+		recommender:      recommender,
+		memoryManager:    memoryManager,
+		distributedLock:  distributedLock,
+		checkPointStore:  checkPointStore,
 		options: &options{
 			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
 			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
@@ -108,7 +106,7 @@ func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, sink
 	}
 
 	// 构建对话上下文
-	convCtx, err := c.buildConversationContext(ctx, cmd)
+	convCtx, err := c.buildConversationContext(ctx, cmd, sink)
 	if err != nil {
 		return err
 	}
@@ -239,24 +237,20 @@ func (c *ConversationLogicImpl) GetChannelExecutions(ctx context.Context, conver
 	return c.repo.SelectChannelExecutions(ctx, conversationId, exchangeId)
 }
 
-// ---------------------------------------------------------------------------
-// 内部实现：启动计划 / 启动会话 / 执行激活 / 执行计划 / 收尾
-// ---------------------------------------------------------------------------
-
-// buildConversationContext 构建对话上下文：从 ChatCommand 提取问题与对话上下文，生成规范化的对话上下文。
+// buildConversationContext 构建对话上下文：从 ChatCommand 提取问题与对话上下文，生成规范化的对话上下文
 //
 // 执行流程：
 //  1. 规范化会话 ID：优先使用传入的 conversationId；为空时生成无连字符的 UUID
 //  2. 构建初始计划（问题、会话 ID、聊天模式），并填充当前时间
 //  3. 若命令中指定了文档 ID，则从可检索文档列表中查找并写入文档名与索引任务 ID；缺失则返回错误
-func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cmd *vo.ChatCommand) (*conversation.Context, error) {
+func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cmd *vo.ChatCommand, sink adapter.Sink) (*conversation.Context, error) {
 	// 规范化会话 ID —— 空值时生成 UUID 作为新会话标识
-	conversationId := strutil.Trim(cmd.ConversationId)
+	conversationId := utils.Trim(cmd.ConversationId)
 	if conversationId == "" {
 		conversationId = utils.GenerateUUIDWithoutHyphen()
 	}
 
-	selectionSnapshot, err := c.knowledgeBaseResolver.Resolve(ctx, cmd.ChatMode, cmd.KnowledgeBaseSelectionMode, cmd.SelectedKnowledgeBaseIds)
+	selectionSnapshot, err := c.baseGateway.DetermineKnowledgeScope(ctx, cmd.ChatMode, cmd.KnowledgeBaseSelectionMode, cmd.SelectedKnowledgeBaseIds)
 	if err != nil {
 		return nil, err
 	}
@@ -266,12 +260,13 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		Question:                       cmd.Question,
 		ChatMode:                       enum.ToChatQueryMode(cmd.ChatMode),
 		KnowledgeBaseSelectionSnapshot: selectionSnapshot,
+		Sink:                           sink,
 	}
 	if selectionSnapshot.SelectionModeName() == enum.KbSelectionModeNone {
 		convCtx.ChatMode = enum.ChatQueryModeOpenChat
 	}
 
-	// 当命令指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID
+	// 当指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID
 	if cmd.SelectedDocumentId != 0 {
 		documents := utils.Ternary(cmd.KnowledgeBaseSelectionMode == enum.KbSelectionModeNone, nil, selectionSnapshot.AllowedDocuments)
 		index := slices.IndexFunc(documents, func(doc *vo.DocumentMetadata) bool {
@@ -286,172 +281,6 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		convCtx.SelectedTaskId = documents[index].LastIndexTaskId
 	}
 	return convCtx, nil
-}
-
-// bootstrapConversation 启动会话：创建本轮 exchange 记录，构建对话上下文，注册到运行注册表，
-// 并发控制：注册失败表示会话已在执行中，直接落库为失败状态并拒绝，避免同一会话重复执行。
-func (c *ConversationLogicImpl) bootstrapConversation(ctx context.Context, convCtx *conversation.Context) error {
-	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）
-	exchange, err := c.startExchange(ctx, convCtx)
-	if err != nil {
-		return err
-	}
-
-	// 构建对话上下文，绑定可取消的 context（用于后续终止生成）
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	convCtx.CancelFunc = cancelFunc
-
-	// 将 ConversationTrace 存入上下文，供下游 callbacks.Handler 使用
-	cancelCtx = vo.WithTrace(cancelCtx, convCtx.Trace)
-
-	// 注册对话上下文到运行注册表；注册失败意味着会话正被其他执行接管
-	if !c.runtimeRegistry.Register(convCtx) {
-		// 已存在正在执行的会话，回写失败状态并拒绝，让客户端稍后重试
-		failExchange := &entity.ChatExchange{
-			ID:             exchange.ID,
-			ConversationId: convCtx.ConversationId,
-			TurnStatus:     enum.ChatTurnStatusFailed,
-			ErrorMessage:   "该会话当前正在执行中，请稍后再试",
-		}
-		// 完成失败的 exchange
-		if err = c.completeExchange(ctx, failExchange); err != nil {
-			return err
-		}
-		return fmt.Errorf("该会话当前正在执行中，请稍后再试")
-	}
-
-	// 在独立 goroutine 中激活生成逻辑（不阻塞启动返回）
-	c.activateGeneration(cancelCtx, convCtx)
-
-	return nil
-}
-
-// activateGeneration 激活生成逻辑：在 goroutine 中执行对话的生成、流式下发与收尾工作。
-//
-// 执行流程：
-//  1. 检查 finalized 快速返回（会话已被取消/终止）
-//  2. 启动租约续期 goroutine，用于周期性延长分布式锁
-//  3. 执行 buildConversationExecution 构建并执行对话生成；失败时走失败收尾
-//  4. 进入 for-select 循环消费执行结果：
-//     - context 被取消 → 调用 stopTask 中止
-//     - resultCh 关闭 → 调用 finishSuccessfully 收尾成功
-//     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
-//
-// 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
-func (c *ConversationLogicImpl) activateGeneration(ctx context.Context, convCtx *conversation.Context) {
-	// 快速路径：会话已被前置 finalize，直接返回
-	if convCtx.Finalized.Load() {
-		return
-	}
-
-	// 启动租约续期 goroutine，用于周期性延长分布式锁
-	go c.startLeaseRenewal(ctx, convCtx)
-
-	// 再次检查 finalize（避免刚启动即被取消，此时直接释放资源并返回）
-	if convCtx.Finalized.Load() {
-		convCtx.ReleaseResources()
-		return
-	}
-
-	// 构建并执行对话生成，返回流式结果 channel
-	resultCh, err := c.buildConversationExecution(convCtx)(ctx)
-	if err != nil {
-		// 构建/执行异常：记录错误日志，走失败收尾逻辑
-		logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-		c.finishWithFailure(ctx, convCtx, fmt.Errorf("执行出现异常: %v", err))
-		return
-	}
-
-	// 执行完成后再次检查 finalize（下游在执行期间被取消时）
-	if convCtx.Finalized.Load() {
-		convCtx.ReleaseResources()
-		return
-	}
-
-	// 进入 for-select 循环消费流式结果并下发/收尾
-	for {
-		select {
-		case <-ctx.Done():
-			// 客户端取消请求：调用 stopTask 中止
-			c.stopTask(ctx, convCtx, "客户端已取消请求")
-			return
-		case chunk, ok := <-resultCh:
-			if !ok {
-				// resultCh 被关闭 → 执行器正常结束，走成功收尾
-				c.finishSuccessfully(ctx, convCtx)
-				return
-			}
-			// 收到 chunk：转发给客户端 channel；发送失败则按失败收尾
-			if err = convCtx.PublishText(chunk); err != nil {
-				logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-				c.finishWithFailure(ctx, convCtx, err)
-				return
-			}
-		}
-	}
-}
-
-// buildConversationExecution 构建对话执行：执行计划的外层封装。
-//
-// 在闭包中完成：
-//  1. 发送"正在分析问题上下文"的思考事件
-//  2. 调用 prepareExecutionPlan 生成执行计划并写入 convCtx
-//  3. 发送"上下文分析完成，已准备执行计划"的思考事件
-//  4. 通过 executorRegistry 根据 plan.Mode 解析执行器
-//  5. 调用 executor.Execute 进入实际执行逻辑，返回流式结果 channel
-func (c *ConversationLogicImpl) buildConversationExecution(convCtx *conversation.Context) func(ctx context.Context) (<-chan string, error) {
-	return func(ctx context.Context) (<-chan string, error) {
-		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
-		if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
-			return nil, err
-		}
-
-		// 构建执行计划（可能触发路由/改写/子问题分析），并原子写入 convCtx
-		plan, err := c.prepareExecutionPlan(ctx, convCtx)
-		if err != nil {
-			return nil, err
-		}
-		convCtx.ExecutionPlan.Store(plan)
-
-		// 发送"上下文分析完成"的思考事件（前端调试/感知）
-		err = convCtx.PublishThinking("上下文分析完成，已准备执行计划。")
-		if err != nil {
-			return nil, err
-		}
-
-		// 根据执行计划 Mode 从执行器注册表解析执行器
-		executor, err := c.executorRegistry.Get(plan.Mode)
-		if err != nil {
-			return nil, err
-		}
-
-		// 调用执行器，返回流式结果 channel（由调用方在 activateGeneration 中消费）
-		return executor.Execute(ctx, convCtx)
-	}
-}
-
-// startLeaseRenewal 启动租约续期，若续期失败则自动停止当前会话并终止生成
-func (c *ConversationLogicImpl) startLeaseRenewal(ctx context.Context, convCtx *conversation.Context) {
-	ticker := time.NewTicker(chatRunningLeaseRenewInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			// 外部调用取消函数，停止续期
-			return
-		case <-ticker.C:
-			if convCtx.Finalized.Load() {
-				return
-			}
-			// 执行续期逻辑
-			if err := c.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
-				logx.Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d, err=%v",
-					convCtx.ConversationId, convCtx.ExchangeId, err)
-				c.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
-				return
-			}
-		}
-	}
 }
 
 // prepareExecutionPlan 准备执行计划
@@ -567,142 +396,6 @@ func (c *ConversationLogicImpl) stopTask(ctx context.Context, convCtx *conversat
 	}
 }
 
-// finishSuccessfully 以成功状态完成当前会话交互（exchange）
-//
-// 执行流程：
-//  1. 原子检查 Finalized 标志（CAS：false → true），避免重复收尾
-//  2. defer 中异步刷新会话摘要并执行清理（任何返回路径都会执行）
-//  3. 启动 finalize 与 recommendation 两个追踪阶段（忽略其错误）
-//  4. 生成推荐追问：需要澄清时返回澄清选项，否则由 recommender 生成
-//  5. 向客户端流补发引用事件、推荐事件，并发送流 Complete
-//  6. 刷新 DebugTrace 运行时统计
-//  7. 组装成功态 ChatExchange，调用 completeExchange 落库；根据落库结果完成或标记追踪阶段
-func (c *ConversationLogicImpl) finishSuccessfully(ctx context.Context, convCtx *conversation.Context) {
-	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return
-	}
-
-	// 发送 finish 事件
-	_ = convCtx.PublishFinish()
-
-	// defer 中刷新会话摘要 + 执行清理
-	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
-	defer func() {
-		_ = recover()
-		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(convCtx)
-	}()
-
-	// 从 convCtx 中取出当前答案与去重后的引用列表（供后续发送事件与落库使用）
-	answer := convCtx.Answer()
-	uniqueReferences := convCtx.UniqueReferences()
-
-	// 启动 recommendation 阶段
-	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在生成推荐追问。"})
-
-	// 生成推荐追问
-	// - 若本次交互是澄清（NeedClarification 为真），则直接使用澄清选项作为推荐
-	// - 否则，拉取最近交互记录，由 recommender 基于当前问答与历史生成推荐
-	var recommendations []string
-	if convCtx.NeedClarification() {
-		recommendations = convCtx.ClarificationOptions()
-	} else {
-		recentExchanges := c.fetchRecentExchanges(ctx, convCtx.ConversationId, convCtx.ExchangeId)
-		recommendations = c.recommender.Generate(ctx, convCtx.Question, answer, recentExchanges)
-	}
-
-	// 完成 recommendation 追踪阶段，并写入推荐数量快照
-	snapshot := map[string]any{"recommendationCount": len(recommendations), "recommendations": recommendations}
-	_ = vo.OnEnd(recommendCtx, &vo.StageOutput{SummaryText: "推荐追问生成完成。", Snapshot: snapshot})
-
-	// 向客户端流补发引用事件，最后发送流 Complete 信号
-	if len(recommendations) > 0 {
-		if err := convCtx.PublishRecommendations(recommendations); err != nil {
-			logx.Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-		}
-	}
-
-	// 启动 finalize 与 recommendation 两个追踪阶段
-	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
-
-	// 刷新 DebugTrace 的运行时统计
-	c.refreshDebugTraceRuntimeStats(convCtx)
-
-	// 组装成功态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记 finalize 追踪阶段
-	successExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusCompleted, "")
-	successExchange.Recommendations = common.ToJSONArray(recommendations)
-	if err := c.completeExchange(ctx, successExchange); err == nil {
-		// 落库成功：完成 finalize 追踪阶段，写入完成快照（含推荐、引用、答案长度）
-		snapshot = map[string]any{
-			"finalStatus":         enum.ChatTurnStatusName(enum.ChatTurnStatusCompleted),
-			"recommendationCount": len(recommendations),
-			"recommendations":     recommendations,
-			"referenceCount":      len(uniqueReferences),
-			"answerLength":        len(answer),
-		}
-		_ = vo.OnEnd(finalizeCtx, &vo.StageOutput{SummaryText: "会话已按完成状态收尾。", Snapshot: snapshot})
-	} else {
-		_ = vo.OnError(finalizeCtx, "会话收尾落库失败", err)
-	}
-}
-
-// finishWithFailure 以失败状态收尾当前会话交互（exchange）。
-//
-// 执行流程：
-//  1. 原子检查 Finalized 标志（CAS：false → true），确保仅首次调用生效，避免重复收尾
-//  2. 打印错误日志
-//  3. defer 中异步刷新会话摘要并执行清理（保证在任何 return 路径都会执行）
-//  4. 启动 finalize 追踪阶段
-//  5. 发送失败事件与流 Complete 到客户端（失败不影响主流程）
-//  6. 刷新 DebugTrace 的运行时统计
-//  7. 组装失败态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记追踪阶段
-func (c *ConversationLogicImpl) finishWithFailure(ctx context.Context, convCtx *conversation.Context, err error) {
-	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return
-	}
-	// 打印错误日志
-	logx.Errorf("会话执行失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-
-	// defer 中刷新会话摘要 + 执行清理
-	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
-	defer func() {
-		_ = recover()
-		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(convCtx)
-	}()
-
-	// 启动 finalize 追踪阶段（失败时忽略错误，不影响主流程）
-	errorMessage := err.Error()
-	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾失败会话。"})
-
-	// 向失败事件 + 流 Complete 信号；发送失败仅告警
-	if err = convCtx.PublishError(errorMessage); err != nil {
-		logx.Warnf("发送失败事件失败, conversationId=%s, exchangeId=%d, error=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-	}
-
-	// 刷新 DebugTrace 的运行时统计
-	c.refreshDebugTraceRuntimeStats(convCtx)
-
-	// 组装失败 ChatExchange（保留已生成的答案/引用/思考链），调用 completeExchange 落库
-	failExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusFailed, errorMessage)
-	if err = c.completeExchange(ctx, failExchange); err == nil {
-		// 落库成功：完成 finalize 追踪阶段，写入失败快照
-		snapshot := map[string]any{
-			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusFailed),
-			"errorMessage": errorMessage,
-			"answerLength": convCtx.AnswerLength(),
-		}
-		_ = vo.OnEnd(finalizeCtx, &vo.StageOutput{SummaryText: "会话已按失败状态收尾。", Snapshot: snapshot})
-	} else {
-		_ = vo.OnError(finalizeCtx, "失败态收尾失败。", err)
-	}
-}
-
 // refreshDebugTraceRuntimeStats 刷新调试轨迹中的统计信息
 func (c *ConversationLogicImpl) refreshDebugTraceRuntimeStats(convCtx *conversation.Context) {
 	debugTrace := convCtx.DebugTrace.Load()
@@ -720,39 +413,6 @@ func (c *ConversationLogicImpl) refreshDebugTraceRuntimeStats(convCtx *conversat
 		ToolCallsThreadLimit:  c.options.maxToolCallsPerThread,
 	}
 	convCtx.DebugTrace.Store(debugTrace)
-}
-
-// startExchange 开始新一轮会话交互（exchange）
-func (c *ConversationLogicImpl) startExchange(ctx context.Context, plan *vo.StreamLaunchPlan) (*entity.ChatExchange, error) {
-	// 构造对话实体（按 ConversationId 聚合整个会话），状态初始化为 Running
-	dialogue := &entity.ChatDialogue{
-		ConversationId:       plan.ConversationId,
-		Question:             plan.Question,
-		ChatMode:             plan.ChatMode,
-		SelectedDocumentId:   plan.SelectedDocumentId,
-		SelectedDocumentName: plan.SelectedDocumentName,
-		SessionStatus:        enum.ChatSessionStatusRunning,
-	}
-	// 构造本轮交互实体，状态 Running（使用雪花 ID 保证全局唯一）
-	chatExchange := &entity.ChatExchange{
-		ID:             utils.GetSnowflakeNextID(),
-		ConversationId: plan.ConversationId,
-		Question:       plan.Question,
-		TurnStatus:     enum.ChatTurnStatusRunning,
-	}
-	// 事务中原子执行：Upsert 对话 + 插入新交互
-	startFn := func(txCtx context.Context) error {
-		// Upsert：若对话记录已存在（同一 ConversationId）则更新，否则插入
-		if err := c.repo.UpsertDialogue(txCtx, dialogue); err != nil {
-			return err
-		}
-		// 插入本轮交互记录
-		return c.repo.InsertExchange(txCtx, chatExchange)
-	}
-	if err := c.repo.Do(ctx, startFn); err != nil {
-		return nil, err
-	}
-	return chatExchange, nil
 }
 
 // completeExchange 完成会话交互（exchange）
@@ -790,22 +450,6 @@ func (c *ConversationLogicImpl) releaseConversationLock(leaseKey string) {
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// 辅助方法（构建上下文、流辅助、JSON 辅助等）
-// ---------------------------------------------------------------------------
-
-// fetchRecentExchanges 获取最近的历史轮次（排除当前）
-func (c *ConversationLogicImpl) fetchRecentExchanges(ctx context.Context, conversationId string, excludeExchangeId int64) []*entity.ChatExchange {
-	recent, err := c.repo.ListRecentExchanges(ctx, conversationId, c.options.historyPreviewTurns)
-	if err != nil {
-		logx.Warnf("列出最近轮次失败, conversationId=%s, err=%v", conversationId, err)
-		return nil
-	}
-	return slice.Filter(recent, func(_ int, ex *entity.ChatExchange) bool {
-		return ex != nil && ex.ID != excludeExchangeId
-	})
 }
 
 // buildCurrentChatExchange 构建当前会话交互（exchange）

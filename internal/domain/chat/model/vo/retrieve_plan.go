@@ -3,10 +3,8 @@ package vo
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 type RetrievalPlan struct {

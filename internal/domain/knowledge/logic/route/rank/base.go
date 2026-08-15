@@ -95,7 +95,7 @@ func (b *base) listRetrievableDocuments(ctx context.Context, rankCtx *Context) (
 	var docs []*vo.DocumentMetadata
 	var err error
 	if len(rankCtx.AllowedDocumentIds) != 0 {
-		docs, err = b.docGateway.FindRetrieveDocumentByIds(ctx, rankCtx.AllowedDocumentIds)
+		docs, err = b.docGateway.FindRetrieveDocumentByIds(ctx, rankCtx.AllowedDocumentIds...)
 		if err != nil {
 			logx.Warnf("查询可检索文档失败: %v", err)
 		}

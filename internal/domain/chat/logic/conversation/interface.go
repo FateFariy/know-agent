@@ -2,6 +2,8 @@ package conversation
 
 import (
 	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 // Stage 表示对话流程中的一个阶段

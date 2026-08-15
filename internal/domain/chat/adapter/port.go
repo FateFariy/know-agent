@@ -96,6 +96,7 @@ type KnowledgeRouter interface {
 	RecordShadowRoute(ctx context.Context, exchangeId, documentId int64, conversationId, question, rewriteQuestion string) error
 }
 
-type KnowledgeBaseResolver interface {
-	Resolve(ctx context.Context, chatMode, kbSelectionMode string, selectedKnowledgeBaseIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
+type KnowledgeBaseGateway interface {
+	// DetermineKnowledgeScope 确定知识范围
+	DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
 }

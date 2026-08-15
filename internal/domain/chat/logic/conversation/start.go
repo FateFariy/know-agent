@@ -97,6 +97,7 @@ func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*enti
 		KnowledgeBaseSelectionMode:     convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
 		SelectedKnowledgeBaseIdsJson:   convCtx.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
 		SelectedKnowledgeBaseNamesJson: convCtx.KnowledgeBaseSelectionSnapshot.SelectionNames(),
+		RetrievalConfigSnapshot:        convCtx.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
 	}
 	// 事务中原子执行：Upsert 对话 + 插入新交互
 	startFn := func(txCtx context.Context) error {
@@ -121,15 +122,15 @@ func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*enti
 //  2. 启动租约续期 goroutine，用于周期性延长分布式锁
 //  3. 执行 buildConversationExecution 构建并执行对话生成；失败时走失败收尾
 //  4. 进入 for-select 循环消费执行结果：
-//     - context 被取消 → 调用 stopTask 中止
+//     - context 被取消 → 调用 stop 中止
 //     - resultCh 关闭 → 调用 finishSuccessfully 收尾成功
 //     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
 //
 // 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
-func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) {
+func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) error {
 	// 快速路径：会话已被前置 finalize，直接返回
 	if convCtx.Finalized.Load() {
-		return
+		return nil
 	}
 
 	// 启动租约续期 goroutine，用于周期性延长分布式锁
@@ -138,82 +139,18 @@ func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) {
 	// 再次检查 finalize（避免刚启动即被取消，此时直接释放资源并返回）
 	if convCtx.Finalized.Load() {
 		convCtx.ReleaseResources()
-		return
+		return nil
 	}
 
-	// 构建并执行对话生成，返回流式结果 channel
-	resultCh, err := s.buildConversationExecution(convCtx)(ctx)
-	if err != nil {
-		// 构建/执行异常：记录错误日志，走失败收尾逻辑
-		logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-		s.finishWithFailure(ctx, convCtx, fmt.Errorf("执行出现异常: %v", err))
-		return
+	// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
+	if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
+		return err
 	}
 
 	// 执行完成后再次检查 finalize（下游在执行期间被取消时）
 	if convCtx.Finalized.Load() {
 		convCtx.ReleaseResources()
-		return
-	}
-
-	// 进入 for-select 循环消费流式结果并下发/收尾
-	for {
-		select {
-		case <-ctx.Done():
-			// 客户端取消请求：调用 stopTask 中止
-			s.stopTask(ctx, convCtx, "客户端已取消请求")
-			return
-		case chunk, ok := <-resultCh:
-			if !ok {
-				// resultCh 被关闭 → 执行器正常结束，走成功收尾
-				s.finishSuccessfully(ctx, convCtx)
-				return
-			}
-			// 收到 chunk：转发给客户端 channel；发送失败则按失败收尾
-			if err = convCtx.PublishText(chunk); err != nil {
-				logx.Errorf("执行出现异常, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-				s.finishWithFailure(ctx, convCtx, err)
-				return
-			}
-		}
-	}
-}
-
-// buildConversationExecution 构建对话执行：执行计划的外层封装。
-//
-// 在闭包中完成：
-//  1. 发送"正在分析问题上下文"的思考事件
-//  2. 调用 prepareExecutionPlan 生成执行计划并写入 convCtx
-//  3. 发送"上下文分析完成，已准备执行计划"的思考事件
-//  4. 通过 executorRegistry 根据 plan.Mode 解析执行器
-//  5. 调用 executor.Execute 进入实际执行逻辑，返回流式结果 channel
-func (s *StartStage) buildConversationExecution(convCtx *Context) func(ctx context.Context) (<-chan string, error) {
-	return func(ctx context.Context) (<-chan string, error) {
-		// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
-		if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
-			return nil, err
-		}
-
-		// 构建执行计划（可能触发路由/改写/子问题分析），并原子写入 convCtx
-		plan, err := c.prepareExecutionPlan(ctx, convCtx)
-		if err != nil {
-			return nil, err
-		}
-		convCtx.SetExecutePlan(plan)
-
-		// 发送"上下文分析完成"的思考事件（前端调试/感知）
-		if err := convCtx.PublishThinking("上下文分析完成，已准备执行计划。"); err != nil {
-			return nil, err
-		}
-
-		// 根据执行计划 Mode 从执行器注册表解析执行器
-		executor, err := c.executorRegistry.Get(plan.Mode)
-		if err != nil {
-			return nil, err
-		}
-
-		// 调用执行器，返回流式结果 channel（由调用方在 activateGeneration 中消费）
-		return executor.Execute(ctx, convCtx)
+		return nil
 	}
 }
 
@@ -241,12 +178,6 @@ func (s *StartStage) startLeaseRenewal(ctx context.Context, convCtx *Context) {
 	}
 }
 
-// prepareExecutionPlan 准备执行计划
-//
-//	1.调用编排器准备基础计划（改写、路由、历史记忆等）
-//	2.使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
-//	3. 根据所选文档刷新会话范围（在文档模式下）
-//	4. 初始化调试轨迹
 func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context) (*vo.ConversationExecutionPlan, error) {
 	execPlan, err := s.preOrchestrator.Prepare(ctx, convCtx)
 	if err != nil {
@@ -262,7 +193,7 @@ func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context)
 		"historySummary":               execPlan.HistorySummary,
 		"question":                     execPlan.OriginalQuestion,
 	}
-	agentQuestion, err := c.renderer.Render(enum.AgentQuestion, variables)
+	agentQuestion, err := s.renderer.Render(enum.AgentQuestion, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +207,7 @@ func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context)
 			SelectedDocumentId:   execPlan.SelectedDocumentId,
 			SelectedDocumentName: execPlan.SelectedDocumentName,
 		}
-		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
+		if err = s.repo.RefreshSessionScope(ctx, dialogue); err != nil {
 			logx.Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
 			return nil, err
 		}

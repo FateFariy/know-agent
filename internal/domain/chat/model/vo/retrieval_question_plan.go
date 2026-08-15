@@ -2,14 +2,22 @@ package vo
 
 // RetrievalQuestionPlan 检索问题计划
 type RetrievalQuestionPlan struct {
-	CurrentQuestion          string                     // 当前问题
-	RewrittenQuestion        string                     // 改写后问题
-	NormalizedQuery          string                     // 归一化查询
-	ExecutionQueries         []*RetrievalExecutionQuery // 执行查询列表
-	FollowUp                 bool                       // 是否追问
-	HistoryInherited         bool                       // 是否继承历史
-	HistoryInheritanceSource string                     // 历史继承来源
-	InheritedContextAnchors  []*RetrievalContextAnchor  // 继承的上下文锚点列表
+	//CurrentQuestion          string                     // 当前问题
+	//RewrittenQuestion        string                     // 改写后问题
+	//NormalizedQuery          string                     // 归一化查询
+	//ExecutionQueries         []*RetrievalExecutionQuery // 执行查询列表
+	//FollowUp                 bool                       // 是否追问
+	//HistoryInherited         bool                       // 是否继承历史
+	//HistoryInheritanceSource string                     // 历史继承来源
+	//InheritedContextAnchors  []*RetrievalContextAnchor  // 继承的上下文锚点列表
+	MainQuestion      string   `json:"mainQuestion"`      // 主问题
+	RetrievalQuestion string   `json:"retrievalQuestion"` // 检索问题
+	SubQuestions      []string `json:"subQuestions"`      // 子问题列表
+	RetrievalMode     string   `json:"retrievalMode"`     // 检索模式
+	MaxResults        int      `json:"maxResults"`        // 最大结果数
+	ScoreThreshold    float64  `json:"scoreThreshold"`    // 分数阈值
+	ExpandToParent    bool     `json:"expandToParent"`    // 是否扩展到父级
+	ExpandToChildren  bool     `json:"expandToChildren"`  // 是否扩展到子级
 }
 
 type RetrievalExecutionQuery struct {

@@ -13,7 +13,7 @@ type ConversationExecutionPlan struct {
 	Mode                         enum.ExecutionMode          // 执行模式
 	ChatMode                     enum.ChatQueryMode          // 对话模式/查询模式
 	OriginalQuestion             string                      // 原始问题
-	AgentQuestion                string                      // 问题改写结果
+	AgentQuestion                string                      // 代理问题
 	RewriteQuestion              string                      // 问题改写结果
 	RewriteSubQuestions          []string                    // 问题改写子问题列表
 	RetrievalQuestion            string                      // 检索问题
