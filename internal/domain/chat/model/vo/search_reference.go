@@ -88,7 +88,7 @@ func (r *SearchReference) UniqueKey() string {
 	return fmt.Sprintf("%s:%s:%s", utils.BlankToDefault(r.SourceType, "UNKNOWN"), r.Title, r.Snippet)
 }
 
-// ReferenceSummary 生成引用摘要（用于 debug snapshot）
+// ReferenceSummary 生成引用摘要
 func (r *SearchReference) ReferenceSummary(suffix string) string {
 	title := utils.BlankToDefault(r.DocumentName, r.Title)
 	path := utils.BlankToDefault(r.SectionPath, r.Url)

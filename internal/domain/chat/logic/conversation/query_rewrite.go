@@ -69,7 +69,7 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 	// 启动改写追踪阶段
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(),
 		&vo.StageInput{SummaryText: "正在生成检索友好的问题表达。",
-			Snapshot: buildRewriteStageSnapshot(question, historySummary, nil, q.enabled, q.temperature, q.topP, q.thinking)})
+			Snapshot: q.buildRewriteStageSnapshot(question, historySummary, nil)})
 
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := q.rewriter.Rewrite(ctx, question, historySummary)
@@ -80,7 +80,7 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 
 	// 提交改写追踪（包含改写结果快照以便离线分析）
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "问题改写完成。",
-		Snapshot: buildRewriteStageSnapshot(question, historySummary, rewriteResult, q.enabled, q.temperature, q.topP, q.thinking)})
+		Snapshot: q.buildRewriteStageSnapshot(question, historySummary, rewriteResult)})
 
 	// 对改写结果做兜底处理
 	//  - RewrittenQuestion 为空时回退到原始问题
@@ -103,13 +103,7 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 }
 
 // buildRewriteStageSnapshot 构建改写阶段的统一快照
-//
-// 快照字段：
-//   - 原始问题、历史摘要（始终输出）
-//   - 若 rewriteResult 非空，则输出改写后的问题、子问题列表、模型原始输出
-//   - 改写开关、temperature、topP、thinking 等模型参数，用于离线分析
-func buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.QuestionRewriteResult,
-	rewriteEnabled bool, temperature, topP float32, thinking bool) map[string]any {
+func (q *QueryRewriteStage) buildRewriteStageSnapshot(question, historySummary string, rewriteResult *vo.QuestionRewriteResult) map[string]any {
 	snapshot := make(map[string]any)
 	snapshot["originalQuestion"] = strutil.Trim(question)
 	snapshot["historyContext"] = strutil.Trim(historySummary)
@@ -121,9 +115,9 @@ func buildRewriteStageSnapshot(question, historySummary string, rewriteResult *v
 		snapshot["rawModelOutput"] = strutil.Trim(rewriteResult.RawModelOutput)
 	}
 	// 追加当前配置的改写参数（便于离线分析参数影响）
-	snapshot["rewriteOverrideEnabled"] = rewriteEnabled
-	snapshot["rewriteTemperature"] = temperature
-	snapshot["rewriteTopP"] = topP
-	snapshot["rewriteThinking"] = thinking
+	snapshot["rewriteOverrideEnabled"] = q.enabled
+	snapshot["rewriteTemperature"] = q.temperature
+	snapshot["rewriteTopP"] = q.topP
+	snapshot["rewriteThinking"] = q.thinking
 	return snapshot
 }

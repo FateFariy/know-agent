@@ -72,6 +72,9 @@ func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *Context) (*vo.
 		decision.Reason = "问题为空或无法提取有效关键词"
 		return decision, nil
 	}
+
+	routeCtx.Embedding(ctx, r.embedder)
+
 	rankCtx := &rank.Context{
 		RoutingText:              routeCtx.RoutingText,
 		QueryEmbedding:           routeCtx.QueryEmbedding,
@@ -94,6 +97,11 @@ func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *Context) (*vo.
 	decision.IsDegraded = len(routeCtx.Diagnostics) > 0
 	decision.DegradedReasons = utils.MapKeys(routeCtx.Diagnostics)
 
+	trace := r.buildTrace(routeCtx, decision, "auto")
+	if err := r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
+		logx.Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", routeCtx.ConversationId, err)
+	}
+
 	topDocName := ""
 	if len(rankCtx.DocumentCandidates) > 0 {
 		topDocName = rankCtx.DocumentCandidates[0].DocumentName
@@ -111,7 +119,7 @@ func (r *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, routeCtx *Co
 		logx.Warnf("知识路由[shadow]失败: conversationId=%s, err=%v", routeCtx.ConversationId, err)
 		return err
 	}
-	trace := r.buildTrace(routeCtx, decision)
+	trace := r.buildTrace(routeCtx, decision, "shadow")
 	if err = r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
 		logx.Warnf("记录知识路由[shadow]失败: conversationId=%s, exchangeId=%d, err=%v", routeCtx.ConversationId, routeCtx.ExchangeId, err)
 		return err
@@ -119,24 +127,14 @@ func (r *KnowledgeRouteImpl) RecordShadowRoute(ctx context.Context, routeCtx *Co
 	return nil
 }
 
-// RecordAutoRoute 记录自动路由结果
-func (r *KnowledgeRouteImpl) RecordAutoRoute(ctx context.Context, routeCtx *Context, decision *vo.KnowledgeRouteDecision) error {
-	trace := r.buildTrace(routeCtx, decision)
-	if err := r.repo.InsertKnowledgeRouteTrace(ctx, trace); err != nil {
-		logx.Warnf("记录知识路由[auto]失败: conversationId=%s, err=%v", routeCtx.ConversationId, err)
-		return err
-	}
-	return nil
-}
-
 // buildTrace 组装路由跟踪结构（不含选中文档与命中标记，由各路由模式补充）
-func (r *KnowledgeRouteImpl) buildTrace(routeCtx *Context, decision *vo.KnowledgeRouteDecision) *entity.KnowledgeRouteTrace {
+func (r *KnowledgeRouteImpl) buildTrace(routeCtx *Context, decision *vo.KnowledgeRouteDecision, mode string) *entity.KnowledgeRouteTrace {
 	trace := &entity.KnowledgeRouteTrace{
 		ConversationId:             routeCtx.ConversationId,
 		ExchangeId:                 routeCtx.ExchangeId,
 		Question:                   routeCtx.Question,
 		RewriteQuestion:            routeCtx.RewriteQuestion,
-		Mode:                       routeCtx.Mode,
+		Mode:                       mode,
 		KnowledgeBaseSelectionMode: routeCtx.KnowledgeBaseSelectionMode,
 		SelectedDocumentId:         routeCtx.SelectedDocumentId,
 		HitSelectedDocument:        decision.ResolveHitSelectedDocument(routeCtx.SelectedDocumentId),

@@ -73,3 +73,12 @@ func (anchors EvidenceAnchors) RenderStructuredContext(budget int) string {
 	}
 	return utils.ClipHead(strings.TrimSpace(builder.String()), budget)
 }
+
+// ResolveTopic 从锚点中推断主题（优先取 sectionPath，否则取 documentName）
+func (anchors EvidenceAnchors) ResolveTopic() string {
+	if len(anchors) == 0 {
+		return ""
+	}
+	anchor := anchors[0]
+	return utils.BlankToDefault(anchor.SectionPath, anchor.DocumentName)
+}

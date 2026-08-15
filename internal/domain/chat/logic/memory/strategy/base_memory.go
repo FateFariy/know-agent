@@ -72,7 +72,7 @@ func (b *baseMemoryStrategy) renderRecentQuestionTranscript(exchanges []*entity.
 	}
 
 	var builder strings.Builder
-	builder.WriteString("【最近相关对话】\n")
+	builder.WriteString("【最近相关提问】\n")
 	for i := 0; i < len(renderable) && i < keepRecentTurns; i++ {
 		exchange := renderable[i]
 		builder.WriteString("用户：")

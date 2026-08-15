@@ -4,18 +4,15 @@ import (
 	"context"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 )
 
 // Context 路由上下文
 type Context struct {
 	ExchangeId                 int64
-	DocumentId                 int64
 	ConversationId             string
 	Question                   string
 	RewriteQuestion            string
-	Mode                       string
 	KnowledgeBaseSelectionMode string
 	SelectedDocumentId         int64
 	RoutingText                string
@@ -24,12 +21,9 @@ type Context struct {
 	SelectedKnowledgeBaseNames []string
 	AllowedDocumentIds         []int64
 	Diagnostics                map[string]struct{}
-	ScopeCandidates            []*vo.ScopeRouteCandidate
-	TopicCandidates            []*vo.TopicRouteCandidate
-	DocumentCandidates         []*vo.DocumentRouteCandidate
 }
 
-func NewQueryContext(question, rewriteQuestion string, selectedKnowledgeBaseIds []int64, allowedDocumentIds []int64) *Context {
+func NewRouteContext(question, rewriteQuestion string, selectedKnowledgeBaseIds []int64, allowedDocumentIds []int64) *Context {
 	r := &Context{
 		Question:        utils.Trim(question),
 		RewriteQuestion: utils.Trim(rewriteQuestion),
@@ -44,15 +38,19 @@ func NewQueryContext(question, rewriteQuestion string, selectedKnowledgeBaseIds 
 	return r
 }
 
-func (r *Context) Embedding(ctx context.Context, embedder adapter.Embedder) error {
+func (r *Context) Embedding(ctx context.Context, embedder adapter.Embedder) {
+	if embedder == nil {
+		r.Diagnostics["SEMANTIC_ROUTE_NOT_CONFIGURED"] = struct{}{}
+	}
 	if embedder != nil && r.RoutingText != "" {
 		vectors, err := embedder.EmbedStrings(ctx, r.RoutingText)
 		if err != nil || len(vectors) == 0 {
-			return err
+			r.Diagnostics["SEMANTIC_QUERY_EMBEDDING_UNAVAILABLE"] = struct{}{}
+			return
 		}
 		r.QueryEmbedding = vectors[0]
 	}
-	return nil
+	return
 }
 
 // buildRoutingText 将原始问题与改写文本拼接；两文本相同则返回其一

@@ -2,6 +2,8 @@ package conversation
 
 import (
 	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // Stage 表示对话流程中的一个阶段
@@ -22,4 +24,38 @@ type ConditionalStage interface {
 
 	// ShouldExecute 决定是否执行该阶段
 	ShouldExecute(ctx context.Context, convCtx *Context) bool
+}
+
+type RouteInput struct {
+	ConversationId             string
+	ExchangeId                 int64
+	Question                   string
+	RewriteQuestion            string
+	KnowledgeBaseSelectionMode string
+	SelectedDocumentId         int64
+	SelectedKnowledgeBaseIds   []int64
+	SelectedKnowledgeBaseNames []string
+	AllowedDocumentIds         []int64
+}
+
+// KnowledgeRouter 知识路由器
+type KnowledgeRouter interface {
+	// Route 根据问题进行知识路由
+	Route(ctx context.Context, input *RouteInput) (*vo.KnowledgeRouteDecision, error)
+
+	// RecordShadowRoute 记录影子路由结果
+	RecordShadowRoute(ctx context.Context, input *RouteInput) error
+}
+
+func NewRouteInput(convCtx *Context, rewriteQuestion string) *RouteInput {
+	return &RouteInput{
+		Question:                   convCtx.Question,
+		RewriteQuestion:            rewriteQuestion,
+		ConversationId:             convCtx.ConversationId,
+		ExchangeId:                 convCtx.ExchangeId,
+		SelectedDocumentId:         convCtx.SelectedDocumentId,
+		SelectedKnowledgeBaseNames: convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
+		SelectedKnowledgeBaseIds:   convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds,
+		AllowedDocumentIds:         convCtx.KnowledgeBaseSelectionSnapshot.AllowedDocumentIds,
+	}
 }

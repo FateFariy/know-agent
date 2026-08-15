@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -16,4 +17,19 @@ type Conversation struct {
 	CoveredExchangeId        int64                   // 压缩覆盖到的最后一轮对话ID
 	CoveredExchangeCount     int                     // 压缩覆盖的对话轮次数
 	CompressionCount         int                     // 历史压缩的总次数
+}
+
+func (c *Conversation) BuildSnapshot() map[string]any {
+	if c == nil {
+		return nil
+	}
+	return map[string]any{
+		"compressionApplied":       c.CompressionApplied,
+		"coveredExchangeId":        c.CoveredExchangeId,
+		"coveredExchangeCount":     c.CoveredExchangeCount,
+		"compressionCount":         c.CompressionCount,
+		"longTermSummary":          utils.Trim(c.LongTermSummary),
+		"recentTranscript":         utils.Trim(c.RecentTranscript),
+		"recentQuestionTranscript": utils.Trim(c.RecentQuestionTranscript),
+	}
 }

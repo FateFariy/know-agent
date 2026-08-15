@@ -44,24 +44,12 @@ func (m *MemoryLoadStage) Name() string {
 func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
 
-	memoryContext, err := m.summarizeHistory(ctx, convCtx)
+	history, err := m.summarizeHistory(ctx, convCtx)
 	if err != nil {
 		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
 		return err
 	}
-
-	// 写入快照（压缩状态、覆盖的 exchange 信息、长期/近期摘要）
-	snapshot := map[string]any{
-		"compressionApplied":       memoryContext.CompressionApplied,
-		"coveredExchangeId":        memoryContext.CoveredExchangeId,
-		"coveredExchangeCount":     memoryContext.CoveredExchangeCount,
-		"compressionCount":         memoryContext.CompressionCount,
-		"longTermSummary":          strutil.Trim(memoryContext.LongTermSummary),
-		"recentTranscript":         strutil.Trim(memoryContext.RecentTranscript),
-		"RecentQuestionTranscript": strutil.Trim(memoryContext.RecentQuestionTranscript),
-	}
-	// 提交记忆追踪阶段，成功后返回记忆上下文
-	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: snapshot})
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: history.BuildSnapshot()})
 
 	return nil
 }
@@ -82,7 +70,7 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 	historySummary := historyPlanningContext.BuildPlanningText(memoryContext.RecentTranscript, m.planningHistoryMaxChars)
 	// 当前问题 + 近期对话转录，用于后续改写与检索
 	recentQuestions := utils.Trim(memoryContext.RecentQuestionTranscript)
-	questionHistoryContext := vo.NewQuestionHistoryContext(question, recentQuestions, nil, nil, m.planningHistoryMaxChars)
+	questionHistoryContext := vo.NewQuestionHistoryContext(recentQuestions, m.planningHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断）
 	analyzer := vo.NewQueryAnalyzer(question)

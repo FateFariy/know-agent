@@ -30,7 +30,7 @@ func (i *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
 	if i != nil {
 		queryType = i.QueryType
 	}
-	return queryType == "FOLLOW_UP"
+	return queryType == enum.QueryTypeFollowUp
 }
 
 // IsStructureNavigationConfident 判断结构导航意图是否置信度高

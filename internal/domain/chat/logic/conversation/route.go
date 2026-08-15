@@ -17,8 +17,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	kelog "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
 var (
@@ -35,24 +33,24 @@ var (
 //   - Document：指定文档问答，在选定的文档内做意图路由
 //   - AutoDocument：自动知识路由 + 选文档 + 文档内导航
 type RouteStage struct {
-	knowledgeRouter kelog.KnowledgeRouter
+	knowledgeRouter KnowledgeRouter
 	documentRouter  intent.DocumentRouter
-	fetcher         adapter.DocumentGateway
+	docGateway      adapter.DocumentGateway
 	noEvidenceReply string
 }
 
 var _ Stage = (*RouteStage)(nil)
 
 func NewRouteStage(
-	knowledgeRouter kelog.KnowledgeRouter,
+	knowledgeRouter KnowledgeRouter,
 	documentRouter intent.DocumentRouter,
-	fetcher adapter.DocumentGateway,
+	docGateway adapter.DocumentGateway,
 	noEvidenceReply string,
 ) *RouteStage {
 	return &RouteStage{
 		knowledgeRouter: knowledgeRouter,
 		documentRouter:  documentRouter,
-		fetcher:         fetcher,
+		docGateway:      docGateway,
 		noEvidenceReply: noEvidenceReply,
 	}
 }
@@ -147,7 +145,7 @@ func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, 
 	}
 
 	// 记录影子路由（仅用于离线分析，失败只告警）
-	if err := r.knowledgeRouter.RecordShadowRoute(ctx, convCtx.ExchangeId, convCtx.SelectedDocumentId, convCtx.ConversationId, convCtx.Question, execPlan.RewriteQuestion); err != nil {
+	if err := r.knowledgeRouter.RecordShadowRoute(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion)); err != nil {
 		logx.Warnf("记录影子路由失败: %v", err)
 	}
 
@@ -185,14 +183,10 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
 	//  - 路由失败时仅告警，并以空决策对象兜底（避免后续代码 panic）
-	routeDecision, err := r.knowledgeRouter.Route(ctx, convCtx.Question, execPlan.RewriteQuestion)
+	routeDecision, err := r.knowledgeRouter.Route(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion))
 	if err != nil {
-		routeDecision = &klvo.KnowledgeRouteDecision{}
+		routeDecision = &vo.KnowledgeRouteDecision{}
 		logx.Warnf("知识路由失败: %v", err)
-	}
-	// 记录自动路由（用于离线分析；失败只告警）
-	if err = r.knowledgeRouter.RecordAutoRoute(ctx, convCtx.ExchangeId, convCtx.ConversationId, convCtx.Question, execPlan.RewriteQuestion, routeDecision); err != nil {
-		logx.Warnf("记录自动路由失败: %v", err)
 	}
 
 	// 步骤 3：选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
@@ -357,7 +351,7 @@ func (r *RouteStage) looksLikeOpenChatQuestion(normalizedQuestion string, requir
 //  4. 置信度 < 0.55 时将路由候选与 fallback 候选合并（扩大范围以弥补低置信度）
 //  5. 否则直接返回路由候选
 //  6. 最终候选列表需经过允许范围过滤（仅保留在 allowedScope 内的候选）
-func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *klvo.KnowledgeRouteDecision, question, rewriteQuestion string, allowedScope *AllowedExecutionScope) []*klvo.DocumentRouteCandidate {
+func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *vo.KnowledgeRouteDecision, question, rewriteQuestion string, allowedScope *AllowedExecutionScope) []*vo.DocumentRouteCandidate {
 	// 分支 1：路由决策为空或无文档 → 使用 fallback 做兜底
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return r.filterCandidatesByScope(r.fallbackDocuments(ctx, question, rewriteQuestion, 5), allowedScope)
@@ -365,7 +359,7 @@ func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *kl
 
 	// 候选数量阈值：置信度 ≥ 0.80 时取前 5，否则取前 3
 	candidateLimit := utils.Ternary(routeDecision.Confidence >= 0.80, 5, 3)
-	var candidates []*klvo.DocumentRouteCandidate
+	var candidates []*vo.DocumentRouteCandidate
 	for _, doc := range routeDecision.Documents {
 		// 仅保留具有有效 DocumentId 与 LastIndexTaskId 的候选
 		if doc.DocumentId > 0 && doc.LastIndexTaskId > 0 {
@@ -394,7 +388,7 @@ func (r *RouteStage) selectAutoCandidates(ctx context.Context, routeDecision *kl
 
 // filterCandidatesByScope 对候选文档列表执行允许范围过滤
 // 仅保留在 allowedScope 内的候选；若 allowedScope 不可执行，则返回全部候选
-func (r *RouteStage) filterCandidatesByScope(candidates []*klvo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) []*klvo.DocumentRouteCandidate {
+func (r *RouteStage) filterCandidatesByScope(candidates []*vo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) []*vo.DocumentRouteCandidate {
 	if len(candidates) == 0 {
 		return candidates
 	}
@@ -402,7 +396,7 @@ func (r *RouteStage) filterCandidatesByScope(candidates []*klvo.DocumentRouteCan
 	if allowedScope == nil || !allowedScope.Executable() {
 		return candidates
 	}
-	result := make([]*klvo.DocumentRouteCandidate, 0, len(candidates))
+	result := make([]*vo.DocumentRouteCandidate, 0, len(candidates))
 	for _, c := range candidates {
 		if c != nil && r.candidateMatchesAllowedScope(c, allowedScope) {
 			result = append(result, c)
@@ -412,7 +406,7 @@ func (r *RouteStage) filterCandidatesByScope(candidates []*klvo.DocumentRouteCan
 }
 
 // candidateMatchesAllowedScope 判断候选文档是否在允许的执行范围内
-func (r *RouteStage) candidateMatchesAllowedScope(candidate *klvo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) bool {
+func (r *RouteStage) candidateMatchesAllowedScope(candidate *vo.DocumentRouteCandidate, allowedScope *AllowedExecutionScope) bool {
 	if candidate == nil || allowedScope == nil {
 		return false
 	}
@@ -428,7 +422,7 @@ func (r *RouteStage) candidateMatchesAllowedScope(candidate *klvo.DocumentRouteC
 //  4. Confidence 在 [threshold, 1.0] 范围内且为有限值
 //  5. 候选得分 > 0（positive check）
 //  6. 候选与原始路由决策的 top 候选匹配（documentId + taskId）
-func (r *RouteStage) selectRecommendation(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) *klvo.DocumentRouteCandidate {
+func (r *RouteStage) selectRecommendation(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) *vo.DocumentRouteCandidate {
 	// 条件 1-3：路由决策、置信度、路由状态、候选列表基础校验
 	if routeDecision == nil || routeDecision.Confidence <= 0 ||
 		routeDecision.RouteStatus != "SUCCESS" ||
@@ -453,12 +447,12 @@ func (r *RouteStage) selectRecommendation(routeDecision *klvo.KnowledgeRouteDeci
 }
 
 // isPositiveCandidate 判断候选是否为正分候选：score > 0
-func isPositiveCandidate(candidate *klvo.DocumentRouteCandidate) bool {
+func isPositiveCandidate(candidate *vo.DocumentRouteCandidate) bool {
 	return candidate != nil && candidate.Score > 0
 }
 
 // isOriginalTopCandidate 判断候选是否与路由决策的原始top候选匹配
-func (r *RouteStage) isOriginalTopCandidate(routeDecision *klvo.KnowledgeRouteDecision, candidate *klvo.DocumentRouteCandidate) bool {
+func (r *RouteStage) isOriginalTopCandidate(routeDecision *vo.KnowledgeRouteDecision, candidate *vo.DocumentRouteCandidate) bool {
 	if len(routeDecision.Documents) == 0 || candidate == nil {
 		return false
 	}
@@ -513,9 +507,9 @@ func (r *RouteStage) scopeAuthorityLabel(scope *AllowedExecutionScope) string {
 //
 // 在路由决策不可用或置信度偏低时，从全部可检索文档中基于元数据（名称/标签等）匹配查询词，
 // 返回得分最高的前 limit 个候选，理由统一标注为"低置信度时基于文档元数据进行保守扩范围候选"。
-func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*klvo.DocumentRouteCandidate {
+func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*vo.DocumentRouteCandidate {
 	// 拉取全部可检索文档；失败或为空时返回 nil（上游可继续用主文档或混合检索兜底）
-	docs, err := r.fetcher.FetchRetrieveDocuments(ctx)
+	docs, err := r.docGateway.FetchRetrieveDocuments(ctx)
 	if err != nil {
 		logx.Warnf("获取可检索文档失败: %v", err)
 		return nil
@@ -539,12 +533,12 @@ func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQue
 	})
 
 	// 取前 limit 个候选，组装为 DocumentRouteCandidate（统一 Reason 标注）
-	result := make([]*klvo.DocumentRouteCandidate, 0, limit)
+	result := make([]*vo.DocumentRouteCandidate, 0, limit)
 	for i, desc := range docs {
 		if i >= limit {
 			break
 		}
-		result = append(result, &klvo.DocumentRouteCandidate{
+		result = append(result, &vo.DocumentRouteCandidate{
 			DocumentId:      desc.DocumentId,
 			DocumentName:    desc.DocumentName,
 			LastIndexTaskId: desc.LastIndexTaskId,
@@ -558,9 +552,9 @@ func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQue
 
 // mergeCandidates 合并主候选与次候选并去重（以 DocumentId 为键），最终数量不超过 limit。
 // 去重策略：主候选优先（先遍历 primary，其条目被保留），secondary 仅在未出现时被加入。
-func (r *RouteStage) mergeCandidates(primary, secondary []*klvo.DocumentRouteCandidate, limit int) []*klvo.DocumentRouteCandidate {
+func (r *RouteStage) mergeCandidates(primary, secondary []*vo.DocumentRouteCandidate, limit int) []*vo.DocumentRouteCandidate {
 	// 使用 map 做 DocumentId 维度的去重；primary 先遍历以保证优先级
-	merged := make(map[int64]*klvo.DocumentRouteCandidate)
+	merged := make(map[int64]*vo.DocumentRouteCandidate)
 	ids := make([]int64, 0, len(primary)+len(secondary))
 	for _, doc := range primary {
 		merged[doc.DocumentId] = doc
@@ -575,7 +569,7 @@ func (r *RouteStage) mergeCandidates(primary, secondary []*klvo.DocumentRouteCan
 	}
 
 	// 将去重后的候选按插入顺序收集为结果
-	result := make([]*klvo.DocumentRouteCandidate, 0, limit)
+	result := make([]*vo.DocumentRouteCandidate, 0, limit)
 	for _, id := range ids {
 		if len(result) >= limit {
 			break
@@ -599,7 +593,7 @@ func (r *RouteStage) mergeCandidates(primary, secondary []*klvo.DocumentRouteCan
 //  5. 前两名候选得分差 ≤ 3 且分属不同知识范围（KnowledgeScopeCode 不同）—— 存在真正的歧义
 //
 // 特别例外：前两名候选得分均为 0（说明打分完全失败）时不做澄清，以避免无意义的空选项提示。
-func (r *RouteStage) shouldAskClarification(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) bool {
+func (r *RouteStage) shouldAskClarification(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) bool {
 	// 判定 1：候选为空 —— 需要澄清
 	if len(candidateDocuments) == 0 {
 		return true
@@ -633,7 +627,7 @@ func (r *RouteStage) shouldAskClarification(routeDecision *klvo.KnowledgeRouteDe
 }
 
 // buildClarificationReply 构建澄清回复
-func (r *RouteStage) buildClarificationReply(candidateDocuments []*klvo.DocumentRouteCandidate) string {
+func (r *RouteStage) buildClarificationReply(candidateDocuments []*vo.DocumentRouteCandidate) string {
 	topCandidates := candidateDocuments
 	if len(topCandidates) > 3 {
 		topCandidates = topCandidates[:3]
@@ -667,7 +661,7 @@ func (r *RouteStage) buildClarificationReply(candidateDocuments []*klvo.Document
 }
 
 // buildClarificationOptions 构建澄清选项
-func (r *RouteStage) buildClarificationOptions(candidateDocuments []*klvo.DocumentRouteCandidate) []string {
+func (r *RouteStage) buildClarificationOptions(candidateDocuments []*vo.DocumentRouteCandidate) []string {
 	if len(candidateDocuments) == 0 {
 		return nil
 	}
@@ -681,7 +675,7 @@ func (r *RouteStage) buildClarificationOptions(candidateDocuments []*klvo.Docume
 }
 
 // buildClarificationReason 构建澄清原因
-func (r *RouteStage) buildClarificationReason(routeDecision *klvo.KnowledgeRouteDecision, candidateDocuments []*klvo.DocumentRouteCandidate) string {
+func (r *RouteStage) buildClarificationReason(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) string {
 	if routeDecision == nil || len(routeDecision.Documents) == 0 {
 		return "当前自动知识路由没有形成稳定候选，已改为先向用户确认文档范围。"
 	}
@@ -775,7 +769,7 @@ func (r *RouteStage) normalizeFallbackText(value string) string {
 }
 
 // extractDocumentIds 提取文档ID列表
-func (r *RouteStage) extractDocumentIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
+func (r *RouteStage) extractDocumentIds(candidates []*vo.DocumentRouteCandidate) []int64 {
 	result := make([]int64, 0, len(candidates))
 	for _, item := range candidates {
 		if item.DocumentId > 0 {
@@ -786,7 +780,7 @@ func (r *RouteStage) extractDocumentIds(candidates []*klvo.DocumentRouteCandidat
 }
 
 // extractTaskIds 提取任务ID列表
-func (r *RouteStage) extractTaskIds(candidates []*klvo.DocumentRouteCandidate) []int64 {
+func (r *RouteStage) extractTaskIds(candidates []*vo.DocumentRouteCandidate) []int64 {
 	result := make([]int64, 0, len(candidates))
 	for _, item := range candidates {
 		if item.LastIndexTaskId > 0 {

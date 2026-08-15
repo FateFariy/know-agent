@@ -10,7 +10,7 @@ import (
 type QuestionHistoryContext struct {
 	RenderedText      string          // 完整渲染文本
 	StructuredContext string          // 结构化上下文（证据锚点）
-	RecentContext     string          // 近期对话上下文
+	RecentContext     string          // 近期上下文
 	EvidenceAnchors   EvidenceAnchors // 证据锚点列表
 	ResolvedTopic     string          // 推断的主题
 	FollowUpQuestion  bool            // 是否为追问
@@ -20,57 +20,67 @@ type QuestionHistoryContext struct {
 }
 
 // NewQuestionHistoryContext 构建提问历史上下文
-// 参数：
-//   - question: 当前问题
-//   - recentQuestionTranscript: 最近对话转录（含"用户："）
-//   - queryUnderstanding: 查询理解结果（可为 nil）
-//   - recentEvidenceAnchors: 最近的证据锚点（可为 nil）
-//   - maxChars: 总预算字符数（应 > 0）
-func NewQuestionHistoryContext(question, recentQuestionTranscript string, queryUnderstanding *IntentRecognitionResult,
-	recentEvidenceAnchors EvidenceAnchors, maxChars int) *QuestionHistoryContext {
-	normalizedQuestion := strings.TrimSpace(question)
-	recentUserContext := extractRecentUserQuestions(recentQuestionTranscript)
+func NewQuestionHistoryContext(recentQuestionTranscript string, maxChars int) *QuestionHistoryContext {
 	totalBudget := max(maxChars, 1)
-	hasRecentContext := utils.IsNotBlank(recentUserContext)
-	followUpQuestion := queryUnderstanding.IsFollowUpQuestion(normalizedQuestion)
-	anchors := utils.FilterLimit(recentEvidenceAnchors, 5, func(anchor *EvidenceAnchor) bool {
-		return anchor.HasAnchorIdentity()
-	})
-
 	historyContext := &QuestionHistoryContext{
-		FollowUpQuestion: followUpQuestion,
-		TotalBudget:      totalBudget,
+		TotalBudget: totalBudget,
 	}
-	if !followUpQuestion || (!hasRecentContext && len(anchors) == 0) {
+
+	// 渲染近期用户提问记录（取尾部预算）
+	userQuestions := renderRecentUserQuestions(recentQuestionTranscript, totalBudget)
+	if utils.IsBlank(userQuestions) {
 		return historyContext
 	}
 
-	// 渲染近期上下文（取尾部预算）
-	recentPart := renderRecentContext(recentUserContext, totalBudget)
-	// 结构化部分使用剩余预算
-	structuredBudget := totalBudget - utils.Len(recentPart)
-	structuredPart := EvidenceAnchors(anchors).RenderStructuredContext(structuredBudget)
-	renderedText := utils.JoinNonBlank("\n", structuredPart, recentPart)
+	historyContext.RenderedText = userQuestions
+	historyContext.RecentContext = userQuestions
+	historyContext.RecentBudget = utils.Len(userQuestions)
 
-	if renderedText == "" && len(anchors) == 0 {
-		return historyContext
-	}
-
-	historyContext.RenderedText = renderedText
-	historyContext.StructuredContext = structuredPart
-	historyContext.ResolvedTopic = resolveTopic(anchors)
-	historyContext.RecentContext = recentPart
-	historyContext.EvidenceAnchors = anchors
-	historyContext.RecentBudget = utils.Len(recentPart)
-	historyContext.StructuredBudget = utils.Len(structuredPart)
 	return historyContext
 }
 
-// 提取最近用户问题
-func extractRecentUserQuestions(recentQuestionTranscript string) string {
-	normalized := utils.Trim(recentQuestionTranscript)
+// ApplyFollowUpAndEvidence 根据意图识别结果和证据锚点，补充跟进判断、结构化上下文及最终渲染文本
+func (h *QuestionHistoryContext) ApplyFollowUpAndEvidence(question string, recognitionResult *IntentRecognitionResult, anchors EvidenceAnchors) {
+	if h == nil {
+		return
+	}
+	normalizedQuestion := utils.Trim(question)
 
-	prefixes := []string{"【最近相关对话】", "最近相关对话："}
+	// 判断是否为跟进问题
+	h.FollowUpQuestion = recognitionResult.IsFollowUpQuestion(normalizedQuestion)
+
+	// 过滤证据锚点（最多5个）
+	h.EvidenceAnchors = utils.FilterLimit(anchors, 5, func(anchor *EvidenceAnchor) bool {
+		return anchor.HasAnchorIdentity()
+	})
+
+	// 若既不是跟进问题，又没有有效的用户问题和锚点，则无需补充内容
+	if !h.FollowUpQuestion || (utils.IsBlank(h.RecentContext) && len(h.EvidenceAnchors) == 0) {
+		return
+	}
+
+	// 计算结构化部分的预算（总预算减去已用 RecentContext 长度）
+	structuredBudget := h.TotalBudget - h.RecentBudget
+	h.StructuredContext = h.EvidenceAnchors.RenderStructuredContext(structuredBudget)
+	h.StructuredBudget = utils.Len(h.StructuredContext)
+
+	// 组装最终渲染文本（结构化内容 + 用户问题）
+	renderedText := utils.JoinNonBlank("\n", h.StructuredContext, h.RecentContext)
+	if renderedText != "" || len(h.EvidenceAnchors) > 0 {
+		h.RenderedText = renderedText
+		h.ResolvedTopic = h.EvidenceAnchors.ResolveTopic()
+	}
+}
+
+// renderRecentUserQuestions 从原始转录中提取近期用户问题，并按预算渲染（含标题）
+func renderRecentUserQuestions(rawTranscript string, budget int) string {
+	if budget <= 0 || utils.IsBlank(rawTranscript) {
+		return ""
+	}
+
+	// 提取用户问题部分（去除前缀，仅保留“用户：”行）
+	normalized := utils.Trim(rawTranscript)
+	prefixes := []string{"【最近相关提问】", "最近相关提问："}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(normalized, prefix) {
 			normalized = strings.TrimSpace(normalized[len(prefix):])
@@ -90,31 +100,19 @@ func extractRecentUserQuestions(recentQuestionTranscript string) string {
 		}
 		builder.WriteString(trimmed)
 	}
-
-	return utils.Trim(builder.String())
-}
-
-// resolveTopic 从锚点中推断主题（优先取 sectionPath，否则取 documentName）
-func resolveTopic(anchors []*EvidenceAnchor) string {
-	if len(anchors) == 0 {
+	userQuestions := utils.Trim(builder.String())
+	if userQuestions == "" {
 		return ""
 	}
-	anchor := anchors[0]
-	return utils.BlankToDefault(anchor.SectionPath, anchor.DocumentName)
-}
 
-// renderRecentContext 渲染近期上下文（用户问题部分）
-func renderRecentContext(recentUserContext string, budget int) string {
-	if budget <= 0 || utils.IsBlank(recentUserContext) {
-		return ""
-	}
+	// 渲染（添加标题并截断）
 	title := "对话承接上下文（仅用于理解指代，不作为事实证据）：\n"
 	titleLen := utils.Len(title)
 	if budget <= titleLen {
 		// 预算不够标题，只返回裁剪后的用户问题
-		return utils.ClipTail(recentUserContext, budget)
+		return utils.ClipTail(userQuestions, budget)
 	}
-	body := utils.ClipTail(recentUserContext, budget-titleLen)
+	body := utils.ClipTail(userQuestions, budget-titleLen)
 	if body == "" {
 		return ""
 	}
