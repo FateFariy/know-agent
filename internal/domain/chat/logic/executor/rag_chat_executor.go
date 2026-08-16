@@ -69,7 +69,7 @@ func (e *RagChatExecutor) Execute(ctx context.Context, convCtx *conversation.Con
 
 // streamFromRetrievalContext 基于检索上下文生成流式回答
 func (e *RagChatExecutor) streamFromRetrievalContext(ctx context.Context, convCtx *conversation.Context,
-	plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (<-chan string, error) {
+	plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RetrievalResult) (<-chan string, error) {
 	// 先下发思考事件（检索笔记、渠道列表）
 	notes := retrievalCtx.RetrievalNotes()
 	for _, note := range notes {

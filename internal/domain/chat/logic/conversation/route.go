@@ -266,10 +266,12 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	}
 	execPlan.QuestionHistoryContext.ApplyFollowUpAndEvidence(convCtx.Question, execPlan.RecognitionResult, anchors)
 	execPlan.RecentEvidenceAnchors = anchors
-	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示
+
+	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
 	execPlan.Mode = navigationDecision.ExecutionMode
 	execPlan.NavigationDecision = navigationDecision
-	execPlan.NoEvidenceReply = r.noEvidenceReply
+	execPlan.ApplyNoEvidenceReply()
+	execPlan.RetrievalPlan = r.buildRetrievalPlan(convCtx, execPlan)
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', executionMode=%s, targetSection='%s",
@@ -319,4 +321,9 @@ func (r *RouteStage) filterValidEvidenceAnchors(anchors vo.EvidenceAnchors, allD
 	return utils.Filter(anchors, func(anchor *vo.EvidenceAnchor) bool {
 		return anchor != nil && (utils.ContainsAny(allDocumentIds, anchor.DocumentId))
 	})
+}
+
+// buildRetrievalPlan todo 待填充 RetrievalPlanAssembler
+func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.ConversationExecutionPlan) *vo.RetrievalPlan {
+	return &vo.RetrievalPlan{}
 }

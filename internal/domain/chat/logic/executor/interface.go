@@ -31,5 +31,5 @@ type Executor interface {
 
 // RagPromptAssembler RAG 提示词组装接口
 type RagPromptAssembler interface {
-	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error)
+	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RetrievalResult) (*vo.RagPromptAssemblyResult, error)
 }

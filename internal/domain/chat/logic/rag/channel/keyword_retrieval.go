@@ -6,40 +6,38 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // KeywordRetrievalChannel 关键词检索通道
 type KeywordRetrievalChannel struct {
-	retriever adapter.KeywordRetriever
+	retriever KeywordRetriever
 }
 
-var _ Retrieval = (*KeywordRetrievalChannel)(nil)
-
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever adapter.KeywordRetriever) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever KeywordRetriever) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
 		retriever: retriever,
 	}
 }
 
-// ChannelName 返回通道名称
-func (c *KeywordRetrievalChannel) ChannelName() string {
+// Name 返回通道名称
+func (c *KeywordRetrievalChannel) Name() string {
 	return enum.RetrievalChannelKeyword
 }
 
-// Supports 判断是否支持该执行计划
-func (c *KeywordRetrievalChannel) Supports(plan *vo.ConversationExecutionPlan) bool {
-	return plan.SelectedDocumentId != 0
-}
-
 // Retrieve 执行关键词检索
-func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.DocumentRetrieve) (*vo.RetrievalChannelResult, error) {
-	if !query.ValidSearchable() {
+func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, input *rag.ExecutionInput) (*rag.RetrievalChannelResult, error) {
+	query, err := rag.NewDocumentRetrieve(input, c.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if !query.Validate() {
 		return nil, fmt.Errorf("invaild value")
 	}
 
@@ -49,8 +47,21 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, query *vo.Docume
 		return nil, err
 	}
 
-	return &vo.RetrievalChannelResult{
-		ChannelName: c.ChannelName(),
-		Documents:   docs,
+	channel, _ := input.RequireChannel(c.Name())
+	topScore := docs.TopScore()
+	if topScore <= 0 {
+		return &rag.RetrievalChannelResult{
+			ChannelName: c.Name(),
+			Documents:   docs,
+		}, nil
+	}
+	acceptedFloor := topScore * channel.RelativeScoreFloor
+	accepted := utils.Filter(docs, func(doc *vo.DocumentChunk) bool {
+		return doc != nil && doc.Score >= acceptedFloor
+	})
+
+	return &rag.RetrievalChannelResult{
+		ChannelName: c.Name(),
+		Documents:   accepted,
 	}, nil
 }

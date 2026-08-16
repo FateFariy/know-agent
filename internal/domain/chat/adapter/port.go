@@ -38,16 +38,6 @@ type DistributedLock interface {
 	Extend(ctx context.Context, name string) error
 }
 
-type KeywordRetriever interface {
-	// SearchByKeyword  按关键词检索
-	SearchByKeyword(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
-}
-
-type VectorRetriever interface {
-	// SearchByVector 按向量检索
-	SearchByVector(ctx context.Context, query *vo.DocumentRetrieve) ([]*vo.DocumentChunk, error)
-}
-
 type DocumentGateway interface {
 	// FetchRetrieveDocuments 获取文档
 	FetchRetrieveDocuments(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error)
