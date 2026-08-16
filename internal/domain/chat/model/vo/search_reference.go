@@ -159,7 +159,7 @@ func (r *SearchReference) ToEvidenceAnchor(maxSnippetChars int) *EvidenceAnchor 
 		SectionPath:     r.SectionPath,
 		CanonicalPath:   r.CanonicalPath,
 		ItemIndex:       r.ItemIndex,
-		ParentBlockId:   r.ParentBlockId,
+		ParentChunkId:   r.ParentBlockId,
 		ChunkId:         r.ChunkId,
 		SourceType:      r.SourceType,
 		Channel:         r.Channel,

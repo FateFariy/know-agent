@@ -3,26 +3,13 @@ package conversation
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"sort"
-	"strings"
-
-	"github.com/duke-git/lancet/v2/maputil"
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-)
-
-var (
-	capabilityHints    = []string{"你都能干什么", "你能做什么", "你可以做什么", "你会什么", "你是谁", "怎么用你", "你能帮我什么"}
-	openChatHints      = []string{"天气", "温度", "下雨", "新闻", "股价", "汇率", "热搜", "今天", "明天", "最新", "现在"}
-	chitchatHints      = []string{"你好", "您好", "hello", "hi", "谢谢", "感谢", "再见", "拜拜"}
-	fallbackCleanRegex = regexp.MustCompile(`[\s>\` + "`" + `*#_\-，,。；;：:（）()“”\"'\\[\\]]+`)
-	fallbackSplitRegex = regexp.MustCompile(`[\s、，,；;：:（）()\-的和及与或]+`)
 )
 
 const (
@@ -35,8 +22,9 @@ const (
 //   - Document：指定文档问答，在选定的文档内做意图路由
 //   - AutoDocument：自动知识路由 + 选文档 + 文档内导航
 type RouteStage struct {
+	repo            adapter.ChatRepository
 	knowledgeRouter KnowledgeRouter
-	documentRouter  DocumentRouter
+	documentRouter  route.DocumentRouter
 	docGateway      adapter.DocumentGateway
 	noEvidenceReply string
 }
@@ -44,12 +32,14 @@ type RouteStage struct {
 var _ Stage = (*RouteStage)(nil)
 
 func NewRouteStage(
+	repo adapter.ChatRepository,
 	knowledgeRouter KnowledgeRouter,
-	documentRouter DocumentRouter,
+	documentRouter route.DocumentRouter,
 	docGateway adapter.DocumentGateway,
 	noEvidenceReply string,
 ) *RouteStage {
 	return &RouteStage{
+		repo:            repo,
 		knowledgeRouter: knowledgeRouter,
 		documentRouter:  documentRouter,
 		docGateway:      docGateway,
@@ -181,10 +171,10 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	}
 
 	// 选择候选文档（基于路由决策 + 允许范围过滤），提取候选 ID 列表
-	inScopeCandidates := r.selectAutoCandidates(routeDecision, allowedScope)
+	inScopeCandidates := allowedScope.FilterCandidates(routeDecision.Documents)
 
-	// 选择推荐候选作为主文档，使用 selectRecommendation 综合判断：置信度阈值、候选有效性、原始top匹配
-	topDocument := r.selectRecommendation(routeDecision, inScopeCandidates)
+	// 选择推荐候选作为主文档，使用 SelectRecommendedCandidate 综合判断：置信度阈值、候选有效性、原始top匹配
+	topDocument := routeDecision.SelectRecommendedCandidate(inScopeCandidates, recommendationThreshold)
 	confidentTop := topDocument != nil && topDocument.DocumentId > 0
 
 	// 构建增强快照（含范围信息、路由状态、置信度、候选数、推荐结果）
@@ -242,7 +232,13 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
-	navigationDecision, err := r.documentRouter.Route(ctx, convCtx.SelectedDocumentId, convCtx.Question, rewriteResult)
+	input := &route.DocumentRouteInput{
+		DocumentId:        convCtx.SelectedDocumentId,
+		OriginalQuestion:  convCtx.Question,
+		RewriteResult:     rewriteResult,
+		RecognitionResult: execPlan.RecognitionResult,
+	}
+	navigationDecision, err := r.documentRouter.Route(ctx, input)
 	if err != nil {
 		ctx = vo.OnError(ctx, "执行路由失败。", err)
 		return err
@@ -258,14 +254,26 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
 	}
 
+	anchors, err := r.loadRecentEvidenceAnchors(ctx, convCtx.ConversationId, maxRecentExchanges)
+	if err != nil {
+		ctx = vo.OnError(ctx, "加载最近证据锚点失败。", err)
+		return err
+	}
+	if convCtx.ChatMode == enum.ChatQueryModeDocument {
+		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.SelectedDocumentId)
+	} else {
+		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.KnowledgeBaseSelectionSnapshot.SelectedDocumentIds()...)
+	}
+	execPlan.QuestionHistoryContext.ApplyFollowUpAndEvidence(convCtx.Question, execPlan.RecognitionResult, anchors)
+	execPlan.RecentEvidenceAnchors = anchors
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示
 	execPlan.Mode = navigationDecision.ExecutionMode
 	execPlan.NavigationDecision = navigationDecision
-	execPlan.NoEvidenceReply = execPlan.RequiresRealTimeSearch
+	execPlan.NoEvidenceReply = r.noEvidenceReply
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
 	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', executionMode=%s, targetSection='%s",
-		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), strutil.Trim(convCtx.Question),
+		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), utils.Trim(convCtx.Question),
 		execPlan.RewriteQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
@@ -273,212 +281,42 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	return nil
 }
 
-// ============================================================================
-// 自动路由：候选文档选择
-// ============================================================================
-
-// selectAutoCandidates 根据路由决策和允许范围选择自动候选文档
-func (r *RouteStage) selectAutoCandidates(routeDecision *vo.KnowledgeRouteDecision, allowedScope *vo.AllowedExecutionScope) []*vo.DocumentRouteCandidate {
-	if routeDecision == nil || len(routeDecision.Documents) == 0 || !allowedScope.Executable() {
-		return nil
+// loadRecentEvidenceAnchors 加载最近的证据锚点，从对话历史中抽取追问可继承的结构锚点
+func (r *RouteStage) loadRecentEvidenceAnchors(ctx context.Context, conversationId string, limit int) (vo.EvidenceAnchors, error) {
+	if conversationId == "" || limit <= 0 {
+		return nil, nil
 	}
 
-	return utils.Filter(routeDecision.Documents, func(c *vo.DocumentRouteCandidate) bool {
-		return c != nil && allowedScope.Contains(c.DocumentId, c.LastIndexTaskId)
-	})
-}
-
-// selectRecommendation 从候选文档中选择推荐文档作为主文档
-func (r *RouteStage) selectRecommendation(routeDecision *vo.KnowledgeRouteDecision, candidateDocuments []*vo.DocumentRouteCandidate) *vo.DocumentRouteCandidate {
-	if routeDecision == nil || routeDecision.Confidence <= 0 ||
-		routeDecision.RouteStatus != enum.RouteStatusSuccess ||
-		len(candidateDocuments) == 0 {
-		return nil
+	exchanges, err := r.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
+	if err != nil || len(exchanges) == 0 {
+		return nil, err
 	}
 
-	confidence := routeDecision.Confidence
-	if confidence < recommendationThreshold || confidence > 1.0 {
-		return nil
-	}
-
-	topCandidate := candidateDocuments[0]
-	if !topCandidate.IsValidScore() || !r.isOriginalTopCandidate(routeDecision, topCandidate) {
-		return nil
-	}
-
-	return topCandidate
-}
-
-// isOriginalTopCandidate 判断候选是否与路由决策的原始top候选匹配
-func (r *RouteStage) isOriginalTopCandidate(routeDecision *vo.KnowledgeRouteDecision, candidate *vo.DocumentRouteCandidate) bool {
-	if len(routeDecision.Documents) == 0 || candidate == nil {
-		return false
-	}
-	originalTop := routeDecision.Documents[0]
-	if originalTop == nil {
-		return false
-	}
-	return originalTop.DocumentId == candidate.DocumentId &&
-		originalTop.LastIndexTaskId == candidate.LastIndexTaskId
-}
-
-// fallbackDocuments 获取后备候选文档
-//
-// 在路由决策不可用或置信度偏低时，从全部可检索文档中基于元数据（名称/标签等）匹配查询词，
-// 返回得分最高的前 limit 个候选，理由统一标注为"低置信度时基于文档元数据进行保守扩范围候选"。
-func (r *RouteStage) fallbackDocuments(ctx context.Context, question, rewriteQuestion string, limit int) []*vo.DocumentRouteCandidate {
-	// 拉取全部可检索文档；失败或为空时返回 nil（上游可继续用主文档或混合检索兜底）
-	docs, err := r.docGateway.FetchRetrieveDocuments(ctx)
-	if err != nil {
-		logx.Warnf("获取可检索文档失败: %v", err)
-		return nil
-	}
-	if len(docs) == 0 {
-		return nil
-	}
-
-	// 从问题与改写问题中抽取 fallback 查询词（用于元数据匹配打分）
-	queryTerms := r.extractFallbackTerms(question, rewriteQuestion)
-
-	// 按文档分别计算 fallback 得分（基于名称/标签与查询词的匹配）
-	scoreMap := make(map[int64]float64, len(docs))
-	for _, desc := range docs {
-		scoreMap[desc.DocumentId] = r.fallbackDescriptorScore(desc, queryTerms)
-	}
-
-	// 按得分降序排序
-	sort.Slice(docs, func(i, j int) bool {
-		return scoreMap[docs[i].DocumentId] > scoreMap[docs[j].DocumentId]
-	})
-
-	// 取前 limit 个候选，组装为 DocumentRouteCandidate（统一 Reason 标注）
-	result := make([]*vo.DocumentRouteCandidate, 0, limit)
-	for i, desc := range docs {
-		if i >= limit {
-			break
-		}
-		result = append(result, &vo.DocumentRouteCandidate{
-			DocumentId:      desc.DocumentId,
-			DocumentName:    desc.DocumentName,
-			LastIndexTaskId: desc.LastIndexTaskId,
-			Score:           scoreMap[desc.DocumentId],
-			Reason:          "低置信度时基于文档元数据进行保守扩范围候选",
-		})
-	}
-
-	return result
-}
-
-// mergeCandidates 合并主候选与次候选并去重（以 DocumentId 为键），最终数量不超过 limit。
-// 去重策略：主候选优先（先遍历 primary，其条目被保留），secondary 仅在未出现时被加入。
-func (r *RouteStage) mergeCandidates(primary, secondary []*vo.DocumentRouteCandidate, limit int) []*vo.DocumentRouteCandidate {
-	// 使用 map 做 DocumentId 维度的去重；primary 先遍历以保证优先级
-	merged := make(map[int64]*vo.DocumentRouteCandidate)
-	ids := make([]int64, 0, len(primary)+len(secondary))
-	for _, doc := range primary {
-		merged[doc.DocumentId] = doc
-		ids = append(ids, doc.DocumentId)
-	}
-	// secondary 仅在 DocumentId 未出现时被加入
-	for _, doc := range secondary {
-		if _, exists := merged[doc.DocumentId]; !exists {
-			merged[doc.DocumentId] = doc
-			ids = append(ids, doc.DocumentId)
-		}
-	}
-
-	// 将去重后的候选按插入顺序收集为结果
-	result := make([]*vo.DocumentRouteCandidate, 0, limit)
-	for _, id := range ids {
-		if len(result) >= limit {
-			break
-		}
-		result = append(result, merged[id])
-	}
-	return result
-}
-
-// ============================================================================
-// 自动路由：辅助方法
-// ============================================================================
-
-// extractFallbackTerms 提取后备检索词
-func (r *RouteStage) extractFallbackTerms(question, rewriteQuestion string) []string {
-	routingText := strutil.Trim(question) + " " + strutil.Trim(rewriteQuestion)
-	segments := fallbackSplitRegex.Split(routingText, -1)
-	terms := make(map[string]struct{})
-	for _, segment := range segments {
-		trimmed := strutil.Trim(segment)
-		trimmedLen := utils.Len(trimmed)
-		if trimmedLen >= 2 {
-			terms[trimmed] = struct{}{}
-			if trimmedLen >= 4 {
-				maxGram := max(6, trimmedLen)
-				for gram := 2; gram <= maxGram; gram++ {
-					for start := 0; start+gram <= trimmedLen; start++ {
-						terms[trimmed[start:start+gram]] = struct{}{}
-					}
-				}
-			}
-		}
-	}
-	return utils.Limit(maputil.Keys(terms), 40)
-}
-
-// fallbackDescriptorScore 计算后备文档匹配分数
-func (r *RouteStage) fallbackDescriptorScore(metadata *vo.DocumentMetadata, queryTerms []string) float64 {
-	content := strings.Join([]string{
-		metadata.DocumentName,
-	}, " ")
-
-	content = r.normalizeFallbackText(content)
-
-	if len(queryTerms) == 0 || content == "" {
-		return 0
-	}
-
-	var score float64
-	sortedTerms := make([]string, 0, len(queryTerms))
-	for _, term := range queryTerms {
-		normalized := r.normalizeFallbackText(term)
-		if normalized != "" {
-			sortedTerms = append(sortedTerms, normalized)
-		}
-	}
-
-	sort.Slice(sortedTerms, func(i, j int) bool {
-		return utils.Len(sortedTerms[i]) > utils.Len(sortedTerms[j])
-	})
-
-	matched := make([]string, 0, len(sortedTerms))
-	for _, term := range sortedTerms {
-		if utils.Len(term) < 2 || strutil.ContainsAny(term, matched) {
+	var anchors vo.EvidenceAnchors
+	for _, exchange := range exchanges {
+		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
 			continue
 		}
-
-		if strings.Contains(content, term) {
-			matched = append(matched, term)
-			switch {
-			case utils.Len(term) >= 8:
-				score += 12
-			case utils.Len(term) >= 5:
-				score += 8
-			case utils.Len(term) >= 3:
-				score += 4
-			default:
-				score += 2
+		for _, ref := range exchange.ParseReferences() {
+			anchor := ref.ToEvidenceAnchor(maxSnippetChars)
+			if anchor == nil {
+				continue
+			}
+			anchors = append(anchors, anchor)
+			if len(anchors) >= limit {
+				return anchors, nil
 			}
 		}
 	}
-
-	return score
+	return anchors, nil
 }
 
-// normalizeFallbackText 标准化后备文本
-func (r *RouteStage) normalizeFallbackText(value string) string {
-	if value == "" {
-		return ""
+func (r *RouteStage) filterValidEvidenceAnchors(anchors vo.EvidenceAnchors, allDocumentIds ...int64) vo.EvidenceAnchors {
+	if len(anchors) == 0 || len(allDocumentIds) == 0 {
+		return anchors
 	}
-	cleaned := fallbackCleanRegex.ReplaceAllString(value, "")
-	return strings.ToLower(cleaned)
+
+	return utils.Filter(anchors, func(anchor *vo.EvidenceAnchor) bool {
+		return anchor != nil && (utils.ContainsAny(allDocumentIds, anchor.DocumentId))
+	})
 }

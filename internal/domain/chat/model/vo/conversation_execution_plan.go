@@ -29,6 +29,7 @@ type ConversationExecutionPlan struct {
 	HistoryCoveredExchangeId     int64                       // 覆盖的历史记录交换ID
 	HistoryCoveredExchangeCount  int                         // 覆盖的历史记录交换计数
 	HistoryCompressionCount      int                         // 历史压缩计数
+	RecentEvidenceAnchors        EvidenceAnchors             // 最近证据锚点
 	CurrentDate                  time.Time                   // 当前日期
 	CurrentDateText              string                      // 当前日期文本表示
 	RequiresRealTimeSearch       bool                        // 是否需要实时搜索
@@ -37,7 +38,6 @@ type ConversationExecutionPlan struct {
 	ClarificationOptions         []string                    // 澄清选项列表
 	ClarificationReason          string                      // 澄清原因文本
 	NoEvidenceReply              string                      // 无证据回复文本
-	ScopedEvidenceAnchors        []*EvidenceAnchor           // 作用域内的证据锚点
 }
 
 func (p *ConversationExecutionPlan) Validate() error {
@@ -64,8 +64,8 @@ func (p *ConversationExecutionPlan) BuildRetrievalPlanSnapshot() map[string]any 
 	}
 	return map[string]any{
 		"mode":              p.ExecutionModeName(),
-		"retrievalQuestion": p.RetrievalQuestion,
-		"subQuestions":      p.RetrievalSubQuestions,
-		"selectedDocument":  p.SelectedDocumentName,
+		"retrievalQuestion": p.RetrievalPlan.Question,
+		"subQuestions":      p.RetrievalPlan.SubQuestions,
+		"selectedDocument":  p.RetrievalPlan.SelectedDocumentIds(),
 	}
 }

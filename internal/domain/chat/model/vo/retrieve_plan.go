@@ -19,7 +19,7 @@ type RetrievalPlan struct {
 	TaskScope                 []int64                      // 任务范围ID列表
 	MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件
 	EvidenceApplicabilityPlan *EvidenceApplicabilityPlan   // 证据适用性计划
-	Channels                  []RetrievalChannelPlan       // 检索通道计划列表
+	Channels                  []*RetrievalChannelPlan      // 检索通道计划列表
 	StructureNavigation       *StructureNavigationIntent   // 结构导航意图
 	NavigationAction          string                       // 文档导航动作
 	StructureNavigationResult *StructureNavigationResult   // 结构导航结果
@@ -140,15 +140,15 @@ func (p *RetrievalPlan) validateChannels() error {
 	//	if ch == nil {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	if strings.TrimSpace(ch.ChannelName) == "" {
+	//	if strings.TrimSpace(ch.Channel) == "" {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	if _, exists := channelNames[ch.ChannelName]; exists {
+	//	if _, exists := channelNames[ch.Channel]; exists {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	channelNames[ch.ChannelName] = struct{}{}
+	//	channelNames[ch.Channel] = struct{}{}
 	//
-	//	if ch.TopK <= 0 || ch.Budget <= 0 || ch.TimeoutMs <= 0 {
+	//	if ch.TopK <= 0 || ch.Budget <= 0 || ch.Timeout <= 0 {
 	//		return errors.New("RetrievalPlan channel topK, budget and timeout must be positive")
 	//	}
 	//	if !isFiniteAndNonNegative(ch.Weight) {

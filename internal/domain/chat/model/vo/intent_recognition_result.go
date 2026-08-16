@@ -163,3 +163,10 @@ func (i *IntentRecognitionResult) ResolveNoEvidenceReply(requiresFreshSearch boo
 	}
 	return "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。"
 }
+
+func (i *IntentRecognitionResult) SuggestedChannels() []string {
+	if i == nil || len(i.Channels) == 0 {
+		return nil
+	}
+	return utils.FilterUniqueLimit(i.Channels, -1, func(s string) (string, bool) { return s, s != "" })
+}

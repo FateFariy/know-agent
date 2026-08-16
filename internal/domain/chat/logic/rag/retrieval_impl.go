@@ -653,7 +653,7 @@ func (e *RetrievalImpl) recordRetrievalResultObservations(ctx context.Context, t
 // projectRetrievalResults 将原始/过滤/融合/重排/最终文档投影为 ChatRetrievalResult 列表
 func (e *RetrievalImpl) projectRetrievalResults(subQuestionIndex int, subQuestion string, trace *vo.ConversationTrace,
 	rawResults, filteredResults []*vo.RetrievalChannelResult, fusedDocs, rerankedDocs, finalDocs []*vo.DocumentChunk) ([]*vo.ChatRetrievalResult, error) {
-	// 构建最终文档 FinalRank 映射（按 ParentBlockId）
+	// 构建最终文档 FinalRank 映射（按 ParentChunkId）
 	finalRankMap := make(map[int64]int)
 	for i, doc := range finalDocs {
 		finalRankMap[doc.ParentBlockId] = i + 1

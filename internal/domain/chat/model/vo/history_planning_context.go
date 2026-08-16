@@ -103,3 +103,29 @@ func (h *HistoryPlanningContext) BuildPlanningText(recentTranscript string, maxC
 	// 合并结构化文本与近期转录（非空项以 "\n\n" 分隔）
 	return utils.JoinNonBlank("\n\n", structuredPart, recentPart)
 }
+
+// AppendAnchorHints 追加锚点提示，每个锚点提示包含文档 ID、章节路径、节点 ID、父块 ID、块 ID
+func (h *HistoryPlanningContext) AppendAnchorHints(anchors []*EvidenceAnchor) {
+	if h == nil || len(anchors) == 0 {
+		return
+	}
+
+	hints := h.QueryContextHints
+	if hints == nil {
+		hints = []string{}
+	}
+
+	count := 0
+	for _, anchor := range anchors {
+		if count >= 5 {
+			break
+		}
+		hint := anchor.AnchorHint()
+		if hint != "" {
+			hints = append(hints, hint)
+			count++
+		}
+	}
+
+	h.QueryContextHints = hints
+}

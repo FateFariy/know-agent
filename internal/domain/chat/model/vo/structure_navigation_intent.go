@@ -59,3 +59,13 @@ func (i *StructureNavigationIntent) NormalizeConfidence() float64 {
 	}
 	return max(0, i.Confidence)
 }
+
+func (i *StructureNavigationIntent) Clone() *StructureNavigationIntent {
+	if i == nil {
+		return nil
+	}
+	var clone = *i
+	clone.Operations = utils.Copy(i.Operations)
+	clone.SectionAnchors = utils.Copy(i.SectionAnchors)
+	return &clone
+}

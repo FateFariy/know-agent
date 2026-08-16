@@ -8,11 +8,27 @@ type DocumentNavigationDecision struct {
 	ExecutionMode     enum.ExecutionMode            // 执行模式
 	StructureAnchor   *ConversationStructureAnchor  `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor       `json:"itemAnchor"`        // 项目锚点
+	RetrievalIntent   enum.RetrievalIntent          `json:"retrievalIntent"`   // 检索意图
 	RetrievalPlan     *RetrievalQuestionPlan        `json:"retrievalPlan"`     // 检索问题计划(已弃用）
 	SummaryText       string                        `json:"summaryText"`       // 摘要文本
 	QueryContextHints []string                      `json:"queryContextHints"` // 查询上下文提示
 	SoftSectionHints  []string                      `json:"softSectionHints"`  // 软章节提示
 	ExecutionModeName string                        `json:"executionMode"`     // 执行模式
+}
+
+// PrimaryIntent 获取主要检索意图
+func (d *DocumentNavigationDecision) PrimaryIntent() string {
+	if d == nil {
+		return enum.RetrievalIntentGeneral
+	}
+	return d.RetrievalIntent
+}
+
+func (d *DocumentNavigationDecision) NavigationActionText() string {
+	if d == nil {
+		return ""
+	}
+	return d.NavigationAction
 }
 
 // ConversationStructureAnchor 会话结构锚点

@@ -33,6 +33,7 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectionIDs() string {
 	return string(ids)
 }
 
+// SelectionNames 返回所有选中的知识库名称
 func (s *KnowledgeBaseSelectionSnapshot) SelectionNames() string {
 	if s == nil || len(s.SelectedKnowledgeBaseNames) == 0 {
 		return ""
@@ -46,6 +47,16 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectionNames() string {
 	}
 	marshal, _ := json.Marshal(names)
 	return string(marshal)
+}
+
+// SelectedDocumentIds 返回所有允许文档的ID列表
+func (s *KnowledgeBaseSelectionSnapshot) SelectedDocumentIds() []int64 {
+	if s == nil || len(s.AllowedDocuments) == 0 {
+		return nil
+	}
+	return utils.Map(s.AllowedDocuments, func(doc *DocumentMetadata) int64 {
+		return doc.DocumentId
+	})
 }
 
 func (s *KnowledgeBaseSelectionSnapshot) RagRuntimeConfigSnapshot() string {
@@ -161,4 +172,18 @@ func (s *AllowedExecutionScope) TaskIds() []int64 {
 		return nil
 	}
 	return utils.Copy(s.taskIds)
+}
+
+func (s *AllowedExecutionScope) FilterCandidates(candidates []*DocumentRouteCandidate) []*DocumentRouteCandidate {
+	if s == nil || !s.Executable() || len(candidates) == 0 {
+		return nil
+	}
+
+	filtered := make([]*DocumentRouteCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		if c != nil && s.Contains(c.DocumentId, c.LastIndexTaskId) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
 }

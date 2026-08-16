@@ -7,12 +7,10 @@ import (
 
 // DocumentRouteInput 文档路由输入
 type DocumentRouteInput struct {
-	DocumentId             int64                       `json:"documentId"`              // 文档ID
-	OriginalQuestion       string                      `json:"originalQuestion"`        // 原始问题
-	RewriteResult          *vo.QuestionRewriteResult   `json:"rewriteResult"`           // 改写结果
-	HistorySummary         string                      `json:"historySummary"`          // 历史摘要
-	AnswerRecentTranscript string                      `json:"answerRecentTranscript"`  // 回答近期转录
-	RecognitionResult      *vo.IntentRecognitionResult `json:"intentRecognitionResult"` // 查询理解结果
+	DocumentId        int64                       `json:"documentId"`              // 文档ID
+	OriginalQuestion  string                      `json:"originalQuestion"`        // 原始问题
+	RewriteResult     *vo.QuestionRewriteResult   `json:"rewriteResult"`           // 改写结果
+	RecognitionResult *vo.IntentRecognitionResult `json:"intentRecognitionResult"` // 查询理解结果
 }
 
 // RewrittenQuestion 获取改写后问题，无改写则回退原始问题

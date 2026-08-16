@@ -176,5 +176,17 @@ func IsBlank(str string) bool {
 }
 
 func Trim(str string) string {
+	if str == "" {
+		return ""
+	}
 	return strutil.Trim(str)
+}
+
+// CompactWhitespace 去除字符串首尾的空白，并将中间连续的空白字符（空格、制表符、换行等）压缩为单个空格
+func CompactWhitespace(s string) string {
+	s = Trim(s)
+	if s == "" {
+		return ""
+	}
+	return strings.Join(strings.Fields(s), " ")
 }

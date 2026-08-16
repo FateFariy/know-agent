@@ -1,6 +1,10 @@
 package route
 
-import "context"
+import (
+	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+)
 
 // NavigationSectionHit 章节索引服务返回的命中节点
 type NavigationSectionHit struct {
@@ -22,4 +26,10 @@ type SearchInput struct {
 type NavigationIndexer interface {
 	// SearchSections 按关键词+维度检索匹配的章节命中
 	SearchSections(ctx context.Context, input *SearchInput) ([]*NavigationSectionHit, error)
+}
+
+// DocumentRouter 文档路由器
+type DocumentRouter interface {
+	// Route 根据文档ID和问题进行文档内路由
+	Route(ctx context.Context, input *DocumentRouteInput) (*vo.DocumentNavigationDecision, error)
 }

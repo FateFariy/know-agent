@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	yearPattern    = regexp.MustCompile(`\b(20\d{2})\b`)
 	sectionPattern = regexp.MustCompile(`(第\s*[一二三四五六七八九十百0-9]+\s*[章节条部分])|(附录\s*[A-Za-z一二三四五六七八九十0-9]+)`)
 	separators     = regexp.MustCompile(`[\s、，,；:：（）()\-的和及与或]+`)
 	spacePattern   = regexp.MustCompile(`\s+`)

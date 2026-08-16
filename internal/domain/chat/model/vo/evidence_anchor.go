@@ -18,7 +18,7 @@ type EvidenceAnchor struct {
 	SectionPath       string  // 章节路径
 	CanonicalPath     string  // 规范路径
 	ItemIndex         int     // 条目索引
-	ParentBlockId     int64   // 父块ID
+	ParentChunkId     int64   // 父块ID
 	ChunkId           int64   // 分块ID
 	SourceType        string  // 来源类型
 	Channel           string  // 来源渠道
@@ -33,9 +33,50 @@ func (a *EvidenceAnchor) HasAnchorIdentity() bool {
 	}
 	return a.DocumentId != 0 ||
 		a.StructureNodeId != 0 ||
-		a.ParentBlockId != 0 ||
+		a.ParentChunkId != 0 ||
 		a.ChunkId != 0 ||
 		strutil.IsNotBlank(a.SectionPath)
+}
+
+// AnchorHint 生成单个锚点的提示字符串
+func (a *EvidenceAnchor) AnchorHint() string {
+	if a == nil {
+		return ""
+	}
+	var builder strings.Builder
+	appendHintPart := func(name string, value any) {
+		trimmed := utils.Trim(utils.ToString(value))
+		if trimmed == "" {
+			return
+		}
+		if builder.Len() > 0 {
+			builder.WriteString("; ")
+		}
+		builder.WriteString(name)
+		builder.WriteString("=")
+		builder.WriteString(trimmed)
+	}
+
+	appendHintPart("documentId", a.DocumentId)
+	appendHintPart("sectionPath", a.SectionPath)
+	appendHintPart("structureNodeId", a.StructureNodeId)
+	appendHintPart("parentBlockId", a.ParentChunkId)
+	appendHintPart("chunkId", a.ChunkId)
+	return utils.Trim(builder.String())
+}
+
+func (a *EvidenceAnchor) ToRetrievalContextAnchor() *RetrievalContextAnchor {
+	if a == nil || a.DocumentId == 0 {
+		return nil
+	}
+	return &RetrievalContextAnchor{
+		DocumentId:      a.DocumentId,
+		SectionPath:     a.SectionPath,
+		StructureNodeId: a.StructureNodeId,
+		ParentChunkId:   a.ParentChunkId,
+		ChunkId:         a.ChunkId,
+		Source:          "FINAL_EVIDENCE_ANCHOR",
+	}
 }
 
 type EvidenceAnchors []*EvidenceAnchor
@@ -65,7 +106,7 @@ func (anchors EvidenceAnchors) RenderStructuredContext(budget int) string {
 			appendAnchorField("  章节", anchor.SectionPath)
 			appendAnchorField("  canonicalPath", anchor.CanonicalPath)
 			appendAnchorField("  structureNodeId", anchor.StructureNodeId)
-			appendAnchorField("  parentBlockId", anchor.ParentBlockId)
+			appendAnchorField("  parentBlockId", anchor.ParentChunkId)
 			appendAnchorField("  chunkId", anchor.ChunkId)
 			appendAnchorField("  itemIndex", anchor.ItemIndex)
 			appendAnchorField("  snippet", utils.ClipHead(anchor.Snippet, 300))

@@ -135,6 +135,7 @@ func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.Gr
 		NavigationAction:  action,
 		ExecutionMode:     mode,
 		ExecutionModeName: mode.Name(),
+		RetrievalIntent:   retrievalIntent,
 	}
 
 	// 构建结构锚点
@@ -189,19 +190,6 @@ func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.Gr
 		action, displayTitle, reason)
 
 	return decision
-}
-
-// buildEmptyDecision 构建空决策
-func (r *DocumentQuestionRouter) buildEmptyDecision(reason string) *vo.DocumentNavigationDecision {
-	return &vo.DocumentNavigationDecision{
-		ExecutionMode:     enum.ExecutionModeRetrieval,
-		ExecutionModeName: enum.ExecutionModeRetrieval.Name(),
-		NavigationAction:  enum.DocumentNavigationActionFreshTopic,
-		StructureAnchor: &vo.ConversationStructureAnchor{
-			ScopeMode: "NONE",
-		},
-		SummaryText: reason,
-	}
 }
 
 // ============================================================

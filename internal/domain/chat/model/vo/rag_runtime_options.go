@@ -40,3 +40,52 @@ type RagRuntimeOptions struct {
 	Hybrid                    *HybridOptions
 	KbConfigConflictFields    []string
 }
+
+func NewDefaultHybridOptions() *HybridOptions {
+	return &HybridOptions{
+		VectorWeight:        0.5,
+		KeywordWeight:       0.3,
+		TableWeight:         0.2,
+		GraphRagWeight:      0.4,
+		RaptorWeight:        0.3,
+		RankWeight:          0.5,
+		OriginalScoreWeight: 0.7,
+		MetadataBoostWeight: 0.2,
+		MaxMetadataBoost:    1.0,
+	}
+}
+
+func NewDefaultRagRuntimeOptions() *RagRuntimeOptions {
+	return &RagRuntimeOptions{
+		VectorTopK:                10,
+		KeywordTopK:               10,
+		GraphRagTopK:              10,
+		GraphRagMaxHops:           2,
+		RaptorTopK:                10,
+		RaptorSourceChunkTopK:     10,
+		CandidateTopK:             10,
+		RerankCandidateTopK:       10,
+		FinalTopK:                 10,
+		RerankEnabled:             true,
+		ChannelTimeout:            5 * time.Second,
+		SubQuestionTimeout:        5 * time.Second,
+		MinVectorSimilarity:       0.7,
+		KeywordRelativeScoreFloor: 0.1,
+		KeywordChannelEnabled:     true,
+		TableChannelEnabled:       true,
+		GraphRagChannelEnabled:    true,
+		RaptorChannelEnabled:      true,
+		Hybrid: &HybridOptions{
+			VectorWeight:        0.5,
+			KeywordWeight:       0.3,
+			TableWeight:         0.2,
+			GraphRagWeight:      0.4,
+			RaptorWeight:        0.3,
+			RankWeight:          0.5,
+			OriginalScoreWeight: 0.7,
+			MetadataBoostWeight: 0.2,
+			MaxMetadataBoost:    1.0,
+		},
+		KbConfigConflictFields: []string{},
+	}
+}

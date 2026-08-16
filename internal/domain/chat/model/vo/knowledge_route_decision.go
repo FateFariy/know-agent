@@ -17,6 +17,43 @@ type KnowledgeRouteDecision struct {
 	DegradedReasons []string                  // 降级原因列表
 }
 
+func NewUnavailableRouteDecision(degradedReasons ...string) *KnowledgeRouteDecision {
+	return &KnowledgeRouteDecision{
+		RouteStatus:     enum.RouteStatusFailed,
+		Reason:          "Route advice is unavailable; ordinary retrieval keeps the explicit knowledge scope",
+		Source:          enum.KbSelectionModeNone,
+		Degraded:        true,
+		DegradedReasons: degradedReasons,
+	}
+}
+
+// SelectRecommendedCandidate 从候选文档中选出推荐主文档
+func (d *KnowledgeRouteDecision) SelectRecommendedCandidate(candidates []*DocumentRouteCandidate, threshold float64) *DocumentRouteCandidate {
+	if d == nil || d.Confidence <= 0 || d.RouteStatus != enum.RouteStatusSuccess || len(candidates) == 0 {
+		return nil
+	}
+
+	if d.Confidence < threshold || d.Confidence > 1.0 {
+		return nil
+	}
+
+	top := candidates[0]
+	if top == nil || !top.IsValidScore() || !d.IsOriginalTop(top) {
+		return nil
+	}
+	return top
+}
+
+// IsOriginalTop 判断候选是否与原始路由决策的 top 候选一致
+func (d *KnowledgeRouteDecision) IsOriginalTop(candidate *DocumentRouteCandidate) bool {
+	if d == nil || len(d.Documents) == 0 || candidate == nil {
+		return false
+	}
+
+	originalTop := d.Documents[0]
+	return originalTop != nil && originalTop.SameDocumentTask(candidate)
+}
+
 // ScopeRouteCandidate 知识范围（scope）路由候选
 type ScopeRouteCandidate struct {
 	ScopeCode string  `json:"scopeCode"` // 知识范围代码
@@ -51,25 +88,10 @@ func (d *DocumentRouteCandidate) IsValidScore() bool {
 	return d != nil && d.Score > 0
 }
 
-func NewUnavailableRouteDecision(degradedReasons ...string) *KnowledgeRouteDecision {
-	return &KnowledgeRouteDecision{
-		RouteStatus:     enum.RouteStatusFailed,
-		Reason:          "Route advice is unavailable; ordinary retrieval keeps the explicit knowledge scope",
-		Source:          enum.KbSelectionModeNone,
-		Degraded:        true,
-		DegradedReasons: degradedReasons,
+// SameDocumentTask 判断两个文档候选是否指向同一文档与索引任务
+func (d *DocumentRouteCandidate) SameDocumentTask(other *DocumentRouteCandidate) bool {
+	if d == nil || other == nil {
+		return false
 	}
-}
-
-// ResolveHitSelectedDocument 当 selectedDocumentId 有效时，判断其是否候选前三
-func (k *KnowledgeRouteDecision) ResolveHitSelectedDocument(selectedDocumentId int64) int {
-	if selectedDocumentId == 0 || len(k.Documents) == 0 {
-		return 0
-	}
-	for idx := 0; idx < 3; idx++ {
-		if k.Documents[idx].DocumentId == selectedDocumentId {
-			return 1
-		}
-	}
-	return 0
+	return d.DocumentId == other.DocumentId && d.LastIndexTaskId == other.LastIndexTaskId
 }

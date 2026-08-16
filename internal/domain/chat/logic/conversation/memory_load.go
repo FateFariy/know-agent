@@ -105,33 +105,3 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 
 	return memoryContext, nil
 }
-
-// loadRecentEvidenceAnchors 加载最近的证据锚点，从对话历史中抽取追问可继承的结构锚点
-func (m *MemoryLoadStage) loadRecentEvidenceAnchors(ctx context.Context, conversationId string, limit int) ([]*vo.EvidenceAnchor, error) {
-	if conversationId == "" || limit <= 0 {
-		return nil, nil
-	}
-
-	exchanges, err := m.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
-	if err != nil || len(exchanges) == 0 {
-		return nil, err
-	}
-
-	var anchors []*vo.EvidenceAnchor
-	for _, exchange := range exchanges {
-		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
-			continue
-		}
-		for _, ref := range exchange.ParseReferences() {
-			anchor := ref.ToEvidenceAnchor(maxSnippetChars)
-			if anchor == nil {
-				continue
-			}
-			anchors = append(anchors, anchor)
-			if len(anchors) >= limit {
-				return anchors, nil
-			}
-		}
-	}
-	return anchors, nil
-}
