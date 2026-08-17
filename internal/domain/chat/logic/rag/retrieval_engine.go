@@ -3,7 +3,6 @@ package rag
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -18,12 +17,13 @@ import (
 
 // RetrievalEngine RAG 检索引擎实现
 type RetrievalEngine struct {
-	repo                      adapter.ChatRepository
-	reranker                  rerank.Reranker
-	channels                  []Retrieval
-	docGateway                adapter.DocumentGateway
-	fusion                    Fusion
-	pipeline                  *Pipeline
+	repo       adapter.ChatRepository
+	reranker   rerank.Reranker
+	channels   []Retrieval
+	docGateway adapter.DocumentGateway
+	fusion     Fusion
+	pipeline   *Pipeline
+	// todo 逐步弃用
 	channelTimeout            time.Duration
 	subQuestionTimeout        time.Duration
 	minVectorSimilarity       float64
@@ -40,21 +40,11 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 	channels []Retrieval, docGateway adapter.DocumentGateway, fusion Fusion) *RetrievalEngine {
 	//pipeline := e.buildPipeline()
 	return &RetrievalEngine{
-		repo:                      repo,
-		channels:                  channels,
-		reranker:                  reranker,
-		docGateway:                docGateway,
-		fusion:                    fusion,
-		subQuestionTimeout:        svcCtx.Config.Chat.Rag.SubQuestionTimeout,
-		channelTimeout:            svcCtx.Config.Chat.Rag.ChannelTimeout,
-		minVectorSimilarity:       svcCtx.Config.Chat.Rag.Vector.MinSimilarity,
-		keywordRelativeScoreFloor: svcCtx.Config.Chat.Rag.Keyword.RelativeScoreFloor,
-		rerankScoreThreshold:      svcCtx.Config.Chat.Rag.Rerank.ScoreThreshold,
-		parentEvidenceMaxChars:    svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars,
-		rerankEnabled:             svcCtx.Config.Chat.Rag.Rerank.Enabled,
-		finalTopK:                 svcCtx.Config.Chat.Rag.FinalTopK,
-		vectorTopK:                svcCtx.Config.Chat.Rag.Vector.TopK,
-		keywordTopK:               svcCtx.Config.Chat.Rag.Keyword.TopK,
+		repo:       repo,
+		channels:   channels,
+		reranker:   reranker,
+		docGateway: docGateway,
+		fusion:     fusion,
 	}
 }
 
@@ -66,7 +56,7 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) 
 		return nil, err
 	}
 
-	ragCtx := vo.NewRagRetrievalResult(plan.QuestionPlan.RetrievalQuestion)
+	retrievalResult := vo.NewRagRetrievalResult(plan.QuestionPlan.RetrievalQuestion)
 
 	inputs := make([]*ExecutionInput, 0, len(plan.QuestionPlan.ExecutionQueries))
 	for _, query := range plan.QuestionPlan.ExecutionQueries {
@@ -77,22 +67,22 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) 
 		inputs = append(inputs, input)
 	}
 
-	evidenceList := e.retrieveSubQuestionParallel(ctx, ragCtx, inputs, plan)
+	evidenceList := e.retrieveSubQuestionParallel(ctx, retrievalResult, inputs, plan)
 	acceptedCount := slice.CountBy(evidenceList, func(index int, item *vo.SubQuestionEvidence) bool { return len(item.SourceDocuments) > 0 })
 
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
-		ragCtx.RetrievalQuestion, len(evidenceList), acceptedCount, ragCtx.RetrievalNotes())
+		retrievalResult.RetrievalQuestion, len(evidenceList), acceptedCount, retrievalResult.RetrievalNotes())
 
 	e.assignReferenceIds(ctx, evidenceList, plan)
-	ragCtx.SubQuestionEvidenceList = evidenceList
+	retrievalResult.SubQuestionEvidenceList = evidenceList
 
-	return ragCtx, nil
+	return retrievalResult, nil
 }
 
 // buildPipeline 构建完整的检索管线，按顺序组装各阶段。
 func (e *RetrievalEngine) buildPipeline() *Pipeline {
 	return NewPipeline(
-		NewChannelRetrievalStage(e.channels, e.docGateway),
+		NewChannelRetrievalStage(e.channels),
 		NewEvidenceGateStage(e.minVectorSimilarity, e.keywordRelativeScoreFloor),
 		NewFusionStage(e.fusion),
 		NewParentElevationStage(e.docGateway, e.parentEvidenceMaxChars),
@@ -105,29 +95,29 @@ func (e *RetrievalEngine) buildPipeline() *Pipeline {
 
 // -------------------- 子问题并行检索 --------------------
 
-// retrieveSubQuestionParallel 并行检索所有子问题，每个子问题通过管线独立执行完整检索流程。
-func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCtx *vo.RetrievalResult, inputs []*ExecutionInput, plan *vo.RetrievalPlan) []*vo.SubQuestionEvidence {
+// retrieveSubQuestionParallel 并行检索所有子问题，每个子问题通过管线独立执行完整检索流程
+func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retrievalResult *vo.RetrievalResult, inputs []*ExecutionInput, plan *vo.RetrievalPlan) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, plan.SubQuestionTimeout)
 	defer cancel()
 
 	resultChan := make(chan *vo.SubQuestionEvidence, len(inputs))
 	defer close(resultChan)
 
-	for i, input := range inputs {
-		go func(subQuestionIndex int, subQuestion string) {
+	for _, input := range inputs {
+		go func(input *ExecutionInput) {
+			subQuestionIndex := input.SubQuestionIndex
+			subQuestion := input.ExecutionQuery
 			start := time.Now()
 			state := &RetrievalState{
-				Input:            input,
-				RagCtx:           ragCtx,
-				SubQuestionIndex: subQuestionIndex,
-				SubQuestion:      subQuestion,
-				Plan:             plan,
-				Start:            start,
+				Input:           input,
+				RetrievalResult: retrievalResult,
+				Plan:            plan,
+				Start:           start,
 			}
 
 			if err := e.pipeline.Execute(timeoutCtx, state); err != nil {
 				logx.Warnf("子问题检索失败: subQuestionIndex=%d, subQuestion='%v", subQuestionIndex, err)
-				ragCtx.AddRetrievalNotef("子问题%d检索失败或超时，已自动忽略。", subQuestionIndex)
+				retrievalResult.AddRetrievalNotef("子问题%d检索失败或超时，已自动忽略。", subQuestionIndex)
 				resultChan <- &vo.SubQuestionEvidence{SubQuestionIndex: subQuestionIndex, SubQuestion: subQuestion}
 				return
 			}
@@ -142,7 +132,7 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, ragCt
 				RerankedCandidateCount: len(state.RerankedDocs),
 				ObservationPersistence: state.ObservationPersistence,
 			}
-		}(i+1, input.ExecutionQuery)
+		}(input)
 	}
 
 	evidenceList := make([]*vo.SubQuestionEvidence, 0, len(inputs))
@@ -213,12 +203,4 @@ func (e *RetrievalEngine) knowledgeBaseReferenceMetadataMap(ctx context.Context,
 	return utils.MapBy(metadata, func(item *vo.DocumentMetadata) (int64, *vo.DocumentMetadata) {
 		return item.DocumentId, item
 	})
-}
-
-// safeText 安全获取文本值
-func (e *RetrievalEngine) safeText(value any) string {
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprintf("%v", value))
 }

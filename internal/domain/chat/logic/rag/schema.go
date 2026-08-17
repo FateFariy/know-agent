@@ -8,6 +8,12 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
+// RetrievalChannelResult 检索通道结果
+type RetrievalChannelResult struct {
+	ChannelName string              `json:"channelName"`
+	Documents   []*vo.DocumentChunk `json:"documents"`
+}
+
 // ExecutionInput 是编译后的不可变检索执行请求，针对单次 RetrievalPlan 执行查询编译一次
 type ExecutionInput struct {
 	SubQuestionIndex     int

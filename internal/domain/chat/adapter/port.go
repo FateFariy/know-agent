@@ -39,8 +39,11 @@ type DistributedLock interface {
 }
 
 type DocumentGateway interface {
-	// FetchRetrieveDocuments 获取文档
-	FetchRetrieveDocuments(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error)
+	// FindRetrievableByKbIds 根据知识库ID列表查询可检索的文档元数据
+	FindRetrievableByKbIds(ctx context.Context, kbIds []int64) ([]*vo.DocumentMetadata, error)
+
+	// FindRetrieveDocumentByIds 根据ID列表获取可检索的文档元数据
+	FindRetrieveDocumentByIds(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error)
 
 	// QueryParentChunks 查询父块
 	QueryParentChunks(ctx context.Context, ids []int64) ([]*vo.DocumentChunk, error)
