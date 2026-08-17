@@ -1,5 +1,11 @@
 package vo
 
+import (
+	"fmt"
+
+	"github.com/swiftbit/know-agent/common/utils"
+)
+
 // DocumentKnowledgeMetadataKeys 文档知识元数据键常量
 const (
 	MetaSourceType          = "source_type"
@@ -54,11 +60,9 @@ type DocumentChunk struct {
 	OriginalSnippet   string  `json:"originalSnippet"`   // 文档原始片段
 
 	// ========== 从 DocumentMetadata 补充 ==========
-	DocumentName       string `json:"documentName"`       // 文档名称
-	KnowledgeScopeCode string `json:"knowledgeScopeCode"` // 文档知识范围编码
-	KnowledgeScopeName string `json:"knowledgeScopeName"` // 文档知识范围名称
-	BusinessCategory   string `json:"businessCategory"`   // 文档业务分类
-	DocumentTags       string `json:"documentTags"`       // 文档标签
+	DocumentName      string `json:"documentName"`      // 文档名称
+	KnowledgeBaseId   string `json:"knowledgeBaseId"`   // 知识库ID
+	KnowledgeBaseName string `json:"knowledgeBaseName"` // 知识库名称
 
 	// ========== 其他来源（RRF/重排/外部工具等） ==========
 	IsElevated          int     `json:"isElevated"`          // 是否提升
@@ -79,6 +83,33 @@ func (d *DocumentChunk) FillKnowledge(knowledge *DocumentMetadata) {
 		return
 	}
 	d.DocumentName = knowledge.DocumentName
+}
+
+// NeedsMetadataFallback 判断文档是否需要从知识库回填元数据
+// 当文档名称、知识范围编码或知识范围名称为空时，认为需要回填
+func (d *DocumentChunk) NeedsMetadataFallback() bool {
+	if d == nil {
+		return false
+	}
+	return utils.IsBlank(d.DocumentName) ||
+		utils.IsBlank(d.KnowledgeBaseId) ||
+		utils.IsBlank(d.KnowledgeBaseName)
+}
+
+// EnrichFromMetadata 使用知识库回填文档的缺失元数据字段
+func (d *DocumentChunk) EnrichFromMetadata(metadata *DocumentMetadata) {
+	if d == nil || metadata == nil {
+		return
+	}
+	if utils.IsBlank(d.DocumentName) && utils.IsNotBlank(metadata.DocumentName) {
+		d.DocumentName = metadata.DocumentName
+	}
+	if utils.IsBlank(d.KnowledgeBaseId) && metadata.KnowledgeBaseId != 0 {
+		d.KnowledgeBaseId = fmt.Sprintf("%d", metadata.KnowledgeBaseId)
+	}
+	if utils.IsBlank(d.KnowledgeBaseName) && utils.IsNotBlank(metadata.KnowledgeBaseName) {
+		d.KnowledgeBaseName = metadata.KnowledgeBaseName
+	}
 }
 
 type DocumentChunks []*DocumentChunk

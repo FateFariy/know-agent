@@ -4,10 +4,10 @@ import "github.com/swiftbit/know-agent/common/utils"
 
 // SubQuestionEvidence 子问题检索证据
 type SubQuestionEvidence struct {
-	SubQuestionIndex int              // 子问题索引
-	SubQuestion      string           // 子问题内容
-	SourceDocuments  []*DocumentChunk // 源文档列表
-	//ContextDocuments       []Document                 // 上下文文档列表
+	SubQuestionIndex       int                        // 子问题索引
+	SubQuestion            string                     // 子问题内容
+	SourceDocuments        []*DocumentChunk           // 源文档列表
+	ContextDocuments       []*DocumentChunk           // 上下文文档列表
 	References             []*SearchReference         // 搜索引用列表
 	ChannelTraces          []*SubQuestionChannelTrace // 渠道追踪记录
 	FusedCandidateCount    int                        // 融合候选数量
