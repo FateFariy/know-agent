@@ -99,7 +99,7 @@ type DocumentConverter interface {
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand
 
-	ToRetrievalResultRespList(src []*cvo.ChatRetrievalResult) []*chat.RetrievalResultResp
+	ToRetrievalResultRespList(src []*cen.ChatRetrievalResult) []*chat.RetrievalResultResp
 	ToConversationSessionResp(src *aggregate.ConversationArchiveRecord) *chat.ConversationSessionResp
 	ToConversationSessionRespList(src []*aggregate.ConversationArchiveRecord) []*chat.ConversationSessionResp
 	ToConversationResetResp(src *cvo.ConversationReset) *chat.ConversationResetResp
@@ -110,8 +110,8 @@ type ChatConverter interface {
 	ToConversationMemorySummaryResp(src *cen.ChatMemorySummary) *chat.ConversationMemorySummaryResp
 	// goverter:map StartTime | TimeToStringMs
 	// goverter:map EndTime | TimeToStringMs
-	ToChannelExecutionResp(src *cvo.ChatChannelExecution) *chat.ChannelExecutionResp
-	ToChannelExecutionRespList(src []*cvo.ChatChannelExecution) []*chat.ChannelExecutionResp
+	ToChannelExecutionResp(src *cen.ChatChannelExecution) *chat.ChannelExecutionResp
+	ToChannelExecutionRespList(src []*cen.ChatChannelExecution) []*chat.ChannelExecutionResp
 
 	// goverter:map . Model
 	ToChatDialogueModel(src *cen.ChatDialogue) *model.ChatDialogue
@@ -122,11 +122,11 @@ type ChatConverter interface {
 	// goverter:map . Model
 	ToChatMemorySummaryModel(src *cen.ChatMemorySummary) *model.ChatMemorySummary
 	// goverter:map . Model
-	ToChatRetrievalResultModel(src *cvo.ChatRetrievalResult) *model.ChatRetrievalResult
-	ToChatRetrievalResultModelList(src []*cvo.ChatRetrievalResult) []*model.ChatRetrievalResult
+	ToChatRetrievalResultModel(src *cen.ChatRetrievalResult) *model.ChatRetrievalResult
+	ToChatRetrievalResultModelList(src []*cen.ChatRetrievalResult) []*model.ChatRetrievalResult
 	// goverter:map . Model
-	ToChatChannelExecutionModel(src *cvo.ChatChannelExecution) *model.ChatChannelExecution
-	ToChatChannelExecutionModelList(src []*cvo.ChatChannelExecution) []*model.ChatChannelExecution
+	ToChatChannelExecutionModel(src *cen.ChatChannelExecution) *model.ChatChannelExecution
+	ToChatChannelExecutionModelList(src []*cen.ChatChannelExecution) []*model.ChatChannelExecution
 }
 
 // goverter:converter

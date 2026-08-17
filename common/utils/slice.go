@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/duke-git/lancet/v2/maputil"
+	"github.com/duke-git/lancet/v2/slice"
 )
 
 func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
@@ -198,4 +199,9 @@ func MapValues[K comparable, V any](m map[K]V) []V {
 // MapKeys 获取 map 的所有键
 func MapKeys[K comparable, V any](m map[K]V) []K {
 	return maputil.Keys(m)
+}
+
+// ForEach 遍历切片
+func ForEach[T any](s []T, iteratee func(index int, item T)) {
+	slice.ForEach(s, iteratee)
 }

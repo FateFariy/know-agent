@@ -5,6 +5,10 @@ package convert
 
 import (
 	"encoding/json"
+	"time"
+
+	datatypes "gorm.io/datatypes"
+
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
@@ -19,8 +23,6 @@ import (
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
-	datatypes "gorm.io/datatypes"
-	"time"
 )
 
 func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
@@ -37,7 +39,7 @@ func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
 	}
 	return pVoChatCommand
 }
-func ToChannelExecutionResp(source *vo.ChatChannelExecution) *chat.ChannelExecutionResp {
+func ToChannelExecutionResp(source *entity.ChatChannelExecution) *chat.ChannelExecutionResp {
 	var pChatChannelExecutionResp *chat.ChannelExecutionResp
 	if source != nil {
 		var chatChannelExecutionResp chat.ChannelExecutionResp
@@ -64,7 +66,7 @@ func ToChannelExecutionResp(source *vo.ChatChannelExecution) *chat.ChannelExecut
 	}
 	return pChatChannelExecutionResp
 }
-func ToChannelExecutionRespList(source []*vo.ChatChannelExecution) []*chat.ChannelExecutionResp {
+func ToChannelExecutionRespList(source []*entity.ChatChannelExecution) []*chat.ChannelExecutionResp {
 	var pChatChannelExecutionRespList []*chat.ChannelExecutionResp
 	if source != nil {
 		pChatChannelExecutionRespList = make([]*chat.ChannelExecutionResp, len(source))
@@ -74,7 +76,7 @@ func ToChannelExecutionRespList(source []*vo.ChatChannelExecution) []*chat.Chann
 	}
 	return pChatChannelExecutionRespList
 }
-func ToChatChannelExecutionModel(source *vo.ChatChannelExecution) *model.ChatChannelExecution {
+func ToChatChannelExecutionModel(source *entity.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution
 	if source != nil {
 		var modelChatChannelExecution model.ChatChannelExecution
@@ -101,7 +103,7 @@ func ToChatChannelExecutionModel(source *vo.ChatChannelExecution) *model.ChatCha
 	}
 	return pModelChatChannelExecution
 }
-func ToChatChannelExecutionModelList(source []*vo.ChatChannelExecution) []*model.ChatChannelExecution {
+func ToChatChannelExecutionModelList(source []*entity.ChatChannelExecution) []*model.ChatChannelExecution {
 	var pModelChatChannelExecutionList []*model.ChatChannelExecution
 	if source != nil {
 		pModelChatChannelExecutionList = make([]*model.ChatChannelExecution, len(source))
@@ -195,7 +197,7 @@ func ToChatMemorySummaryModel(source *entity.ChatMemorySummary) *model.ChatMemor
 	}
 	return pModelChatMemorySummary
 }
-func ToChatRetrievalResultModel(source *vo.ChatRetrievalResult) *model.ChatRetrievalResult {
+func ToChatRetrievalResultModel(source *entity.ChatRetrievalResult) *model.ChatRetrievalResult {
 	var pModelChatRetrievalResult *model.ChatRetrievalResult
 	if source != nil {
 		var modelChatRetrievalResult model.ChatRetrievalResult
@@ -229,7 +231,7 @@ func ToChatRetrievalResultModel(source *vo.ChatRetrievalResult) *model.ChatRetri
 	}
 	return pModelChatRetrievalResult
 }
-func ToChatRetrievalResultModelList(source []*vo.ChatRetrievalResult) []*model.ChatRetrievalResult {
+func ToChatRetrievalResultModelList(source []*entity.ChatRetrievalResult) []*model.ChatRetrievalResult {
 	var pModelChatRetrievalResultList []*model.ChatRetrievalResult
 	if source != nil {
 		pModelChatRetrievalResultList = make([]*model.ChatRetrievalResult, len(source))
@@ -341,7 +343,7 @@ func ToConversationStageTraces(source []*entity.ChatExchangeTraceStage) []*chat.
 	}
 	return pChatConversationTraceStageList
 }
-func ToRetrievalResultRespList(source []*vo.ChatRetrievalResult) []*chat.RetrievalResultResp {
+func ToRetrievalResultRespList(source []*entity.ChatRetrievalResult) []*chat.RetrievalResultResp {
 	var pChatRetrievalResultRespList []*chat.RetrievalResultResp
 	if source != nil {
 		pChatRetrievalResultRespList = make([]*chat.RetrievalResultResp, len(source))
@@ -410,7 +412,7 @@ func pTimeTimeToString(source *time.Time) string {
 	}
 	return xstring
 }
-func pVoChatRetrievalResultToPChatRetrievalResultResp(source *vo.ChatRetrievalResult) *chat.RetrievalResultResp {
+func pVoChatRetrievalResultToPChatRetrievalResultResp(source *entity.ChatRetrievalResult) *chat.RetrievalResultResp {
 	var pChatRetrievalResultResp *chat.RetrievalResultResp
 	if source != nil {
 		var chatRetrievalResultResp chat.RetrievalResultResp
@@ -463,12 +465,12 @@ func pVoConversationSummaryToPChatSummaryPayload(source *vo.ConversationSummary)
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
 }
-func voChatChannelExecutionToCommonModel(source vo.ChatChannelExecution) common.Model {
+func voChatChannelExecutionToCommonModel(source entity.ChatChannelExecution) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
 }
-func voChatRetrievalResultToCommonModel(source vo.ChatRetrievalResult) common.Model {
+func voChatRetrievalResultToCommonModel(source entity.ChatRetrievalResult) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
