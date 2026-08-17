@@ -9,10 +9,10 @@ import (
 
 type KeywordRetriever interface {
 	// SearchByKeyword  按关键词检索
-	SearchByKeyword(ctx context.Context, query *rag.DocumentRetrieve) (vo.DocumentChunks, error)
+	SearchByKeyword(ctx context.Context, query *rag.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }
 
 type VectorRetriever interface {
 	// SearchByVector 按向量检索
-	SearchByVector(ctx context.Context, query *rag.DocumentRetrieve) (vo.DocumentChunks, error)
+	SearchByVector(ctx context.Context, query *rag.DocumentRetrieve) ([]*vo.DocumentChunk, error)
 }

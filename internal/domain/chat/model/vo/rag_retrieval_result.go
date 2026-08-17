@@ -116,7 +116,7 @@ func (c *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptA
 			"subQuestionIndex": sq.SubQuestionIndex,
 			"question":         sq.SubQuestion,
 			"referenceCount":   len(sq.References),
-			//"documentCount":    len(sq.Documents),
+			//"documentCount":    len(sq.RawDocuments),
 		}
 	}
 	_ = promptResult // 保留扩展位置

@@ -16,7 +16,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -364,18 +363,18 @@ func (r *ChatRepositoryImpl) selectLatestExchangesByConversationIds(ctx context.
 }
 
 // InsertChannelExecutions 插入通道执行记录
-func (r *ChatRepositoryImpl) InsertChannelExecutions(ctx context.Context, executions []*vo.ChatChannelExecution) error {
+func (r *ChatRepositoryImpl) InsertChannelExecutions(ctx context.Context, executions []*entity.ChatChannelExecution) error {
 	return r.dbWithContext(ctx).Create(convert.ToChatChannelExecutionModelList(executions)).Error
 }
 
 // InsertRetrievalResults 插入检索结果
-func (r *ChatRepositoryImpl) InsertRetrievalResults(ctx context.Context, results []*vo.ChatRetrievalResult) error {
+func (r *ChatRepositoryImpl) InsertRetrievalResults(ctx context.Context, results []*entity.ChatRetrievalResult) error {
 	return r.dbWithContext(ctx).Create(convert.ToChatRetrievalResultModelList(results)).Error
 }
 
 // SelectRetrievalResults 查询检索结果
-func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
-	var results []*vo.ChatRetrievalResult
+func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatRetrievalResult, error) {
+	var results []*entity.ChatRetrievalResult
 	if err := r.dbWithContext(ctx).
 		Model(&model.ChatRetrievalResult{}).
 		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
@@ -386,8 +385,8 @@ func (r *ChatRepositoryImpl) SelectRetrievalResults(ctx context.Context, convers
 }
 
 // SelectChannelExecutions 查询渠道执行记录
-func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
-	var executions []*vo.ChatChannelExecution
+func (r *ChatRepositoryImpl) SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatChannelExecution, error) {
+	var executions []*entity.ChatChannelExecution
 	if err := r.dbWithContext(ctx).
 		Model(&model.ChatChannelExecution{}).
 		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).

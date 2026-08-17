@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
@@ -83,7 +84,6 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) 
 func (e *RetrievalEngine) buildPipeline() *Pipeline {
 	return NewPipeline(
 		NewChannelRetrievalStage(e.channels),
-		NewEvidenceGateStage(e.minVectorSimilarity, e.keywordRelativeScoreFloor),
 		NewFusionStage(e.fusion),
 		NewParentElevationStage(e.docGateway, e.parentEvidenceMaxChars),
 		NewRerankStage(e.reranker, e.rerankEnabled),
@@ -142,6 +142,10 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retri
 			break
 		}
 	}
+	slices.SortFunc(evidenceList, func(a, b *vo.SubQuestionEvidence) int {
+		return a.SubQuestionIndex - b.SubQuestionIndex
+	})
+
 	return evidenceList
 }
 
@@ -163,7 +167,7 @@ func (e *RetrievalEngine) assignReferenceIds(ctx context.Context, evidenceList [
 		references := make([]*vo.SearchReference, 0, len(evidence.SourceDocuments))
 		for _, doc := range evidence.SourceDocuments {
 			doc.EnrichFromMetadata(metadataMap[doc.DocumentId])
-			ref := vo.NewSearchReference(doc, evidence.SubQuestionIndex, 0, evidence.SubQuestion)
+			ref := doc.ToSearchReference(evidence.SubQuestionIndex, 0, evidence.SubQuestion)
 			uniqueKey := ref.UniqueKey()
 
 			assignedId, ok := assignedIds[uniqueKey]

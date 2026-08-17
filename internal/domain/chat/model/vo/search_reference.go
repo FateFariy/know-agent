@@ -2,9 +2,7 @@ package vo
 
 import (
 	"fmt"
-	"strconv"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -19,8 +17,8 @@ type SearchReference struct {
 	DocumentId        int64   `json:"documentId"`        // 文档ID
 	DocumentName      string  `json:"documentName"`      // 文档名称
 	ChunkId           int64   `json:"chunkId"`           // 块ID
-	ParentBlockId     int64   `json:"parentBlockId"`     // 父块ID
-	ParentBlockNo     int     `json:"parentBlockNo"`     // 父块序号
+	ParentChunkId     int64   `json:"parentChunkId"`     // 父块ID
+	ParentChunkNo     int     `json:"parentChunkNo"`     // 父块序号
 	ChunkNo           int     `json:"chunkNo"`           // 块序号
 	SectionPath       string  `json:"sectionPath"`       // 节点路径
 	StructureNodeId   int64   `json:"structureNodeId"`   // 结构节点ID
@@ -32,52 +30,93 @@ type SearchReference struct {
 	SubQuestion       string  `json:"subQuestion"`       // 子问题内容
 	Channel           string  `json:"channel"`           // 渠道名称
 	ToolName          string  `json:"toolName"`          // 工具名称
-	KnowledgeBaseId   string  `json:"knowledgeBaseId"`   // 知识库ID
+	KnowledgeBaseId   int64   `json:"knowledgeBaseId"`   // 知识库ID
 	KnowledgeBaseName string  `json:"knowledgeBaseName"` // 知识库名称
-}
 
-func NewSearchReference(chunk *DocumentChunk, subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {
-	if chunk == nil {
-		return &SearchReference{}
-	}
+	// todo 以下字段待完善
+	FinalSelectionReason         string   `json:"finalSelectionReason"`
+	EvidenceApplicabilityStatus  string   `json:"evidenceApplicabilityStatus"`
+	EvidenceApplicabilityReason  string   `json:"evidenceApplicabilityReason"`
+	ContextIdentity              string   `json:"contextIdentity"`
+	CitationIdentity             string   `json:"citationIdentity"`
+	CitationEvidenceType         string   `json:"citationEvidenceType"`
+	ContextOnly                  bool     `json:"contextOnly"`
+	SourceEvidenceResolved       bool     `json:"sourceEvidenceResolved"`
+	TaskId                       int64    `json:"taskId"`
+	ChunkType                    string   `json:"chunkType"`
+	SourceAuthoredHeading        bool     `json:"sourceAuthoredHeading"`
+	PageNo                       int      `json:"pageNo"`
+	PageRange                    string   `json:"pageRange"`
+	BboxJson                     string   `json:"bboxJson"`
+	SourceBlockIds               string   `json:"sourceBlockIds"`
+	TableId                      int64    `json:"tableId"`
+	TableNo                      int      `json:"tableNo"`
+	TableTitle                   string   `json:"tableTitle"`
+	TableOperation               string   `json:"tableOperation"`
+	TableMetricColumn            string   `json:"tableMetricColumn"`
+	TableGroupByColumn           string   `json:"tableGroupByColumn"`
+	TableMatchedRowCount         int      `json:"tableMatchedRowCount"`
+	TableEvidenceRowIds          []int64  `json:"tableEvidenceRowIds"`
+	TableEvidenceRowNos          []int    `json:"tableEvidenceRowNos"`
+	TableEvidenceColumnIds       []int64  `json:"tableEvidenceColumnIds"`
+	TableEvidenceColumnNos       []int    `json:"tableEvidenceColumnNos"`
+	TableEvidenceColumnNames     []string `json:"tableEvidenceColumnNames"`
+	TableEvidenceCellIds         []int64  `json:"tableEvidenceCellIds"`
+	TableEvidenceCellCoordinates []string `json:"tableEvidenceCellCoordinates"`
+	TableEvidenceCellBboxJsons   []string `json:"tableEvidenceCellBboxJsons"`
 
-	sourceType := utils.BlankToDefault(chunk.SourceType, "DOCUMENT")
-	ref := &SearchReference{
-		ReferenceId:      strconv.Itoa(referenceNumber),
-		SourceType:       sourceType,
-		Snippet:          chunk.OriginalSnippet,
-		SubQuestionIndex: subQuestionIndex,
-		SubQuestion:      subQuestion,
-		Score:            chunk.Score,
-		Channel:          chunk.Channel,
-	}
-	if sourceType == "WEB" {
-		ref.Title = utils.BlankToDefault(chunk.Title, "网页来源")
-		ref.Url = chunk.Url
-		ref.ToolName = utils.BlankToDefault(chunk.ToolName, "tavily_search")
-		return ref
-	}
-	ref.Title = utils.BlankToDefault(chunk.Title, "文档片段")
-	ref.DocumentId = chunk.DocumentId
-	ref.DocumentName = chunk.DocumentName
-	ref.ParentBlockId = chunk.ParentBlockId
-	ref.ParentBlockNo = chunk.ParentBlockNo
-	ref.ChunkId, _ = convertor.ToInt(chunk.ID)
-	ref.ChunkNo = chunk.ChunkNo
-	ref.SectionPath = chunk.SectionPath
-	ref.StructureNodeId = chunk.StructureNodeId
-	ref.StructureNodeType = chunk.StructureNodeType
-	ref.CanonicalPath = chunk.CanonicalPath
-	ref.ItemIndex = chunk.ItemIndex
-	ref.KnowledgeBaseId = chunk.KnowledgeBaseId
-	ref.KnowledgeBaseName = chunk.KnowledgeBaseName
-	return ref
+	KgEntityId                                 int64   `json:"kgEntityId"`
+	KgEntityName                               string  `json:"kgEntityName"`
+	KgCanonicalEntityKey                       string  `json:"kgCanonicalEntityKey"`
+	KgCanonicalEntityName                      string  `json:"kgCanonicalEntityName"`
+	KgCanonicalEntityCount                     int     `json:"kgCanonicalEntityCount"`
+	KgCanonicalDocumentCount                   int     `json:"kgCanonicalDocumentCount"`
+	KgRelatedEntityId                          int64   `json:"kgRelatedEntityId"`
+	KgRelatedEntityName                        string  `json:"kgRelatedEntityName"`
+	KgRelationId                               int64   `json:"kgRelationId"`
+	KgRelationType                             string  `json:"kgRelationType"`
+	KgRelationGroupKey                         string  `json:"kgRelationGroupKey"`
+	KgRelationGroupRelationCount               int     `json:"kgRelationGroupRelationCount"`
+	KgRelationGroupEvidenceCount               int     `json:"kgRelationGroupEvidenceCount"`
+	KgRelationGroupDocumentCount               int     `json:"kgRelationGroupDocumentCount"`
+	KgEvidenceId                               int64   `json:"kgEvidenceId"`
+	KgGraphPath                                string  `json:"kgGraphPath"`
+	KgHopCount                                 int     `json:"kgHopCount"`
+	KgQueryPlanSource                          string  `json:"kgQueryPlanSource"`
+	KgQueryPlanAnswerTypes                     string  `json:"kgQueryPlanAnswerTypes"`
+	KgQueryPlanEntities                        string  `json:"kgQueryPlanEntities"`
+	KgNhopSeedEntityId                         int64   `json:"kgNhopSeedEntityId"`
+	KgNhopSeedEntityName                       string  `json:"kgNhopSeedEntityName"`
+	KgNhopPath                                 string  `json:"kgNhopPath"`
+	KgCrossDocumentCommunityKey                string  `json:"kgCrossDocumentCommunityKey"`
+	KgCommunitySummaryOnly                     bool    `json:"kgCommunitySummaryOnly"`
+	KgCrossDocumentCommunityEntityCount        int     `json:"kgCrossDocumentCommunityEntityCount"`
+	KgCrossDocumentCommunityRelationGroupCount int     `json:"kgCrossDocumentCommunityRelationGroupCount"`
+	KgCrossDocumentCommunityEvidenceCount      int     `json:"kgCrossDocumentCommunityEvidenceCount"`
+	KgCrossDocumentCommunityDocumentCount      int     `json:"kgCrossDocumentCommunityDocumentCount"`
+	KgCommunityRankScore                       float64 `json:"kgCommunityRankScore"`
+	KgCommunityRankReasons                     string  `json:"kgCommunityRankReasons"`
+	KgQualityScore                             float64 `json:"kgQualityScore"`
+	KgQualityReasons                           string  `json:"kgQualityReasons"`
+	KgNoiseReasons                             string  `json:"kgNoiseReasons"`
+	KgPagerank                                 float64 `json:"kgPagerank"`
+	KgRankPosition                             int     `json:"kgRankPosition"`
+	KgDegree                                   int     `json:"kgDegree"`
+
+	RaptorNodeId       int64  `json:"raptorNodeId"`
+	RaptorNodeTitle    string `json:"raptorNodeTitle"`
+	RaptorNodeLevel    int    `json:"raptorNodeLevel"`
+	RaptorSummary      string `json:"raptorSummary"`
+	RaptorSourceStatus string `json:"raptorSourceStatus"`
+
+	QuoteText         string `json:"quoteText"`
+	GenerationVisible bool   // 生成时是否可见
 }
 
 // UniqueKey 生成唯一键
 func (r *SearchReference) UniqueKey() string {
-	if r.ParentBlockId > 0 {
-		return fmt.Sprintf("PARENT:%d", r.ParentBlockId)
+	if r.ParentChunkId > 0 {
+		return fmt.Sprintf("PARENT:%d", r.ParentChunkId)
 	}
 	if r.ChunkId > 0 {
 		return fmt.Sprintf("DOCUMENT:%d", r.ChunkId)
@@ -106,7 +145,7 @@ func (r *SearchReference) HasUsableAnchor() bool {
 	}
 	return r.DocumentId != 0 ||
 		r.StructureNodeId != 0 ||
-		r.ParentBlockId != 0 ||
+		r.ParentChunkId != 0 ||
 		r.ChunkId != 0 ||
 		r.SectionPath != ""
 }
@@ -120,8 +159,8 @@ func (r *SearchReference) ToSnapshot() map[string]any {
 		"documentName":       utils.BlankToDefault(r.DocumentName, r.Title),
 		"chunkId":            r.ChunkId,
 		"chunkNo":            r.ChunkNo,
-		"parentBlockId":      r.ParentBlockId,
-		"parentBlockNo":      r.ParentBlockNo,
+		"parentBlockId":      r.ParentChunkId,
+		"parentBlockNo":      r.ParentChunkNo,
 		"sectionPath":        r.SectionPath,
 		"channel":            r.Channel,
 		"score":              r.Score,
@@ -159,7 +198,7 @@ func (r *SearchReference) ToEvidenceAnchor(maxSnippetChars int) *EvidenceAnchor 
 		SectionPath:     r.SectionPath,
 		CanonicalPath:   r.CanonicalPath,
 		ItemIndex:       r.ItemIndex,
-		ParentChunkId:   r.ParentBlockId,
+		ParentChunkId:   r.ParentChunkId,
 		ChunkId:         r.ChunkId,
 		SourceType:      r.SourceType,
 		Channel:         r.Channel,

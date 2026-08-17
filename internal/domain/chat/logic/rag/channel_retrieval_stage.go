@@ -24,7 +24,7 @@ func (s *ChannelRetrievalStage) Name() string {
 	return "ChannelRetrieval"
 }
 
-// Execute 并行检索所有支持的通道，结果写入 state.RawChannelResults
+// Execute 并行检索所有支持的通道，结果写入 state.ChannelResults
 func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalState) error {
 	retrievalResult := state.RetrievalResult
 	subQuestionIndex := state.Input.SubQuestionIndex
@@ -54,7 +54,7 @@ func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalSta
 				logx.Warnf("检索通道失败: subQuestionIndex=%d, subQuestion='%s', channel='%s', error=%v",
 					subQuestionIndex, subQuestion, ch.Name(), err)
 				retrievalResult.AddRetrievalNotef("子问题%d通道[%s]检索失败或超时，已自动降级。", subQuestionIndex, ch.Name())
-				result = &RetrievalChannelResult{ChannelName: ch.Name()}
+				result = &RetrievalChannelResult{Name: ch.Name()}
 			}
 			resultCh <- result
 		}(ch)
@@ -68,7 +68,34 @@ func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalSta
 			break
 		}
 	}
-	state.RawChannelResults = channelResults
+	state.ChannelResults = channelResults
+	state.ChannelTraces = s.buildChannelTraces(channelResults, state.Plan)
 
 	return nil
+}
+
+// buildChannelTraces 构建子问题渠道执行追踪
+func (s *ChannelRetrievalStage) buildChannelTraces(results []*RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.SubQuestionChannelTrace {
+	if len(results) == 0 {
+		return nil
+	}
+
+	rawMap := make(map[string]int)
+	acceptedMap := make(map[string]int)
+	channelNames := make(map[string]struct{})
+
+	utils.ForEach(results, func(index int, r *RetrievalChannelResult) {
+		rawMap[r.Name] = len(r.RawDocuments)
+		acceptedMap[r.Name] = len(r.AcceptedDocuments)
+		channelNames[r.Name] = struct{}{}
+	})
+
+	return utils.Map(utils.MapKeys(channelNames), func(name string) *vo.SubQuestionChannelTrace {
+		return &vo.SubQuestionChannelTrace{
+			ChannelName:     name,
+			RetrievalIntent: plan.PrimaryIntent,
+			RecalledCount:   rawMap[name],
+			AcceptedCount:   acceptedMap[name],
+		}
+	})
 }

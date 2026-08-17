@@ -16,6 +16,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/enum"
@@ -53,7 +54,7 @@ func (m *MilvusVector) BuildVectors(ctx context.Context, chunks []*entity.Docume
 	return nil
 }
 
-func (m *MilvusVector) SearchByVector(ctx context.Context, query *cvo.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
+func (m *MilvusVector) SearchByVector(ctx context.Context, query *rag.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
 	return m.Search(ctx, query)
 }
 

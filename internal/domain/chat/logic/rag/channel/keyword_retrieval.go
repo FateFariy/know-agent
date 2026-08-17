@@ -3,6 +3,7 @@ package channel
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/zeromicro/go-zero/core/logx"
 
@@ -48,11 +49,15 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, input *rag.Execu
 	}
 
 	channel, _ := input.RequireChannel(c.Name())
-	topScore := docs.TopScore()
+	topScore := 1.0
+	if len(docs) > 1 {
+		cmp := func(a, b *vo.DocumentChunk) int { return int(a.Score - b.Score) }
+		topScore = slices.MaxFunc(docs, cmp).Score
+	}
 	if topScore <= 0 {
 		return &rag.RetrievalChannelResult{
-			ChannelName: c.Name(),
-			Documents:   docs,
+			Name:         c.Name(),
+			RawDocuments: docs,
 		}, nil
 	}
 	acceptedFloor := topScore * channel.RelativeScoreFloor
@@ -61,7 +66,8 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, input *rag.Execu
 	})
 
 	return &rag.RetrievalChannelResult{
-		ChannelName: c.Name(),
-		Documents:   accepted,
+		Name:              c.Name(),
+		RawDocuments:      docs,
+		AcceptedDocuments: accepted,
 	}, nil
 }

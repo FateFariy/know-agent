@@ -1,7 +1,9 @@
 package vo
 
 import (
-	"fmt"
+	"strconv"
+
+	"github.com/duke-git/lancet/v2/convertor"
 
 	"github.com/swiftbit/know-agent/common/utils"
 )
@@ -49,7 +51,7 @@ type DocumentChunk struct {
 	SourceType        string  `json:"sourceType"`        // 文档来源类型
 	Channel           string  `json:"channel"`           // 文档来源渠道
 	TaskId            int64   `json:"taskId"`            // 任务ID
-	ParentBlockId     int64   `json:"parentBlockId"`     // 父块ID
+	ParentChunkId     int64   `json:"parentChunkId"`     // 父块ID
 	DocumentId        int64   `json:"documentId"`        // 文档ID
 	ChunkNo           int     `json:"chunkNo"`           // 块序号
 	SectionPath       string  `json:"sectionPath"`       // 文档章节路径
@@ -61,14 +63,14 @@ type DocumentChunk struct {
 
 	// ========== 从 DocumentMetadata 补充 ==========
 	DocumentName      string `json:"documentName"`      // 文档名称
-	KnowledgeBaseId   string `json:"knowledgeBaseId"`   // 知识库ID
+	KnowledgeBaseId   int64  `json:"knowledgeBaseId"`   // 知识库ID
 	KnowledgeBaseName string `json:"knowledgeBaseName"` // 知识库名称
 
 	// ========== 其他来源（RRF/重排/外部工具等） ==========
 	IsElevated          int     `json:"isElevated"`          // 是否提升
 	RRFScore            float64 `json:"rrfScore"`            // RRF分数
 	RerankScore         float64 `json:"rerankScore"`         // 重排分数
-	ParentBlockNo       int     `json:"parentBlockNo"`       // 父块序号
+	ParentChunkNo       int     `json:"parentChunkNo"`       // 父块序号
 	Title               string  `json:"title"`               // 文档标题
 	Url                 string  `json:"url"`                 // URL地址
 	ToolName            string  `json:"toolName"`            // 文档工具名称
@@ -91,9 +93,7 @@ func (d *DocumentChunk) NeedsMetadataFallback() bool {
 	if d == nil {
 		return false
 	}
-	return utils.IsBlank(d.DocumentName) ||
-		utils.IsBlank(d.KnowledgeBaseId) ||
-		utils.IsBlank(d.KnowledgeBaseName)
+	return utils.IsBlank(d.DocumentName) || d.KnowledgeBaseId != 0 || utils.IsBlank(d.KnowledgeBaseName)
 }
 
 // EnrichFromMetadata 使用知识库回填文档的缺失元数据字段
@@ -104,25 +104,48 @@ func (d *DocumentChunk) EnrichFromMetadata(metadata *DocumentMetadata) {
 	if utils.IsBlank(d.DocumentName) && utils.IsNotBlank(metadata.DocumentName) {
 		d.DocumentName = metadata.DocumentName
 	}
-	if utils.IsBlank(d.KnowledgeBaseId) && metadata.KnowledgeBaseId != 0 {
-		d.KnowledgeBaseId = fmt.Sprintf("%d", metadata.KnowledgeBaseId)
+	if d.KnowledgeBaseId != 0 && metadata.KnowledgeBaseId != 0 {
+		d.KnowledgeBaseId = metadata.KnowledgeBaseId
 	}
 	if utils.IsBlank(d.KnowledgeBaseName) && utils.IsNotBlank(metadata.KnowledgeBaseName) {
 		d.KnowledgeBaseName = metadata.KnowledgeBaseName
 	}
 }
 
-type DocumentChunks []*DocumentChunk
+func (d *DocumentChunk) ToSearchReference(subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {
+	if d == nil {
+		return &SearchReference{}
+	}
 
-func (d DocumentChunks) TopScore() float64 {
-	if len(d) == 0 {
-		return 0
+	sourceType := utils.BlankToDefault(d.SourceType, "DOCUMENT")
+	ref := &SearchReference{
+		ReferenceId:      strconv.Itoa(referenceNumber),
+		SourceType:       sourceType,
+		Snippet:          d.OriginalSnippet,
+		SubQuestionIndex: subQuestionIndex,
+		SubQuestion:      subQuestion,
+		Score:            d.Score,
+		Channel:          d.Channel,
 	}
-	topScore := 0.0
-	for _, chunk := range d {
-		if chunk != nil && chunk.Score > topScore {
-			topScore = chunk.Score
-		}
+	if sourceType == "WEB" {
+		ref.Title = utils.BlankToDefault(d.Title, "网页来源")
+		ref.Url = d.Url
+		ref.ToolName = utils.BlankToDefault(d.ToolName, "tavily_search")
+		return ref
 	}
-	return topScore
+	ref.Title = utils.BlankToDefault(d.Title, "文档片段")
+	ref.DocumentId = d.DocumentId
+	ref.DocumentName = d.DocumentName
+	ref.ParentChunkId = d.ParentChunkId
+	ref.ParentChunkNo = d.ParentChunkNo
+	ref.ChunkId, _ = convertor.ToInt(d.ID)
+	ref.ChunkNo = d.ChunkNo
+	ref.SectionPath = d.SectionPath
+	ref.StructureNodeId = d.StructureNodeId
+	ref.StructureNodeType = d.StructureNodeType
+	ref.CanonicalPath = d.CanonicalPath
+	ref.ItemIndex = d.ItemIndex
+	ref.KnowledgeBaseId = d.KnowledgeBaseId
+	ref.KnowledgeBaseName = d.KnowledgeBaseName
+	return ref
 }

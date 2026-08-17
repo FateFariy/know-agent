@@ -1,7 +1,9 @@
-package vo
+package entity
 
 import (
 	"time"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChatChannelExecution 通道执行记录
@@ -29,7 +31,7 @@ type ChatChannelExecution struct {
 }
 
 // SetScores 设置分数统计
-func (v *ChatChannelExecution) SetScores(docs []*DocumentChunk) {
+func (v *ChatChannelExecution) SetScores(docs []*vo.DocumentChunk) {
 	if len(docs) == 0 {
 		return
 	}

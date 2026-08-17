@@ -1,6 +1,8 @@
 package vo
 
-import "github.com/swiftbit/know-agent/common/utils"
+import (
+	"github.com/swiftbit/know-agent/common/utils"
+)
 
 // SubQuestionEvidence 子问题检索证据
 type SubQuestionEvidence struct {

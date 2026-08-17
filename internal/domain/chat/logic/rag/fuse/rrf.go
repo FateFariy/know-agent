@@ -69,7 +69,7 @@ func newCandidateHolder(doc *vo.DocumentChunk) *candidateHolder {
 //  3. 按通道权重、排名权重和原始分数权重计算最终融合分数
 //  4. 按融合分数降序排序，截取候选窗口（plan.CandidateWindow）内的文档
 //  5. 回写融合分数到文档的 RRFScore 字段
-func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResult, plan *vo.RetrievalPlan) vo.DocumentChunks {
+func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.DocumentChunk {
 	if len(results) == 0 {
 		return nil
 	}
@@ -90,7 +90,7 @@ func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResul
 		holder.document.Channel = resolveChannelLabel(holder.channels)
 	}
 
-	result := make(vo.DocumentChunks, 0, len(selected))
+	result := make([]*vo.DocumentChunk, 0, len(selected))
 	for _, holder := range selected {
 		result = append(result, holder.document)
 	}
@@ -101,16 +101,16 @@ func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResul
 func resolveChannelMaxScoreMap(results []*rag.RetrievalChannelResult) map[string]float64 {
 	maxScoreMap := make(map[string]float64, len(results))
 	for _, result := range results {
-		if result == nil || len(result.Documents) == 0 {
+		if result == nil || len(result.RawDocuments) == 0 {
 			continue
 		}
 		maxScore := 0.0
-		for _, doc := range result.Documents {
+		for _, doc := range result.RawDocuments {
 			if doc != nil && doc.Score > maxScore {
 				maxScore = doc.Score
 			}
 		}
-		maxScoreMap[result.ChannelName] = math.Max(maxScore, 0)
+		maxScoreMap[result.Name] = math.Max(maxScore, 0)
 	}
 	return maxScoreMap
 }
@@ -122,14 +122,14 @@ func (f *RRFFusion) accumulateWeightedHybrid(
 	channelMaxScoreMap map[string]float64,
 	plan *vo.RetrievalPlan,
 ) {
-	if channelResult == nil || len(channelResult.Documents) == 0 {
+	if channelResult == nil || len(channelResult.RawDocuments) == 0 {
 		return
 	}
 
-	channelWeight := resolveChannelWeight(channelResult.ChannelName, plan)
-	channelMaxScore := channelMaxScoreMap[channelResult.ChannelName]
+	channelWeight := resolveChannelWeight(channelResult.Name, plan)
+	channelMaxScore := channelMaxScoreMap[channelResult.Name]
 
-	for rank, doc := range channelResult.Documents {
+	for rank, doc := range channelResult.RawDocuments {
 		if doc == nil {
 			continue
 		}
@@ -161,16 +161,16 @@ func (f *RRFFusion) accumulateWeightedHybrid(
 		holder.metadataBoost = math.Max(holder.metadataBoost, f.calcMetadataBoost(doc, plan))
 
 		// 记录通道来源
-		if !slices.Contains(holder.channels, channelResult.ChannelName) {
-			holder.channels = append(holder.channels, channelResult.ChannelName)
+		if !slices.Contains(holder.channels, channelResult.Name) {
+			holder.channels = append(holder.channels, channelResult.Name)
 		}
 
 		// 保留各通道原始分数
-		if channelResult.ChannelName == enum.RetrievalChannelVector {
+		if channelResult.Name == enum.RetrievalChannelVector {
 			v := doc.Score
 			holder.vectorScore = &v
 		}
-		if channelResult.ChannelName == enum.RetrievalChannelKeyword {
+		if channelResult.Name == enum.RetrievalChannelKeyword {
 			v := doc.Score
 			holder.keywordScore = &v
 		}

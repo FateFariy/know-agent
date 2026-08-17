@@ -1,4 +1,4 @@
-package vo
+package entity
 
 import (
 	"time"
@@ -6,6 +6,7 @@ import (
 	"github.com/duke-git/lancet/v2/convertor"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type ChatRetrievalResult struct {
@@ -39,7 +40,7 @@ type ChatRetrievalResult struct {
 }
 
 // SetDocumentInfo 设置文档基本信息
-func (v *ChatRetrievalResult) SetDocumentInfo(doc *DocumentChunk) {
+func (v *ChatRetrievalResult) SetDocumentInfo(doc *vo.DocumentChunk) {
 	if doc == nil {
 		return
 	}
@@ -48,8 +49,8 @@ func (v *ChatRetrievalResult) SetDocumentInfo(doc *DocumentChunk) {
 	v.DocumentName = doc.DocumentName
 	v.ChunkId, _ = convertor.ToInt(doc.ID)
 	v.ChunkNo = doc.ChunkNo
-	v.ParentBlockId, _ = convertor.ToInt(doc.ParentBlockId)
-	v.ParentBlockNo = doc.ParentBlockNo
+	v.ParentBlockId, _ = convertor.ToInt(doc.ParentChunkId)
+	v.ParentBlockNo = doc.ParentChunkNo
 	v.SectionPath = doc.SectionPath
 
 	// 设置原始分数

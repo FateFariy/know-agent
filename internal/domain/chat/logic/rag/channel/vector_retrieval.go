@@ -10,7 +10,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -55,7 +54,8 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, input *rag.Execut
 	})
 
 	return &rag.RetrievalChannelResult{
-		ChannelName: c.Name(),
-		Documents:   accepted,
+		Name:              c.Name(),
+		RawDocuments:      docs,
+		AcceptedDocuments: accepted,
 	}, nil
 }

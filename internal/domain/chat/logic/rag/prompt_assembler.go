@@ -40,7 +40,7 @@ func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer adapter.Promp
 }
 
 // Assemble 全量组装（返回 system + user + 预算/引用统计）
-func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RagRetrievalContext) (*vo.RagPromptAssemblyResult, error) {
+func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RetrievalResult) (*vo.RagPromptAssemblyResult, error) {
 	if plan == nil {
 		return nil, fmt.Errorf("plan not is nil")
 	}
@@ -116,7 +116,7 @@ func (s *PromptAssembler) buildSystemPrompt() string {
 }
 
 // buildEvidenceBlocks 组装证据块（每个子问题对应一个块）
-func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RagRetrievalContext, budget *promptBudget) string {
+func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RetrievalResult, budget *promptBudget) string {
 	if retrievalCtx == nil || len(retrievalCtx.SubQuestionEvidenceList) == 0 {
 		return s.renderNoEvidenceBlock()
 	}
