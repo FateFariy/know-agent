@@ -28,7 +28,7 @@ func (s *RerankStage) Name() string {
 
 // Execute 对父块提升后的文档执行重排序，结果写入 state.RerankedDocs。
 func (s *RerankStage) Execute(ctx context.Context, state *RetrievalState) error {
-	state.RerankedDocs = s.applyRerank(ctx, state.RetrievalResult, state.ParentSearchDocs, state.Input.ExecutionQuery)
+	state.RerankedDocs = s.applyRerank(ctx, state.RetrievalResult, state.ParentSearchDocs, state.Input.SubQuestion)
 	return nil
 }
 

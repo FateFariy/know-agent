@@ -106,7 +106,7 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retri
 	for _, input := range inputs {
 		go func(input *ExecutionInput) {
 			subQuestionIndex := input.SubQuestionIndex
-			subQuestion := input.ExecutionQuery
+			subQuestion := input.SubQuestion
 			start := time.Now()
 			state := &RetrievalState{
 				Input:           input,

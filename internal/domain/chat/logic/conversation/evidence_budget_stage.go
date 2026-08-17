@@ -1,13 +1,13 @@
-package rag
+package conversation
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -15,23 +15,22 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// PromptAssembler RAG 提示词组装实现
+// EvidenceBudgetStage RAG 提示词组装实现
 //
 // 负责：
 //  1. 基于执行计划（ConversationExecutionPlan）构建 system / user prompt
 //  2. 对证据块进行预算裁剪（总预算 + 每个子问题预算）
 //  3. 复用已渲染引用（避免重复输出相同证据块）
 //  4. 统计渲染/省略引用详情，供上层跟踪。
-type PromptAssembler struct {
+type EvidenceBudgetStage struct {
 	promptRenderer               adapter.PromptRenderer
 	totalEvidenceBudget          int    // 总证据预算（字符数）
 	perSubQuestionEvidenceBudget int    // 每个子问题的证据预算（字符数）
 	systemPrompt                 string // 系统提示词
 }
 
-// NewPromptAssembler 创建 RAG 提示词组装实现
-func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer adapter.PromptRenderer) *PromptAssembler {
-	return &PromptAssembler{
+func NewEvidenceBudgetStage(svcCtx *svc.ServiceContext, promptRenderer adapter.PromptRenderer) *EvidenceBudgetStage {
+	return &EvidenceBudgetStage{
 		promptRenderer:               promptRenderer,
 		totalEvidenceBudget:          svcCtx.Config.Chat.Rag.TotalEvidenceMaxChars,
 		perSubQuestionEvidenceBudget: svcCtx.Config.Chat.Rag.PerSubQuestionEvidenceMaxChars,
@@ -39,23 +38,76 @@ func NewPromptAssembler(svcCtx *svc.ServiceContext, promptRenderer adapter.Promp
 	}
 }
 
-// Assemble 全量组装（返回 system + user + 预算/引用统计）
-func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RetrievalResult) (*vo.RagPromptAssemblyResult, error) {
-	if plan == nil {
-		return nil, fmt.Errorf("plan not is nil")
+func (s *EvidenceBudgetStage) Name() string {
+	return enum.ConversationTraceStageEvidenceBudget.Name
+}
+
+// Execute 执行证据预算与 Prompt 组装阶段，负责校验执行上下文、处理空证据兜底、发布引用、组装 Prompt 并填充调试轨迹
+func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) error {
+	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
+		return nil
 	}
+
+	execPlan := convCtx.ExecutionPlan.Load()
+	if execPlan == nil || execPlan.RetrievalResult == nil {
+		return nil
+	}
+
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageEvidenceBudget, s.Name(),
+		&vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})
+
+	// 空证据兜底：检索结果为空时直接返回无证据提示
+	if execPlan.RetrievalResult.IsEmpty() {
+		if err := convCtx.PublishThinking("当前没有足够证据，直接返回无证据兜底回复。"); err != nil {
+			return err
+		}
+		_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "无 Source 证据，已完成空证据预算账本。"})
+		return nil
+	}
+
+	// 发布检索引用（仅在存在引用时）
+	if references := execPlan.RetrievalResult.FlattenReferences(); len(references) > 0 {
+		if err := convCtx.PublishReferences(references); err != nil {
+			return err
+		}
+	}
+
+	// 组装 Prompt（系统提示 + 用户提示）
+	promptResult, err := s.assemble(execPlan)
+	if err != nil {
+		logx.Errorf("Prompt 组装失败: conversationId=%s, err=%v", convCtx.ConversationId, err)
+		vo.OnError(ctx, "证据预算与 Prompt 组装失败。", err)
+		return err
+	}
+
+	// 填充调试轨迹，便于排查 RAG 提示词问题
+	if debugTrace := convCtx.DebugTrace.Load(); debugTrace != nil {
+		debugTrace.RagSystemPrompt = promptResult.SystemPrompt
+		debugTrace.RagUserPrompt = promptResult.UserPrompt
+	}
+
+	_ = vo.OnEnd(ctx, &vo.StageOutput{
+		SummaryText: "证据预算与 Prompt 组装完成。",
+		Snapshot:    promptResult.ToSnapshot(execPlan.RetrievalResult),
+	})
+
+	return nil
+}
+
+// Assemble 全量组装（返回 system + user + 预算/引用统计）
+func (s *EvidenceBudgetStage) assemble(plan *vo.ConversationExecutionPlan) (*vo.RagPromptAssemblyResult, error) {
 	budget := newPromptBudget(s.totalEvidenceBudget, s.perSubQuestionEvidenceBudget)
 
 	userPrompt, _ := s.promptRenderer.Render(enum.RagAnswerUser, map[string]any{
 		"currentDate":          plan.CurrentDateText,
 		"originalQuestion":     plan.OriginalQuestion,
-		"hasRetrievalQuestion": s.hasRetrievalQuestion(plan),
-		"retrievalQuestion":    plan.RetrievalQuestion,
-		"hasHistoryContext":    s.hasHistoryContext(plan),
-		"historyContext":       s.buildHistoryContext(plan),
-		"hasSubQuestions":      len(plan.RetrievalSubQuestions) > 1,
+		"hasRetrievalQuestion": plan.HasRetrievalQuestion(),
+		"retrievalQuestion":    plan.RetrievalPlan.QuestionPlan.RetrievalQuestion,
+		"hasHistoryContext":    plan.HasHistoryContext(),
+		"historyContext":       utils.Trim(plan.QuestionHistoryContext.RenderedText),
+		"hasSubQuestions":      len(plan.SubQuestions()) > 1,
 		"subQuestions":         s.buildSubQuestions(plan),
-		"evidenceBlocks":       s.buildEvidenceBlocks(retrievalCtx, budget),
+		"evidenceBlocks":       s.buildEvidenceBlocks(plan.RetrievalResult, budget),
 	})
 
 	return &vo.RagPromptAssemblyResult{
@@ -70,53 +122,32 @@ func (s *PromptAssembler) Assemble(_ context.Context, plan *vo.ConversationExecu
 	}, nil
 }
 
-// hasRetrievalQuestion 是否有检索问题
-func (s *PromptAssembler) hasRetrievalQuestion(plan *vo.ConversationExecutionPlan) bool {
-	return strutil.IsNotBlank(plan.RetrievalQuestion) && plan.RetrievalQuestion != plan.OriginalQuestion
-}
-
-// hasHistoryContext 是否有历史上下文
-func (s *PromptAssembler) hasHistoryContext(plan *vo.ConversationExecutionPlan) bool {
-	if plan.QuestionHistoryContext == nil {
-		return false
-	}
-	return strutil.IsNotBlank(plan.QuestionHistoryContext.RenderedText)
-}
-
-// buildHistoryContext 构建历史上下文
-func (s *PromptAssembler) buildHistoryContext(plan *vo.ConversationExecutionPlan) string {
-	if s.hasHistoryContext(plan) {
-		return strutil.Trim(plan.QuestionHistoryContext.RenderedText)
-	}
-	return ""
-}
-
 // buildSubQuestions 构建子问题列表
-func (s *PromptAssembler) buildSubQuestions(plan *vo.ConversationExecutionPlan) string {
-	if len(plan.RetrievalSubQuestions) < 2 {
+func (s *EvidenceBudgetStage) buildSubQuestions(plan *vo.ConversationExecutionPlan) string {
+	if len(plan.SubQuestions()) < 2 {
 		return ""
 	}
 	var b strings.Builder
-	for idx, q := range plan.RetrievalSubQuestions {
+	for idx, q := range plan.RetrievalPlan.QuestionPlan.SubQuestions {
 		b.WriteString(strconv.Itoa(idx + 1))
 		b.WriteString(". ")
-		b.WriteString(strutil.Trim(q))
+		b.WriteString(utils.Trim(q))
 		b.WriteString("\n")
 	}
-	return strutil.Trim(b.String())
+	return utils.Trim(b.String())
 }
 
 // buildSystemPrompt 构建 system prompt
-func (s *PromptAssembler) buildSystemPrompt() string {
-	if strutil.IsNotBlank(s.systemPrompt) {
-		return strutil.Trim(s.systemPrompt)
+func (s *EvidenceBudgetStage) buildSystemPrompt() string {
+	if utils.IsNotBlank(s.systemPrompt) {
+		return utils.Trim(s.systemPrompt)
 	}
 	rendered, _ := s.promptRenderer.Render(enum.RagAnswerSystem, nil)
-	return strutil.Trim(rendered)
+	return utils.Trim(rendered)
 }
 
 // buildEvidenceBlocks 组装证据块（每个子问题对应一个块）
-func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RetrievalResult, budget *promptBudget) string {
+func (s *EvidenceBudgetStage) buildEvidenceBlocks(retrievalCtx *vo.RetrievalResult, budget *promptBudget) string {
 	if retrievalCtx == nil || len(retrievalCtx.SubQuestionEvidenceList) == 0 {
 		return s.renderNoEvidenceBlock()
 	}
@@ -135,7 +166,7 @@ func (s *PromptAssembler) buildEvidenceBlocks(retrievalCtx *vo.RetrievalResult, 
 }
 
 // renderSubQuestionReferences 渲染单个子问题的引用列表（复用 + 预算裁剪）
-func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchReference, budget *promptBudget) string {
+func (s *EvidenceBudgetStage) renderSubQuestionReferences(references []*vo.SearchReference, budget *promptBudget) string {
 	renderedKeys := make(map[string]struct{})
 	if len(references) == 0 {
 		return s.renderNoEvidenceBlock()
@@ -148,7 +179,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 		}
 		if _, exists := renderedKeys[ref.UniqueKey()]; exists {
 			reuse, _ := s.promptRenderer.Render(enum.RagAnswerReuseReference, map[string]any{
-				"referenceId": strutil.Trim(ref.ReferenceId),
+				"referenceId": utils.Trim(ref.ReferenceId),
 			})
 			reuse = reuse + "\n"
 			if budget.tryConsume(utils.Len(reuse)) {
@@ -192,7 +223,7 @@ func (s *PromptAssembler) renderSubQuestionReferences(references []*vo.SearchRef
 }
 
 // renderNoEvidenceBlock 渲染无证据块
-func (s *PromptAssembler) renderNoEvidenceBlock() string {
+func (s *EvidenceBudgetStage) renderNoEvidenceBlock() string {
 	rendered, _ := s.promptRenderer.Render(enum.RagAnswerNoEvidence, nil)
 	return rendered + "\n"
 }
@@ -228,7 +259,7 @@ func (p *promptBudget) resetSubQuestionBudget() {
 	p.remainingSubQuestion = p.perSubQuestionBudget
 }
 
-// tryConsume 尝试消费 size 个字符，返回是否成功；
+// tryConsume 尝试消费 size 个字符，返回是否成功
 func (p *promptBudget) tryConsume(size int) bool {
 	if p.totalBudget <= 0 || p.perSubQuestionBudget <= 0 {
 		return false

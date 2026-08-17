@@ -28,7 +28,7 @@ func (s *ChannelRetrievalStage) Name() string {
 func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalState) error {
 	retrievalResult := state.RetrievalResult
 	subQuestionIndex := state.Input.SubQuestionIndex
-	subQuestion := state.Input.ExecutionQuery
+	subQuestion := state.Input.SubQuestion
 
 	// 过滤出当前计划需要的通道
 	channels := utils.Filter(s.channels, func(item Retrieval) bool { return utils.ContainsAny(state.Input.EnableChannels(), item.Name()) })

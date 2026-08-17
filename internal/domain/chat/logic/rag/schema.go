@@ -18,9 +18,7 @@ type RetrievalChannelResult struct {
 // ExecutionInput 是编译后的不可变检索执行请求，针对单次 RetrievalPlan 执行查询编译一次
 type ExecutionInput struct {
 	SubQuestionIndex     int
-	SourceQuestion       string
-	NormalizedQuery      string
-	ExecutionQuery       string
+	SubQuestion          string
 	ContextHints         []string
 	ScopeMode            string
 	KnowledgeBaseIds     []int64
@@ -54,9 +52,7 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 	}
 	input := &ExecutionInput{
 		SubQuestionIndex:     query.Index,
-		SourceQuestion:       query.SourceQuestion,
-		NormalizedQuery:      query.NormalizedQuery,
-		ExecutionQuery:       query.ExecutionQuery,
+		SubQuestion:          query.SubQuestion,
 		ContextHints:         utils.Copy(query.ContextHints),
 		ScopeMode:            plan.ScopeMode,
 		KnowledgeBaseIds:     utils.Copy(plan.KnowledgeBaseIds),
@@ -76,9 +72,9 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 	return input, nil
 }
 
-// validate 校验检索执行请求字段。
+// validate 校验检索执行请求字段
 func (r *ExecutionInput) validate() error {
-	if r.SubQuestionIndex <= 0 || utils.IsBlank(r.ExecutionQuery) {
+	if r.SubQuestionIndex <= 0 || utils.IsBlank(r.SubQuestion) {
 		return fmt.Errorf("execution input query index and text are required")
 	}
 	if r.ScopeMode == "" || r.ScopeMode == enum.KbSelectionModeNone {

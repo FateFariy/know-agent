@@ -48,3 +48,7 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 		}
 	}
 }
+
+func (g *GenerateStage) ClarificationExecute(ctx context.Context, convCtx *Context) error {
+	return nil
+}
