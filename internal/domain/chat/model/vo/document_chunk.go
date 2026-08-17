@@ -30,10 +30,6 @@ const (
 	MetaStructureNodeType   = "structure_node_type"
 	MetaCanonicalPath       = "canonical_path"
 	MetaItemIndex           = "item_index"
-	MetaKnowledgeScopeCode  = "knowledgeScopeCode"
-	MetaKnowledgeScopeName  = "knowledgeScopeName"
-	MetaBusinessCategory    = "businessCategory"
-	MetaDocumentTags        = "documentTags"
 	MetaTitle               = "title"
 	MetaURL                 = "url"
 	MetaToolName            = "toolName"
@@ -82,6 +78,9 @@ type DocumentChunk struct {
 	RerankQuery         string  `json:"rerankQuery"`         // 重排查询
 	RerankDurationMs    int64   `json:"rerankDurationMs"`    // 重排耗时（毫秒）
 	RerankOriginalIndex int     `json:"rerankOriginalIndex"` // 重排原始索引
+
+	// ========== 扩展数据 ==========
+	ExtraData map[string]any `json:"extraData"` // 扩展数据
 }
 
 func (d *DocumentChunk) FillKnowledge(knowledge *DocumentMetadata) {
