@@ -33,7 +33,7 @@ func (c *KeywordRetrievalChannel) Name() string {
 
 // Retrieve 执行关键词检索
 func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, input *rag.ExecutionInput) (*rag.RetrievalChannelResult, error) {
-	query, err := rag.NewDocumentRetrieve(input, c.Name())
+	query, err := NewDocumentRetrieve(c.Name(), input)
 	if err != nil {
 		return nil, err
 	}

@@ -16,10 +16,10 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/zeromicro/go-zero/core/logx"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
-	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	dvo "github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -54,7 +54,7 @@ func (m *MilvusVector) BuildVectors(ctx context.Context, chunks []*entity.Docume
 	return nil
 }
 
-func (m *MilvusVector) SearchByVector(ctx context.Context, query *rag.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
+func (m *MilvusVector) SearchByVector(ctx context.Context, query *channel.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	return m.Search(ctx, query)
 }
 
@@ -63,8 +63,8 @@ func (m *MilvusVector) markSuccess(chunks []*entity.DocumentChunk) {
 	for _, chunk := range chunks {
 		if chunk != nil && strutil.IsNotBlank(chunk.ChunkText) {
 			chunk.VectorId = strconv.FormatInt(chunk.ID, 10)
-			chunk.VectorStoreType = dvo.VectorStoreTypeMilvus
-			chunk.VectorStatus = dvo.VectorStatusVectorSuccess
+			chunk.VectorStoreType = enum.VectorStoreTypeMilvus
+			chunk.VectorStatus = enum.VectorStatusVectorSuccess
 		}
 	}
 }
@@ -78,23 +78,23 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 				ID:      strconv.FormatInt(chunk.ID, 10),
 				Content: chunk.ChunkText,
 				MetaData: map[string]any{
-					cvo.MetaDocumentId:        chunk.DocumentId,
-					cvo.MetaTaskId:            chunk.TaskId,
-					cvo.MetaPlanId:            chunk.PlanId,
-					cvo.MetaParentBlockId:     chunk.ParentChunkId,
-					cvo.MetaChunkNo:           int32(chunk.ChunkNo),
-					cvo.MetaSourceType:        int32(chunk.SourceType),
-					cvo.MetaSectionPath:       chunk.SectionPath,
-					cvo.MetaStructureNodeId:   chunk.StructureNodeId,
-					cvo.MetaStructureNodeType: int32(chunk.StructureNodeType),
-					cvo.MetaCanonicalPath:     chunk.CanonicalPath,
-					cvo.MetaItemIndex:         int32(chunk.ItemIndex),
-					"charCount":               int32(chunk.CharCount),
-					"tokenCount":              int32(chunk.TokenCount),
-					"embeddingModel":          m.model,
-					"createTime":              time.Now(),
-					"updateTime":              time.Now(),
-					"status":                  int8(0),
+					vo.MetaDocumentId:        chunk.DocumentId,
+					vo.MetaTaskId:            chunk.TaskId,
+					vo.MetaPlanId:            chunk.PlanId,
+					vo.MetaParentBlockId:     chunk.ParentChunkId,
+					vo.MetaChunkNo:           int32(chunk.ChunkNo),
+					vo.MetaSourceType:        int32(chunk.SourceType),
+					vo.MetaSectionPath:       chunk.SectionPath,
+					vo.MetaStructureNodeId:   chunk.StructureNodeId,
+					vo.MetaStructureNodeType: int32(chunk.StructureNodeType),
+					vo.MetaCanonicalPath:     chunk.CanonicalPath,
+					vo.MetaItemIndex:         int32(chunk.ItemIndex),
+					"charCount":              int32(chunk.CharCount),
+					"tokenCount":             int32(chunk.TokenCount),
+					"embeddingModel":         m.model,
+					"createTime":             time.Now(),
+					"updateTime":             time.Now(),
+					"status":                 int8(0),
 				},
 			})
 		}

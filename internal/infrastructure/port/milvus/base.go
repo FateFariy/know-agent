@@ -21,7 +21,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -49,7 +49,7 @@ func (b *Base) DeleteByDocumentId(ctx context.Context, documentId int64) error {
 }
 
 // Search 检索
-func (b *Base) Search(ctx context.Context, query *rag.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
+func (b *Base) Search(ctx context.Context, query *channel.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
 	filterExpr := b.buildFilterExpr(query)
 	retrievedDocs, err := b.retriever.Retrieve(ctx, query.RetrievalQuery, retriever.WithTopK(query.TopK), retrievermilvus.WithFilter(filterExpr))
 	if err != nil {
@@ -69,7 +69,7 @@ func (b *Base) Search(ctx context.Context, query *rag.DocumentRetrieve) ([]*cvo.
 //	    [ AND item_index in [..] ]                      ← itemIndexHints
 //
 // 说明：Milvus 的 like 区分大小写；hint 在拼接前统一转小写以贴近 Java 版本 LOWER() 语义。
-func (b *Base) buildFilterExpr(query *rag.DocumentRetrieve) string {
+func (b *Base) buildFilterExpr(query *channel.DocumentRetrieve) string {
 	var sb strings.Builder
 	sb.WriteString("document_id in ")
 	sb.WriteString(utils.Join(query.DocumentIds, "[", "]", ", "))
@@ -116,7 +116,7 @@ func (b *Base) buildSectionFilter(hints []string) string {
 // buildStructureFilter 拼接 structure_node_id / canonical_path / item_index hints 对应的过滤片段
 //
 // 返回形如 ` AND structure_node_id in [..] AND (...) AND item_index in [..]`；所有 hint 都为空时返回空串。
-func (b *Base) buildStructureFilter(filters *rag.DocumentRetrieveFilters) string {
+func (b *Base) buildStructureFilter(filters *channel.DocumentRetrieveFilters) string {
 	if filters == nil {
 		return ""
 	}

@@ -62,40 +62,25 @@ func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalSta
 
 	// 主循环收集结果
 	channelResults := make([]*RetrievalChannelResult, 0, len(channels))
+	channelTraces := make([]*vo.SubQuestionChannelTrace, 0, len(channels))
 	for result := range resultCh {
 		channelResults = append(channelResults, result)
+		channelTraces = append(channelTraces, &vo.SubQuestionChannelTrace{
+			ChannelName:     result.Name,
+			RecalledCount:   len(result.RawDocuments),
+			AcceptedCount:   len(result.AcceptedDocuments),
+			RetrievalIntent: state.Plan.PrimaryIntent,
+			ChannelWeight:   channelPlanMap[result.Name].Weight,
+		})
+		if len(result.AcceptedDocuments) > 0 {
+			state.RetrievalResult.AddUsedChannel(result.Name)
+		}
 		if len(channelResults) == len(channels) {
 			break
 		}
 	}
 	state.ChannelResults = channelResults
-	state.ChannelTraces = s.buildChannelTraces(channelResults, state.Plan)
+	state.ChannelTraces = channelTraces
 
 	return nil
-}
-
-// buildChannelTraces 构建子问题渠道执行追踪
-func (s *ChannelRetrievalStage) buildChannelTraces(results []*RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.SubQuestionChannelTrace {
-	if len(results) == 0 {
-		return nil
-	}
-
-	rawMap := make(map[string]int)
-	acceptedMap := make(map[string]int)
-	channelNames := make(map[string]struct{})
-
-	utils.ForEach(results, func(index int, r *RetrievalChannelResult) {
-		rawMap[r.Name] = len(r.RawDocuments)
-		acceptedMap[r.Name] = len(r.AcceptedDocuments)
-		channelNames[r.Name] = struct{}{}
-	})
-
-	return utils.Map(utils.MapKeys(channelNames), func(name string) *vo.SubQuestionChannelTrace {
-		return &vo.SubQuestionChannelTrace{
-			ChannelName:     name,
-			RetrievalIntent: plan.PrimaryIntent,
-			RecalledCount:   rawMap[name],
-			AcceptedCount:   acceptedMap[name],
-		}
-	})
 }

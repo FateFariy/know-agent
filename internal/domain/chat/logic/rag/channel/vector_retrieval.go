@@ -33,7 +33,7 @@ func (c *VectorRetrievalChannel) Name() string {
 // Retrieve 执行向量检索
 // 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）
 func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, input *rag.ExecutionInput) (*rag.RetrievalChannelResult, error) {
-	query, err := rag.NewDocumentRetrieve(input, c.Name())
+	query, err := NewDocumentRetrieve(c.Name(), input)
 	if err != nil {
 		return nil, err
 	}

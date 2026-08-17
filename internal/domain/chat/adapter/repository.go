@@ -5,7 +5,6 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChatRepository 聊天仓储接口
@@ -86,16 +85,16 @@ type ChatRepository interface {
 	// ========== 检索结果相关 ==========
 
 	// InsertChannelExecutions 插入渠道执行记录
-	InsertChannelExecutions(ctx context.Context, executions []*vo.ChatChannelExecution) error
+	InsertChannelExecutions(ctx context.Context, executions []*entity.ChatChannelExecution) error
 
 	// InsertRetrievalResults 插入检索结果
-	InsertRetrievalResults(ctx context.Context, results []*vo.ChatRetrievalResult) error
+	InsertRetrievalResults(ctx context.Context, results []*entity.ChatRetrievalResult) error
 
 	// SelectRetrievalResults 查询检索结果
-	SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)
+	SelectRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatRetrievalResult, error)
 
 	// SelectChannelExecutions 查询渠道执行记录
-	SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
+	SelectChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatChannelExecution, error)
 
 	// DeleteRetrievalResultsByConversationId 删除会话所有检索结果
 	DeleteRetrievalResultsByConversationId(ctx context.Context, conversationId string) error
