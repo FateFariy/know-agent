@@ -48,13 +48,9 @@ func (p *RetrievalPlan) Validate() error {
 	return p.ValidateForExecution()
 }
 
-//// CandidateWindow 返回候选窗口大小（非负）
-//func (p *RetrievalPlan) CandidateWindow() int {
-//	if p == nil || p.CandidateWindow <= 0 {
-//		return 0
-//	}
-//	return p.CandidateWindow
-//}
+func (p *RetrievalPlan) hasRetrievalQuestion() bool {
+	return p.QuestionPlan != nil && p.QuestionPlan.RetrievalQuestion != ""
+}
 
 // RankWeight 返回排名权重（默认 1）
 func (p *RetrievalPlan) RankWeight() float64 {
@@ -171,7 +167,7 @@ func (p *RetrievalPlan) validateExecutionQueries() error {
 		return errors.New("RetrievalPlan execution query is required for every sub-question")
 	}
 	for _, q := range p.QuestionPlan.ExecutionQueries {
-		if q == nil || utils.IsBlank(q.ExecutionQuery) {
+		if q == nil || utils.IsBlank(q.SubQuestion) {
 			return errors.New("RetrievalPlan execution query is required for every sub-question")
 		}
 	}

@@ -5,11 +5,6 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-)
-
-const (
-	defaultNoEvidenceReply = "当前没有足够证据支持明确回答。"
 )
 
 // singleValueChan 将给定字符串包装为一个已关闭的带缓冲只读 channel，便于与流式管道拼接
@@ -27,9 +22,4 @@ type Executor interface {
 
 	// Execute 执行回答生成逻辑
 	Execute(ctx context.Context, convCtx *conversation.Context) (<-chan string, error)
-}
-
-// RagPromptAssembler RAG 提示词组装接口
-type RagPromptAssembler interface {
-	Assemble(ctx context.Context, plan *vo.ConversationExecutionPlan, retrievalCtx *vo.RetrievalResult) (*vo.RagPromptAssemblyResult, error)
 }

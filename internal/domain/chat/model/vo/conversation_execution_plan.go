@@ -3,6 +3,7 @@ package vo
 import (
 	"time"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -24,6 +25,8 @@ type ConversationExecutionPlan struct {
 	NavigationDecision           *DocumentNavigationDecision // 导航决策
 	RecognitionResult            *IntentRecognitionResult    // 意图识别结果
 	RetrievalPlan                *RetrievalPlan              // 检索执行计划
+	RetrievalResult              *RetrievalResult            // 检索结果
+	PromptAssemblyResult         *RagPromptAssemblyResult    // 提示组装结果
 	HistoryCompressionApplied    bool                        // 是否应用历史压缩
 	HistoryCoveredExchangeId     int64                       // 覆盖的历史记录交换ID
 	HistoryCoveredExchangeCount  int                         // 覆盖的历史记录交换计数
@@ -47,6 +50,31 @@ func (p *ConversationExecutionPlan) ExecutionModeName() string {
 	return p.Mode.Name()
 }
 
+// HasRetrievalQuestion 是否有检索问题
+func (p *ConversationExecutionPlan) HasRetrievalQuestion() bool {
+	if p == nil || p.RetrievalPlan == nil {
+		return false
+	}
+	questionPlan := p.RetrievalPlan.QuestionPlan
+	return questionPlan != nil && utils.IsNotBlank(questionPlan.RetrievalQuestion) && questionPlan.RetrievalQuestion != p.OriginalQuestion
+}
+
+// HasHistoryContext 是否有历史上下文
+func (p *ConversationExecutionPlan) HasHistoryContext() bool {
+	if p == nil || p.QuestionHistoryContext == nil {
+		return false
+	}
+	return utils.IsNotBlank(p.QuestionHistoryContext.RenderedText)
+}
+
+func (p *ConversationExecutionPlan) SubQuestions() []string {
+	if p == nil || p.RetrievalPlan == nil || p.RetrievalPlan.QuestionPlan == nil {
+		return nil
+	}
+	return p.RetrievalPlan.QuestionPlan.SubQuestions
+}
+
+// ApplyNoEvidenceReply 应用无证据回复
 func (p *ConversationExecutionPlan) ApplyNoEvidenceReply() {
 	if p == nil {
 		return

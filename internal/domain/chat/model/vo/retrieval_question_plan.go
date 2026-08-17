@@ -17,7 +17,7 @@ type RetrievalQuestionPlan struct {
 	HistoryInherited         bool                       // 是否继承历史
 	HistoryInheritanceSource string                     // 历史继承来源
 	InheritedContextAnchors  []*RetrievalContextAnchor  // 继承的上下文锚点列表
-	SubQuestions             []string                   // 子问题列表(已弃用)
+	SubQuestions             []string                   // 子问题列表
 }
 
 // Equal 判断是否一致
@@ -26,18 +26,14 @@ func (q *RetrievalExecutionQuery) Equal(other *RetrievalExecutionQuery) bool {
 		return false
 	}
 	return q.Index == other.Index &&
-		q.SourceQuestion == other.SourceQuestion &&
-		q.NormalizedQuery == other.NormalizedQuery &&
-		q.ExecutionQuery == other.ExecutionQuery &&
+		q.SubQuestion == other.SubQuestion &&
 		utils.EqualUnordered(q.ContextHints, other.ContextHints)
 }
 
 type RetrievalExecutionQuery struct {
-	Index           int      // 查询索引
-	SourceQuestion  string   // 原始问题
-	NormalizedQuery string   // 归一化查询
-	ExecutionQuery  string   // 执行查询语句
-	ContextHints    []string // 上下文提示列表
+	Index        int      // 子问题索引
+	SubQuestion  string   // 子问题
+	ContextHints []string // 上下文提示列表
 }
 
 type RetrievalContextAnchor struct {

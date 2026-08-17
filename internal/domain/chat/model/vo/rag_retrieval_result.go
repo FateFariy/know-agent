@@ -79,11 +79,11 @@ func (c *RetrievalResult) RetrievalNotes() []string {
 }
 
 // ToSnapshot 构建检索阶段快照
-func (c *RetrievalResult) ToSnapshot(plan *ConversationExecutionPlan) map[string]any {
+func (c *RetrievalResult) ToSnapshot(plan *RetrievalPlan) map[string]any {
 	references := c.FlattenReferences()
 	return map[string]any{
 		"retrievalQuestion": c.RetrievalQuestion,
-		"retrievalPlan":     plan.RetrievalPlan,
+		"retrievalPlan":     plan,
 		"usedChannels":      c.UsedChannels(),
 		"retrievalNotes":    c.RetrievalNotes(),
 		"referenceCount":    len(references),
@@ -116,7 +116,6 @@ func (c *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptA
 			"subQuestionIndex": sq.SubQuestionIndex,
 			"question":         sq.SubQuestion,
 			"referenceCount":   len(sq.References),
-			//"documentCount":    len(sq.RawDocuments),
 		}
 	}
 	_ = promptResult // 保留扩展位置

@@ -43,8 +43,8 @@ func NewDocumentRetrieve(channelName string, input *rag.ExecutionInput) (*Docume
 	}
 
 	req := &DocumentRetrieve{
-		Question:          utils.BlankToDefault(input.SourceQuestion, input.NormalizedQuery),
-		RetrievalQuery:    input.ExecutionQuery,
+		Question:          input.SubQuestion,
+		RetrievalQuery:    input.SubQuestion,
 		TopK:              channel.TopK,
 		QueryContextHints: input.ContextHints,
 		DocumentIds:       input.DocumentScope,

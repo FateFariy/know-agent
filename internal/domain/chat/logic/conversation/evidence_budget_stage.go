@@ -85,6 +85,7 @@ func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) err
 		debugTrace.RagSystemPrompt = promptResult.SystemPrompt
 		debugTrace.RagUserPrompt = promptResult.UserPrompt
 	}
+	execPlan.PromptAssemblyResult = promptResult
 
 	_ = vo.OnEnd(ctx, &vo.StageOutput{
 		SummaryText: "证据预算与 Prompt 组装完成。",
