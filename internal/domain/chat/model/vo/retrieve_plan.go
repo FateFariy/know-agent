@@ -3,6 +3,7 @@ package vo
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -45,6 +46,46 @@ func (p *RetrievalPlan) Validate() error {
 		return errors.New("retrieval plan is nil")
 	}
 	return p.ValidateForExecution()
+}
+
+//// CandidateWindow 返回候选窗口大小（非负）
+//func (p *RetrievalPlan) CandidateWindow() int {
+//	if p == nil || p.CandidateWindow <= 0 {
+//		return 0
+//	}
+//	return p.CandidateWindow
+//}
+
+// RankWeight 返回排名权重（默认 1）
+func (p *RetrievalPlan) RankWeight() float64 {
+	if p == nil || p.RankFeatures == nil {
+		return 1
+	}
+	return math.Max(0, p.RankFeatures.RankWeight)
+}
+
+// OriginalScoreWeight 返回原始分数权重（默认 0.08）
+func (p *RetrievalPlan) OriginalScoreWeight() float64 {
+	if p == nil || p.RankFeatures == nil {
+		return 0.08
+	}
+	return math.Max(0, p.RankFeatures.OriginalScoreWeight)
+}
+
+// MetadataBoostWeight 返回元数据提升权重（默认 0.04）
+func (p *RetrievalPlan) MetadataBoostWeight() float64 {
+	if p == nil || p.RankFeatures == nil {
+		return 0.04
+	}
+	return math.Max(0, p.RankFeatures.MetadataBoostWeight)
+}
+
+// MaxMetadataBoost 返回最大元数据提升值（默认 1）
+func (p *RetrievalPlan) MaxMetadataBoost() float64 {
+	if p == nil || p.RankFeatures == nil {
+		return 1
+	}
+	return math.Max(0, p.RankFeatures.MaxMetadataBoost)
 }
 
 // ValidateForExecution 校验执行计划的完整性和合法性
@@ -148,13 +189,13 @@ func (p *RetrievalPlan) validateChannels() error {
 	//	if ch == nil {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	if strings.TrimSpace(ch.Channel) == "" {
+	//	if strings.TrimSpace(ch.Name) == "" {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	if _, exists := channelNames[ch.Channel]; exists {
+	//	if _, exists := channelNames[ch.Name]; exists {
 	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
 	//	}
-	//	channelNames[ch.Channel] = struct{}{}
+	//	channelNames[ch.Name] = struct{}{}
 	//
 	//	if ch.TopK <= 0 || ch.Budget <= 0 || ch.Timeout <= 0 {
 	//		return errors.New("RetrievalPlan channel topK, budget and timeout must be positive")

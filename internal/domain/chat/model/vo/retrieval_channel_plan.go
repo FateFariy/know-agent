@@ -8,7 +8,7 @@ import (
 
 // RetrievalChannelPlan 检索通道计划
 type RetrievalChannelPlan struct {
-	Channel            enum.RetrievalChannel `json:"channel"`            // 通道名称
+	Name               enum.RetrievalChannel `json:"name"`               // 通道名称
 	Enabled            bool                  `json:"enabled"`            // 是否启用
 	TopK               int                   `json:"topK"`               // 返回数量
 	Timeout            time.Duration         `json:"timeout"`            // 超时时间
@@ -54,7 +54,7 @@ func NewRaptorChannelPlan(enabled bool, topK int, timeout time.Duration, weight 
 
 func newChannelPlan(channel enum.RetrievalChannel, enabled bool, topK int, timeout time.Duration, weight, minScore, relativeFloor float64) *RetrievalChannelPlan {
 	return &RetrievalChannelPlan{
-		Channel:            channel,
+		Name:               channel,
 		Enabled:            enabled,
 		TopK:               topK,
 		Timeout:            timeout,

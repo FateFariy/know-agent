@@ -1,11 +1,13 @@
 package vo
 
 import (
+	"math"
 	"strconv"
 
 	"github.com/duke-git/lancet/v2/convertor"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 // DocumentKnowledgeMetadataKeys 文档知识元数据键常量
@@ -44,9 +46,9 @@ const (
 
 // DocumentChunk 文档块
 type DocumentChunk struct {
-	// ========== 向量检索直接得到 ==========
+	// ========== 检索直接得到 ==========
 	ID                string  `json:"id"`                // 块ID
-	Score             float64 `json:"score"`             // 相似度分数
+	Score             float64 `json:"score"`             // 分数
 	Content           string  `json:"content"`           // 文本内容
 	SourceType        string  `json:"sourceType"`        // 文档来源类型
 	Channel           string  `json:"channel"`           // 文档来源渠道
@@ -68,6 +70,8 @@ type DocumentChunk struct {
 
 	// ========== 其他来源（RRF/重排/外部工具等） ==========
 	IsElevated          int     `json:"isElevated"`          // 是否提升
+	MetadataBoost       float64 `json:"metadataBoost"`       // 元数据提升
+	NormalizedScore     float64 `json:"normalizedScore"`     // 归一化分数
 	RRFScore            float64 `json:"rrfScore"`            // RRF分数
 	RerankScore         float64 `json:"rerankScore"`         // 重排分数
 	ParentChunkNo       int     `json:"parentChunkNo"`       // 父块序号
@@ -110,6 +114,22 @@ func (d *DocumentChunk) EnrichFromMetadata(metadata *DocumentMetadata) {
 	if utils.IsBlank(d.KnowledgeBaseName) && utils.IsNotBlank(metadata.KnowledgeBaseName) {
 		d.KnowledgeBaseName = metadata.KnowledgeBaseName
 	}
+}
+
+// NormalizeScore 归一化分数
+func (d *DocumentChunk) NormalizeScore(maxScore float64) {
+	if d == nil || maxScore <= 0 {
+		return
+	}
+	d.NormalizedScore = math.Min(1, d.Score/maxScore)
+}
+
+// IsGraphRagSource 判断文档是否来自 GraphRAG 通道
+func (d *DocumentChunk) IsGraphRagSource() bool {
+	if d == nil {
+		return false
+	}
+	return d.Channel == enum.RetrievalChannelGraphRAG || d.SourceType == "GRAPH_RAG"
 }
 
 func (d *DocumentChunk) ToSearchReference(subQuestionIndex, referenceNumber int, subQuestion string) *SearchReference {

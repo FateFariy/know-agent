@@ -23,5 +23,5 @@ type Retriever interface {
 // Fusion 检索结果融合接口
 type Fusion interface {
 	// Fuse 对多通道检索结果执行加权融合，返回排序后的候选文档列表
-	Fuse(ctx context.Context, results []*RetrievalChannelResult, plan *vo.RetrievalPlan) vo.DocumentChunks
+	Fuse(ctx context.Context, results []*RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.DocumentChunk
 }

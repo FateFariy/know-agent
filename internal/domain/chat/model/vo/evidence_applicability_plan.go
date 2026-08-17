@@ -32,8 +32,8 @@ func NewEvidenceApplicabilityPlan(question string, intentResult *IntentRecogniti
 
 	// 构建候选通道列表
 	plan.ChannelCandidates = append(plan.ChannelCandidates,
-		RetrievalChannelPlan{Channel: "VECTOR", Enabled: true, Weight: 0.8},
-		RetrievalChannelPlan{Channel: "KEYWORD", Enabled: true, Weight: 0.7},
+		RetrievalChannelPlan{Name: "VECTOR", Enabled: true, Weight: 0.8},
+		RetrievalChannelPlan{Name: "KEYWORD", Enabled: true, Weight: 0.7},
 	)
 
 	if !plan.NeedsDocumentLevel {

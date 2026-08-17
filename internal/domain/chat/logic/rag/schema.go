@@ -95,10 +95,10 @@ func (r *ExecutionInput) validate() error {
 		if ch == nil {
 			return fmt.Errorf("execution input channel must not be nil")
 		}
-		if _, exists := names[ch.Channel]; exists {
+		if _, exists := names[ch.Name]; exists {
 			return fmt.Errorf("execution input channel names must be unique")
 		}
-		names[ch.Channel] = struct{}{}
+		names[ch.Name] = struct{}{}
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (r *ExecutionInput) validate() error {
 // RequireChannel 按名称查找通道，不存在则返回错误
 func (r *ExecutionInput) RequireChannel(channelName string) (*vo.RetrievalChannelPlan, error) {
 	for _, ch := range r.Channels {
-		if ch.Channel == channelName {
+		if ch.Name == channelName {
 			return ch, nil
 		}
 	}
@@ -117,5 +117,14 @@ func (r *ExecutionInput) EnableChannels() []string {
 	if r == nil {
 		return nil
 	}
-	return utils.Map(r.Channels, func(ch *vo.RetrievalChannelPlan) string { return ch.Channel })
+	return utils.Map(r.Channels, func(ch *vo.RetrievalChannelPlan) string { return ch.Name })
+}
+
+// ChannelPlanMap 返回通道计划的映射，键为通道名称
+func (r *ExecutionInput) ChannelPlanMap() map[string]*vo.RetrievalChannelPlan {
+	if r == nil || len(r.Channels) == 0 {
+		return nil
+	}
+	keyFunc := func(ch *vo.RetrievalChannelPlan) (string, *vo.RetrievalChannelPlan) { return ch.Name, ch }
+	return utils.MapBy(r.Channels, keyFunc)
 }

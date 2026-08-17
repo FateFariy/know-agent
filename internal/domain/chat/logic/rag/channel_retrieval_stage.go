@@ -36,9 +36,7 @@ func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalSta
 		retrievalResult.AddRetrievalNotef("子问题%d没有可用的检索通道。", subQuestionIndex)
 		return nil
 	}
-	channelPlanMap := utils.MapBy(state.Input.Channels, func(item *vo.RetrievalChannelPlan) (string, *vo.RetrievalChannelPlan) {
-		return item.Channel, item
-	})
+	channelPlanMap := state.Input.ChannelPlanMap()
 
 	// 创建带缓冲的结果通道
 	resultCh := make(chan *RetrievalChannelResult, len(channels))
