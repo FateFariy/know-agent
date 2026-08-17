@@ -3,6 +3,7 @@ package vo
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/utils"
 )
@@ -34,9 +35,16 @@ type RetrievalPlan struct {
 	RerankWindow              int                          // 重排序窗口大小
 	RerankRequested           bool                         // 是否请求重排序
 	FinalEvidenceBudget       int                          // 最终证据预算
-	SubQuestionTimeoutMs      int64                        // 子问题超时时间（毫秒）
+	SubQuestionTimeout        time.Duration                // 子问题超时时间
 	Reasons                   []string                     // 决策原因列表
 	Source                    string                       // 来源标识
+}
+
+func (p *RetrievalPlan) Validate() error {
+	if p == nil {
+		return errors.New("retrieval plan is nil")
+	}
+	return p.ValidateForExecution()
 }
 
 // ValidateForExecution 校验执行计划的完整性和合法性
@@ -44,7 +52,7 @@ func (p *RetrievalPlan) ValidateForExecution() error {
 	//if p == nil {
 	//	return errors.New("RetrievalPlan is required")
 	//}
-	//if p.QuestionPlan == nil || utils.IsBlank(p.QuestionPlan.NormalizedQuery) {
+	//if p.QuestionPlan == nil || utils.IsBlank(p.QuestionPlan.RetrievalQuestion) {
 	//	return errors.New("RetrievalPlan normalized query is required")
 	//}
 	//
@@ -109,7 +117,7 @@ func (p *RetrievalPlan) ValidateForExecution() error {
 	//if p.FinalEvidenceBudget <= 0 || p.FinalEvidenceBudget > p.RerankWindow {
 	//	return errors.New("RetrievalPlan final evidence budget must be positive and no larger than rerank window")
 	//}
-	//if p.SubQuestionTimeoutMs <= 0 {
+	//if p.SubQuestionTimeout <= 0 {
 	//	return errors.New("RetrievalPlan sub-question timeout must be positive")
 	//}
 
@@ -172,6 +180,28 @@ func requirePositiveIDs(values []int64, field string) error {
 		}
 	}
 	return nil
+}
+
+// FindPlannedQuery 按索引查找执行查询
+func (p *RetrievalPlan) FindPlannedQuery(queryIndex int) *RetrievalExecutionQuery {
+	if p == nil || p.QuestionPlan == nil || len(p.QuestionPlan.ExecutionQueries) == 0 {
+		return nil
+	}
+	for _, q := range p.QuestionPlan.ExecutionQueries {
+		if q != nil && q.Index == queryIndex {
+			return q
+		}
+	}
+	return nil
+}
+
+// RequirePlannedQuery 按索引查找执行查询，不存在则返回错误
+func (p *RetrievalPlan) RequirePlannedQuery(queryIndex int) (*RetrievalExecutionQuery, error) {
+	query := p.FindPlannedQuery(queryIndex)
+	if query == nil {
+		return nil, fmt.Errorf("execution query index is absent from RetrievalPlan: %d", queryIndex)
+	}
+	return query, nil
 }
 
 func (p *RetrievalPlan) validateRouteAuthorization() error {

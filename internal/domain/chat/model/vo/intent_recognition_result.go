@@ -152,7 +152,7 @@ func (i *IntentRecognitionResult) GetStructureNavigationIntent() *StructureNavig
 	return i.StructureNavigationIntent
 }
 
-// ResolveNoEvidenceReply 根据是否需要新鲜搜索返回合适的无证据回复
+// ResolveNoEvidenceReply 根据是否需要实时搜索返回合适的无证据回复
 func (i *IntentRecognitionResult) ResolveNoEvidenceReply(requiresFreshSearch bool) string {
 	queryType := utils.BlankToDefault(i.QueryType, enum.QueryTypeDocumentQA)
 	if queryType == enum.QueryTypeCapabilityQuery {
@@ -169,4 +169,73 @@ func (i *IntentRecognitionResult) SuggestedChannels() []string {
 		return nil
 	}
 	return utils.FilterUniqueLimit(i.Channels, -1, func(s string) (string, bool) { return s, s != "" })
+}
+
+func (i *IntentRecognitionResult) ToTableIntent() *TableIntent {
+	if i == nil {
+		return &TableIntent{
+			Source: "NONE",
+		}
+	}
+	return &TableIntent{
+		Requested: i.channelRequested(enum.QueryTypeTableQuery, "TABLE"),
+		TableOps:  normalizeStringsLimit(i.TableOps, 8),
+		Source:    i.intentSource(),
+	}
+}
+
+func (i *IntentRecognitionResult) ToGraphIntent(maxHops int) *GraphIntent {
+	if i == nil {
+		return &GraphIntent{
+			MaxHops: maxHops,
+			Source:  "NONE",
+		}
+	}
+	return &GraphIntent{
+		Requested:      i.channelRequested("GRAPH_RELATION", "GRAPH_RAG"),
+		Entities:       normalizeStringsLimit(i.Entities, 8),
+		TargetEntities: normalizeStringsLimit(i.TargetEntities, 8),
+		MaxHops:        maxHops,
+		Source:         i.intentSource(),
+	}
+}
+
+func (i *IntentRecognitionResult) ToRaptorIntent(sourceChunkTopK int) *RaptorIntent {
+	if i == nil {
+		return &RaptorIntent{
+			SourceChunkTopK: sourceChunkTopK,
+			Source:          "NONE",
+		}
+	}
+	requested := i.channelRequested("GLOBAL_SUMMARY", "RAPTOR")
+	return &RaptorIntent{
+		Requested:        requested,
+		SummaryRequested: requested,
+		SourceChunkTopK:  sourceChunkTopK,
+		Source:           i.intentSource(),
+	}
+}
+
+// channelRequested 检查通道是否被请求
+func (i *IntentRecognitionResult) channelRequested(queryType, intent string) bool {
+	if i == nil {
+		return false
+	}
+	return i.QueryType == queryType || utils.ContainsAny(i.Channels, intent)
+}
+
+// intentSource 获取意图来源
+func (i *IntentRecognitionResult) intentSource() string {
+	if i == nil {
+		return "NONE"
+	}
+	return utils.BlankToDefault(i.Source, "intent-recognize")
+}
+
+// normalizeStringsLimit 标准化字符串列表并限制数量
+func normalizeStringsLimit(items []string, limit int) []string {
+	return utils.FilterMapUniqueLimit(items, limit, func(item string) (string, string, bool) {
+		item = utils.CompactWhitespace(item)
+		return item, item, item != ""
+	})
 }

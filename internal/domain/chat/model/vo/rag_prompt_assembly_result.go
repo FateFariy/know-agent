@@ -13,7 +13,7 @@ type RagPromptAssemblyResult struct {
 }
 
 // ToSnapshot 构建证据预算阶段快照
-func (r *RagPromptAssemblyResult) ToSnapshot(retrievalCtx *RagRetrievalContext) map[string]any {
+func (r *RagPromptAssemblyResult) ToSnapshot(retrievalCtx *RetrievalResult) map[string]any {
 	evidence := retrievalCtx.SubQuestionEvidenceList
 	_ = retrievalCtx.ValidateEvidenceBudgetScope()
 

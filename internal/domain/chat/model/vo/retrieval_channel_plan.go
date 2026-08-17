@@ -8,14 +8,23 @@ import (
 
 // RetrievalChannelPlan 检索通道计划
 type RetrievalChannelPlan struct {
-	Channel            string        `json:"channel"`            // 通道名称
-	Enabled            bool          `json:"enabled"`            // 是否启用
-	TopK               int           `json:"topK"`               // 返回数量
-	Timeout            time.Duration `json:"timeout"`            // 超时时间
-	Budget             int           `json:"budget"`             // 预算
-	Weight             float64       `json:"weight"`             // 权重
-	MinimumScore       float64       `json:"minimumScore"`       // 最小分数
-	RelativeScoreFloor float64       `json:"relativeScoreFloor"` // 相对分数下限
+	Channel            enum.RetrievalChannel `json:"channel"`            // 通道名称
+	Enabled            bool                  `json:"enabled"`            // 是否启用
+	TopK               int                   `json:"topK"`               // 返回数量
+	Timeout            time.Duration         `json:"timeout"`            // 超时时间
+	Budget             int                   `json:"budget"`             // 预算
+	Weight             float64               `json:"weight"`             // 权重
+	MinimumScore       float64               `json:"minimumScore"`       // 最小分数
+	RelativeScoreFloor float64               `json:"relativeScoreFloor"` // 相对分数下限
+}
+
+// Clone 深拷贝通道计划
+func (p *RetrievalChannelPlan) Clone() *RetrievalChannelPlan {
+	if p == nil {
+		return nil
+	}
+	s := *p
+	return &s
 }
 
 // NewVectorChannelPlan 创建向量检索通道计划

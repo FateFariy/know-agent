@@ -6,16 +6,16 @@ import (
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 )
 
-// RagRetrievalContext RAG 检索上下文
-type RagRetrievalContext struct {
+// RetrievalResult RAG 检索结果
+type RetrievalResult struct {
 	RetrievalQuestion       string
 	SubQuestionEvidenceList []*SubQuestionEvidence
 	retrievalNotes          *list.CopyOnWriteList[string]
 	usedChannels            *list.CopyOnWriteList[string]
 }
 
-func NewRagRetrievalContext(retrievalQuestion string) *RagRetrievalContext {
-	return &RagRetrievalContext{
+func NewRagRetrievalResult(retrievalQuestion string) *RetrievalResult {
+	return &RetrievalResult{
 		RetrievalQuestion: retrievalQuestion,
 		retrievalNotes:    list.NewCopyOnWriteList([]string{}),
 		usedChannels:      list.NewCopyOnWriteList([]string{}),
@@ -23,7 +23,7 @@ func NewRagRetrievalContext(retrievalQuestion string) *RagRetrievalContext {
 }
 
 // IsEmpty 判断检索上下文是否为空（所有子问题均无证据）
-func (c *RagRetrievalContext) IsEmpty() bool {
+func (c *RetrievalResult) IsEmpty() bool {
 	if len(c.SubQuestionEvidenceList) == 0 {
 		return true
 	}
@@ -36,7 +36,7 @@ func (c *RagRetrievalContext) IsEmpty() bool {
 }
 
 // FlattenReferences 合并所有子问题的引用
-func (c *RagRetrievalContext) FlattenReferences() []*SearchReference {
+func (c *RetrievalResult) FlattenReferences() []*SearchReference {
 	if c == nil || len(c.SubQuestionEvidenceList) == 0 {
 		return nil
 	}
@@ -48,20 +48,20 @@ func (c *RagRetrievalContext) FlattenReferences() []*SearchReference {
 }
 
 // AddRetrievalNotef 添加检索笔记
-func (c *RagRetrievalContext) AddRetrievalNotef(format string, args ...any) {
+func (c *RetrievalResult) AddRetrievalNotef(format string, args ...any) {
 	note := fmt.Sprintf(format, args...)
 	c.retrievalNotes.Add(note)
 }
 
 // AddUsedChannel 添加已使用的渠道
-func (c *RagRetrievalContext) AddUsedChannel(channel string) {
+func (c *RetrievalResult) AddUsedChannel(channel string) {
 	if !c.usedChannels.Contain(channel) {
 		c.usedChannels.Add(channel)
 	}
 }
 
 // UsedChannels 获取已使用的渠道
-func (c *RagRetrievalContext) UsedChannels() []string {
+func (c *RetrievalResult) UsedChannels() []string {
 	size := c.usedChannels.Size()
 	if size == 0 {
 		return nil
@@ -70,7 +70,7 @@ func (c *RagRetrievalContext) UsedChannels() []string {
 }
 
 // RetrievalNotes 获取检索笔记
-func (c *RagRetrievalContext) RetrievalNotes() []string {
+func (c *RetrievalResult) RetrievalNotes() []string {
 	size := c.retrievalNotes.Size()
 	if size == 0 {
 		return nil
@@ -79,7 +79,7 @@ func (c *RagRetrievalContext) RetrievalNotes() []string {
 }
 
 // ToSnapshot 构建检索阶段快照
-func (c *RagRetrievalContext) ToSnapshot(plan *ConversationExecutionPlan) map[string]any {
+func (c *RetrievalResult) ToSnapshot(plan *ConversationExecutionPlan) map[string]any {
 	references := c.FlattenReferences()
 	return map[string]any{
 		"retrievalQuestion": c.RetrievalQuestion,
@@ -94,7 +94,7 @@ func (c *RagRetrievalContext) ToSnapshot(plan *ConversationExecutionPlan) map[st
 }
 
 // ValidateEvidenceBudgetScope 验证证据预算范围：子问题索引必须为正数且唯一
-func (c *RagRetrievalContext) ValidateEvidenceBudgetScope() error {
+func (c *RetrievalResult) ValidateEvidenceBudgetScope() error {
 	indexSet := make(map[int]struct{}, len(c.SubQuestionEvidenceList))
 	for _, sq := range c.SubQuestionEvidenceList {
 		if sq.SubQuestionIndex <= 0 {
@@ -109,7 +109,7 @@ func (c *RagRetrievalContext) ValidateEvidenceBudgetScope() error {
 }
 
 // BuildSubQuestionBudgetDetails 构建子问题预算详情列表
-func (c *RagRetrievalContext) BuildSubQuestionBudgetDetails(promptResult *RagPromptAssemblyResult) []map[string]any {
+func (c *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptAssemblyResult) []map[string]any {
 	details := make([]map[string]any, len(c.SubQuestionEvidenceList))
 	for i, sq := range c.SubQuestionEvidenceList {
 		details[i] = map[string]any{
@@ -124,7 +124,7 @@ func (c *RagRetrievalContext) BuildSubQuestionBudgetDetails(promptResult *RagPro
 }
 
 // BuildSubQuestionSnapshots 构建子问题追踪快照列表
-func (c *RagRetrievalContext) BuildSubQuestionSnapshots() []map[string]any {
+func (c *RetrievalResult) BuildSubQuestionSnapshots() []map[string]any {
 	subQuestions := make([]map[string]any, len(c.SubQuestionEvidenceList))
 	for i, sq := range c.SubQuestionEvidenceList {
 		subQuestions[i] = sq.BuildSubQuestionSnapshot()

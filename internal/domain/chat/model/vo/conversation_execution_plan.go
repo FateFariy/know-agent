@@ -1,7 +1,6 @@
 package vo
 
 import (
-	"errors"
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -40,16 +39,6 @@ type ConversationExecutionPlan struct {
 	NoEvidenceReply              string                      // 无证据回复文本
 }
 
-func (p *ConversationExecutionPlan) Validate() error {
-	if p == nil {
-		return errors.New("conversation execution plan is nil")
-	}
-	if p.RetrievalPlan == nil {
-		return errors.New("retrieval plan is nil")
-	}
-	return p.RetrievalPlan.ValidateForExecution()
-}
-
 // ExecutionModeName 获取执行模式名称
 func (p *ConversationExecutionPlan) ExecutionModeName() string {
 	if p.Mode == nil {
@@ -58,14 +47,9 @@ func (p *ConversationExecutionPlan) ExecutionModeName() string {
 	return p.Mode.Name()
 }
 
-func (p *ConversationExecutionPlan) BuildRetrievalPlanSnapshot() map[string]any {
+func (p *ConversationExecutionPlan) ApplyNoEvidenceReply() {
 	if p == nil {
-		return nil
+		return
 	}
-	return map[string]any{
-		"mode":              p.ExecutionModeName(),
-		"retrievalQuestion": p.RetrievalPlan.Question,
-		"subQuestions":      p.RetrievalPlan.SubQuestions,
-		"selectedDocument":  p.RetrievalPlan.SelectedDocumentIds(),
-	}
+	p.NoEvidenceReply = p.RecognitionResult.ResolveNoEvidenceReply(p.RequiresRealTimeSearch)
 }

@@ -47,11 +47,11 @@ type RetrievalCandidate struct {
 // BuildRetrievalRoutePlan 构建检索路由计划
 func BuildRetrievalRoutePlan(input *AssemblyInput) *RetrievalRoutePlan {
 	source := "ALLOWED_DOCUMENT_SCOPE"
-	documentIds := copyInt64IDs(input.DocumentScope)
-	taskIds := copyInt64IDs(input.TaskScope)
+	documentIds := utils.Copy(input.DocumentScope)
+	taskIds := utils.Copy(input.TaskScope)
 
 	candidates := make([]*RetrievalRouteCandidate, 0)
-	pairCount := minInt(len(documentIds), len(taskIds))
+	pairCount := min(len(documentIds), len(taskIds))
 	for i := 0; i < pairCount; i++ {
 		reason := "Allowed scope expansion"
 		if input.ChatMode == enum.ChatQueryModeDocument {
@@ -94,8 +94,8 @@ func BuildRetrievalRoutePlan(input *AssemblyInput) *RetrievalRoutePlan {
 		DegradedReasons:          degradedReasons,
 		AuthorizationMode:        authorizationMode,
 		ScopeAuthorizationReason: utils.BlankToDefault("", ""),
-		AuthorizedDocumentIds:    copyInt64IDs(input.AllowedDocumentIds),
-		AuthorizedTaskIds:        copyInt64IDs(input.TaskScope),
+		AuthorizedDocumentIds:    utils.Copy(input.AllowedDocumentIds),
+		AuthorizedTaskIds:        utils.Copy(input.TaskScope),
 		Candidates:               candidates,
 	}
 }
@@ -113,22 +113,4 @@ func resolveAuthorizationMode(input *AssemblyInput) string {
 	default:
 		return "KNOWLEDGE_BASE_ALLOWED_SCOPE"
 	}
-}
-
-// copyInt64IDs 复制int64 ID列表
-func copyInt64IDs(values []int64) []int64 {
-	if len(values) == 0 {
-		return nil
-	}
-	result := make([]int64, len(values))
-	copy(result, values)
-	return result
-}
-
-// minInt 取最小整数
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

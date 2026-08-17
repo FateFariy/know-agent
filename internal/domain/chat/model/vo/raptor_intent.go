@@ -8,17 +8,11 @@ type RaptorIntent struct {
 	Source           string `json:"source"`           // 来源
 }
 
-// BuildRaptorIntent 构建RAPTOR检索意图
-func BuildRaptorIntent(intentResult *IntentRecognitionResult, runtime *RagRuntimeOptions) *RaptorIntent {
-	requested := channelRequested(intentResult, "GLOBAL_SUMMARY", "RAPTOR")
-	sourceChunkTopK := 10
-	if runtime != nil {
-		sourceChunkTopK = runtime.RaptorSourceChunkTopK
+// Clone 深拷贝RAPTOR意图
+func (r *RaptorIntent) Clone() *RaptorIntent {
+	if r == nil {
+		return nil
 	}
-	return &RaptorIntent{
-		Requested:        requested,
-		SummaryRequested: requested,
-		SourceChunkTopK:  sourceChunkTopK,
-		Source:           intentSource(intentResult),
-	}
+	s := *r
+	return &s
 }

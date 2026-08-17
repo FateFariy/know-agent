@@ -13,8 +13,8 @@ type SubQuestionEvidence struct {
 	FusedCandidateCount    int                        // 融合候选数量
 	ParentCandidateCount   int                        // 父级候选数量
 	RerankedCandidateCount int                        // 重排序候选数量
-	//EvidenceSelectionLedger EvidenceSelectionLedger   // 证据选择记录
-	ObservationPersistence *ObservationPersistence // 观察持久化信息
+	//EvidenceSelectionLedger EvidenceSelectionLedger   // 证据选择记录（观测）
+	ObservationPersistence *ObservationPersistence // 观察持久化信息（观测）
 }
 
 // SubQuestionChannelTrace 子问题渠道执行追踪

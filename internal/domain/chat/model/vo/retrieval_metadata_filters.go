@@ -21,8 +21,21 @@ var (
 type RetrievalMetadataFilters struct {
 	DocumentNameHints []string `json:"documentNameHints,omitempty"` // 文档名称提示
 	SectionPathHints  []string `json:"sectionPathHints,omitempty"`  // 章节路径提示
-	EntityHints       []string `json:"entityHints	,omitempty"`      // 实体提示
+	EntityHints       []string `json:"entityHints,omitempty"`       // 实体提示
 	YearHints         []string `json:"yearHints,omitempty"`         // 年份提示
+}
+
+// Clone 深拷贝过滤器
+func (f *RetrievalMetadataFilters) Clone() *RetrievalMetadataFilters {
+	if f == nil {
+		return nil
+	}
+	return &RetrievalMetadataFilters{
+		DocumentNameHints: utils.Copy(f.DocumentNameHints),
+		SectionPathHints:  utils.Copy(f.SectionPathHints),
+		YearHints:         utils.Copy(f.YearHints),
+		EntityHints:       utils.Copy(f.EntityHints),
+	}
 }
 
 // NewMetadataFilters 构建检索元数据过滤条件

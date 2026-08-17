@@ -11,20 +11,25 @@ import (
 type RetrievalQuestionPlan struct {
 	CurrentQuestion          string                     // 当前问题
 	RewrittenQuestion        string                     // 改写后问题
-	NormalizedQuery          string                     // 归一化查询
+	RetrievalQuestion        string                     // 规范化检索问题
 	ExecutionQueries         []*RetrievalExecutionQuery // 执行查询列表
 	FollowUp                 bool                       // 是否追问
 	HistoryInherited         bool                       // 是否继承历史
 	HistoryInheritanceSource string                     // 历史继承来源
 	InheritedContextAnchors  []*RetrievalContextAnchor  // 继承的上下文锚点列表
-	MainQuestion             string                     // 主问题(已弃用)
-	RetrievalQuestion        string                     // 检索问题(已弃用)
 	SubQuestions             []string                   // 子问题列表(已弃用)
-	RetrievalMode            string                     // 检索模式(已弃用)
-	MaxResults               int                        // 最大结果数(已弃用)
-	ScoreThreshold           float64                    // 分数阈值(已弃用)
-	ExpandToParent           bool                       // 是否扩展到父级(已弃用)
-	ExpandToChildren         bool                       // 是否扩展到子级(已弃用)
+}
+
+// Equal 判断是否一致
+func (q *RetrievalExecutionQuery) Equal(other *RetrievalExecutionQuery) bool {
+	if q == nil || other == nil {
+		return false
+	}
+	return q.Index == other.Index &&
+		q.SourceQuestion == other.SourceQuestion &&
+		q.NormalizedQuery == other.NormalizedQuery &&
+		q.ExecutionQuery == other.ExecutionQuery &&
+		utils.EqualUnordered(q.ContextHints, other.ContextHints)
 }
 
 type RetrievalExecutionQuery struct {
