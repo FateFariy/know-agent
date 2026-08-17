@@ -9,11 +9,9 @@ import "github.com/duke-git/lancet/v2/enum"
 type ExecutionMode = *enum.Item[int]
 
 var (
-	ExecutionModeGraphOnly         = enum.NewItem(0, "graph_only")          // 结构图直答模式
-	ExecutionModeGraphThenEvidence = enum.NewItem(1, "graph_then_evidence") // 结构图定位后取证模式
-	ExecutionModeRetrieval         = enum.NewItem(2, "retrieval")           // 普通知识库检索问答模式
-	ExecutionModeReactAgent        = enum.NewItem(3, "react_agent")         // 开放式 ReAct Agent 模式
-	ExecutionModeClarification     = enum.NewItem(4, "clarification")       // 澄清模式
+	ExecutionModeRetrieval     = enum.NewItem(1, "retrieval")     // 普通知识库检索问答模式
+	ExecutionModeReactAgent    = enum.NewItem(2, "react_agent")   // 开放式 ReAct Agent 模式
+	ExecutionModeClarification = enum.NewItem(3, "clarification") // 澄清模式
 )
 
 // ============================================================

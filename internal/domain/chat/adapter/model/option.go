@@ -9,18 +9,9 @@ type Options struct {
 	Temperature *float32
 	TopP        *float32
 	MaxTokens   int
-	Callback    func()
 }
 
 type Option = common.Option
-
-func WithCallback(callback func()) Option {
-	return common.WrapImplSpecificOptFn(func(opt *Options) {
-		if callback != nil {
-			opt.Callback = callback
-		}
-	})
-}
 
 // WithModel 设置模型名称
 func WithModel(model string) Option {

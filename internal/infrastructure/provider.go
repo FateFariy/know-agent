@@ -6,6 +6,7 @@ import (
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/rerank"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/parse"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
@@ -39,10 +40,10 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(documentadapter.MessageProducer), new(*mq.RocketMQMessageProducer)),
 	keyword.NewMilvusKeyword,
 	wire.Bind(new(documentadapter.KeywordIndexer), new(*keyword.MilvusKeyword)),
-	wire.Bind(new(chatadapter.KeywordRetriever), new(*keyword.MilvusKeyword)),
+	wire.Bind(new(channel.KeywordRetriever), new(*keyword.MilvusKeyword)),
 	vector.NewMilvusVector,
 	wire.Bind(new(documentadapter.VectorIndexer), new(*vector.MilvusVector)),
-	wire.Bind(new(chatadapter.VectorRetriever), new(*vector.MilvusVector)),
+	wire.Bind(new(channel.VectorRetriever), new(*vector.MilvusVector)),
 	lock.NewRedisMutexLock,
 	wire.Bind(new(chatadapter.DistributedLock), new(*lock.RedisMutexLock)),
 	reranker.NewDashScope,

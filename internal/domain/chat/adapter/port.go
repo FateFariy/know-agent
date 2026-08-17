@@ -45,8 +45,8 @@ type DocumentGateway interface {
 	// FindRetrieveDocumentByIds 根据ID列表获取可检索的文档元数据
 	FindRetrieveDocumentByIds(ctx context.Context, ids ...int64) ([]*vo.DocumentMetadata, error)
 
-	// QueryParentChunks 查询父块
-	QueryParentChunks(ctx context.Context, ids []int64) ([]*vo.DocumentChunk, error)
+	// FindParentChunks 查询父块
+	FindParentChunks(ctx context.Context, ids []int64) ([]*vo.DocumentChunk, error)
 }
 
 // Sink 面向客户端的事件输出端口

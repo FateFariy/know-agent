@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -31,30 +32,111 @@ func (g *GenerateStage) Name() string {
 }
 
 func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
-	// 发送"上下文分析完成"的思考事件（前端调试/感知）
-	if err := convCtx.PublishThinking("上下文分析完成，已准备执行计划。"); err != nil {
-		return err
-	}
 	plan := convCtx.ExecutionPlan.Load()
-	// 根据执行计划 Mode 从执行器注册表解析执行器
-	exec, err := g.executorRegistry.Get(plan.Mode)
-	if err != nil {
-		return err
-	}
-
-	resultCh, err := exec.Execute(ctx, convCtx)
-	if err != nil {
-		return err
+	if plan == nil {
+		return fmt.Errorf("invalid value")
 	}
 
 	if plan.RetrievalResult.IsEmpty() {
 		text := utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)
-		if err = convCtx.PublishText(text); err != nil {
+		if err := convCtx.PublishText(text); err != nil {
 			return err
 		}
 		return nil
 	}
+	switch plan.Mode {
+	case enum.ExecutionModeClarification:
+		return g.clarificationExecute(ctx, convCtx)
+	case enum.ExecutionModeRetrieval:
+		return g.ragExecute(ctx, convCtx)
+	case enum.ExecutionModeReactAgent:
+		return g.agentExecute(ctx, convCtx)
+	}
 
+	return nil
+}
+
+func (g *GenerateStage) clarificationExecute(ctx context.Context, convCtx *Context) error {
+	plan := convCtx.ExecutionPlan.Load()
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, plan.Mode.Name(), &vo.StageInput{SummaryText: "当前候选存在歧义，先返回澄清问题。"})
+
+	// 从执行计划中取出澄清文本、原因与候选项；原因写入调试轨迹以便离线分析
+	reply := utils.BlankToDefault(plan.ClarificationReply, "当前我无法稳定判断你想问哪份知识文档，请补充更具体的文档名、主题或关键词。")
+	reason := plan.ClarificationReason
+	options := plan.ClarificationOptions
+
+	if debugTrace := convCtx.DebugTrace.Load(); debugTrace != nil {
+		if utils.IsNotBlank(reason) {
+			debugTrace.AddRetrievalNotes(reason)
+		}
+	}
+
+	// 向客户端流发布思考事件；原因非空时再追加一条状态事件
+	if err := convCtx.PublishThinking("当前问题涉及多份候选文档，先向你确认知识范围。"); err != nil {
+		return nil
+	}
+	if utils.IsNotBlank(reason) {
+		if err := convCtx.PublishStatus(reason); err != nil {
+			return nil
+		}
+	}
+
+	// 提交追踪快照（包含回复、原因、候选项）
+	snapshot := map[string]any{
+		"clarificationReply":   reply,
+		"clarificationReason":  reason,
+		"clarificationOptions": options,
+	}
+	vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "已返回澄清问题。", Snapshot: snapshot})
+
+	return convCtx.PublishText(reply)
+}
+
+func (g *GenerateStage) ragExecute(ctx context.Context, convCtx *Context) error {
+	plan := convCtx.ExecutionPlan.Load()
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, plan.Mode.Name(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
+
+	if err := convCtx.PublishThinking("证据整理完成，正在基于证据生成回答。"); err != nil {
+		return err
+	}
+	prompt := plan.PromptAssemblyResult
+	if prompt == nil {
+		return errors.New("执行计划中缺少Prompt")
+	}
+	streamCh, err := g.chatModel.Stream(ctx, enum.ChatStageRagAnswer, prompt.SystemPrompt, prompt.UserPrompt)
+	if err != nil {
+		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
+		vo.OnError(ctx, "答案生成失败。", err)
+		return err
+	}
+	return g.channel(ctx, convCtx, streamCh)
+}
+
+func (g *GenerateStage) agentExecute(ctx context.Context, convCtx *Context) error {
+	//plan := convCtx.ExecutionPlan.Load()
+	//
+	// 	publishThinking(convCtx, "问题涉及多方面信息，交由 ReAct Agent 综合回答。")
+	//
+	// 	agentStage, err := e.tracer.OnStart(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
+	// 		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
+	//
+	// 	streamCh, err := e.reactAgent.Stream(ctx, plan.Question)
+	// 	if err != nil {
+	// 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
+	// 		e.tracer.OnErr(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
+	// 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
+	// 		return nil, err
+	// 	}
+	//
+	// 	snapshot := map[string]any{
+	// 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
+	// 		"answerLength":        convCtx.AnswerLength(),
+	// 	}
+	// 	_ = e.tracer.OnEnd(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
+	return nil
+}
+
+func (g *GenerateStage) channel(ctx context.Context, convCtx *Context, ch <-chan string) error {
 	defer func() {
 		output := &vo.StageOutput{
 			SummaryText: "答案生成完成。",
@@ -68,36 +150,13 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case chunk, ok := <-resultCh:
+		case chunk, ok := <-ch:
 			if !ok {
 				return nil
 			}
-			if err = convCtx.PublishText(chunk); err != nil {
+			if err := convCtx.PublishText(chunk); err != nil {
 				return err
 			}
 		}
 	}
-}
-
-func (g *GenerateStage) ClarificationExecute(ctx context.Context, convCtx *Context) error {
-	return nil
-}
-
-func (g *GenerateStage) ragExecute(ctx context.Context, convCtx *Context) (<-chan string, error) {
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, g.Name(), &vo.StageInput{SummaryText: "正在基于证据生成回答。"})
-
-	if err := convCtx.PublishThinking("证据整理完成，正在基于证据生成回答。"); err != nil {
-		return nil, err
-	}
-	prompt := convCtx.ExecutionPlan.Load().PromptAssemblyResult
-	if prompt == nil {
-		return nil, errors.New("执行计划中缺少Prompt")
-	}
-	streamCh, err := g.chatModel.Stream(ctx, enum.ChatStageRagAnswer, prompt.SystemPrompt, prompt.UserPrompt)
-	if err != nil {
-		logx.Errorf("模型流式调用失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
-		vo.OnError(ctx, "答案生成失败。", err)
-		return nil, err
-	}
-	return streamCh, nil
 }

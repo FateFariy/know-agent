@@ -33,8 +33,8 @@ type ConversationLogic interface {
 	RebuildConversationSummary(ctx context.Context, conversationId string) (*entity.ChatMemorySummary, error)
 
 	// GetRetrievalResults 获取检索结果
-	GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error)
+	GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatRetrievalResult, error)
 
 	// GetChannelExecutions 获取渠道执行结果
-	GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error)
+	GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatChannelExecution, error)
 }

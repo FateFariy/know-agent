@@ -17,7 +17,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/preparation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -35,7 +34,6 @@ const (
 // ConversationLogicImpl 聊天业务逻辑实现
 type ConversationLogicImpl struct {
 	repo             adapter.ChatRepository
-	preOrchestrator  preparation.ConversationPreOrchestrator
 	renderer         adapter.PromptRenderer
 	baseGateway      adapter.KnowledgeBaseGateway
 	runtimeRegistry  *conversation.ChatRuntimeRegistry
@@ -55,7 +53,6 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	executorRegistry *executor.Registry,
 	baseGateway adapter.KnowledgeBaseGateway,
-	preOrchestrator preparation.ConversationPreOrchestrator,
 	renderer adapter.PromptRenderer,
 	recommender recommend.QuestionRecommender,
 	memoryManager memory.SessionMemoryManager,
@@ -66,7 +63,6 @@ func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
 		repo:             repo,
 		executorRegistry: executorRegistry,
 		baseGateway:      baseGateway,
-		preOrchestrator:  preOrchestrator,
 		renderer:         renderer,
 		runtimeRegistry:  &conversation.ChatRuntimeRegistry{},
 		recommender:      recommender,
@@ -228,12 +224,12 @@ func (c *ConversationLogicImpl) RebuildConversationSummary(ctx context.Context, 
 }
 
 // GetRetrievalResults 获取检索结果
-func (c *ConversationLogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatRetrievalResult, error) {
+func (c *ConversationLogicImpl) GetRetrievalResults(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatRetrievalResult, error) {
 	return c.repo.SelectRetrievalResults(ctx, conversationId, exchangeId)
 }
 
 // GetChannelExecutions 获取渠道执行结果
-func (c *ConversationLogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*vo.ChatChannelExecution, error) {
+func (c *ConversationLogicImpl) GetChannelExecutions(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatChannelExecution, error) {
 	return c.repo.SelectChannelExecutions(ctx, conversationId, exchangeId)
 }
 
