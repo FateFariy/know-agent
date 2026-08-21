@@ -24,28 +24,27 @@ type RetrievalEngine struct {
 	docGateway adapter.DocumentGateway
 	fusion     Fusion
 	pipeline   *Pipeline
-	// todo 逐步弃用
-	channelTimeout            time.Duration
-	subQuestionTimeout        time.Duration
-	minVectorSimilarity       float64
-	keywordRelativeScoreFloor float64
-	rerankScoreThreshold      float64
-	parentEvidenceMaxChars    int
-	rerankEnabled             bool
-	finalTopK                 int
-	vectorTopK                int
-	keywordTopK               int
 }
 
 func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker rerank.Reranker,
 	channels []Retrieval, docGateway adapter.DocumentGateway, fusion Fusion) *RetrievalEngine {
-	//pipeline := e.buildPipeline()
+	maxChars := svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars
+	pipeline := NewPipeline(
+		NewChannelRetrievalStage(channels),
+		NewFusionStage(fusion),
+		NewParentElevationStage(docGateway, maxChars),
+		NewRerankStage(reranker),
+		NewFinalTopKStage(),
+		NewGraphRAGCanonicalStage(),
+		NewObservationStage(repo),
+	)
 	return &RetrievalEngine{
 		repo:       repo,
 		channels:   channels,
 		reranker:   reranker,
 		docGateway: docGateway,
 		fusion:     fusion,
+		pipeline:   pipeline,
 	}
 }
 
@@ -78,19 +77,6 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) 
 	retrievalResult.SubQuestionEvidenceList = evidenceList
 
 	return retrievalResult, nil
-}
-
-// buildPipeline 构建完整的检索管线，按顺序组装各阶段。
-func (e *RetrievalEngine) buildPipeline() *Pipeline {
-	return NewPipeline(
-		NewChannelRetrievalStage(e.channels),
-		NewFusionStage(e.fusion),
-		NewParentElevationStage(e.docGateway, e.parentEvidenceMaxChars),
-		NewRerankStage(e.reranker, e.rerankEnabled),
-		NewFinalTopKStage(e.finalTopK),
-		NewGraphRAGCanonicalStage(),
-		NewObservationStage(e.repo),
-	)
 }
 
 // -------------------- 子问题并行检索 --------------------

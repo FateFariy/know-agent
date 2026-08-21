@@ -9,7 +9,6 @@ import (
 	"time"
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -104,7 +103,7 @@ func (c *Context) SetExecutePlan(plan *vo.ConversationExecutionPlan) {
 
 // PublishThinking 发布思考事件
 func (c *Context) PublishThinking(content string) error {
-	if c == nil || strutil.IsBlank(content) {
+	if c == nil || utils.IsBlank(content) {
 		return nil
 	}
 	c.ThinkingSteps.AddAll([]string{content})
@@ -113,7 +112,7 @@ func (c *Context) PublishThinking(content string) error {
 
 // PublishStatus 发布状态事件
 func (c *Context) PublishStatus(content string) error {
-	if c == nil || strutil.IsBlank(content) {
+	if c == nil || utils.IsBlank(content) {
 		return nil
 	}
 	return c.Sink.Status(content, c.ConversationId, c.ExchangeId)
@@ -171,7 +170,7 @@ func (c *Context) ReleaseResources() {
 // AddUsedTools 添加已使用的工具
 func (c *Context) AddUsedTools(tools ...string) {
 	for _, tool := range tools {
-		if !c.UsedTools.Contain(tool) && strutil.IsNotBlank(tool) {
+		if !c.UsedTools.Contain(tool) && utils.IsNotBlank(tool) {
 			c.UsedTools.Add(tool)
 		}
 	}
