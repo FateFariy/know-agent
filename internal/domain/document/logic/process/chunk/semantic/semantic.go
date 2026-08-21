@@ -9,10 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic/similarity"
-)
-
-const (
-	Name = "SEMANTIC" // 名称
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // Chunker 语义分块策略
@@ -34,7 +31,7 @@ func NewChunker(opts ...chunk.Option) *Chunker {
 
 // Name 返回策略名称
 func (s *Chunker) Name() string {
-	return Name
+	return enum.StrategyTypeName(enum.StrategyTypeSemantic)
 }
 
 // Chunk 执行语义分块

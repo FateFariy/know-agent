@@ -14,7 +14,7 @@ func (o *IndexingOptions) ResolveRecursiveMaxChars(pipelineType enum.PipelineTyp
 		return 0
 	}
 	if pipelineType == enum.PipelineTypeParent {
-		return o.Chunk.ParentBlockMaxChars
+		return o.Chunk.ParentChunkMaxChars
 	}
 	return o.Chunk.ChildRecursiveMaxChars
 }
@@ -47,7 +47,7 @@ func (o *IndexingOptions) ResolveRecursiveOverlap(pipelineType enum.PipelineType
 		return 0
 	}
 	if pipelineType == enum.PipelineTypeParent {
-		return min(o.Chunk.ParentBlockOverlapChars, max(0, maxChars-1))
+		return min(o.Chunk.ParentChunkOverlapChars, max(0, maxChars-1))
 	}
 	return min(o.Chunk.ChildRecursiveOverlapChars, max(0, maxChars-1))
 }
@@ -58,7 +58,7 @@ func (o *IndexingOptions) ResolveLlmMaxChars(pipelineType enum.PipelineType) int
 		return 0
 	}
 	if pipelineType == enum.PipelineTypeParent {
-		return o.Chunk.ParentBlockMaxChars
+		return o.Chunk.ParentChunkMaxChars
 	}
 	return 0
 }
@@ -69,8 +69,8 @@ type ChunkOptions struct {
 	ChildSemanticMaxChars            int     `json:"childSemanticMaxChars"`
 	ChildSemanticMinChars            int     `json:"childSemanticMinChars"`
 	ChildSemanticSimilarityThreshold float64 `json:"childSemanticSimilarityThreshold"`
-	ParentBlockMaxChars              int     `json:"parentBlockMaxChars"`
-	ParentBlockOverlapChars          int     `json:"parentBlockOverlapChars"`
+	ParentChunkMaxChars              int     `json:"parentChunkMaxChars"`
+	ParentChunkOverlapChars          int     `json:"parentChunkOverlapChars"`
 	ParentSemanticMaxChars           int     `json:"parentSemanticMaxChars"`
 	ParentSemanticMinChars           int     `json:"parentSemanticMinChars"`
 }

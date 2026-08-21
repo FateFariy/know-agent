@@ -11,7 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
-// mockProvider 实现 GlobalRagRuntimeConfigProvider 接口，用于测试
+// mockProvider 实现 GlobalConfigProvider 接口，用于测试
 type mockProvider struct {
 	defaultOptions *vo.RagRuntimeOptions
 }
@@ -70,10 +70,10 @@ func TestResolver_Resolve_EmptyKnowledgeBases(t *testing.T) {
 	resolver := NewResolver(provider)
 
 	// 传入空切片或 nil
-	result := resolver.Resolve([]*entity.KnowledgeBase{})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{})
 	assert.Equal(t, defaultOpts, result, "空列表应返回原 options")
 
-	result = resolver.Resolve(nil)
+	result = resolver.ResolveRagRuntimeOptions(nil)
 	assert.Equal(t, defaultOpts, result, "nil 应返回原 options")
 }
 
@@ -124,7 +124,7 @@ func TestResolver_Resolve_SingleKB_FullOverride(t *testing.T) {
 		RaptorConfigJson:    nil,
 	}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb})
 
 	// 验证所有字段都被覆盖
 	expected := *defaultOpts
@@ -184,7 +184,7 @@ func TestResolver_Resolve_SingleKB_PartialOverride(t *testing.T) {
 		RaptorConfigJson:    nil,
 	}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb})
 
 	// 只有设置了的字段改变，其他保留默认
 	expected := *defaultOpts
@@ -212,7 +212,7 @@ func TestResolver_Resolve_SingleKB_InvalidJSON(t *testing.T) {
 		RaptorConfigJson:    nil,
 	}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb})
 
 	// 解析失败，配置被忽略，返回原 options
 	assert.Equal(t, defaultOpts, result)
@@ -239,7 +239,7 @@ func TestResolver_Resolve_MultipleKB_AllSame(t *testing.T) {
 	kb1 := &entity.KnowledgeBase{ID: 4, BaseName: "kb1", RetrievalConfigJson: jsonData1}
 	kb2 := &entity.KnowledgeBase{ID: 5, BaseName: "kb2", RetrievalConfigJson: jsonData2}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb1, kb2})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb1, kb2})
 
 	expected := *defaultOpts
 	expected.VectorTopK = *commonCfg.VectorTopK
@@ -281,7 +281,7 @@ func TestResolver_Resolve_MultipleKB_Conflicts(t *testing.T) {
 	kb1 := &entity.KnowledgeBase{ID: 6, BaseName: "kb1", RetrievalConfigJson: json1}
 	kb2 := &entity.KnowledgeBase{ID: 7, BaseName: "kb2", RetrievalConfigJson: json2}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb1, kb2})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb1, kb2})
 
 	// 冲突字段保持默认值（未设置），冲突列表记录这些字段
 	expected := *defaultOpts
@@ -320,7 +320,7 @@ func TestResolver_Resolve_MultipleKB_SomeNil(t *testing.T) {
 	kb1 := &entity.KnowledgeBase{ID: 8, BaseName: "kb1", RetrievalConfigJson: json1}
 	kb2 := &entity.KnowledgeBase{ID: 9, BaseName: "kb2", RetrievalConfigJson: json2}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb1, kb2})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb1, kb2})
 
 	// VectorTopK 有值 (5) 和 nil 冲突，记录冲突，不设置
 	// KeywordTopK 有值 (3) 和 nil? 实际上 cfg2 有 KeywordTopK，cfg1 没有，所以也是冲突
@@ -355,7 +355,7 @@ func TestResolver_Resolve_MultipleKB_HybridConflict(t *testing.T) {
 	kb1 := &entity.KnowledgeBase{ID: 10, BaseName: "kb1", RetrievalConfigJson: json1}
 	kb2 := &entity.KnowledgeBase{ID: 11, BaseName: "kb2", RetrievalConfigJson: json2}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb1, kb2})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb1, kb2})
 
 	expected := *defaultOpts
 	expected.KbConfigConflictFields = []string{"hybrid.vectorWeight"}
@@ -383,7 +383,7 @@ func TestResolver_Resolve_MultipleKB_AllSameHybrid(t *testing.T) {
 	kb1 := &entity.KnowledgeBase{ID: 12, BaseName: "kb1", RetrievalConfigJson: json1}
 	kb2 := &entity.KnowledgeBase{ID: 13, BaseName: "kb2", RetrievalConfigJson: json2}
 
-	result := resolver.Resolve([]*entity.KnowledgeBase{kb1, kb2})
+	result := resolver.ResolveRagRuntimeOptions([]*entity.KnowledgeBase{kb1, kb2})
 
 	expected := *defaultOpts
 	expected.Hybrid.VectorWeight = *commonHybrid.VectorWeight

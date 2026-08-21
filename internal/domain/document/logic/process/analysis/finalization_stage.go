@@ -14,21 +14,21 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-// FinalizationPhase 收尾阶段：持久化策略方案、更新文档状态、标记任务完成
-type FinalizationPhase struct {
+// FinalizationStage 收尾阶段：持久化策略方案、更新文档状态、标记任务完成
+type FinalizationStage struct {
 	repo adapter.DocumentRepository
 	port *adapter.DocumentPort
 }
 
-func NewFinalizationPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *FinalizationPhase {
-	return &FinalizationPhase{repo: repo, port: port}
+func NewFinalizationStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *FinalizationStage {
+	return &FinalizationStage{repo: repo, port: port}
 }
 
-func (p *FinalizationPhase) Name() string {
+func (p *FinalizationStage) Name() string {
 	return "收尾阶段"
 }
 
-func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) error {
+func (p *FinalizationStage) Execute(ctx context.Context, parseCtx *Context) error {
 	planDraft := parseCtx.StrategyPlanDraft
 	document := parseCtx.Document
 	task := parseCtx.Task
@@ -108,7 +108,7 @@ func (p *FinalizationPhase) Execute(ctx context.Context, parseCtx *Context) erro
 }
 
 // persistPlanAndSteps 持久化策略方案和步骤
-func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *Context) (int64, error) {
+func (p *FinalizationStage) persistPlanAndSteps(ctx context.Context, parseCtx *Context) (int64, error) {
 	planDraft := parseCtx.StrategyPlanDraft
 	document := parseCtx.Document
 
@@ -145,7 +145,7 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 }
 
 // persistParserTraceMetadata 持久化解析器 Trace 元数据
-func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *aggregate.AnalysisResult) {
+func (p *FinalizationStage) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *aggregate.AnalysisResult) {
 	if taskID == 0 || analysisResult == nil {
 		return
 	}
@@ -172,7 +172,7 @@ func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, task
 }
 
 // readTaskExtJson 读取并解析任务的扩展 JSON 字段
-func (p *FinalizationPhase) readTaskExtJson(extJson string) map[string]any {
+func (p *FinalizationStage) readTaskExtJson(extJson string) map[string]any {
 	if extJson == "" {
 		return make(map[string]any)
 	}
@@ -187,7 +187,7 @@ func (p *FinalizationPhase) readTaskExtJson(extJson string) map[string]any {
 	return result
 }
 
-func (p *FinalizationPhase) convertStepDraftsToEntities(planId int64, document *entity.Document, pipelineType enum.PipelineType, draft *vo.DocumentStrategyPlanDraft) []*entity.DocumentStrategyStep {
+func (p *FinalizationStage) convertStepDraftsToEntities(planId int64, document *entity.Document, pipelineType enum.PipelineType, draft *vo.DocumentStrategyPlanDraft) []*entity.DocumentStrategyStep {
 	stepDrafts := draft.ParentSteps
 	if pipelineType == enum.PipelineTypeChild {
 		stepDrafts = draft.ChildSteps

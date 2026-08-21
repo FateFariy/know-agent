@@ -21,7 +21,7 @@ type KnowledgeBaseRetrievalScopeLogicImpl struct {
 	resolver   *config.Resolver
 }
 
-func NewKnowledgeBaseRetrievalScopeLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, global config.GlobalRagRuntimeConfigProvider) *KnowledgeBaseRetrievalScopeLogicImpl {
+func NewKnowledgeBaseRetrievalScopeLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, global config.GlobalConfigProvider) *KnowledgeBaseRetrievalScopeLogicImpl {
 	return &KnowledgeBaseRetrievalScopeLogicImpl{
 		repo:       repo,
 		docGateway: docGateway,
@@ -36,7 +36,7 @@ func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx conte
 
 	snapshot := &aggregate.KnowledgeBaseSelectionSnapshot{
 		SelectionMode:     enum.KbSelectionModeNone,
-		RagRuntimeOptions: s.resolver.Resolve(nil),
+		RagRuntimeOptions: s.resolver.ResolveRagRuntimeOptions(nil),
 	}
 	// 开放式聊天或无选择模式时返回空快照
 	if chatMode == "open_chat" || resolvedMode == enum.KbSelectionModeNone {
@@ -100,7 +100,7 @@ func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx conte
 	snapshot.SelectedKnowledgeBaseNames = selectedBaseNames
 	snapshot.SelectedKnowledgeBases = selectedBases
 	snapshot.AllowedDocuments = allowedDocuments
-	snapshot.RagRuntimeOptions = s.resolver.Resolve(selectedBases)
+	snapshot.RagRuntimeOptions = s.resolver.ResolveRagRuntimeOptions(selectedBases)
 
 	return snapshot, nil
 }

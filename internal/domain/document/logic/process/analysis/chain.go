@@ -16,15 +16,15 @@ type Chain struct {
 }
 
 // NewAnalysisChain 创建并注册所有阶段
-func NewAnalysisChain(svcCtx svc.ServiceContext, repo adapter.DocumentRepository, tableRepo adapter.TableRepository,
+func NewAnalysisChain(svcCtx *svc.ServiceContext, repo adapter.DocumentRepository, tableRepo adapter.TableRepository,
 	port *adapter.DocumentPort, resolver IndexingConfigResolver) *Chain {
 	phases := []Phase{
-		NewInitializationPhase(repo),             // 1. 初始化任务状态，标记解析开始
-		NewDownloadPhase(port),                   // 2. 从对象存储下载原始文件
-		NewParsePhase(repo, port),                // 3. 解析文件内容，生成分析结果
-		NewSavePhase(repo, tableRepo, port),      // 4. 保存解析产物（文本、结构节点等）
-		NewStrategyPhase(svcCtx, repo, resolver), // 5. 生成推荐切分策略
-		NewFinalizationPhase(repo, port),         // 6. 持久化策略，更新文档/任务最终状态
+		NewInitializationStage(repo),             // 1. 初始化任务状态，标记解析开始
+		NewDownloadStage(port),                   // 2. 从对象存储下载原始文件
+		NewParseStage(repo, port),                // 3. 解析文件内容，生成分析结果
+		NewSaveStage(repo, tableRepo, port),      // 4. 保存解析产物（文本、结构节点等）
+		NewStrategyStage(svcCtx, repo, resolver), // 5. 生成推荐切分策略
+		NewFinalizationStage(repo, port),         // 6. 持久化策略，更新文档/任务最终状态
 	}
 
 	return &Chain{phases: phases}

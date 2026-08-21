@@ -166,4 +166,5 @@ type KnowledgeConverter interface {
 
 	ToKnowledgeBaseSelectionSnapshot(src *aggregate2.KnowledgeBaseSelectionSnapshot) *cvo.KnowledgeBaseSelectionSnapshot
 	ToKnowledgeRouteDecision(src *klvo.KnowledgeRouteDecision) *cvo.KnowledgeRouteDecision
+	ToIndexingOptions(src *klvo.IndexingOptions) *dvo.IndexingOptions
 }

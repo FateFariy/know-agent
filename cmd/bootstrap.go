@@ -18,6 +18,7 @@ import (
 	doclogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/index"
 	knowlogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	knowroute "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
@@ -89,9 +90,10 @@ func bootstrap(c *config.Config) *server.Server {
 		rewriteImpl, knowledgeAdapter, documentRouter, adapterForChat, retrievalEngine, renderer, chatModel, recommender)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
 
-	analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, documentPort)
+	analysisChain := analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, documentPort, knowledgeAdapter)
+	indexChain := index.NewBuildIndexChain(documentRepo, documentPort, knowledgeAdapter)
 	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, documentPort, minioStorage, documentRepo)
-	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, documentPort)
+	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, documentPort, analysisChain)
 	parseConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessImpl)
 	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessImpl)
 

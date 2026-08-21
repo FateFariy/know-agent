@@ -5,10 +5,6 @@ package convert
 
 import (
 	"encoding/json"
-	"time"
-
-	datatypes "gorm.io/datatypes"
-
 	chat "github.com/swiftbit/know-agent/api/chat"
 	document "github.com/swiftbit/know-agent/api/document"
 	knowledge "github.com/swiftbit/know-agent/api/knowledge"
@@ -23,6 +19,8 @@ import (
 	entity2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	vo2 "github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 	model "github.com/swiftbit/know-agent/internal/infrastructure/persistence/model"
+	datatypes "gorm.io/datatypes"
+	"time"
 )
 
 func FromChatReq(source *chat.ChatReq) *vo.ChatCommand {
@@ -80,7 +78,7 @@ func ToChatChannelExecutionModel(source *entity.ChatChannelExecution) *model.Cha
 	var pModelChatChannelExecution *model.ChatChannelExecution
 	if source != nil {
 		var modelChatChannelExecution model.ChatChannelExecution
-		modelChatChannelExecution.Model = voChatChannelExecutionToCommonModel((*source))
+		modelChatChannelExecution.Model = entityChatChannelExecutionToCommonModel((*source))
 		modelChatChannelExecution.ConversationId = (*source).ConversationId
 		modelChatChannelExecution.ExchangeId = (*source).ExchangeId
 		modelChatChannelExecution.TraceId = (*source).TraceId
@@ -201,7 +199,7 @@ func ToChatRetrievalResultModel(source *entity.ChatRetrievalResult) *model.ChatR
 	var pModelChatRetrievalResult *model.ChatRetrievalResult
 	if source != nil {
 		var modelChatRetrievalResult model.ChatRetrievalResult
-		modelChatRetrievalResult.Model = voChatRetrievalResultToCommonModel((*source))
+		modelChatRetrievalResult.Model = entityChatRetrievalResultToCommonModel((*source))
 		modelChatRetrievalResult.ConversationId = (*source).ConversationId
 		modelChatRetrievalResult.ExchangeId = (*source).ExchangeId
 		modelChatRetrievalResult.TraceId = (*source).TraceId
@@ -348,13 +346,18 @@ func ToRetrievalResultRespList(source []*entity.ChatRetrievalResult) []*chat.Ret
 	if source != nil {
 		pChatRetrievalResultRespList = make([]*chat.RetrievalResultResp, len(source))
 		for i := 0; i < len(source); i++ {
-			pChatRetrievalResultRespList[i] = pVoChatRetrievalResultToPChatRetrievalResultResp(source[i])
+			pChatRetrievalResultRespList[i] = pEntityChatRetrievalResultToPChatRetrievalResultResp(source[i])
 		}
 	}
 	return pChatRetrievalResultRespList
 }
 func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
 	return source
+}
+func entityChatChannelExecutionToCommonModel(source entity.ChatChannelExecution) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
 }
 func entityChatDialogueToCommonModel(source entity.ChatDialogue) common.Model {
 	var commonModel common.Model
@@ -372,6 +375,11 @@ func entityChatExchangeTraceStageToCommonModel(source entity.ChatExchangeTraceSt
 	return commonModel
 }
 func entityChatMemorySummaryToCommonModel(source entity.ChatMemorySummary) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityChatRetrievalResultToCommonModel(source entity.ChatRetrievalResult) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
@@ -405,14 +413,7 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.C
 	}
 	return pChatConversationTraceStage
 }
-func pTimeTimeToString(source *time.Time) string {
-	var xstring string
-	if source != nil {
-		xstring = TimeToString((*source))
-	}
-	return xstring
-}
-func pVoChatRetrievalResultToPChatRetrievalResultResp(source *entity.ChatRetrievalResult) *chat.RetrievalResultResp {
+func pEntityChatRetrievalResultToPChatRetrievalResultResp(source *entity.ChatRetrievalResult) *chat.RetrievalResultResp {
 	var pChatRetrievalResultResp *chat.RetrievalResultResp
 	if source != nil {
 		var chatRetrievalResultResp chat.RetrievalResultResp
@@ -447,6 +448,13 @@ func pVoChatRetrievalResultToPChatRetrievalResultResp(source *entity.ChatRetriev
 	}
 	return pChatRetrievalResultResp
 }
+func pTimeTimeToString(source *time.Time) string {
+	var xstring string
+	if source != nil {
+		xstring = TimeToString((*source))
+	}
+	return xstring
+}
 func pVoConversationSummaryToPChatSummaryPayload(source *vo.ConversationSummary) *chat.SummaryPayload {
 	var pChatSummaryPayload *chat.SummaryPayload
 	if source != nil {
@@ -464,16 +472,6 @@ func pVoConversationSummaryToPChatSummaryPayload(source *vo.ConversationSummary)
 }
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source
-}
-func voChatChannelExecutionToCommonModel(source entity.ChatChannelExecution) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func voChatRetrievalResultToCommonModel(source entity.ChatRetrievalResult) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
 }
 func FromConfirmStrategyReq(source *document.ConfirmStrategyReq) *vo1.DocumentStrategyConfirmCmd {
 	var pVoDocumentStrategyConfirmCmd *vo1.DocumentStrategyConfirmCmd
@@ -1391,6 +1389,17 @@ func FromKnowledgeTopicSaveReq(source *knowledge.KnowledgeTopicSaveReq) *entity2
 	}
 	return pEntityKnowledgeTopicNode
 }
+func ToIndexingOptions(source *vo2.IndexingOptions) *vo1.IndexingOptions {
+	var pVoIndexingOptions *vo1.IndexingOptions
+	if source != nil {
+		var voIndexingOptions vo1.IndexingOptions
+		voIndexingOptions.Chunk = voChunkOptionsToVoChunkOptions((*source).Chunk)
+		voIndexingOptions.GraphRag = voGraphRagBuildOptionsToVoGraphRagBuildOptions((*source).GraphRag)
+		voIndexingOptions.Raptor = voRaptorBuildOptionsToVoRaptorBuildOptions((*source).Raptor)
+		pVoIndexingOptions = &voIndexingOptions
+	}
+	return pVoIndexingOptions
+}
 func ToKnowledgeBaseEntities(source []*model.KnowledgeBase) []*entity2.KnowledgeBase {
 	var pEntityKnowledgeBaseList []*entity2.KnowledgeBase
 	if source != nil {
@@ -1849,6 +1858,17 @@ func pVoTopicRouteCandidateToPVoTopicRouteCandidate(source *vo2.TopicRouteCandid
 func timeDurationToTimeDuration(source time.Duration) time.Duration {
 	return source
 }
+func voChunkOptionsToVoChunkOptions(source vo2.ChunkOptions) vo1.ChunkOptions {
+	var voChunkOptions vo1.ChunkOptions
+	voChunkOptions.ChildRecursiveMaxChars = source.ChildRecursiveMaxChars
+	voChunkOptions.ChildRecursiveOverlapChars = source.ChildRecursiveOverlapChars
+	voChunkOptions.ChildSemanticMaxChars = source.ChildSemanticMaxChars
+	voChunkOptions.ChildSemanticMinChars = source.ChildSemanticMinChars
+	voChunkOptions.ChildSemanticSimilarityThreshold = source.ChildSemanticSimilarityThreshold
+	voChunkOptions.ParentSemanticMaxChars = source.ParentSemanticMaxChars
+	voChunkOptions.ParentSemanticMinChars = source.ParentSemanticMinChars
+	return voChunkOptions
+}
 func voDocumentRouteCandidatesToPVoDocumentRouteCandidateList(source vo2.DocumentRouteCandidates) []*vo.DocumentRouteCandidate {
 	var pVoDocumentRouteCandidateList []*vo.DocumentRouteCandidate
 	if source != nil {
@@ -1858,4 +1878,18 @@ func voDocumentRouteCandidatesToPVoDocumentRouteCandidateList(source vo2.Documen
 		}
 	}
 	return pVoDocumentRouteCandidateList
+}
+func voGraphRagBuildOptionsToVoGraphRagBuildOptions(source vo2.GraphRagBuildOptions) vo1.GraphRagBuildOptions {
+	var voGraphRagBuildOptions vo1.GraphRagBuildOptions
+	voGraphRagBuildOptions.GraphRagBuildEnabled = source.GraphRagBuildEnabled
+	return voGraphRagBuildOptions
+}
+func voRaptorBuildOptionsToVoRaptorBuildOptions(source vo2.RaptorBuildOptions) vo1.RaptorBuildOptions {
+	var voRaptorBuildOptions vo1.RaptorBuildOptions
+	voRaptorBuildOptions.RaptorBuildEnabled = source.RaptorBuildEnabled
+	voRaptorBuildOptions.RaptorMaxClusterSize = source.RaptorMaxClusterSize
+	voRaptorBuildOptions.RaptorMaxLevels = source.RaptorMaxLevels
+	voRaptorBuildOptions.RaptorLlmSummaryEnabled = source.RaptorLlmSummaryEnabled
+	voRaptorBuildOptions.RaptorSummaryQualityFloor = source.RaptorSummaryQualityFloor
+	return voRaptorBuildOptions
 }

@@ -19,15 +19,15 @@ type Save interface {
 	Execute(ctx context.Context, saveCtx *save.Context) error
 }
 
-// SavePhase 保存阶段：按顺序执行文本上传、产物持久化、结构节点持久化等子阶段
-type SavePhase struct {
+// SaveStage 保存阶段：按顺序执行文本上传、产物持久化、结构节点持久化等子阶段
+type SaveStage struct {
 	repo   adapter.DocumentRepository
 	phases []Save
 }
 
-// NewSavePhase 创建保存阶段
-func NewSavePhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *SavePhase {
-	return &SavePhase{
+// NewSaveStage 创建保存阶段
+func NewSaveStage(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *SaveStage {
+	return &SaveStage{
 		repo: repo,
 		phases: []Save{
 			save.NewParsedTextUploadPhase(port),
@@ -40,12 +40,12 @@ func NewSavePhase(repo adapter.DocumentRepository, tableRepo adapter.TableReposi
 }
 
 // Name 阶段名称
-func (p *SavePhase) Name() string {
+func (p *SaveStage) Name() string {
 	return "保存阶段"
 }
 
 // Execute 执行保存阶段，从解析上下文构建保存上下文，依次执行各子阶段
-func (p *SavePhase) Execute(ctx context.Context, parseCtx *Context) error {
+func (p *SaveStage) Execute(ctx context.Context, parseCtx *Context) error {
 	// 构建保存上下文
 	saveCtx := &save.Context{
 		DocumentId:     parseCtx.DocumentId,
@@ -58,13 +58,13 @@ func (p *SavePhase) Execute(ctx context.Context, parseCtx *Context) error {
 		stageName := stage.Name()
 		startTime := time.Now()
 
-		logx.Infof("[SavePhase] 开始执行子阶段: %s, documentId=%d, taskId=%d", stageName, parseCtx.DocumentId, parseCtx.TaskId)
+		logx.Infof("[SaveStage] 开始执行子阶段: %s, documentId=%d, taskId=%d", stageName, parseCtx.DocumentId, parseCtx.TaskId)
 
 		if err := stage.Execute(ctx, saveCtx); err != nil {
 			return fmt.Errorf("保存子阶段 %s 执行失败: %w", stageName, err)
 		}
 
-		logx.Infof("[SavePhase] 子阶段 %s 执行成功, costMillis=%d", stageName, time.Since(startTime).Milliseconds())
+		logx.Infof("[SaveStage] 子阶段 %s 执行成功, costMillis=%d", stageName, time.Since(startTime).Milliseconds())
 	}
 
 	parseCtx.SaveCtx = saveCtx

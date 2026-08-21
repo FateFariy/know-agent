@@ -10,24 +10,24 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-// InitializationPhase 初始化阶段：标记任务运行中、文档解析中、写入开始日志
-type InitializationPhase struct {
+// InitializationStage 初始化阶段：标记任务运行中、文档解析中、写入开始日志
+type InitializationStage struct {
 	repo adapter.DocumentRepository
 }
 
-func NewInitializationPhase(repo adapter.DocumentRepository) *InitializationPhase {
-	return &InitializationPhase{repo: repo}
+func NewInitializationStage(repo adapter.DocumentRepository) *InitializationStage {
+	return &InitializationStage{repo: repo}
 }
 
-func (p *InitializationPhase) Name() string {
+func (p *InitializationStage) Name() string {
 	return "初始化阶段"
 }
 
-func (p *InitializationPhase) Order() int {
+func (p *InitializationStage) Order() int {
 	return 0
 }
 
-func (p *InitializationPhase) Execute(ctx context.Context, parseCtx *Context) error {
+func (p *InitializationStage) Execute(ctx context.Context, parseCtx *Context) error {
 	parseCtx.Task.TaskStatus = enum.TaskStatusRunning
 	parseCtx.Task.CurrentStage = enum.TaskStageContentParse
 	parseCtx.Task.StartTime = utils.Pointer(parseCtx.StartTime)

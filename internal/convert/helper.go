@@ -79,11 +79,11 @@ func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat
 		mode = src.ExecutionMode.Name()
 	}
 	return &chat.DocumentNavigationDecision{
-		NavigationAction:  src.NavigationAction,
-		ExecutionMode:     mode,
-		StructureAnchor:   ToChatStructureAnchor(src.StructureAnchor),
-		ItemAnchor:        ToChatItemAnchor(src.ItemAnchor),
-		RetrievalPlan:     ToChatRetrievalQuestionPlan(src.RetrievalPlan),
+		NavigationAction: src.NavigationAction,
+		ExecutionMode:    mode,
+		StructureAnchor:  ToChatStructureAnchor(src.StructureAnchor),
+		ItemAnchor:       ToChatItemAnchor(src.ItemAnchor),
+		//RetrievalPlan:     ToChatRetrievalQuestionPlan(src.RetrievalPlan),
 		SummaryText:       src.SummaryText,
 		QueryContextHints: append([]string(nil), src.QueryContextHints...),
 		SoftSectionHints:  append([]string(nil), src.SoftSectionHints...),
@@ -113,16 +113,6 @@ func ToChatItemAnchor(src *cvo.ConversationItemAnchor) *chat.ConversationItemAnc
 		ItemText:        src.ItemText,
 		StructureNodeId: src.StructureNodeId,
 		CanonicalPath:   src.CanonicalPath,
-	}
-}
-
-func ToChatRetrievalQuestionPlan(src *cvo.RetrievalQuestionPlan) *chat.RetrievalQuestionPlan {
-	if src == nil {
-		return nil
-	}
-	return &chat.RetrievalQuestionPlan{
-		RetrievalQuestion: src.RetrievalQuestion,
-		SubQuestions:      append([]string(nil), src.SubQuestions...),
 	}
 }
 

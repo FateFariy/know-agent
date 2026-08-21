@@ -57,3 +57,36 @@ func (c *LocalConfig) CurrentOptions() *vo.RagRuntimeOptions {
 
 	return opts
 }
+
+func (c *LocalConfig) CurrentIndexingOptions() *vo.IndexingOptions {
+	if c == nil || c.conf == nil {
+		return &vo.IndexingOptions{}
+	}
+
+	chunk := c.conf.Chunk
+	rag := c.conf.Chat.Rag
+
+	return &vo.IndexingOptions{
+		Chunk: vo.ChunkOptions{
+			ChildRecursiveMaxChars:           chunk.RecursiveMaxChars,
+			ChildRecursiveOverlapChars:       chunk.RecursiveOverlapChars,
+			ChildSemanticMaxChars:            chunk.SemanticMaxChars,
+			ChildSemanticMinChars:            chunk.SemanticMinChars,
+			ChildSemanticSimilarityThreshold: chunk.SemanticSimilarityThreshold,
+			ParentBlockMaxChars:              chunk.ParentChunkMaxChars,
+			ParentBlockOverlapChars:          chunk.ParentChunkOverlapChars,
+			ParentSemanticMaxChars:           chunk.ParentSemanticMaxChars,
+			ParentSemanticMinChars:           chunk.ParentSemanticMinChars,
+		},
+		GraphRag: vo.GraphRagBuildOptions{
+			GraphRagBuildEnabled: rag.GraphRag.Enabled,
+		},
+		Raptor: vo.RaptorBuildOptions{
+			RaptorBuildEnabled:        rag.Raptor.Enabled,
+			RaptorMaxClusterSize:      rag.Raptor.MaxClusterSize,
+			RaptorMaxLevels:           rag.Raptor.MaxLevels,
+			RaptorLlmSummaryEnabled:   rag.Raptor.LlmSummaryEnabled,
+			RaptorSummaryQualityFloor: rag.Raptor.SummaryQualityFloor,
+		},
+	}
+}

@@ -18,8 +18,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// StrategyPhase 策略推荐阶段：推进任务到策略路由、生成推荐策略
-type StrategyPhase struct {
+// StrategyStage 策略推荐阶段：推进任务到策略路由、生成推荐策略
+type StrategyStage struct {
 	repo                       adapter.DocumentRepository
 	resolver                   IndexingConfigResolver
 	llmEnabled                 bool
@@ -27,8 +27,8 @@ type StrategyPhase struct {
 	llmValid                   bool
 }
 
-func NewStrategyPhase(svcCtx svc.ServiceContext, repo adapter.DocumentRepository, resolver IndexingConfigResolver) *StrategyPhase {
-	return &StrategyPhase{
+func NewStrategyStage(svcCtx *svc.ServiceContext, repo adapter.DocumentRepository, resolver IndexingConfigResolver) *StrategyStage {
+	return &StrategyStage{
 		repo:                       repo,
 		resolver:                   resolver,
 		llmEnabled:                 svcCtx.Config.Chunk.LlmEnabled,
@@ -37,11 +37,11 @@ func NewStrategyPhase(svcCtx svc.ServiceContext, repo adapter.DocumentRepository
 	}
 }
 
-func (p *StrategyPhase) Name() string {
+func (p *StrategyStage) Name() string {
 	return "策略推荐阶段"
 }
 
-func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err error) {
+func (p *StrategyStage) Execute(ctx context.Context, parseCtx *Context) (err error) {
 	ctx = callbacks.OnStart(ctx, struct{}{})
 	defer func() {
 		if err != nil {
@@ -92,7 +92,7 @@ func (p *StrategyPhase) Execute(ctx context.Context, parseCtx *Context) (err err
 // Recommend 根据文档分析结果推荐最优的父块-子块策略组合。
 // 整体思路：先通过若干判定函数分别评估结构/递归/语义/大模型切块的必要性，
 // 再按"父块优先保留天然大语义单元、子块围绕召回边界精细化"的原则拼接流水线。
-func (p *StrategyPhase) recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
+func (p *StrategyStage) recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error) {
 	if document == nil || analysisResult == nil {
 		return nil, fmt.Errorf("invaild value")
 	}
@@ -161,7 +161,7 @@ func (p *StrategyPhase) recommend(ctx context.Context, document *entity.Document
 }
 
 // buildDraftSteps 将策略类型列表构造成推荐步骤草稿（带上角色与理由），首项默认为主策略，其余按类型赋予优化/兜底/增强角色
-func (p *StrategyPhase) buildDraftSteps(pipelineType string, strategyTypes []int, reasonMap map[int]string) vo.DocumentStrategyStepDrafts {
+func (p *StrategyStage) buildDraftSteps(pipelineType string, strategyTypes []int, reasonMap map[int]string) vo.DocumentStrategyStepDrafts {
 	return slice.Map(strategyTypes, func(index, strategyType int) *vo.DocumentStrategyStepDraft {
 		return &vo.DocumentStrategyStepDraft{
 			PipelineType:    pipelineType,

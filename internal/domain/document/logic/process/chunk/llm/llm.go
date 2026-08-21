@@ -12,10 +12,10 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 const (
-	Name               = "LLM"                //  名称
 	documentLlmSplit   = "document-llm-split" // 提示词模板名称
 	defaultLLMMaxChars = 3500                 // 默认大模型最大字符数
 )
@@ -46,7 +46,7 @@ func NewChunker(model model.ChatModel, renderer adapter.PromptRenderer, opts ...
 
 // Name 返回策略名称
 func (s *Chunker) Name() string {
-	return Name
+	return enum.StrategyTypeName(enum.StrategyTypeLLM)
 }
 
 // Chunk 执行大模型智能分块

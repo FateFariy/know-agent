@@ -6,12 +6,10 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
-)
-
-const (
-	Name = "RECURSIVE" // 名称
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // Chunker 递归分块策略, 按优先级：段落 -> 行 -> 句子 -> 固定窗口，递归地将超长段落继续切分, 支持在相邻块之间保留一段重叠文本
@@ -20,9 +18,9 @@ type Chunker struct {
 }
 
 // NewChunker 创建递归分块器
-func NewChunker(opts ...chunk.Option) *Chunker {
+func NewChunker(opts ...common.Option) *Chunker {
 	return &Chunker{
-		opt: chunk.GetSpecificOptions(&options{
+		opt: common.GetImplSpecificOptions(&options{
 			maxChars:     defaultMaxChars,
 			overlapChars: defaultOverlapChars,
 		}, opts...),
@@ -31,18 +29,18 @@ func NewChunker(opts ...chunk.Option) *Chunker {
 
 // Name 返回策略名称
 func (s *Chunker) Name() string {
-	return Name
+	return enum.StrategyTypeName(enum.StrategyTypeRecursive)
 }
 
 // Chunk 执行递归分块
-func (s *Chunker) Chunk(_ context.Context, input string, opts ...chunk.Option) ([]string, error) {
+func (s *Chunker) Chunk(_ context.Context, input string, opts ...common.Option) ([]string, error) {
 	text := strings.TrimSpace(input)
 	if text == "" {
 		return nil, nil
 	}
 
 	// 允许通过 opts 覆盖原始配置
-	opt := chunk.GetSpecificOptions(s.opt, opts...)
+	opt := common.GetImplSpecificOptions(s.opt, opts...)
 
 	// 先按优先级切分为若干原始块
 	rawChunks := s.split(text, opt.maxChars, opt.overlapChars)

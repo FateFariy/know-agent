@@ -19,14 +19,14 @@ import (
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser/markdown"
 )
 
-// ParsePhase 解析阶段：调用文本预处理逻辑解析文件内容
-type ParsePhase struct {
+// ParseStage 解析阶段：调用文本预处理逻辑解析文件内容
+type ParseStage struct {
 	repo     adapter.DocumentRepository
 	port     *adapter.DocumentPort
 	registry *parse.Registry
 }
 
-func NewParsePhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *ParsePhase {
+func NewParseStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *ParseStage {
 	fallbackParser := &parser.TextParser{}
 	parsers := []parse.Parser{
 		&parser.HTMLParser{},
@@ -35,18 +35,18 @@ func NewParsePhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) 
 		markdown.NewGoldmarkParser(),
 	}
 
-	return &ParsePhase{
+	return &ParseStage{
 		repo:     repo,
 		port:     port,
 		registry: parse.NewRegistry(fallbackParser, parsers...),
 	}
 }
 
-func (p *ParsePhase) Name() string {
+func (p *ParseStage) Name() string {
 	return "解析阶段"
 }
 
-func (p *ParsePhase) Execute(ctx context.Context, parseCtx *Context) error {
+func (p *ParseStage) Execute(ctx context.Context, parseCtx *Context) error {
 	startTime := time.Now()
 
 	analysisResult, err := p.process(ctx, parseCtx)
@@ -78,7 +78,7 @@ func (p *ParsePhase) Execute(ctx context.Context, parseCtx *Context) error {
 	return nil
 }
 
-func (p *ParsePhase) process(ctx context.Context, parseCtx *Context) (*aggregate.AnalysisResult, error) {
+func (p *ParseStage) process(ctx context.Context, parseCtx *Context) (*aggregate.AnalysisResult, error) {
 	if parseCtx == nil || parseCtx.Document == nil {
 		return nil, fmt.Errorf("上下文或文档为空")
 	}

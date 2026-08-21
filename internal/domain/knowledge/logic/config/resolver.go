@@ -11,16 +11,16 @@ import (
 
 // Resolver 实现配置解析与合并
 type Resolver struct {
-	provider GlobalRagRuntimeConfigProvider
+	provider GlobalConfigProvider
 }
 
 // NewResolver 创建 Resolver 实例
-func NewResolver(provider GlobalRagRuntimeConfigProvider) *Resolver {
+func NewResolver(provider GlobalConfigProvider) *Resolver {
 	return &Resolver{provider: provider}
 }
 
-// Resolve 根据知识库列表解析出最终的 RagRuntimeOptions
-func (r *Resolver) Resolve(knowledgeBases []*entity.KnowledgeBase) *vo.RagRuntimeOptions {
+// ResolveRagRuntimeOptions 根据知识库列表解析出最终的 RagRuntimeOptions
+func (r *Resolver) ResolveRagRuntimeOptions(knowledgeBases []*entity.KnowledgeBase) *vo.RagRuntimeOptions {
 	options := r.provider.CurrentOptions()
 	if len(knowledgeBases) == 0 {
 		return options
@@ -46,6 +46,15 @@ func (r *Resolver) Resolve(knowledgeBases []*entity.KnowledgeBase) *vo.RagRuntim
 	}
 
 	r.applyMerged(options, configs)
+	return options
+}
+
+// ResolveIndexingOptions 根据知识库列表解析出索引配置 todo 暂时返回全局默认
+func (r *Resolver) ResolveIndexingOptions(knowledgeBases []*entity.KnowledgeBase) *vo.IndexingOptions {
+	options := r.provider.CurrentIndexingOptions()
+	if len(knowledgeBases) == 0 {
+		return options
+	}
 	return options
 }
 

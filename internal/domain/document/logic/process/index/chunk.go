@@ -32,8 +32,7 @@ type ChunkingPhase struct {
 }
 
 // NewChunkingPhase 创建切块阶段
-func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort,
-	registry chunk.Registry, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingPhase {
+func NewChunkingPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingPhase {
 	return &ChunkingPhase{
 		repo:      repo,
 		port:      port,
