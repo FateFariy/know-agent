@@ -5,7 +5,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/rerank"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // RerankStage 重排序阶段，对父块提升后的文档执行重排序（如果启用）
@@ -28,20 +27,17 @@ func (s *RerankStage) Name() string {
 
 // Execute 对父块提升后的文档执行重排序，结果写入 state.RerankedDocs。
 func (s *RerankStage) Execute(ctx context.Context, state *RetrievalState) error {
-	state.RerankedDocs = s.applyRerank(ctx, state.RetrievalResult, state.ParentSearchDocs, state.Input.SubQuestion)
-	return nil
-}
-
-// applyRerank 应用重排序（如果启用）
-func (s *RerankStage) applyRerank(ctx context.Context, retrievalResult *vo.RetrievalResult, candidates []*vo.DocumentChunk, subQuestion string) []*vo.DocumentChunk {
-	if !s.enabled || len(candidates) == 0 || s.reranker == nil {
-		return candidates
+	state.RerankedDocs = state.ParentSearchDocs
+	if !s.enabled || len(state.RerankedDocs) == 0 || s.reranker == nil {
+		return nil
 	}
 
-	result, err := s.reranker.Process(ctx, subQuestion, candidates)
+	result, err := s.reranker.Process(ctx, state.Input.SubQuestion, state.ParentSearchDocs)
 	if err != nil {
-		logx.Warnf("重排序处理失败: subQuestion='%s', error=%v", subQuestion, err)
-		return candidates
+		logx.Warnf("重排序处理失败: subQuestion='%s', error=%v", state.Input.SubQuestion, err)
+		return err
 	}
-	return result
+	state.RerankedDocs = result
+
+	return nil
 }

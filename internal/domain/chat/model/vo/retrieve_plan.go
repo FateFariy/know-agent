@@ -32,7 +32,7 @@ type RetrievalPlan struct {
 	CandidateTopK             int                          // 候选窗口大小
 	RerankTopK                int                          // 重排序窗口大小
 	RerankEnabled             bool                         // 是否请求重排序
-	FinalEvidenceBudget       int                          // 最终证据预算
+	FinalTopK                 int                          // 最终证据预算
 	SubQuestionTimeout        time.Duration                // 子问题超时时间
 }
 

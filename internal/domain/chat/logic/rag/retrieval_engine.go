@@ -130,7 +130,6 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retri
 				FusedCandidateCount:    len(state.FusedDocs),
 				ParentCandidateCount:   len(state.ParentSearchDocs),
 				RerankedCandidateCount: len(state.RerankedDocs),
-				ObservationPersistence: state.ObservationPersistence,
 			}
 		}(input)
 	}

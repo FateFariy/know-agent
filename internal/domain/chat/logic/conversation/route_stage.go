@@ -370,7 +370,7 @@ func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.Conversat
 		CandidateTopK:             runtime.CandidateTopK,
 		RerankTopK:                runtime.RerankCandidateTopK,
 		RerankEnabled:             runtime.RerankEnabled,
-		FinalEvidenceBudget:       runtime.FinalTopK,
+		FinalTopK:                 runtime.FinalTopK,
 		SubQuestionTimeout:        runtime.SubQuestionTimeout,
 	}
 

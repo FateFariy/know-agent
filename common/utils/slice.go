@@ -26,6 +26,18 @@ func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]
 	return maps
 }
 
+func GroupBy[T any, K comparable, V any](slice []T, valueFunc func(T) (K, V)) map[K][]V {
+	if slice == nil {
+		return nil
+	}
+	result := make(map[K][]V, len(slice))
+	for _, item := range slice {
+		key, value := valueFunc(item)
+		result[key] = append(result[key], value)
+	}
+	return result
+}
+
 func Map[T, V any](slice []T, mapper func(T) V) []V {
 	if slice == nil {
 		return nil

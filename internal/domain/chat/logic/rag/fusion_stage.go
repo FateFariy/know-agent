@@ -42,7 +42,7 @@ func (s *FusionStage) preprocess(state *RetrievalState) {
 		if chResult == nil {
 			continue
 		}
-		for _, doc := range chResult.RawDocuments {
+		for _, doc := range chResult.AcceptedDocuments {
 			if doc == nil {
 				continue
 			}
@@ -59,11 +59,11 @@ func (s *FusionStage) preprocess(state *RetrievalState) {
 func resolveChannelMaxScoreMap(results []*RetrievalChannelResult) map[string]float64 {
 	maxScoreMap := make(map[string]float64, len(results))
 	for _, result := range results {
-		if result == nil || len(result.RawDocuments) == 0 {
+		if result == nil || len(result.AcceptedDocuments) == 0 {
 			continue
 		}
 		maxScore := 0.0
-		for _, doc := range result.RawDocuments {
+		for _, doc := range result.AcceptedDocuments {
 			if doc != nil && doc.Score > maxScore {
 				maxScore = doc.Score
 			}

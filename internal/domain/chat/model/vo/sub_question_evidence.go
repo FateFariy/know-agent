@@ -15,8 +15,6 @@ type SubQuestionEvidence struct {
 	FusedCandidateCount    int                        // 融合候选数量
 	ParentCandidateCount   int                        // 父级候选数量
 	RerankedCandidateCount int                        // 重排序候选数量
-	//EvidenceSelectionLedger EvidenceSelectionLedger   // 证据选择记录（观测）
-	ObservationPersistence *ObservationPersistence // 观察持久化信息（观测）
 }
 
 // SubQuestionChannelTrace 子问题渠道执行追踪
@@ -26,15 +24,6 @@ type SubQuestionChannelTrace struct {
 	AcceptedCount   int     `json:"acceptedCount"`   // 接受数量
 	RetrievalIntent string  `json:"retrievalIntent"` // 检索意图
 	ChannelWeight   float64 `json:"channelWeight"`   // 通道权重
-}
-
-// ObservationPersistence 观察持久化信息
-type ObservationPersistence struct {
-	SchemaVersion string `json:"schemaVersion"` // 模式版本
-	//Status                  Status   // 处理状态
-	ExpectedCandidateCount  int `json:"expectedCandidateCount"`  // 预期候选数量
-	PersistedCandidateCount int `json:"persistedCandidateCount"` // 已持久化候选数量
-	//ErrorType               ErrorType // 错误类型
 }
 
 func (s *SubQuestionEvidence) GetReferenceMaps() []map[string]any {
@@ -60,7 +49,6 @@ func (s *SubQuestionEvidence) BuildSubQuestionSnapshot() map[string]any {
 		"fusedCandidateCount":    s.FusedCandidateCount,
 		"parentCandidateCount":   s.ParentCandidateCount,
 		"rerankedCandidateCount": s.RerankedCandidateCount,
-		"observationPersistence": s.ObservationPersistence,
 		"channelTraces":          s.ChannelTraces,
 		"references":             s.GetReferenceMaps(),
 	}

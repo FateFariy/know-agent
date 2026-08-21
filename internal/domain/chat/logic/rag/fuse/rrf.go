@@ -69,11 +69,11 @@ func (f *RRFFusion) accumulateWeightedHybrid(channelResults []*rag.RetrievalChan
 		return channel.Name, channel
 	})
 	for _, channelResult := range channelResults {
-		if channelResult == nil || len(channelResult.RawDocuments) == 0 {
+		if channelResult == nil || len(channelResult.AcceptedDocuments) == 0 {
 			continue
 		}
 		channel := channelMap[channelResult.Name]
-		for rank, doc := range channelResult.RawDocuments {
+		for rank, doc := range channelResult.AcceptedDocuments {
 			if doc == nil {
 				continue
 			}

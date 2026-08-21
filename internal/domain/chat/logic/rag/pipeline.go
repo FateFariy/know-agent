@@ -17,13 +17,12 @@ type RetrievalState struct {
 	Start           time.Time
 
 	// 阶段中间产物
-	ChannelResults         []*RetrievalChannelResult
-	ChannelTraces          []*vo.SubQuestionChannelTrace
-	FusedDocs              []*vo.DocumentChunk
-	ParentSearchDocs       []*vo.DocumentChunk
-	RerankedDocs           []*vo.DocumentChunk
-	FinalDocs              []*vo.DocumentChunk
-	ObservationPersistence *vo.ObservationPersistence
+	ChannelResults   []*RetrievalChannelResult
+	ChannelTraces    []*vo.SubQuestionChannelTrace
+	FusedDocs        []*vo.DocumentChunk
+	ParentSearchDocs []*vo.DocumentChunk
+	RerankedDocs     []*vo.DocumentChunk
+	FinalDocs        []*vo.DocumentChunk
 }
 
 // Stage 检索管线阶段接口
@@ -43,7 +42,7 @@ func NewPipeline(stages ...Stage) *Pipeline {
 	return &Pipeline{stages: stages}
 }
 
-// Execute 按顺序执行所有阶段，遇到错误立即终止，返回包装后的错误。
+// Execute 按顺序执行所有阶段，遇到错误立即终止，返回包装后的错误
 func (p *Pipeline) Execute(ctx context.Context, state *RetrievalState) error {
 	for _, stage := range p.stages {
 		// 提前检查 ctx 是否已取消
