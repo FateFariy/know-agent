@@ -17,7 +17,6 @@ const (
 )
 
 type GenerateStage struct {
-	//executorRegistry *executor.Registry
 	chatModel model.ChatModel
 }
 

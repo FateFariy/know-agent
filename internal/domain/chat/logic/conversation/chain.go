@@ -4,34 +4,67 @@ import (
 	"context"
 	"errors"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type Chain struct {
-	repo            adapter.ChatRepository
 	stages          []Stage
+	repo            adapter.ChatRepository
 	runtime         *ChatRuntimeRegistry
-	docGateway      adapter.DocumentGateway
 	memoryManager   memory.SessionMemoryManager
-	recommender     recommend.QuestionRecommender
 	distributedLock adapter.DistributedLock
-	checkPointStore adapter.CheckPointStore
 }
 
-func NewChain(repo adapter.ChatRepository, runtime *ChatRuntimeRegistry, stages ...Stage) *Chain {
-	return &Chain{
-		repo:    repo,
-		stages:  stages,
-		runtime: runtime,
+func NewChain(
+	svcCtx *svc.ServiceContext,
+	repo adapter.ChatRepository,
+	runtime *ChatRuntimeRegistry,
+	distributedLock adapter.DistributedLock,
+	memoryManager memory.SessionMemoryManager,
+	intentRecognizer intent.Recognizer,
+	queryRewriter rewrite.QueryRewriter,
+	knowledgeRouter KnowledgeRouter,
+	documentRouter route.DocumentRouter,
+	docGateway adapter.DocumentGateway,
+	retriever rag.Retriever,
+	promptRenderer adapter.PromptRenderer,
+	chatModel model.ChatModel,
+	questionRecommender recommend.QuestionRecommender,
+) *Chain {
+	chain := &Chain{
+		repo:            repo,
+		runtime:         runtime,
+		memoryManager:   memoryManager,
+		distributedLock: distributedLock,
 	}
+	// 按对话执行流程顺序初始化所有子阶段，顺序不可调整
+	chain.stages = []Stage{
+		NewStartStage(repo, runtime, distributedLock, chain.Stop),
+		NewMemoryLoadStage(svcCtx, repo, memoryManager),
+		NewIntentRecognizeStage(intentRecognizer),
+		NewQueryRewriteStage(svcCtx, queryRewriter),
+		NewRouteStage(svcCtx, repo, knowledgeRouter, documentRouter, docGateway),
+		NewRetrievalStage(retriever),
+		NewEvidenceBudgetStage(svcCtx, promptRenderer),
+		NewGenerateStage(chatModel),
+		NewRecommendStage(svcCtx, repo, memoryManager, questionRecommender),
+		NewEnd(repo), // 终态阶段，统一处理成功落库
+	}
+
+	return chain
 }
 
 func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
@@ -42,27 +75,18 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 			if errors.Is(err, errorx.ErrSessionRunning) {
 				_ = c.startFailed(ctx, convCtx)
 			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.stop(ctx, convCtx, "客户端已取消请求")
+				c.Stop(ctx, convCtx, "客户端已取消请求")
 			} else {
 				c.finishFailed(ctx, convCtx, err)
 			}
 			return err
 		}
 	}
-	c.finishSuccessfully(ctx, convCtx)
 	return nil
 }
 
+// Stop 停止：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
 func (c *Chain) Stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
-	convCtx, ok := c.runtime.Get(conversationId)
-	if !ok {
-		return "没有找到正在执行的会话", false
-	}
-	return c.stop(ctx, convCtx, reason)
-}
-
-// stop 停止：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
-func (c *Chain) stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return "会话已停止", false
 	}
@@ -70,12 +94,6 @@ func (c *Chain) stop(ctx context.Context, convCtx *Context, reason string) (stri
 		return "会话已由新的执行接管", false
 	}
 
-	// todo 中断 ReactAgent
-	//        try {
-	//         businessChatReactAgent.interrupt(taskInfo.runnableConfig());
-	//     } catch (RuntimeException exception) {
-	//         log.debug("中断 ReactAgent 时出现异常，继续释放资源", exception);
-	//     }
 	responseMessage := "已停止会话生成"
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
@@ -113,39 +131,6 @@ func (c *Chain) startFailed(ctx context.Context, convCtx *Context) error {
 		ErrorMessage:   "该会话当前正在执行中，请稍后再试",
 	}
 	return c.completeExchange(ctx, failExchange)
-}
-
-// finishSuccessfully 以成功状态完成当前会话交互
-func (c *Chain) finishSuccessfully(ctx context.Context, convCtx *Context) {
-	// CAS确保收尾仅执行一次
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return
-	}
-
-	// 开启finalize追踪阶段
-	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
-
-	answer := convCtx.Answer()
-	uniqueReferences := convCtx.UniqueReferences()
-	recommendations := convCtx.Recommendations
-
-	// 构建成功态交换记录并落库
-	successExchange := convCtx.BuildChatExchange(enum.ChatTurnStatusCompleted, "")
-	successExchange.Recommendations = common.ToJSONArray(recommendations)
-	if err := c.completeExchange(ctx, successExchange); err == nil {
-		// 落库成功，记录完成快照
-		snapshot := map[string]any{
-			"finalStatus":         enum.ChatTurnStatusName(enum.ChatTurnStatusCompleted),
-			"recommendationCount": len(recommendations),
-			"recommendations":     recommendations,
-			"referenceCount":      len(uniqueReferences),
-			"answerLength":        len(answer),
-		}
-		_ = vo.OnEnd(finalizeCtx, &vo.StageOutput{SummaryText: "会话已按完成状态收尾。", Snapshot: snapshot})
-	} else {
-		_ = vo.OnError(finalizeCtx, "会话收尾落库失败", err)
-	}
 }
 
 // finishFailed 以失败状态完成当前会话交互
@@ -201,14 +186,6 @@ func (c *Chain) refreshDebugTraceRuntimeStats(convCtx *Context) {
 	}
 	modelUsageTraces := convCtx.Trace.SnapshotModelUsageTraces()
 	debugTrace.ModelUsageTraces = modelUsageTraces
-	debugTrace.LimitStats = &vo.ChatLimitStats{
-		ModelCallsUsed:        len(modelUsageTraces),
-		ToolCallsUsed:         len(convCtx.SnapshotUsedTools()),
-		ModelCallsRunLimit:    c.options.maxModelCallsPerRun,
-		ToolCallsRunLimit:     c.options.maxToolCallsPerRun,
-		ModelCallsThreadLimit: c.options.maxModelCallsPerThread,
-		ToolCallsThreadLimit:  c.options.maxToolCallsPerThread,
-	}
 	convCtx.DebugTrace.Store(debugTrace)
 }
 

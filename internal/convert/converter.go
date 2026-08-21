@@ -64,9 +64,6 @@ type DocumentConverter interface {
 	// goverter:map . Model
 	ToDocumentParentBlockModel(src *den.DocumentParentChunk) *model.DocumentParentChunk
 	ToDocumentParentBlockModelList(src []*den.DocumentParentChunk) []*model.DocumentParentChunk
-	// // goverter:map . Model
-	// ToDocumentTableCandidateModel(src *den.DocumentTableCandidate) *model.DocumentTableCandidate
-	// ToDocumentTableCandidateModelList(src []*den.DocumentTableCandidate) []*model.DocumentTableCandidate
 	// goverter:map . Model
 	ToParseArtifactModel(src *den.ParseArtifact) *model.DocumentParseArtifact
 	ToParseArtifactModelList(src []*den.ParseArtifact) []*model.DocumentParseArtifact

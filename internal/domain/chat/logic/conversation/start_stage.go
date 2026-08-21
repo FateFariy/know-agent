@@ -3,10 +3,7 @@ package conversation
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
-
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -26,15 +23,22 @@ type StartStage struct {
 	repo            adapter.ChatRepository
 	runtimeRegistry *ChatRuntimeRegistry
 	distributedLock adapter.DistributedLock
+	stop            func(context.Context, *Context, string) (string, bool)
 }
 
 var _ Stage = (*StartStage)(nil)
 
-func NewStart(repo adapter.ChatRepository, runtimeRegistry *ChatRuntimeRegistry, distributedLock adapter.DistributedLock) *StartStage {
+func NewStartStage(
+	repo adapter.ChatRepository,
+	runtimeRegistry *ChatRuntimeRegistry,
+	distributedLock adapter.DistributedLock,
+	stop func(context.Context, *Context, string) (string, bool),
+) *StartStage {
 	return &StartStage{
 		repo:            repo,
 		runtimeRegistry: runtimeRegistry,
 		distributedLock: distributedLock,
+		stop:            stop,
 	}
 }
 
@@ -45,13 +49,6 @@ func (s *StartStage) Name() string {
 
 // Execute 执行逻辑
 func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) {
-	panic("unimplemented")
-}
-
-// bootstrapConversation 启动会话：创建本轮 exchange 记录，构建对话上下文，注册到运行注册表，
-// 最后在独立 goroutine 中激活生成逻辑，异步返回客户端可读的流式 channel。
-// 并发控制：注册失败表示会话已在执行中，直接落库为失败状态并拒绝，避免同一会话重复执行。
-func (s *StartStage) bootstrapConversation(ctx context.Context, convCtx *Context) error {
 	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）
 	exchange, err := s.startExchange(ctx, convCtx)
 	if err != nil {
@@ -71,9 +68,7 @@ func (s *StartStage) bootstrapConversation(ctx context.Context, convCtx *Context
 		return errorx.ErrSessionRunning
 	}
 
-	s.activateGeneration(cancelCtx, convCtx)
-
-	return nil
+	return s.activateGeneration(cancelCtx, convCtx)
 }
 
 func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*entity.ChatExchange, error) {
@@ -115,18 +110,6 @@ func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*enti
 
 }
 
-// activateGeneration 激活生成逻辑: 执行对话的生成、流式下发与收尾工作。
-//
-// 执行流程：
-//  1. 检查 finalized 快速返回（会话已被取消/终止）
-//  2. 启动租约续期 goroutine，用于周期性延长分布式锁
-//  3. 执行 buildConversationExecution 构建并执行对话生成；失败时走失败收尾
-//  4. 进入 for-select 循环消费执行结果：
-//     - context 被取消 → 调用 stop 中止
-//     - resultCh 关闭 → 调用 finishSuccessfully 收尾成功
-//     - 收到 chunk → 转发给客户端 channel；发送失败则按失败收尾
-//
-// 并发设计：多处 Finalized 检查确保下游在开始前即被取消时及时释放资源。
 func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) error {
 	// 快速路径：会话已被前置 finalize，直接返回
 	if convCtx.Finalized.Load() {
@@ -142,6 +125,9 @@ func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) e
 		return nil
 	}
 
+	debugTrace := vo.NewChatDebugTrace(convCtx.ExecutionPlan.Load())
+	convCtx.DebugTrace.Store(debugTrace)
+
 	// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
 	if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
 		return err
@@ -150,8 +136,9 @@ func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) e
 	// 执行完成后再次检查 finalize（下游在执行期间被取消时）
 	if convCtx.Finalized.Load() {
 		convCtx.ReleaseResources()
-		return nil
 	}
+
+	return nil
 }
 
 // startLeaseRenewal 启动租约续期，若续期失败则自动停止当前会话并终止生成
@@ -171,53 +158,11 @@ func (s *StartStage) startLeaseRenewal(ctx context.Context, convCtx *Context) {
 			if err := s.distributedLock.Extend(ctx, convCtx.LeaseKey); err != nil {
 				logx.Warnf("会话租约续期失败，准备停止当前会话, conversationId=%s, exchangeId=%d, err=%v",
 					convCtx.ConversationId, convCtx.ExchangeId, err)
-				s.stopTask(ctx, convCtx, "会话租约已失效，已停止生成")
+				s.stop(ctx, convCtx, "会话租约已失效，已停止生成")
 				return
 			}
 		}
 	}
-}
-
-func (s *StartStage) prepareExecutionPlan(ctx context.Context, convCtx *Context) (*vo.ConversationExecutionPlan, error) {
-	execPlan, err := s.preOrchestrator.Prepare(ctx, convCtx)
-	if err != nil {
-		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
-		return nil, err
-	}
-
-	variables := map[string]any{
-		"currentDateText":              execPlan.CurrentDateText,
-		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
-		"hasHistorySummary":            strutil.IsNotBlank(execPlan.HistorySummary),
-		"historySummary":               execPlan.HistorySummary,
-		"question":                     execPlan.OriginalQuestion,
-	}
-	agentQuestion, err := s.renderer.Render(enum.AgentQuestion, variables)
-	if err != nil {
-		return nil, err
-	}
-	execPlan.AgentQuestion = agentQuestion
-
-	// 文档模式下若 selectedDocumentId 发生变化，则刷新会话范围
-	if execPlan.SelectedDocumentId > 0 && execPlan.SelectedDocumentId != convCtx.SelectedDocumentId {
-		dialogue := &entity.ChatDialogue{
-			ConversationId:       convCtx.ConversationId,
-			ChatMode:             execPlan.ChatMode,
-			SelectedDocumentId:   execPlan.SelectedDocumentId,
-			SelectedDocumentName: execPlan.SelectedDocumentName,
-		}
-		if err = s.repo.RefreshSessionScope(ctx, dialogue); err != nil {
-			logx.Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
-			return nil, err
-		}
-	}
-
-	debugTrace := vo.NewChatDebugTrace(execPlan)
-	convCtx.DebugTrace.Store(debugTrace)
-	convCtx.ExecutionPlan.Store(execPlan)
-
-	return execPlan, nil
 }
 
 // releaseConversationLock 释放会话分布式锁

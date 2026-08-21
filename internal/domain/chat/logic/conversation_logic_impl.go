@@ -6,76 +6,48 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"time"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/executor"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const (
-	chatRunningLeasePrefix        = "conversation:running:"
-	chatRunningLeaseRenewInterval = 10 * time.Second
+	chatRunningLeasePrefix = "conversation:running:"
 )
 
 // ConversationLogicImpl 聊天业务逻辑实现
 type ConversationLogicImpl struct {
-	repo             adapter.ChatRepository
-	renderer         adapter.PromptRenderer
-	baseGateway      adapter.KnowledgeBaseGateway
-	runtimeRegistry  *conversation.ChatRuntimeRegistry
-	executorRegistry *executor.Registry
-	recommender      recommend.QuestionRecommender
-	memoryManager    memory.SessionMemoryManager
-	distributedLock  adapter.DistributedLock
-	checkPointStore  adapter.CheckPointStore
-	chain            *conversation.Chain
+	repo            adapter.ChatRepository
+	baseGateway     adapter.KnowledgeBaseGateway
+	runtimeRegistry *conversation.ChatRuntimeRegistry
+	memoryManager   memory.SessionMemoryManager
+	distributedLock adapter.DistributedLock
+	checkPointStore adapter.CheckPointStore
+	chain           *conversation.Chain
 	*options
 }
 
 var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 
 // NewConversationLogicImpl 创建聊天逻辑实例
-func NewConversationLogicImpl(svcCtx *svc.ServiceContext,
-	repo adapter.ChatRepository,
-	executorRegistry *executor.Registry,
-	baseGateway adapter.KnowledgeBaseGateway,
-	renderer adapter.PromptRenderer,
-	recommender recommend.QuestionRecommender,
-	memoryManager memory.SessionMemoryManager,
-	distributedLock adapter.DistributedLock,
-	checkPointStore adapter.CheckPointStore,
-) *ConversationLogicImpl {
+func NewConversationLogicImpl(repo adapter.ChatRepository, baseGateway adapter.KnowledgeBaseGateway,
+	memoryManager memory.SessionMemoryManager, distributedLock adapter.DistributedLock,
+	checkPointStore adapter.CheckPointStore) *ConversationLogicImpl {
 	return &ConversationLogicImpl{
-		repo:             repo,
-		executorRegistry: executorRegistry,
-		baseGateway:      baseGateway,
-		renderer:         renderer,
-		runtimeRegistry:  &conversation.ChatRuntimeRegistry{},
-		recommender:      recommender,
-		memoryManager:    memoryManager,
-		distributedLock:  distributedLock,
-		checkPointStore:  checkPointStore,
-		options: &options{
-			historyPreviewTurns:    svcCtx.Config.Chat.Agent.HistoryPreviewTurns,
-			maxModelCallsPerRun:    svcCtx.Config.Chat.Agent.MaxModelCallsPerRun,
-			maxModelCallsPerThread: svcCtx.Config.Chat.Agent.MaxModelCallsPerThread,
-			maxToolCallsPerRun:     svcCtx.Config.Chat.Agent.MaxToolCallsPerRun,
-			maxToolCallsPerThread:  svcCtx.Config.Chat.Agent.MaxToolCallsPerThread,
-		},
+		repo:            repo,
+		baseGateway:     baseGateway,
+		runtimeRegistry: &conversation.ChatRuntimeRegistry{},
+		memoryManager:   memoryManager,
+		distributedLock: distributedLock,
+		checkPointStore: checkPointStore,
 	}
 }
 
@@ -165,10 +137,10 @@ func (c *ConversationLogicImpl) ListSessions(ctx context.Context, pageNo, pageSi
 
 // ResetConversation 重置会话：停止并清除所有相关落库数据
 func (c *ConversationLogicImpl) ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error) {
-	stopResult := &vo.ConversationStop{}
+	stoped := false
 	// 停止正在运行的会话
 	if convCtx, ok := c.runtimeRegistry.Get(conversationId); ok {
-		stopResult = c.stopTask(ctx, convCtx, "会话被重置")
+		_, stoped = c.chain.Stop(ctx, convCtx, "会话被重置")
 	}
 
 	var dialogueCount, exchangeCount int64
@@ -205,7 +177,7 @@ func (c *ConversationLogicImpl) ResetConversation(ctx context.Context, conversat
 	}
 	return &vo.ConversationReset{
 		ConversationId:         conversationId,
-		StoppedRunningTask:     stopResult.Stopped,
+		StoppedRunningTask:     stoped,
 		RemovedDialogueCount:   int(dialogueCount),
 		RemovedExchangeCount:   int(exchangeCount),
 		RemovedCheckpointCount: count,
@@ -279,189 +251,10 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 	return convCtx, nil
 }
 
-// prepareExecutionPlan 准备执行计划
-//
-//	1.调用编排器准备基础计划（改写、路由、历史记忆等）
-//	2.使用 prompt 模板构造 agent 问题（包含当前日期/上下文提示/历史摘要）
-//	3. 根据所选文档刷新会话范围（在文档模式下）
-//	4. 初始化调试轨迹
-func (c *ConversationLogicImpl) prepareExecutionPlan(ctx context.Context, convCtx *conversation.Context) (*vo.ConversationExecutionPlan, error) {
-	execPlan, err := c.preOrchestrator.Prepare(ctx, convCtx)
-	if err != nil {
-		logx.Warnf("执行计划准备失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
-		return nil, err
-	}
-
-	variables := map[string]any{
-		"currentDateText":              execPlan.CurrentDateText,
-		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
-		"hasHistorySummary":            strutil.IsNotBlank(execPlan.HistorySummary),
-		"historySummary":               execPlan.HistorySummary,
-		"question":                     execPlan.OriginalQuestion,
-	}
-	agentQuestion, err := c.renderer.Render(enum.AgentQuestion, variables)
-	if err != nil {
-		return nil, err
-	}
-	execPlan.AgentQuestion = agentQuestion
-
-	// 文档模式下若 selectedDocumentId 发生变化，则刷新会话范围
-	if execPlan.SelectedDocumentId > 0 && execPlan.SelectedDocumentId != convCtx.SelectedDocumentId {
-		dialogue := &entity.ChatDialogue{
-			ConversationId:       convCtx.ConversationId,
-			ChatMode:             execPlan.ChatMode,
-			SelectedDocumentId:   execPlan.SelectedDocumentId,
-			SelectedDocumentName: execPlan.SelectedDocumentName,
-		}
-		if err = c.repo.RefreshSessionScope(ctx, dialogue); err != nil {
-			logx.Warnf("刷新会话范围失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
-			return nil, err
-		}
-	}
-
-	debugTrace := vo.NewChatDebugTrace(execPlan)
-	convCtx.DebugTrace.Store(debugTrace)
-	convCtx.ExecutionPlan.Store(execPlan)
-
-	return execPlan, nil
-}
-
-// stopTask 停止任务：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
-func (c *ConversationLogicImpl) stopTask(ctx context.Context, convCtx *conversation.Context, reason string) *vo.ConversationStop {
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return &vo.ConversationStop{
-			ConversationId: convCtx.ConversationId,
-			Stopped:        false,
-			Message:        "会话已经结束",
-		}
-	}
-	if curr, exists := c.runtimeRegistry.Get(convCtx.ConversationId); exists && curr != convCtx {
-		return &vo.ConversationStop{
-			ConversationId: convCtx.ConversationId,
-			Stopped:        false,
-			Message:        "会话已由新的执行接管",
-		}
-	}
-	// defer 中刷新会话摘要 + 执行清理
-	// 使用 defer 确保即便后续步骤出错，这两个清理动作也会执行
-	defer func() {
-		_ = recover()
-		c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
-		c.cleanup(convCtx)
-	}()
-
-	// todo 中断 ReactAgent
-	//        try {
-	//         businessChatReactAgent.interrupt(taskInfo.runnableConfig());
-	//     } catch (RuntimeException exception) {
-	//         log.debug("中断 ReactAgent 时出现异常，继续释放资源", exception);
-	//     }
-	responseMessage := "已停止会话生成"
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
-
-	// 发送 status 事件
-	err := convCtx.PublishStatus("⏹ " + reason)
-	if err != nil {
-		logx.Warnf("发送停止事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
-		responseMessage = "会话已停止，停止事件发送失败"
-	}
-
-	// 刷新调试轨迹统计
-	c.refreshDebugTraceRuntimeStats(convCtx)
-
-	// 构造停止态 exchange 并落库
-	stopExchange := c.buildCurrentChatExchange(convCtx, enum.ChatTurnStatusStopped, reason)
-	if err := c.completeExchange(ctx, stopExchange); err == nil {
-		metadata := map[string]any{
-			"finalStatus":  enum.ChatTurnStatusName(enum.ChatTurnStatusStopped),
-			"reason":       reason,
-			"answerLength": convCtx.AnswerLength(),
-		}
-		_ = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话已按停止状态收尾", Snapshot: metadata})
-	} else {
-		responseMessage = "会话已停止，收尾落库失败"
-		_ = vo.OnError(ctx, "会话已按停止状态收尾", err)
-	}
-
-	return &vo.ConversationStop{
-		ConversationId: convCtx.ConversationId,
-		Stopped:        true,
-		Message:        responseMessage,
-	}
-}
-
-// refreshDebugTraceRuntimeStats 刷新调试轨迹中的统计信息
-func (c *ConversationLogicImpl) refreshDebugTraceRuntimeStats(convCtx *conversation.Context) {
-	debugTrace := convCtx.DebugTrace.Load()
-	if debugTrace == nil {
-		return
-	}
-	modelUsageTraces := convCtx.Trace.SnapshotModelUsageTraces()
-	debugTrace.ModelUsageTraces = modelUsageTraces
-	debugTrace.LimitStats = &vo.ChatLimitStats{
-		ModelCallsUsed:        len(modelUsageTraces),
-		ToolCallsUsed:         len(convCtx.SnapshotUsedTools()),
-		ModelCallsRunLimit:    c.options.maxModelCallsPerRun,
-		ToolCallsRunLimit:     c.options.maxToolCallsPerRun,
-		ModelCallsThreadLimit: c.options.maxModelCallsPerThread,
-		ToolCallsThreadLimit:  c.options.maxToolCallsPerThread,
-	}
-	convCtx.DebugTrace.Store(debugTrace)
-}
-
-// completeExchange 完成会话交互（exchange）
-func (c *ConversationLogicImpl) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
-	completeFn := func(txCtx context.Context) error {
-		// 更新交互记录（含答案、耗时、最终状态等，由调用方已在 exchange 对象中填充）
-		if err := c.repo.UpdateExchangeById(txCtx, exchange); err != nil {
-			return err
-		}
-		// 将对应会话的状态重置为 Idle（释放"运行中"标记）
-		dialogue := &entity.ChatDialogue{
-			ConversationId: exchange.ConversationId,
-			SessionStatus:  enum.ChatSessionStatusIdle,
-		}
-		return c.repo.UpdateDialogueByConversationId(txCtx, dialogue)
-	}
-	if err := c.repo.Do(ctx, completeFn); err != nil {
-		logx.Errorf("会话落库失败, conversationId=%s, exchangeId=%d, err=%v",
-			exchange.ConversationId, exchange.ID, err)
-		return err
-	}
-	return nil
-}
-
-// cleanup 清理会话运行时资源（管道、子协程、分布式锁、注册表）
-func (c *ConversationLogicImpl) cleanup(convCtx *conversation.Context) {
-	c.releaseConversationLock(convCtx.LeaseKey)
-	c.runtimeRegistry.Remove(convCtx.ConversationId, convCtx)
-	convCtx.ReleaseResources()
-}
-
 // releaseConversationLock 释放会话运行锁
 func (c *ConversationLogicImpl) releaseConversationLock(leaseKey string) {
 	err := c.distributedLock.Unlock(leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
-	}
-}
-
-// buildCurrentChatExchange 构建当前会话交互（exchange）
-func (c *ConversationLogicImpl) buildCurrentChatExchange(convCtx *conversation.Context, turnStatus int, errorMsg string) *entity.ChatExchange {
-	return &entity.ChatExchange{
-		ID:                  convCtx.ExchangeId,
-		ConversationId:      convCtx.ConversationId,
-		Question:            convCtx.Question,
-		Answer:              convCtx.Answer(),
-		ThinkingSteps:       common.ToJSONArray(convCtx.SnapshotThinkingSteps()),
-		References:          common.ToJSONArray(convCtx.UniqueReferences()),
-		UsedTools:           common.ToJSONArray(convCtx.SnapshotUsedTools()),
-		DebugTrace:          convCtx.DebugTraceJSON(),
-		TurnStatus:          turnStatus,
-		ErrorMessage:        errorMsg,
-		FirstResponseTimeMs: convCtx.FirstResponseTimeMs.Load(),
-		TotalResponseTimeMs: time.Since(convCtx.StartTime).Milliseconds(),
 	}
 }

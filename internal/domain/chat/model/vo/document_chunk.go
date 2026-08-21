@@ -80,7 +80,7 @@ type DocumentChunk struct {
 	RerankOriginalIndex int     `json:"rerankOriginalIndex"` // 重排原始索引
 
 	// ========== 扩展数据 ==========
-	ExtraData map[string]any `json:"extraData"` // 扩展数据
+	Extra map[string]any `json:"extra"` // 扩展数据
 }
 
 func (d *DocumentChunk) FillKnowledge(knowledge *DocumentMetadata) {

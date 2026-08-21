@@ -10,6 +10,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const (
@@ -32,18 +33,18 @@ type RouteStage struct {
 var _ Stage = (*RouteStage)(nil)
 
 func NewRouteStage(
+	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	knowledgeRouter KnowledgeRouter,
 	documentRouter route.DocumentRouter,
 	docGateway adapter.DocumentGateway,
-	noEvidenceReply string,
 ) *RouteStage {
 	return &RouteStage{
 		repo:            repo,
 		knowledgeRouter: knowledgeRouter,
 		documentRouter:  documentRouter,
 		docGateway:      docGateway,
-		noEvidenceReply: noEvidenceReply,
+		noEvidenceReply: svcCtx.Config.Chat.Rag.NoEvidenceReply,
 	}
 }
 

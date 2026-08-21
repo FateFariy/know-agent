@@ -21,7 +21,7 @@ type RecommendStage struct {
 	historyPreviewTurns int
 }
 
-func NewRecommendStage(svcCtx svc.ServiceContext, repo adapter.ChatRepository,
+func NewRecommendStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 	manager memory.SessionMemoryManager, recommender recommend.QuestionRecommender) *RecommendStage {
 	return &RecommendStage{
 		repo:                repo,
@@ -36,11 +36,6 @@ func (r *RecommendStage) Name() string {
 }
 
 func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
-	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return nil
-	}
-
 	// 启动 recommendation 阶段
 	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation,
 		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在生成推荐追问。"})

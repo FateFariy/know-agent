@@ -40,7 +40,7 @@ func NewQueryRewriteImpl(svcCtx *svc.ServiceContext, chatModel model.ChatModel,
 // Rewrite 改写问题（结合历史上下文）
 // 流程：空问题直接返回 -> 判断是否需要改写 -> 不需要则规则改写 -> 需要则LLM改写 -> 规范化结果
 func (q *QueryRewriteImpl) Rewrite(ctx context.Context, question, historySummary string) (*vo.QuestionRewriteResult, error) {
-	oq := vo.NewOriginalQuestion(question, historySummary)
+	oq := NewOriginalQuestion(question, historySummary)
 
 	// 空问题直接返回空结果
 	if oq.IsBlank() {
@@ -101,7 +101,7 @@ func (q *QueryRewriteImpl) Rewrite(ctx context.Context, question, historySummary
 }
 
 // fallback 兜底改写
-func (q *QueryRewriteImpl) fallback(oq *vo.OriginalQuestion) *vo.QuestionRewriteResult {
+func (q *QueryRewriteImpl) fallback(oq *OriginalQuestion) *vo.QuestionRewriteResult {
 	if oq.IsExplicitMultiQuestion() {
 		return vo.NewQuestionRewriteResult(oq.Question(), oq.SplitByRules(q.maxSubQuestions))
 	}
@@ -109,7 +109,7 @@ func (q *QueryRewriteImpl) fallback(oq *vo.OriginalQuestion) *vo.QuestionRewrite
 }
 
 // normalizeRewriteResult 规范化 LLM 改写输出，生成最终的 QuestionRewriteResult
-func (q *QueryRewriteImpl) normalizeRewriteResult(oq *vo.OriginalQuestion, parsed *parsedRewritePayload) *vo.QuestionRewriteResult {
+func (q *QueryRewriteImpl) normalizeRewriteResult(oq *OriginalQuestion, parsed *parsedRewritePayload) *vo.QuestionRewriteResult {
 	if parsed == nil {
 		return nil
 	}

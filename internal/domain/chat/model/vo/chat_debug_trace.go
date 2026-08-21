@@ -106,7 +106,7 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace.OriginalQuestion = execPlan.OriginalQuestion
 	trace.RewriteQuestion = execPlan.RewriteQuestion
 	trace.RewriteSubQuestions = append(trace.RewriteSubQuestions, execPlan.RewriteSubQuestions...)
-	trace.RetrievalQuestion = execPlan.RetrievalQuestion
+	trace.RetrievalQuestion = execPlan.RetrievalPlan.QuestionPlan.RetrievalQuestion
 	trace.AgentQuestion = execPlan.AgentQuestion
 	trace.NavigationDecision = execPlan.NavigationDecision
 
@@ -128,9 +128,7 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace.RequiresCurrentDateAnchoring = execPlan.RequiresCurrentDateAnchoring
 
 	// 检索子问题
-	trace.SubQuestions = append(trace.SubQuestions, execPlan.RetrievalSubQuestions...)
-	trace.SelectedDocumentId = execPlan.SelectedDocumentId
-	trace.SelectedTaskId = execPlan.SelectedTaskId
+	trace.SubQuestions = append(trace.SubQuestions, execPlan.RetrievalPlan.QuestionPlan.SubQuestions...)
 
 	trace.NoEvidenceReply = execPlan.NoEvidenceReply
 

@@ -132,7 +132,7 @@ func (s *ParentElevationStage) buildParentEvidenceDocument(parentChunk *vo.Docum
 		IsElevated:        1,
 		Score:             parentScore,
 		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
-		ExtraData:         bestChild.ExtraData,
+		Extra:             bestChild.Extra,
 	}
 }
 
