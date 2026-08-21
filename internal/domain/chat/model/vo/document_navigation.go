@@ -9,7 +9,6 @@ type DocumentNavigationDecision struct {
 	StructureAnchor   *ConversationStructureAnchor  `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor       `json:"itemAnchor"`        // 项目锚点
 	RetrievalIntent   enum.RetrievalIntent          `json:"retrievalIntent"`   // 检索意图
-	RetrievalPlan     *RetrievalQuestionPlan        `json:"retrievalPlan"`     // 检索问题计划(已弃用）
 	SummaryText       string                        `json:"summaryText"`       // 摘要文本
 	QueryContextHints []string                      `json:"queryContextHints"` // 查询上下文提示
 	SoftSectionHints  []string                      `json:"softSectionHints"`  // 软章节提示

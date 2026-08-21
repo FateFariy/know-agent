@@ -227,7 +227,6 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 //  5. 组装最终执行计划（执行模式 / 导航决策 / 无证据回复提示）
 //  6. 打印关键编排结果并返回
 func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
-
 	// 启动文档内路由阶段追踪，并以 "混合检索" 为默认模式名
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
 
@@ -324,7 +323,145 @@ func (r *RouteStage) filterValidEvidenceAnchors(anchors vo.EvidenceAnchors, allD
 	})
 }
 
-// buildRetrievalPlan todo 待填充 RetrievalPlanAssembler
+// buildRetrievalPlan
 func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.ConversationExecutionPlan) *vo.RetrievalPlan {
-	return &vo.RetrievalPlan{}
+	snapshot := convCtx.KnowledgeBaseSelectionSnapshot
+	runtime := snapshot.RagRuntimeOptions
+	if runtime == nil {
+		runtime = vo.NewDefaultRagRuntimeOptions()
+	}
+	questionPlan := r.newQuestionPlan(execPlan)
+	intentResult := execPlan.RecognitionResult
+	hybrid := runtime.Hybrid
+	if hybrid == nil {
+		hybrid = vo.NewDefaultHybridOptions()
+	}
+
+	channels := r.newChannelPlans(runtime, hybrid)
+	chatMode := execPlan.ChatMode
+	documentScope := snapshot.SelectedDocumentIds()
+	taskScope := snapshot.SelectedTaskIds()
+	if chatMode == enum.ChatQueryModeDocument {
+		documentScope = []int64{convCtx.SelectedDocumentId}
+		taskScope = []int64{convCtx.SelectedTaskId}
+	}
+	plan := &vo.RetrievalPlan{
+		QuestionPlan:              questionPlan,
+		ChatMode:                  enum.ChatQueryModeName(execPlan.ChatMode),
+		PrimaryIntent:             execPlan.NavigationDecision.PrimaryIntent(),
+		SuggestedIntents:          intentResult.SuggestedChannels(),
+		ScopeMode:                 snapshot.SelectionModeName(),
+		KnowledgeBaseIds:          utils.Copy(snapshot.SelectedKnowledgeBaseIds),
+		AllowedDocumentScope:      utils.Copy(snapshot.SelectedDocumentIds()),
+		DocumentScope:             utils.Copy(documentScope),
+		TaskScope:                 utils.Copy(taskScope),
+		MetadataFilters:           vo.NewMetadataFilters(questionPlan.RetrievalQuestion, intentResult),
+		EvidenceApplicabilityPlan: vo.NewEvidenceApplicabilityPlan(questionPlan.CurrentQuestion, intentResult),
+		Channels:                  channels,
+		StructureNavigation:       intentResult.StructureNavigationIntent.Clone(),
+		NavigationAction:          execPlan.NavigationDecision.NavigationActionText(),
+		StructureNavigationResult: r.copyStructureNavigationResult(execPlan.NavigationDecision),
+		StructureAnchor:           r.copyStructureAnchor(execPlan.NavigationDecision),
+		ItemAnchor:                r.copyItemAnchor(execPlan.NavigationDecision),
+		TableIntent:               intentResult.ToTableIntent(),
+		GraphIntent:               intentResult.ToGraphIntent(runtime.GraphRagMaxHops),
+		RaptorIntent:              intentResult.ToRaptorIntent(runtime.RaptorSourceChunkTopK),
+		RankFeatures:              vo.BuildRankFeatures(hybrid),
+		CandidateTopK:             runtime.CandidateTopK,
+		RerankTopK:                runtime.RerankCandidateTopK,
+		RerankEnabled:             runtime.RerankEnabled,
+		FinalEvidenceBudget:       runtime.FinalTopK,
+		SubQuestionTimeout:        runtime.SubQuestionTimeout,
+	}
+
+	return plan
+}
+
+// newQuestionPlan 构建检索问题计划
+func (r *RouteStage) newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.RetrievalQuestionPlan {
+	currentQuestion := utils.CompactWhitespace(exec.OriginalQuestion)
+	rewrittenQuestion := utils.CompactWhitespace(exec.RewriteQuestion)
+	normalizedQuery := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
+
+	var inheritedAnchors []*vo.RetrievalContextAnchor
+	if exec.RecognitionResult != nil && exec.RecognitionResult.QueryType == enum.QueryTypeFollowUp {
+		keyOf := func(anchor *vo.EvidenceAnchor) (string, *vo.RetrievalContextAnchor, bool) {
+			if inherited := anchor.ToRetrievalContextAnchor(); inherited != nil {
+				return inherited.UniqueKey(), inherited, true
+			}
+			return "", nil, false
+		}
+		inheritedAnchors = utils.FilterMapUniqueLimit(exec.RecentEvidenceAnchors, 5, keyOf)
+	}
+	contextHints := make([]string, 0, len(inheritedAnchors))
+	for _, anchor := range inheritedAnchors {
+		contextHints = append(contextHints, anchor.AnchorHint())
+	}
+
+	of := func(sq string) (string, string, bool) {
+		sq = utils.CompactWhitespace(sq)
+		return sq, sq, sq != ""
+	}
+	subQuestions := utils.FilterMapUniqueLimit(exec.RewriteSubQuestions, 5, of)
+	if len(subQuestions) == 0 && utils.IsNotBlank(normalizedQuery) {
+		subQuestions = append(subQuestions, normalizedQuery)
+	}
+
+	executionQueries := make([]*vo.RetrievalExecutionQuery, 0, len(subQuestions))
+	for i, sq := range subQuestions {
+		executionQueries = append(executionQueries, &vo.RetrievalExecutionQuery{
+			Index:        i + 1,
+			SubQuestion:  sq,
+			ContextHints: append([]string{}, contextHints...),
+		})
+	}
+
+	return &vo.RetrievalQuestionPlan{
+		CurrentQuestion:          currentQuestion,
+		RewrittenQuestion:        rewrittenQuestion,
+		RetrievalQuestion:        normalizedQuery,
+		ExecutionQueries:         executionQueries,
+		FollowUp:                 len(inheritedAnchors) > 0,
+		HistoryInherited:         len(inheritedAnchors) > 0,
+		HistoryInheritanceSource: utils.Ternary(len(inheritedAnchors) > 0, "FINAL_EVIDENCE_ANCHOR", "NONE"),
+		InheritedContextAnchors:  inheritedAnchors,
+		SubQuestions:             subQuestions,
+	}
+}
+
+// newChannelPlans 构建检索通道计划列表
+func (r *RouteStage) newChannelPlans(runtime *vo.RagRuntimeOptions, hybrid *vo.HybridOptions) []*vo.RetrievalChannelPlan {
+	return []*vo.RetrievalChannelPlan{
+		vo.NewVectorChannelPlan(true, runtime.VectorTopK, runtime.ChannelTimeout, hybrid.VectorWeight, runtime.MinVectorSimilarity),
+		vo.NewKeywordChannelPlan(runtime.KeywordChannelEnabled, runtime.KeywordTopK, runtime.ChannelTimeout, hybrid.KeywordWeight, runtime.KeywordRelativeScoreFloor),
+		vo.NewTableChannelPlan(runtime.TableChannelEnabled, runtime.CandidateTopK, runtime.ChannelTimeout, hybrid.TableWeight),
+		vo.NewGraphRAGChannelPlan(runtime.GraphRagChannelEnabled, runtime.GraphRagTopK, runtime.ChannelTimeout, hybrid.GraphRagWeight),
+		vo.NewRaptorChannelPlan(runtime.RaptorChannelEnabled, runtime.RaptorTopK, runtime.ChannelTimeout, hybrid.RaptorWeight),
+	}
+}
+
+// copyStructureNavigationResult 复制结构导航结果 todo 待实现
+func (r *RouteStage) copyStructureNavigationResult(decision *vo.DocumentNavigationDecision) *vo.StructureNavigationResult {
+	if decision == nil {
+		return nil
+	}
+	return nil
+}
+
+// copyStructureAnchor 复制结构锚点
+func (r *RouteStage) copyStructureAnchor(decision *vo.DocumentNavigationDecision) *vo.ConversationStructureAnchor {
+	if decision == nil || decision.StructureAnchor == nil {
+		return nil
+	}
+	anchor := *decision.StructureAnchor
+	return &anchor
+}
+
+// copyItemAnchor 复制条目锚点
+func (r *RouteStage) copyItemAnchor(decision *vo.DocumentNavigationDecision) *vo.ConversationItemAnchor {
+	if decision == nil || decision.ItemAnchor == nil {
+		return nil
+	}
+	item := *decision.ItemAnchor
+	return &item
 }

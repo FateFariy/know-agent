@@ -40,9 +40,6 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 	if query == nil {
 		return nil, fmt.Errorf("RetrievalExecutionQuery is required")
 	}
-	if err := plan.ValidateForExecution(); err != nil {
-		return nil, err
-	}
 	plannedQuery, err := plan.RequirePlannedQuery(query.Index)
 	if err != nil {
 		return nil, err

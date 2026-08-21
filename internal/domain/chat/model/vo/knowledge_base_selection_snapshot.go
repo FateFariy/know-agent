@@ -59,6 +59,17 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectedDocumentIds() []int64 {
 	})
 }
 
+// SelectedTaskIds 返回所有允许文档的任务ID列表
+func (s *KnowledgeBaseSelectionSnapshot) SelectedTaskIds() []int64 {
+	if s == nil || len(s.AllowedDocuments) == 0 {
+		return nil
+	}
+	return utils.Map(s.AllowedDocuments, func(doc *DocumentMetadata) int64 {
+		return doc.LastIndexTaskId
+
+	})
+}
+
 func (s *KnowledgeBaseSelectionSnapshot) RagRuntimeConfigSnapshot() string {
 	if s == nil || s.RagRuntimeOptions == nil {
 		return ""

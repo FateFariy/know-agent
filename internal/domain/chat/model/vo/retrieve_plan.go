@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math"
 	"time"
-
-	"github.com/swiftbit/know-agent/common/utils"
 )
 
 type RetrievalPlan struct {
@@ -30,22 +28,19 @@ type RetrievalPlan struct {
 	TableIntent               *TableIntent                 // 表格检索意图
 	GraphIntent               *GraphIntent                 // 图谱检索意图
 	RaptorIntent              *RaptorIntent                // RAPTOR检索意图
-	RoutePlan                 *RetrievalRoutePlan          // 路由计划
 	RankFeatures              *RankFeatureBundle           // 排序特征包
-	CandidateWindow           int                          // 候选窗口大小
-	RerankWindow              int                          // 重排序窗口大小
-	RerankRequested           bool                         // 是否请求重排序
+	CandidateTopK             int                          // 候选窗口大小
+	RerankTopK                int                          // 重排序窗口大小
+	RerankEnabled             bool                         // 是否请求重排序
 	FinalEvidenceBudget       int                          // 最终证据预算
 	SubQuestionTimeout        time.Duration                // 子问题超时时间
-	Reasons                   []string                     // 决策原因列表
-	Source                    string                       // 来源标识
 }
 
 func (p *RetrievalPlan) Validate() error {
 	if p == nil {
 		return errors.New("retrieval plan is nil")
 	}
-	return p.ValidateForExecution()
+	return nil
 }
 
 func (p *RetrievalPlan) hasRetrievalQuestion() bool {
@@ -82,141 +77,6 @@ func (p *RetrievalPlan) MaxMetadataBoost() float64 {
 		return 1
 	}
 	return math.Max(0, p.RankFeatures.MaxMetadataBoost)
-}
-
-// ValidateForExecution 校验执行计划的完整性和合法性
-func (p *RetrievalPlan) ValidateForExecution() error {
-	//if p == nil {
-	//	return errors.New("RetrievalPlan is required")
-	//}
-	//if p.QuestionPlan == nil || utils.IsBlank(p.QuestionPlan.RetrievalQuestion) {
-	//	return errors.New("RetrievalPlan normalized query is required")
-	//}
-	//
-	//// 校验执行查询列表
-	//if err := p.validateExecutionQueries(); err != nil {
-	//	return err
-	//}
-	//
-	//// 校验各类 ID 列表必须为正数
-	//if err := requirePositiveIDs(p.KnowledgeBaseIds, "knowledge base scope"); err != nil {
-	//	return err
-	//}
-	//if err := requirePositiveIDs(p.AllowedDocumentScope, "allowed document scope"); err != nil {
-	//	return err
-	//}
-	//if err := requirePositiveIDs(p.DocumentScope, "document scope"); err != nil {
-	//	return err
-	//}
-	//if err := requirePositiveIDs(p.TaskScope, "task scope"); err != nil {
-	//	return err
-	//}
-	//
-	//// 校验作用域模式
-	//if p.ScopeMode == enum.KbSelectionModeNone {
-	//	return errors.New("RetrievalPlan knowledge base scope mode is required")
-	//}
-	//
-	//// 校验文档作用域包含关系
-	//if !utils.ContainsAll(p.AllowedDocumentScope, p.DocumentScope) {
-	//	return errors.New("RetrievalPlan document scope must stay inside allowed document scope")
-	//}
-	//
-	//// 校验文档与任务作用域数量一致
-	//if len(p.DocumentScope) != len(p.TaskScope) {
-	//	return errors.New("RetrievalPlan document scope and task scope must have the same size")
-	//}
-	//
-	//// 校验核心策略对象非空
-	//if p.ChatMode == "" || p.PrimaryIntent == "" || p.MetadataFilters == nil ||
-	//	p.EvidenceApplicabilityPlan == nil || p.RoutePlan == nil || p.RankFeatures == nil ||
-	//	p.TableIntent == nil || p.GraphIntent == nil || p.RaptorIntent == nil {
-	//	return errors.New("RetrievalPlan controlled filters, applicability, route, intents and rank features are required")
-	//}
-	//
-	//// 校验路由授权（假设该方法已存在，不自行实现）
-	//if err := p.validateRouteAuthorization(); err != nil {
-	//	return err
-	//}
-	//
-	//// 校验通道计划
-	//if err := p.validateChannels(); err != nil {
-	//	return err
-	//}
-	//
-	//// 校验窗口和预算参数
-	//if p.CandidateWindow <= 0 {
-	//	return errors.New("RetrievalPlan candidate window must be positive")
-	//}
-	//if p.RerankWindow <= 0 || p.RerankWindow > p.CandidateWindow {
-	//	return errors.New("RetrievalPlan rerank window must be positive and no larger than candidate window")
-	//}
-	//if p.FinalEvidenceBudget <= 0 || p.FinalEvidenceBudget > p.RerankWindow {
-	//	return errors.New("RetrievalPlan final evidence budget must be positive and no larger than rerank window")
-	//}
-	//if p.SubQuestionTimeout <= 0 {
-	//	return errors.New("RetrievalPlan sub-question timeout must be positive")
-	//}
-
-	return nil
-}
-
-// validateExecutionQueries 校验执行查询列表
-func (p *RetrievalPlan) validateExecutionQueries() error {
-	if len(p.QuestionPlan.ExecutionQueries) == 0 {
-		return errors.New("RetrievalPlan execution query is required for every sub-question")
-	}
-	for _, q := range p.QuestionPlan.ExecutionQueries {
-		if q == nil || utils.IsBlank(q.SubQuestion) {
-			return errors.New("RetrievalPlan execution query is required for every sub-question")
-		}
-	}
-	return nil
-}
-
-// validateChannels 校验通道配置
-func (p *RetrievalPlan) validateChannels() error {
-	//if len(p.Channels) == 0 {
-	//	return errors.New("RetrievalPlan channel plans are required")
-	//}
-	//
-	//channelNames := make(map[string]struct{}, len(p.Channels))
-	//for _, ch := range p.Channels {
-	//	if ch == nil {
-	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
-	//	}
-	//	if strings.TrimSpace(ch.Name) == "" {
-	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
-	//	}
-	//	if _, exists := channelNames[ch.Name]; exists {
-	//		return errors.New("RetrievalPlan channel names must be non-blank and unique")
-	//	}
-	//	channelNames[ch.Name] = struct{}{}
-	//
-	//	if ch.TopK <= 0 || ch.Budget <= 0 || ch.Timeout <= 0 {
-	//		return errors.New("RetrievalPlan channel topK, budget and timeout must be positive")
-	//	}
-	//	if !isFiniteAndNonNegative(ch.Weight) {
-	//		return errors.New("RetrievalPlan channel weight must be finite and non-negative")
-	//	}
-	//	if !isFiniteAndNonNegative(ch.MinimumScore) || !isFiniteAndNonNegative(ch.RelativeScoreFloor) {
-	//		return errors.New("RetrievalPlan channel score thresholds must be finite and non-negative")
-	//	}
-	//}
-	return nil
-}
-
-// requirePositiveIDs 校验 ID 列表非空且均为正数
-func requirePositiveIDs(values []int64, field string) error {
-	if len(values) == 0 {
-		return fmt.Errorf("RetrievalPlan %s must contain positive IDs", field)
-	}
-	for _, v := range values {
-		if v <= 0 {
-			return fmt.Errorf("RetrievalPlan %s must contain positive IDs", field)
-		}
-	}
-	return nil
 }
 
 // FindPlannedQuery 按索引查找执行查询

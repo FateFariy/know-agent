@@ -167,9 +167,7 @@ func (s *StartStage) startLeaseRenewal(ctx context.Context, convCtx *Context) {
 
 // releaseConversationLock 释放会话分布式锁
 func (s *StartStage) releaseConversationLock(leaseKey string) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelFunc()
-	err := s.distributedLock.UnlockContext(ctx, leaseKey)
+	err := s.distributedLock.Unlock(leaseKey)
 	if err != nil && !errors.Is(err, errorx.ErrDistributedLockNotFound) {
 		logx.Warnf("会话分布式锁释放失败, leaseKey=%s, err=%v", leaseKey, err)
 	}

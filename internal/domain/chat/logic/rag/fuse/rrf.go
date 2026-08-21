@@ -37,7 +37,7 @@ func NewRRFFusion() *RRFFusion {
 //  1. 解析各通道的最大分数，用于后续归一化
 //  2. 遍历各通道结果，对每个文档累积加权 RRF 分数、归一化原始分数和元数据提升
 //  3. 按通道权重、排名权重和原始分数权重计算最终融合分数
-//  4. 按融合分数降序排序，截取候选窗口（plan.CandidateWindow）内的文档
+//  4. 按融合分数降序排序，截取候选窗口（plan.CandidateTopK）内的文档
 //  5. 回写融合分数到文档的 RRFScore 字段
 func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.DocumentChunk {
 	if len(results) == 0 || plan == nil {
@@ -139,7 +139,7 @@ func (f *RRFFusion) sortAndFinalize(holders map[string]*candidateHolder, plan *v
 
 // selectHybridCandidates 从排序后的候选列表中选取候选窗口内的文档
 func (f *RRFFusion) selectHybridCandidates(sortedHolders []*candidateHolder, plan *vo.RetrievalPlan) []*candidateHolder {
-	candidateTopK := max(plan.CandidateWindow, 0)
+	candidateTopK := max(plan.CandidateTopK, 0)
 	if candidateTopK <= 0 || len(sortedHolders) == 0 {
 		return nil
 	}

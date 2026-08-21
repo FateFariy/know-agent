@@ -32,7 +32,6 @@ type ConversationLogicImpl struct {
 	distributedLock adapter.DistributedLock
 	checkPointStore adapter.CheckPointStore
 	chain           *conversation.Chain
-	*options
 }
 
 var _ ConversationLogic = (*ConversationLogicImpl)(nil)
