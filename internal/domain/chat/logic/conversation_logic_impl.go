@@ -27,7 +27,6 @@ const (
 type ConversationLogicImpl struct {
 	repo            adapter.ChatRepository
 	baseGateway     adapter.KnowledgeBaseGateway
-	runtimeRegistry *conversation.ChatRuntimeRegistry
 	memoryManager   memory.SessionMemoryManager
 	distributedLock adapter.DistributedLock
 	checkPointStore adapter.CheckPointStore
@@ -39,14 +38,14 @@ var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 // NewConversationLogicImpl 创建聊天逻辑实例
 func NewConversationLogicImpl(repo adapter.ChatRepository, baseGateway adapter.KnowledgeBaseGateway,
 	memoryManager memory.SessionMemoryManager, distributedLock adapter.DistributedLock,
-	checkPointStore adapter.CheckPointStore) *ConversationLogicImpl {
+	checkPointStore adapter.CheckPointStore, chain *conversation.Chain) *ConversationLogicImpl {
 	return &ConversationLogicImpl{
 		repo:            repo,
 		baseGateway:     baseGateway,
-		runtimeRegistry: &conversation.ChatRuntimeRegistry{},
 		memoryManager:   memoryManager,
 		distributedLock: distributedLock,
 		checkPointStore: checkPointStore,
+		chain:           chain,
 	}
 }
 
@@ -83,11 +82,7 @@ func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, sink
 
 // StopConversation 停止会话
 func (c *ConversationLogicImpl) StopConversation(ctx context.Context, conversationId string) (bool, string, error) {
-	convCtx, ok := c.runtimeRegistry.Get(conversationId)
-	if !ok {
-		return false, "没有找到正在执行的会话", nil
-	}
-	responseMessage, stopped := c.chain.Stop(ctx, convCtx, "用户已停止生成")
+	responseMessage, stopped := c.chain.Stop(ctx, conversationId, "用户已停止生成")
 	return stopped, responseMessage, nil
 }
 
@@ -136,11 +131,8 @@ func (c *ConversationLogicImpl) ListSessions(ctx context.Context, pageNo, pageSi
 
 // ResetConversation 重置会话：停止并清除所有相关落库数据
 func (c *ConversationLogicImpl) ResetConversation(ctx context.Context, conversationId string) (*vo.ConversationReset, error) {
-	stoped := false
 	// 停止正在运行的会话
-	if convCtx, ok := c.runtimeRegistry.Get(conversationId); ok {
-		_, stoped = c.chain.Stop(ctx, convCtx, "会话被重置")
-	}
+	_, stoped := c.chain.Stop(ctx, conversationId, "会话被重置")
 
 	var dialogueCount, exchangeCount int64
 	var err error

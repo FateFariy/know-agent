@@ -1,4 +1,4 @@
-package reranker
+package rerank
 
 import (
 	"context"

@@ -16,14 +16,9 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
-
-// MarkdownParser 定义 Markdown 解析器接口
-type MarkdownParser interface {
-	Parse(sourceText []byte) (*shared.MarkdownSyntax, error)
-	ToBlocks(syntax *shared.MarkdownSyntax, parserName string) []*entity.DocumentBlock
-}
 
 type GoldmarkParser struct {
 	parser goldmark.Markdown
@@ -216,11 +211,11 @@ func (p *GoldmarkParser) syntaxToBlocks(syntax *shared.MarkdownSyntax) entity.Do
 	for _, node := range topLevel {
 		rawText := nodeSourceText(syntax, node)
 		blockType, txt := legacyBlockContent(node, rawText)
-		if txt == "" && blockType != BlockTypeTable {
+		if txt == "" && blockType != enum.BlockTypeTable {
 			continue
 		}
 		rows := tableRows(node, childrenByParent)
-		if blockType == BlockTypeTable && txt == "" {
+		if blockType == enum.BlockTypeTable && txt == "" {
 			var rowStrs []string
 			for _, row := range rows {
 				rowStrs = append(rowStrs, strings.Join(row, " | "))
@@ -228,7 +223,7 @@ func (p *GoldmarkParser) syntaxToBlocks(syntax *shared.MarkdownSyntax) entity.Do
 			txt = strings.Join(rowStrs, "\n")
 		}
 		tableHTML := ""
-		if blockType == BlockTypeTable {
+		if blockType == enum.BlockTypeTable {
 			tableHTML = renderMarkdownTable(rawText)
 		}
 

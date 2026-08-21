@@ -16,14 +16,3 @@ const (
 	NodeThematicBreak = "THEMATIC_BREAK"
 	NodeHTMLBlock     = "HTML_BLOCK"
 )
-
-const (
-	BlockTypeTitle         = "TITLE"
-	BlockTypeText          = "TEXT"
-	BlockTypeList          = "LIST"
-	BlockTypeTable         = "TABLE"
-	BlockTypeCode          = "CODE"
-	BlockTypeBlockquote    = "BLOCKQUOTE"
-	BlockTypeThematicBreak = "THEMATIC_BREAK"
-	BlockTypeHTML          = "HTML"
-)

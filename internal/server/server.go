@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	"github.com/google/wire"
 	"github.com/zeromicro/go-zero/rest"
 
 	"github.com/swiftbit/know-agent/api/chat"
@@ -13,8 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 	"github.com/swiftbit/know-agent/internal/trigger/consumer"
 )
-
-var ProviderSet = wire.NewSet(NewServer, NewHTTPServer)
 
 type Server struct {
 	HTTP               *rest.Server

@@ -61,3 +61,24 @@ func (n StructureNodes) FindNodeByPath(sectionPath, canonicalPath string) *Struc
 	}
 	return nil
 }
+
+// FindNodeByNo 根据 NodeNo 查找节点
+func (n StructureNodes) FindNodeByNo(nodeNo int) *StructureNode {
+	for _, node := range n {
+		if node != nil && node.NodeNo == nodeNo {
+			return node
+		}
+	}
+	return nil
+}
+
+// FindChildrenByNo 根据父节点序号查找所有子节点序号
+func (n StructureNodes) FindChildrenByNo(parentNodeNo int) []int {
+	var children []int
+	for _, node := range n {
+		if node != nil && node.ParentNodeNo == parentNodeNo && node.NodeNo != parentNodeNo {
+			children = append(children, node.NodeNo)
+		}
+	}
+	return children
+}

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strconv"
 	"strings"
@@ -189,4 +191,27 @@ func CompactWhitespace(s string) string {
 		return ""
 	}
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// GetStringFromMap 从 map[string]any 安全获取字符串值，支持默认值回退
+func GetStringFromMap(m map[string]any, key, defaultValue string) string {
+	if m == nil {
+		return defaultValue
+	}
+	if value, ok := m[key]; ok {
+		if strVal, valid := value.(string); valid {
+			return strVal
+		}
+	}
+	return defaultValue
+}
+
+// CalcContentHash 计算内容的 SHA256 哈希值，用于产物去重和校验
+func CalcContentHash(parts ...string) string {
+	var builder strings.Builder
+	for _, part := range parts {
+		builder.WriteString(part)
+	}
+	hash := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(hash[:])
 }

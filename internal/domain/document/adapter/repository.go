@@ -132,10 +132,10 @@ type DocumentRepository interface {
 	// ========== 父块相关 ==========
 
 	// InsertParentChunk 插入父块
-	InsertParentChunk(ctx context.Context, block *entity.DocumentParentChunk) error
+	InsertParentChunk(ctx context.Context, chunk *entity.DocumentParentChunk) error
 
 	// InsertParentChunkBatch 批量插入父块
-	InsertParentChunkBatch(ctx context.Context, blocks []*entity.DocumentParentChunk) error
+	InsertParentChunkBatch(ctx context.Context, chunks []*entity.DocumentParentChunk) error
 
 	// DeleteParentChunkByDocumentId 根据文档ID删除父块
 	DeleteParentChunkByDocumentId(ctx context.Context, documentId int64) error

@@ -11,25 +11,25 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
-type End struct {
+type EndStage struct {
 	repo adapter.ChatRepository
 }
 
-var _ Stage = (*End)(nil)
+var _ Stage = (*EndStage)(nil)
 
-func NewEnd(repo adapter.ChatRepository) *End {
-	return &End{
+func NewEndStage(repo adapter.ChatRepository) *EndStage {
+	return &EndStage{
 		repo: repo,
 	}
 }
 
 // Name 阶段名称
-func (e *End) Name() string {
+func (e *EndStage) Name() string {
 	return enum.ConversationTraceStageFinalize.Name
 }
 
 // Execute 执行逻辑
-func (e *End) Execute(ctx context.Context, convCtx *Context) error {
+func (e *EndStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return nil
@@ -64,7 +64,7 @@ func (e *End) Execute(ctx context.Context, convCtx *Context) error {
 }
 
 // completeExchange 完成会话交互（exchange）
-func (e *End) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
+func (e *EndStage) completeExchange(ctx context.Context, exchange *entity.ChatExchange) error {
 	completeFn := func(txCtx context.Context) error {
 		// 更新交互记录（含答案、耗时、最终状态等，由调用方已在 exchange 对象中填充）
 		if err := e.repo.UpdateExchangeById(txCtx, exchange); err != nil {

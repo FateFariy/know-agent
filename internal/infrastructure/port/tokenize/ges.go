@@ -1,15 +1,14 @@
 package tokenize
 
-import "github.com/go-ego/gse"
+import (
+	"github.com/go-ego/gse"
+
+	"github.com/swiftbit/know-agent/internal/svc"
+)
 
 // GseTokenizer 是 domain.Tokenizer 的 GSE 实现
 type GseTokenizer struct {
-	seg    gse.Segmenter
-	config GseConfig
-}
-
-// GseConfig 用于配置 GSE 行为（停用词、词典、HMM 等）
-type GseConfig struct {
+	seg      gse.Segmenter
 	DictPath string // 词典文件路径
 	StopPath string // 停用词文件路径
 	UseHMM   bool   // 是否默认启用 HMM
@@ -17,14 +16,15 @@ type GseConfig struct {
 }
 
 // NewGseTokenizer 创建基于 GSE 的分词器
-func NewGseTokenizer(cfg GseConfig) (*GseTokenizer, error) {
+func NewGseTokenizer(svcCtx *svc.ServiceContext) *GseTokenizer {
+	cfg := svcCtx.Config.Gse
 	var seg gse.Segmenter
 	seg.AlphaNum = cfg.AlphaNum
 
 	// 加载词典
 	if cfg.DictPath != "" {
 		if err := seg.LoadDict(cfg.DictPath); err != nil {
-			return nil, err
+			panic(err)
 		}
 	} else {
 		_ = seg.LoadDict() // 使用内置默认词典
@@ -33,17 +33,20 @@ func NewGseTokenizer(cfg GseConfig) (*GseTokenizer, error) {
 	// 加载停用词
 	if cfg.StopPath != "" {
 		if err := seg.LoadStop(cfg.StopPath); err != nil {
-			return nil, err
+			panic(err)
 		}
 	}
 
 	return &GseTokenizer{
-		seg:    seg,
-		config: cfg,
-	}, nil
+		seg:      seg,
+		DictPath: cfg.DictPath,
+		StopPath: cfg.StopPath,
+		UseHMM:   cfg.UseHMM,
+		AlphaNum: cfg.AlphaNum,
+	}
 }
 
 // SegmentWords 分词并返回结果（暂时仅支持精确模式）
 func (t *GseTokenizer) SegmentWords(text string) []string {
-	return t.seg.Cut(text, t.config.UseHMM)
+	return t.seg.Cut(text, t.UseHMM)
 }

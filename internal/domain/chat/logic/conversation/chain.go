@@ -23,7 +23,7 @@ import (
 type Chain struct {
 	stages          []Stage
 	repo            adapter.ChatRepository
-	runtime         *ChatRuntimeRegistry
+	runtime         *runtimeRegistry
 	memoryManager   memory.SessionMemoryManager
 	distributedLock adapter.DistributedLock
 }
@@ -31,7 +31,6 @@ type Chain struct {
 func NewChain(
 	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
-	runtime *ChatRuntimeRegistry,
 	distributedLock adapter.DistributedLock,
 	memoryManager memory.SessionMemoryManager,
 	intentRecognizer intent.Recognizer,
@@ -46,13 +45,13 @@ func NewChain(
 ) *Chain {
 	chain := &Chain{
 		repo:            repo,
-		runtime:         runtime,
+		runtime:         &runtimeRegistry{},
 		memoryManager:   memoryManager,
 		distributedLock: distributedLock,
 	}
 	// 按对话执行流程顺序初始化所有子阶段，顺序不可调整
 	chain.stages = []Stage{
-		NewStartStage(repo, runtime, distributedLock, chain.Stop),
+		NewStartStage(repo, chain.runtime, distributedLock, chain.stop),
 		NewMemoryLoadStage(svcCtx, repo, memoryManager),
 		NewIntentRecognizeStage(intentRecognizer),
 		NewQueryRewriteStage(svcCtx, queryRewriter),
@@ -61,7 +60,7 @@ func NewChain(
 		NewEvidenceBudgetStage(svcCtx, promptRenderer),
 		NewGenerateStage(chatModel),
 		NewRecommendStage(svcCtx, repo, memoryManager, questionRecommender),
-		NewEnd(repo), // 终态阶段，统一处理成功落库
+		NewEndStage(repo),
 	}
 
 	return chain
@@ -75,7 +74,7 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 			if errors.Is(err, errorx.ErrSessionRunning) {
 				_ = c.startFailed(ctx, convCtx)
 			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.Stop(ctx, convCtx, "客户端已取消请求")
+				c.stop(ctx, convCtx, "客户端已取消请求")
 			} else {
 				c.finishFailed(ctx, convCtx, err)
 			}
@@ -85,8 +84,17 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 	return nil
 }
 
+// Stop 停止会话
+func (c *Chain) Stop(ctx context.Context, conversationId string, reason string) (string, bool) {
+	convCtx, ok := c.runtime.Get(conversationId)
+	if !ok {
+		return "没有找到正在执行的会话", false
+	}
+	return c.stop(ctx, convCtx, reason)
+}
+
 // Stop 停止：原子切换状态 -> 发送停止事件 -> 落库 -> 清理
-func (c *Chain) Stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
+func (c *Chain) stop(ctx context.Context, convCtx *Context, reason string) (string, bool) {
 	if !convCtx.Finalized.CompareAndSwap(false, true) {
 		return "会话已停止", false
 	}

@@ -18,6 +18,5 @@ type KnowledgeRouter interface {
 
 // Ranker 统一排名器
 type Ranker interface {
-	// Order() int
 	Rank(ctx context.Context, rankCtx *rank.Context) error
 }

@@ -17,7 +17,7 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 
-	server := WireApp(&c)
+	server := bootstrap(&c)
 	defer server.Stop()
 
 	fmt.Printf("Starting HTTP server at %s:%d...\n", c.Http.Host, c.Http.Port)

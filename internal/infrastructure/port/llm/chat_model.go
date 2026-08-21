@@ -44,7 +44,6 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 			Temperature: &conf.Temperature,
 			MaxTokens:   conf.MaxTokens,
 			TopP:        &conf.TopP,
-			Callback:    func() {},
 		},
 	}
 }
@@ -104,7 +103,6 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 		// 确保通道在退出时关闭
 		defer close(resultChan)
 		defer stream.Close()
-		defer o.options.Callback()
 
 		var chunk any
 		for {

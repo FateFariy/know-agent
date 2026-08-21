@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis/save"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
@@ -36,12 +35,6 @@ type Phase interface {
 // StrategyRecommender 策略推荐器接口
 type StrategyRecommender interface {
 	Recommend(ctx context.Context, document *entity.Document, analysisResult *aggregate.AnalysisResult) (*vo.DocumentStrategyPlanDraft, error)
-}
-
-// TextProcessor 文本处理器
-type TextProcessor interface {
-	// Process 文本预处理
-	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error)
 }
 
 type IndexingConfigResolver interface {

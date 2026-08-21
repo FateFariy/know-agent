@@ -21,7 +21,7 @@ const (
 
 type StartStage struct {
 	repo            adapter.ChatRepository
-	runtimeRegistry *ChatRuntimeRegistry
+	runtimeRegistry *runtimeRegistry
 	distributedLock adapter.DistributedLock
 	stop            func(context.Context, *Context, string) (string, bool)
 }
@@ -30,7 +30,7 @@ var _ Stage = (*StartStage)(nil)
 
 func NewStartStage(
 	repo adapter.ChatRepository,
-	runtimeRegistry *ChatRuntimeRegistry,
+	runtimeRegistry *runtimeRegistry,
 	distributedLock adapter.DistributedLock,
 	stop func(context.Context, *Context, string) (string, bool),
 ) *StartStage {

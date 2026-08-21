@@ -8,6 +8,7 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
 
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
 
@@ -39,21 +40,21 @@ func legacyBlockContent(node *shared.MarkdownNode, rawText string) (string, stri
 	rawText = strings.TrimSpace(rawText)
 	switch node.NodeType {
 	case NodeHeading:
-		return BlockTypeTitle, strings.TrimSpace(node.Text)
+		return enum.BlockTypeTitle, strings.TrimSpace(node.Text)
 	case NodeOrderedList, NodeUnorderedList:
-		return BlockTypeList, rawText
+		return enum.BlockTypeList, rawText
 	case NodeTable:
-		return BlockTypeTable, strings.TrimSpace(node.Text)
+		return enum.BlockTypeTable, strings.TrimSpace(node.Text)
 	case NodeCodeBlock:
-		return BlockTypeCode, rawText
+		return enum.BlockTypeCode, rawText
 	case NodeBlockquote:
-		return BlockTypeBlockquote, rawText
+		return enum.BlockTypeBlockquote, rawText
 	case NodeThematicBreak:
-		return BlockTypeThematicBreak, rawText
+		return enum.BlockTypeThematicBreak, rawText
 	case NodeHTMLBlock:
-		return BlockTypeHTML, rawText
+		return enum.BlockTypeHTML, rawText
 	default:
-		return BlockTypeText, rawText
+		return enum.BlockTypeText, rawText
 	}
 }
 

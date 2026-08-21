@@ -18,11 +18,7 @@ import (
 
 // RetrievalEngine RAG 检索引擎实现
 type RetrievalEngine struct {
-	repo       adapter.ChatRepository
-	reranker   rerank.Reranker
-	channels   []Retrieval
 	docGateway adapter.DocumentGateway
-	fusion     Fusion
 	pipeline   *Pipeline
 }
 
@@ -39,11 +35,7 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 		NewObservationStage(repo),
 	)
 	return &RetrievalEngine{
-		repo:       repo,
-		channels:   channels,
-		reranker:   reranker,
 		docGateway: docGateway,
-		fusion:     fusion,
 		pipeline:   pipeline,
 	}
 }

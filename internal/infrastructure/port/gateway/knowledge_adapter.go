@@ -10,27 +10,27 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 )
 
-// KnowledgeBaseResolverImpl 知识库解析器实现
-type KnowledgeBaseResolverImpl struct {
+// KnowledgeAdapter 知识库解析器实现
+type KnowledgeAdapter struct {
 	l      logic.KnowledgeBaseRetrievalLogic
 	router route.KnowledgeRouter
 }
 
-// NewKnowledgeBaseResolverImpl 创建知识库解析器
-func NewKnowledgeBaseResolverImpl(l logic.KnowledgeBaseRetrievalLogic, router route.KnowledgeRouter) *KnowledgeBaseResolverImpl {
-	return &KnowledgeBaseResolverImpl{
+// NewKnowledgeAdapter 创建知识库解析器
+func NewKnowledgeAdapter(l logic.KnowledgeBaseRetrievalLogic, router route.KnowledgeRouter) *KnowledgeAdapter {
+	return &KnowledgeAdapter{
 		l:      l,
 		router: router,
 	}
 }
 
 // DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
-func (r *KnowledgeBaseResolverImpl) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error) {
+func (r *KnowledgeAdapter) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error) {
 	snapshot, err := r.l.DetermineKnowledgeScope(ctx, chatMode, selectMode, kbIds)
 	return convert.ToKnowledgeBaseSelectionSnapshot(snapshot), err
 }
 
-func (r *KnowledgeBaseResolverImpl) Route(ctx context.Context, input *conversation.RouteInput) (*vo.KnowledgeRouteDecision, error) {
+func (r *KnowledgeAdapter) Route(ctx context.Context, input *conversation.RouteInput) (*vo.KnowledgeRouteDecision, error) {
 	routeCtx := ToRouteContext(input)
 	decision, err := r.router.Route(ctx, routeCtx)
 	if err != nil {
@@ -39,7 +39,7 @@ func (r *KnowledgeBaseResolverImpl) Route(ctx context.Context, input *conversati
 	return convert.ToKnowledgeRouteDecision(decision), nil
 }
 
-func (r *KnowledgeBaseResolverImpl) RecordShadowRoute(ctx context.Context, input *conversation.RouteInput) error {
+func (r *KnowledgeAdapter) RecordShadowRoute(ctx context.Context, input *conversation.RouteInput) error {
 	routeCtx := ToRouteContext(input)
 	return r.router.RecordShadowRoute(ctx, routeCtx)
 }
