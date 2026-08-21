@@ -11,7 +11,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -27,7 +26,7 @@ const (
 type ConversationLogicImpl struct {
 	repo            adapter.ChatRepository
 	baseGateway     adapter.KnowledgeBaseGateway
-	memoryManager   memory.SessionMemoryManager
+	memoryManager   conversation.SessionMemoryManager
 	distributedLock adapter.DistributedLock
 	checkPointStore adapter.CheckPointStore
 	chain           *conversation.Chain
@@ -37,7 +36,7 @@ var _ ConversationLogic = (*ConversationLogicImpl)(nil)
 
 // NewConversationLogicImpl 创建聊天逻辑实例
 func NewConversationLogicImpl(repo adapter.ChatRepository, baseGateway adapter.KnowledgeBaseGateway,
-	memoryManager memory.SessionMemoryManager, distributedLock adapter.DistributedLock,
+	memoryManager conversation.SessionMemoryManager, distributedLock adapter.DistributedLock,
 	checkPointStore adapter.CheckPointStore, chain *conversation.Chain) *ConversationLogicImpl {
 	return &ConversationLogicImpl{
 		repo:            repo,

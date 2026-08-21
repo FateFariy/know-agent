@@ -34,7 +34,7 @@ var (
 // structureNavigationConfidenceThreshold 结构导航置信度阈值
 const structureNavigationConfidenceThreshold = 0.65
 
-// DocumentQuestionRouter 文档问答结构导航锚点解析器
+// DocumentRouterImpl 文档问答结构导航锚点解析器
 //
 // 本服务不承担"图直答/图定位取证"执行分叉，也不使用关键词、短语剥离或正文 contains 打分决定意图。
 // 它只做两件确定性的事：
@@ -43,14 +43,14 @@ const structureNavigationConfidenceThreshold = 0.65
 //
 // 所有文档问答统一输出 ExecutionMode.Retrieval，进入统一多通道混合检索；
 // 结构导航结果只作为检索上下文和观测信号，不得绕过混合检索。
-type DocumentQuestionRouter struct {
+type DocumentRouterImpl struct {
 	querier graph.GraphQuerier // 结构图谱查询
 	indexer NavigationIndexer  // 可选：章节索引服务
 }
 
-// NewDocumentQuestionRouter 创建文档问答路由器
-func NewDocumentQuestionRouter(querier graph.GraphQuerier, indexer NavigationIndexer) *DocumentQuestionRouter {
-	return &DocumentQuestionRouter{
+// NewDocumentRouter 创建文档路由器
+func NewDocumentRouter(querier graph.GraphQuerier, indexer NavigationIndexer) *DocumentRouterImpl {
+	return &DocumentRouterImpl{
 		querier: querier,
 		indexer: indexer,
 	}
@@ -64,7 +64,7 @@ func NewDocumentQuestionRouter(querier graph.GraphQuerier, indexer NavigationInd
 //  3. 高置信结构导航时走结构树确定性查询
 //  4. 明确编号项时作为结构锚点软辅助混合检索
 //  5. 其余按普通文档问题处理
-func (r *DocumentQuestionRouter) Route(ctx context.Context, input *DocumentRouteInput) (*vo.DocumentNavigationDecision, error) {
+func (r *DocumentRouterImpl) Route(ctx context.Context, input *DocumentRouteInput) (*vo.DocumentNavigationDecision, error) {
 	if input == nil {
 		return nil, fmt.Errorf("输入为空")
 	}
@@ -126,7 +126,7 @@ func (r *DocumentQuestionRouter) Route(ctx context.Context, input *DocumentRoute
 // ============================================================
 
 // buildDecision 构建导航决策
-func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.GraphSection,
+func (r *DocumentRouterImpl) buildDecision(action string, section *entity.GraphSection,
 	itemIndex *int, recognitionResult *vo.IntentRecognitionResult,
 	retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
 
@@ -198,7 +198,7 @@ func (r *DocumentQuestionRouter) buildDecision(action string, section *entity.Gr
 
 // resolveSection 章节定位只允许精确锚点：章节号精确、引号标题精确、导航索引命中。
 // 不再用正文 contains 打分或短语剥离作为结构锚点权威来源；未命中时返回 nil，交混合检索处理。
-func (r *DocumentQuestionRouter) resolveSection(ctx context.Context, documentId int64,
+func (r *DocumentRouterImpl) resolveSection(ctx context.Context, documentId int64,
 	originalQuestion, rewrittenQuestion string) *entity.GraphSection {
 
 	if documentId == 0 {
@@ -221,7 +221,7 @@ func (r *DocumentQuestionRouter) resolveSection(ctx context.Context, documentId 
 }
 
 // resolveSectionByQuestion 根据问题定位章节
-func (r *DocumentQuestionRouter) resolveSectionByQuestion(ctx context.Context,
+func (r *DocumentRouterImpl) resolveSectionByQuestion(ctx context.Context,
 	documentId int64, question string) *entity.GraphSection {
 
 	// 按章节编号定位
@@ -241,7 +241,7 @@ func (r *DocumentQuestionRouter) resolveSectionByQuestion(ctx context.Context,
 }
 
 // resolveBySectionCode 按章节编号定位
-func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, documentId int64,
+func (r *DocumentRouterImpl) resolveBySectionCode(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
 
 	normalized := utils.Trim(question)
@@ -256,7 +256,7 @@ func (r *DocumentQuestionRouter) resolveBySectionCode(ctx context.Context, docum
 }
 
 // resolveByQuotedTitle 按引号标题定位
-func (r *DocumentQuestionRouter) resolveByQuotedTitle(ctx context.Context, documentId int64,
+func (r *DocumentRouterImpl) resolveByQuotedTitle(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
 	extractor := newNavigationExtractor(question)
 
@@ -293,7 +293,7 @@ func (r *DocumentQuestionRouter) resolveByQuotedTitle(ctx context.Context, docum
 }
 
 // resolveByNavigationIndex 按导航索引定位
-func (r *DocumentQuestionRouter) resolveByNavigationIndex(ctx context.Context, documentId int64,
+func (r *DocumentRouterImpl) resolveByNavigationIndex(ctx context.Context, documentId int64,
 	question string) *entity.GraphSection {
 
 	if r.indexer == nil {

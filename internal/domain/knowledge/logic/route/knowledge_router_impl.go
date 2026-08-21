@@ -51,8 +51,8 @@ func NewKnowledgeRouteImpl(repo adapter.KnowledgeRepository, docGateway adapter.
 	}
 }
 
-// WithEmbeddingProvider 注册嵌入模型（可选）
-func WithEmbeddingProvider(emb adapter.Embedder) Option {
+// WithEmbedding 注册嵌入模型（可选）
+func WithEmbedding(emb adapter.Embedder) Option {
 	return func(o *options) {
 		o.embedder = emb
 	}

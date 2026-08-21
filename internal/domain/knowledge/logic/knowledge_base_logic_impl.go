@@ -12,21 +12,21 @@ import (
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
-// KnowledgeConfigLogicImpl 知识库管理
-type KnowledgeConfigLogicImpl struct {
+// KnowledgeBaseLogicImpl 知识库管理
+type KnowledgeBaseLogicImpl struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
 }
 
-func NewKnowledgeConfigLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway) *KnowledgeConfigLogicImpl {
-	return &KnowledgeConfigLogicImpl{
+func NewKnowledgeBaseLogicImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway) *KnowledgeBaseLogicImpl {
+	return &KnowledgeBaseLogicImpl{
 		repo:       repo,
 		docGateway: docGateway,
 	}
 }
 
 // SaveKnowledgeBase 保存/更新知识库
-func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, base *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) SaveKnowledgeBase(ctx context.Context, base *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if strutil.IsBlank(base.BaseName) {
 		return nil, errors.New("baseName 不能为空")
 	}
@@ -68,7 +68,7 @@ func (k *KnowledgeConfigLogicImpl) SaveKnowledgeBase(ctx context.Context, base *
 }
 
 // DeleteKnowledgeBase 删除知识库
-func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeBase(ctx context.Context, id int64) (bool, error) {
+func (k *KnowledgeBaseLogicImpl) DeleteKnowledgeBase(ctx context.Context, id int64) (bool, error) {
 	if id <= 0 {
 		return false, errors.New("id 不能为空")
 	}
@@ -79,12 +79,12 @@ func (k *KnowledgeConfigLogicImpl) DeleteKnowledgeBase(ctx context.Context, id i
 }
 
 // ListKnowledgeBases 查询所有知识库列表
-func (k *KnowledgeConfigLogicImpl) ListKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) ListKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeBases(ctx)
 }
 
 // GetKnowledgeBase 根据ID查询知识库详情
-func (k *KnowledgeConfigLogicImpl) GetKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) GetKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
@@ -96,7 +96,7 @@ func (k *KnowledgeConfigLogicImpl) GetKnowledgeBase(ctx context.Context, id int6
 }
 
 // UpdateKnowledgeBaseSetting 更新知识库
-func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeBaseSetting(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) UpdateKnowledgeBaseSetting(ctx context.Context, config *entity.KnowledgeBase) (*entity.KnowledgeBase, error) {
 	if config.ID <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
@@ -120,12 +120,12 @@ func (k *KnowledgeConfigLogicImpl) UpdateKnowledgeBaseSetting(ctx context.Contex
 }
 
 // ListEnabledKnowledgeBases 查询所有启用的知识库
-func (k *KnowledgeConfigLogicImpl) ListEnabledKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) ListEnabledKnowledgeBases(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	return k.repo.SelectKnowledgeBases(ctx)
 }
 
 // ListKnowledgeBasesByIds 根据ID列表查询知识库
-func (k *KnowledgeConfigLogicImpl) ListKnowledgeBasesByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) ListKnowledgeBasesByIds(ctx context.Context, ids []int64) ([]*entity.KnowledgeBase, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -133,7 +133,7 @@ func (k *KnowledgeConfigLogicImpl) ListKnowledgeBasesByIds(ctx context.Context, 
 }
 
 // GetEnabledKnowledgeBase 根据ID获取启用的知识库
-func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
+func (k *KnowledgeBaseLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error) {
 	if id <= 0 {
 		return nil, errors.New("id 不能为空")
 	}
@@ -145,7 +145,7 @@ func (k *KnowledgeConfigLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, 
 }
 
 // ListKnowledgeBaseOptions 查询知识库选项列表
-func (k *KnowledgeConfigLogicImpl) ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
+func (k *KnowledgeBaseLogicImpl) ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
 	bases, err := k.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
 		return nil, err

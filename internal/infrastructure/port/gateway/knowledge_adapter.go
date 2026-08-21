@@ -30,7 +30,7 @@ func (r *KnowledgeAdapter) DetermineKnowledgeScope(ctx context.Context, chatMode
 	return convert.ToKnowledgeBaseSelectionSnapshot(snapshot), err
 }
 
-func (r *KnowledgeAdapter) Route(ctx context.Context, input *conversation.RouteInput) (*vo.KnowledgeRouteDecision, error) {
+func (r *KnowledgeAdapter) Route(ctx context.Context, input *conversation.KnowledgeRouteInput) (*vo.KnowledgeRouteDecision, error) {
 	routeCtx := ToRouteContext(input)
 	decision, err := r.router.Route(ctx, routeCtx)
 	if err != nil {
@@ -39,12 +39,12 @@ func (r *KnowledgeAdapter) Route(ctx context.Context, input *conversation.RouteI
 	return convert.ToKnowledgeRouteDecision(decision), nil
 }
 
-func (r *KnowledgeAdapter) RecordShadowRoute(ctx context.Context, input *conversation.RouteInput) error {
+func (r *KnowledgeAdapter) RecordShadowRoute(ctx context.Context, input *conversation.KnowledgeRouteInput) error {
 	routeCtx := ToRouteContext(input)
 	return r.router.RecordShadowRoute(ctx, routeCtx)
 }
 
-func ToRouteContext(input *conversation.RouteInput) *route.Context {
+func ToRouteContext(input *conversation.KnowledgeRouteInput) *route.Context {
 	routeCtx := route.NewRouteContext(input.Question, input.RewriteQuestion, input.SelectedKnowledgeBaseIds, input.AllowedDocumentIds)
 	routeCtx.ConversationId = input.ConversationId
 	routeCtx.ExchangeId = input.ExchangeId

@@ -2,44 +2,7 @@ package route
 
 import (
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
-
-// DocumentRouteInput 文档路由输入
-type DocumentRouteInput struct {
-	DocumentId        int64                       `json:"documentId"`              // 文档ID
-	OriginalQuestion  string                      `json:"originalQuestion"`        // 原始问题
-	RewriteResult     *vo.QuestionRewriteResult   `json:"rewriteResult"`           // 改写结果
-	RecognitionResult *vo.IntentRecognitionResult `json:"intentRecognitionResult"` // 查询理解结果
-}
-
-// RewrittenQuestion 获取改写后问题，无改写则回退原始问题
-func (d *DocumentRouteInput) RewrittenQuestion() string {
-	if d == nil {
-		return ""
-	}
-	question := d.OriginalQuestion
-	if d.RewriteResult != nil && utils.IsNotBlank(d.RewriteResult.RewrittenQuestion) {
-		question = d.RewriteResult.RewrittenQuestion
-	}
-	return utils.Trim(question)
-}
-
-// SubQuestions 获取子问题列表
-func (d *DocumentRouteInput) SubQuestions() []string {
-	if d == nil || d.RewriteResult == nil {
-		return nil
-	}
-	return d.RewriteResult.NormalizeSubQuestions(d.RewrittenQuestion())
-}
-
-// RouteText 获取路由文本（原始 + 改写）
-func (d *DocumentRouteInput) RouteText() string {
-	if d == nil {
-		return ""
-	}
-	return utils.Trim(d.OriginalQuestion) + " " + d.RewrittenQuestion()
-}
 
 type navigationExtractor struct {
 	text string

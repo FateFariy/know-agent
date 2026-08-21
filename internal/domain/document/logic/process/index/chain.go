@@ -6,31 +6,48 @@ import (
 	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 )
 
-// PhaseChain 阶段责任链
-type PhaseChain struct {
+// BuildIndexChain 阶段责任链
+type BuildIndexChain struct {
 	phases []Phase
 }
 
-// NewPhaseChain 创建并注册所有阶段
-func NewPhaseChain(phases []Phase) *PhaseChain {
-	return &PhaseChain{phases: phases}
+func NewBuildIndexChain(
+	repo adapter.DocumentRepository,
+	port *adapter.DocumentPort,
+	registry chunk.Registry,
+	resolver IndexingConfigResolver,
+	tokenizer adapter.Tokenizer,
+	builder GraphRagBuilder,
+) *BuildIndexChain {
+	phases := []Phase{
+		NewPreparationPhase(repo),                                   // 1. 准备阶段：加载任务、验证状态、推进任务状态
+		NewChunkingPhase(repo, port, registry, resolver, tokenizer), // 2. 切块阶段：执行切块流水线
+		NewChunkPostPhase(repo),                                     // 3. 切块后处理阶段：构建父子块实体并持久化
+		NewVectorizePhase(repo, port),                               // 4. 向量化阶段：批量向量化并回写状态
+		NewKeywordIndexPhase(repo, port),                            // 5. 关键词索引阶段：构建关键词索引
+		NewGraphRagPhase(repo, builder),                             // 6. GraphRAG构建阶段：构建实体关系图谱
+		NewCompletionPhase(repo),                                    // 7. 完成阶段：事务性更新任务/方案/文档状态
+	}
+	return &BuildIndexChain{phases: phases}
 }
 
 // Run 执行责任链
-func (c *PhaseChain) Run(ctx context.Context, buildCtx *Context) error {
+func (c *BuildIndexChain) Run(ctx context.Context, buildCtx *Context) error {
 	for _, phase := range c.phases {
 		phaseName := phase.Name()
 		startTime := time.Now()
-		logx.Infof("[PhaseChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, buildCtx.DocumentId, buildCtx.TaskId)
+		logx.Infof("[BuildIndexChain] 开始执行阶段: %s, documentId=%d, taskId=%d", phaseName, buildCtx.DocumentId, buildCtx.TaskId)
 
 		if err := phase.Execute(ctx, buildCtx); err != nil {
-			logx.Errorf("[PhaseChain] 阶段 %s 执行失败: %v", phaseName, err)
+			logx.Errorf("[BuildIndexChain] 阶段 %s 执行失败: %v", phaseName, err)
 			return fmt.Errorf("阶段 %s 执行失败: %w", phaseName, err)
 		}
 
-		logx.Infof("[PhaseChain] 阶段 %s 执行成功, costMillis=%d", phaseName, time.Since(startTime).Milliseconds())
+		logx.Infof("[BuildIndexChain] 阶段 %s 执行成功, costMillis=%d", phaseName, time.Since(startTime).Milliseconds())
 	}
 	return nil
 }

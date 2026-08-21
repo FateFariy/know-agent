@@ -146,7 +146,7 @@ func (p *FinalizationPhase) persistPlanAndSteps(ctx context.Context, parseCtx *C
 
 // persistParserTraceMetadata 持久化解析器 Trace 元数据
 func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, taskID int64, analysisResult *aggregate.AnalysisResult) {
-	if taskID == 0 || analysisResult == nil || len(analysisResult.ParserTraceMetadata) == 0 {
+	if taskID == 0 || analysisResult == nil {
 		return
 	}
 
@@ -155,7 +155,6 @@ func (p *FinalizationPhase) persistParserTraceMetadata(ctx context.Context, task
 		return
 	}
 	extJSON := p.readTaskExtJson(persistedTask.ExtJson)
-	extJSON["parserTraceMetadata"] = analysisResult.ParserTraceMetadata
 	newExtBytes, err := json.Marshal(extJSON)
 	if err != nil {
 		logx.Warnf("写入解析 trace metadata 失败，taskId=%d: %v", taskID, err)

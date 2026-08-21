@@ -7,6 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -20,8 +21,8 @@ const (
 // CompositeIntentRecognizer 基于大模型（LLM）的意图识别器
 // 将散落在路由、表格、GraphRAG、RAPTOR 的主链路关键词硬判收口成受控建议。
 type CompositeIntentRecognizer struct {
-	fallback Recognizer
-	advisor  Recognizer
+	fallback *DeterministicFallbackRecognizer
+	advisor  *LlmAdvisorRecognizer
 }
 
 // NewCompositeIntentRecognizer 创建意图识器
@@ -32,14 +33,18 @@ func NewCompositeIntentRecognizer(chatModel model.ChatModel, renderer adapter.Pr
 	}
 }
 
+func (s *CompositeIntentRecognizer) Name() string {
+	return "composite-recognizer"
+}
+
 // Recognize 统一意图识别入口, 确定性回退 → LLM advisor 增强 → 验证合并
-func (s *CompositeIntentRecognizer) Recognize(ctx context.Context, input *RecognitionInput) *vo.IntentRecognitionResult {
+func (s *CompositeIntentRecognizer) Recognize(ctx context.Context, input *conversation.RecognitionInput) (*vo.IntentRecognitionResult, error) {
 	fallback, _ := s.fallback.Recognize(ctx, input)
 	advised, err := s.advisor.Recognize(ctx, input)
 	if err != nil {
 		logx.Warnf("查询理解 advisor 调用失败，回退确定性结构信号: question=%q, err=%v", input.OriginalQuestion, err)
 	}
-	return s.validate(advised, fallback)
+	return s.validate(advised, fallback), nil
 }
 
 // validate 验证并合并 advisor 和 fallback 结果，生成最终意图识别结果。

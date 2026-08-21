@@ -10,17 +10,14 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// PhaseChain 解析路由阶段责任链
-type PhaseChain struct {
+// Chain 解析路由阶段责任链
+type Chain struct {
 	phases []Phase
 }
 
-// NewPhaseChain 创建并注册所有阶段
-func NewPhaseChain(repo adapter.DocumentRepository,
-	tableRepo adapter.TableRepository,
-	port *adapter.DocumentPort,
-	svcCtx svc.ServiceContext,
-	resolver IndexingConfigResolver) *PhaseChain {
+// NewAnalysisChain 创建并注册所有阶段
+func NewAnalysisChain(svcCtx svc.ServiceContext, repo adapter.DocumentRepository, tableRepo adapter.TableRepository,
+	port *adapter.DocumentPort, resolver IndexingConfigResolver) *Chain {
 	phases := []Phase{
 		NewInitializationPhase(repo),             // 1. 初始化任务状态，标记解析开始
 		NewDownloadPhase(port),                   // 2. 从对象存储下载原始文件
@@ -30,11 +27,11 @@ func NewPhaseChain(repo adapter.DocumentRepository,
 		NewFinalizationPhase(repo, port),         // 6. 持久化策略，更新文档/任务最终状态
 	}
 
-	return &PhaseChain{phases: phases}
+	return &Chain{phases: phases}
 }
 
 // Run 执行责任链
-func (c *PhaseChain) Run(ctx context.Context, parseCtx *Context) (err error) {
+func (c *Chain) Run(ctx context.Context, parseCtx *Context) (err error) {
 	for _, phase := range c.phases {
 		phaseName := phase.Name()
 		startTime := time.Now()

@@ -7,6 +7,7 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -30,7 +31,7 @@ func (r *LlmAdvisorRecognizer) Name() string {
 }
 
 // Recognize 识别意图
-func (r *LlmAdvisorRecognizer) Recognize(ctx context.Context, input *RecognitionInput) (*vo.IntentRecognitionResult, error) {
+func (r *LlmAdvisorRecognizer) Recognize(ctx context.Context, input *conversation.RecognitionInput) (*vo.IntentRecognitionResult, error) {
 	if r.chatModel == nil || r.renderer == nil {
 		return nil, fmt.Errorf("chat model 或 renderer 未配置")
 	}

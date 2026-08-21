@@ -80,8 +80,8 @@ func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, an
 		return nil, err
 	}
 
-	logx.Infof("文档画像生成完成: documentId=%d, documentType=%s, graphFriendly=%v, supportsItemLookup=%v, scopeCode=%s, businessCategory=%s, tags=%s",
-		documentId, profile.DocumentType, profile.GraphFriendly, profile.SupportsItemLookup, document.KnowledgeScopeCode, document.BusinessCategory, document.DocumentTags)
+	logx.Infof("文档画像生成完成: documentId=%d, documentType=%s, graphFriendly=%v, supportsItemLookup=%v",
+		documentId, profile.DocumentType, profile.GraphFriendly, profile.SupportsItemLookup)
 	return profile, nil
 }
 

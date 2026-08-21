@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/transform"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
@@ -17,12 +16,6 @@ type AsyncProcessor interface {
 
 	// HandleIndexBuild 处理索引构建任务
 	HandleIndexBuild(ctx context.Context, documentId, taskId, planId int64) error
-}
-
-// TextPreprocessor 文本预处理器
-type TextPreprocessor interface {
-	// Process 文本预处理
-	Process(ctx context.Context, documentTitle, rawText, fileType string, opts ...transform.TransformerOption) (*aggregate.AnalysisResult, error)
 }
 
 // ProfileGenerator 文档画像生成器

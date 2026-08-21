@@ -15,11 +15,6 @@ type Retrieval interface {
 	Retrieve(ctx context.Context, input *ExecutionInput) (*RetrievalChannelResult, error)
 }
 
-// Retriever RAG 检索引擎接口
-type Retriever interface {
-	Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.RetrievalResult, error)
-}
-
 // Fusion 检索结果融合接口
 type Fusion interface {
 	// Fuse 对多通道检索结果执行加权融合，返回排序后的候选文档列表

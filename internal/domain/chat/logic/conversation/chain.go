@@ -7,12 +7,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -24,7 +18,7 @@ type Chain struct {
 	stages          []Stage
 	repo            adapter.ChatRepository
 	runtime         *runtimeRegistry
-	memoryManager   memory.SessionMemoryManager
+	memoryManager   SessionMemoryManager
 	distributedLock adapter.DistributedLock
 }
 
@@ -32,16 +26,16 @@ func NewChain(
 	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	distributedLock adapter.DistributedLock,
-	memoryManager memory.SessionMemoryManager,
-	intentRecognizer intent.Recognizer,
-	queryRewriter rewrite.QueryRewriter,
+	memoryManager SessionMemoryManager,
+	intentRecognizer Recognizer,
+	queryRewriter QueryRewriter,
 	knowledgeRouter KnowledgeRouter,
-	documentRouter route.DocumentRouter,
+	documentRouter DocumentRouter,
 	docGateway adapter.DocumentGateway,
-	retriever rag.Retriever,
+	retriever Retriever,
 	promptRenderer adapter.PromptRenderer,
 	chatModel model.ChatModel,
-	questionRecommender recommend.QuestionRecommender,
+	questionRecommender QuestionRecommender,
 ) *Chain {
 	chain := &Chain{
 		repo:            repo,

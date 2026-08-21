@@ -7,6 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -30,7 +31,7 @@ func (p *DeterministicFallbackRecognizer) Name() string {
 }
 
 // Recognize 执行确定性意图识别
-func (p *DeterministicFallbackRecognizer) Recognize(ctx context.Context, input *RecognitionInput) (*vo.IntentRecognitionResult, error) {
+func (p *DeterministicFallbackRecognizer) Recognize(ctx context.Context, input *conversation.RecognitionInput) (*vo.IntentRecognitionResult, error) {
 	question := utils.BlankToDefault(input.OriginalQuestion, input.RewrittenQuestion)
 	nq := newNavigationQuestion(question)
 
