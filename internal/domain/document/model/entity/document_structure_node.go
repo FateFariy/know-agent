@@ -4,7 +4,7 @@ import (
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
 // StructureNode 文档结构节点实体
@@ -50,7 +50,7 @@ func (n StructureNodes) ExtractSectionTitles() []string {
 		return nil
 	}
 	return utils.FilterMapUniqueLimit(n, 8, func(node *StructureNode) (string, string, bool) {
-		if node == nil || node.NodeType != vo.NodeTypeSection {
+		if node == nil || node.NodeType != enum.NodeTypeSection {
 			return "", "", false
 		}
 		title := utils.Trim(node.Title)

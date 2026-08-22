@@ -14,17 +14,14 @@ import (
 )
 
 type ScopeRanker struct {
-	repo   adapter.KnowledgeRepository
-	scorer score.Scorer
-	base
+	repo adapter.KnowledgeRepository
+	*base
 }
 
-func NewScopeRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, embedder adapter.Embedder,
-	lexicalIndex adapter.RouteLexicalIndex, scorer score.Scorer) *ScopeRanker {
+func NewScopeRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, opts ...Option) *ScopeRanker {
 	return &ScopeRanker{
-		repo:   repo,
-		scorer: scorer,
-		base:   newBaseRanker(docGateway, embedder, lexicalIndex),
+		repo: repo,
+		base: newBaseRanker(docGateway, opts...),
 	}
 }
 

@@ -25,7 +25,7 @@ type DocumentRetrieveFilters struct {
 	DocumentNameHints    []string // 文档名称提示
 	SectionPathHints     []string // 段落路径提示
 	CanonicalPathHints   []string // 规范路径提示
-	StructureNodeIDHints []int64  // 结构节点ID提示
+	StructureNodeIdHints []int64  // 结构节点ID提示
 	ItemIndexHints       []int    // 条目索引提示
 	YearHints            []string // 年份提示
 }

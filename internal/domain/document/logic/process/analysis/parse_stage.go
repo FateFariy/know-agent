@@ -14,7 +14,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/parser/markdown"
 )
@@ -130,7 +129,7 @@ func projectStructureNodes(documentTitle string, blocks entity.DocumentBlocks) [
 	// 创建根节点（文档）
 	rootNode := &entity.StructureNode{
 		NodeNo:        1,
-		NodeType:      vo.NodeTypeDocument,
+		NodeType:      enum.NodeTypeDocument,
 		Depth:         0,
 		Title:         documentTitle,
 		AnchorText:    utils.ClipHead(documentTitle, 200),
@@ -173,7 +172,7 @@ func projectStructureNodes(documentTitle string, blocks entity.DocumentBlocks) [
 			currentNodeNo++
 			sectionNode := &entity.StructureNode{
 				NodeNo:              currentNodeNo,
-				NodeType:            vo.NodeTypeSection,
+				NodeType:            enum.NodeTypeSection,
 				ParentNodeNo:        parentNodeNo,
 				Depth:               parentNode.Depth + 1,
 				NodeCode:            block.ExtractHeadingCode(),
@@ -208,7 +207,7 @@ func projectStructureNodes(documentTitle string, blocks entity.DocumentBlocks) [
 			currentNodeNo++
 			contentNode := &entity.StructureNode{
 				NodeNo:        currentNodeNo,
-				NodeType:      vo.NodeTypeStep,
+				NodeType:      enum.NodeTypeStep,
 				ParentNodeNo:  contentParentNo,
 				Depth:         contentParent.Depth + 1,
 				Title:         utils.FirstNonBlank(blockText, block.ImageCaption, block.ExtractTableSummary()),

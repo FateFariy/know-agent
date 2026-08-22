@@ -21,17 +21,14 @@ const (
 type DocumentRanker struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
-	scorer     score.Scorer
-	base
+	*base
 }
 
-func NewDocumentRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, embedder adapter.Embedder,
-	lexicalIndex adapter.RouteLexicalIndex, scorer score.Scorer) *DocumentRanker {
+func NewDocumentRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, opts ...Option) *DocumentRanker {
 	return &DocumentRanker{
 		repo:       repo,
 		docGateway: docGateway,
-		scorer:     scorer,
-		base:       newBaseRanker(docGateway, embedder, lexicalIndex),
+		base:       newBaseRanker(docGateway, opts...),
 	}
 }
 

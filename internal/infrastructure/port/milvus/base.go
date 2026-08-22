@@ -4,7 +4,7 @@
 //  1. 领域端口（VectorRetriever / KeywordRetriever）保持独立，按能力而非后端切分。
 //  2. Base 持有 Milvus 客户端与 collection，同时提供过滤表达式构建、metadata 转换等
 //     同后端实现共享的逻辑，避免 vector/milvus.go 与 keyword/milvus.go 重复。
-//  3. 未来 keyword 切到 Elasticsearch 时只需新增 keyword/es.go 直接实现
+//  3. 未来 keyword 切到 Elasticsearch 时只需新增 keyword/elasticsearch.go 直接实现
 //     KeywordRetriever 接口，不依赖 Base，实现真正的"同能力可换后端"。
 package milvus
 
@@ -67,8 +67,6 @@ func (b *Base) Search(ctx context.Context, query *channel.DocumentRetrieve) ([]*
 //	    [ AND structure_node_id in [..] ]               ← structureNodeIdHints
 //	    [ AND (canonical_path like "%h1%" or ...) ]     ← canonicalPathHints
 //	    [ AND item_index in [..] ]                      ← itemIndexHints
-//
-// 说明：Milvus 的 like 区分大小写；hint 在拼接前统一转小写以贴近 Java 版本 LOWER() 语义。
 func (b *Base) buildFilterExpr(query *channel.DocumentRetrieve) string {
 	var sb strings.Builder
 	sb.WriteString("document_id in ")

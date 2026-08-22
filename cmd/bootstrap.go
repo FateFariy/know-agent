@@ -27,6 +27,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	knowlogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	knowroute "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	portconfig "github.com/swiftbit/know-agent/internal/infrastructure/port/config"
@@ -60,6 +61,7 @@ func bootstrap(c *config.Config) *server.Server {
 	renderer := prompt.NewRendererImpl()
 	dashScope := rerank.NewDashScope(serviceContext)
 	minioStorage := storage.NewMinioStorage(serviceContext)
+	elasticStorage := storage.NewElasticStorage(serviceContext)
 	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
 	embedder := emb.NewEmbedder(serviceContext)
 
@@ -72,7 +74,13 @@ func bootstrap(c *config.Config) *server.Server {
 	adapterForChat := gateway.NewDocumentAdapterForChat(documentRepo)
 
 	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, adapterForKnowledge, localConfig)
-	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, adapterForKnowledge, knowroute.WithEmbedding(embedder))
+	opts := []rank.Option{rank.WithLexicalIndex(elasticStorage), rank.WithEmbedding(embedder)}
+	rankers := []knowroute.Ranker{
+		rank.NewDocumentRanker(knowledgeRepo, adapterForKnowledge, opts...),
+		rank.NewScopeRanker(knowledgeRepo, adapterForKnowledge, opts...),
+		rank.NewTopicRanker(knowledgeRepo, adapterForKnowledge, opts...),
+	}
+	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, adapterForKnowledge, rankers, knowroute.WithEmbedding(embedder))
 	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, adapterForKnowledge)
 	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, adapterForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)

@@ -12,12 +12,6 @@ type Embedder interface {
 	EmbedStrings(ctx context.Context, texts ...string) ([][]float64, error)
 }
 
-// RouteLexicalIndex 路由侧的词面索引能力
-type RouteLexicalIndex interface {
-	// Search 在指定实体类型下进行词面检索，返回命中 (entityCode/documentId, score) 列表
-	Search(ctx context.Context, routingText, entityType string, size int, kbIds []int64) ([]*vo.RouteLexicalHit, error)
-}
-
 type DocumentGateway interface {
 	// CountRetrievableDocumentsByKbIds 按知识库ID列表统计可检索文档数量（返回 map[kbId]count）
 	CountRetrievableDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)

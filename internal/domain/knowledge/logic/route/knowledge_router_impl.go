@@ -5,11 +5,11 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
-	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/score"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
@@ -25,43 +25,17 @@ const (
 type KnowledgeRouteImpl struct {
 	repo       adapter.KnowledgeRepository
 	docGateway adapter.DocumentGateway
-	scorer     score.Scorer
 	rankers    []Ranker
 	*options
 }
 
-type options struct {
-	embedder     adapter.Embedder
-	lexicalIndex adapter.RouteLexicalIndex
-}
-
-type Option func(*options)
-
 // NewKnowledgeRouteImpl 创建路由服务实例
-func NewKnowledgeRouteImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, opts ...Option) *KnowledgeRouteImpl {
-	base := new(options)
-	for _, opt := range opts {
-		opt(base)
-	}
+func NewKnowledgeRouteImpl(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, rankers []Ranker, opts ...Option) *KnowledgeRouteImpl {
 	return &KnowledgeRouteImpl{
 		repo:       repo,
 		docGateway: docGateway,
-		scorer:     score.NewDefaultScorer(),
-		options:    base,
-	}
-}
-
-// WithEmbedding 注册嵌入模型（可选）
-func WithEmbedding(emb adapter.Embedder) Option {
-	return func(o *options) {
-		o.embedder = emb
-	}
-}
-
-// WithLexicalIndex 注册词面索引（可选）
-func WithLexicalIndex(index adapter.RouteLexicalIndex) Option {
-	return func(o *options) {
-		o.lexicalIndex = index
+		rankers:    rankers,
+		options:    common.GetImplSpecificOptions(&options{}, opts...),
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
@@ -81,7 +81,7 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 		if node == nil {
 			continue
 		}
-		if node.NodeType == vo.NodeTypeStep || node.NodeType == vo.NodeTypeListItem {
+		if node.NodeType == enum.NodeTypeStep || node.NodeType == enum.NodeTypeListItem {
 			supportsItemLookup = true
 			break
 		}

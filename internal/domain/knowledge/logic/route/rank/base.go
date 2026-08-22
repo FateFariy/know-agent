@@ -4,9 +4,11 @@ import (
 	"context"
 	"math"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/score"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -15,17 +17,19 @@ const (
 )
 
 type base struct {
-	docGateway   adapter.DocumentGateway
-	embedder     adapter.Embedder
-	lexicalIndex adapter.RouteLexicalIndex
+	docGateway adapter.DocumentGateway
+	*options
 }
 
-func newBaseRanker(docGateway adapter.DocumentGateway, embedder adapter.Embedder, lexicalIndex adapter.RouteLexicalIndex) base {
-	return base{
-		docGateway:   docGateway,
-		embedder:     embedder,
-		lexicalIndex: lexicalIndex,
+func newBaseRanker(docGateway adapter.DocumentGateway, opts ...Option) *base {
+	b := &base{
+		docGateway: docGateway,
+		options: &options{
+			scorer: score.NewDefaultScorer(),
+		},
 	}
+	b.options = common.GetImplSpecificOptions(b.options, opts...)
+	return b
 }
 
 // computeSemanticScores 批量计算 routingText 与每个候选文本的余弦相似度；embedder 未配置时返回全 0 长度相同
@@ -65,7 +69,13 @@ func (b *base) searchLexicalScores(ctx context.Context, rankCtx *Context, entity
 		rankCtx.Diagnostics["ROUTE_INDEX_NOT_CONFIGURED"] = struct{}{}
 		return nil
 	}
-	hits, err := b.lexicalIndex.Search(ctx, rankCtx.RoutingText, entityType, size, rankCtx.SelectedKnowledgeBaseIds)
+	input := &EsSearchInput{
+		RoutingText: rankCtx.RoutingText,
+		EntityType:  entityType,
+		Size:        size,
+		KbIds:       rankCtx.SelectedKnowledgeBaseIds,
+	}
+	hits, err := b.lexicalIndex.Search(ctx, input)
 
 	if err != nil {
 		rankCtx.Diagnostics["ROUTE_INDEX_UNAVAILABLE"] = struct{}{}

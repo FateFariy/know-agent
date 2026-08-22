@@ -19,17 +19,14 @@ const (
 )
 
 type TopicRanker struct {
-	repo   adapter.KnowledgeRepository
-	scorer score.Scorer
-	base
+	repo adapter.KnowledgeRepository
+	*base
 }
 
-func NewTopicRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, embedder adapter.Embedder,
-	lexicalIndex adapter.RouteLexicalIndex, scorer score.Scorer) *TopicRanker {
+func NewTopicRanker(repo adapter.KnowledgeRepository, docGateway adapter.DocumentGateway, opts ...Option) *TopicRanker {
 	return &TopicRanker{
-		repo:   repo,
-		scorer: scorer,
-		base:   newBaseRanker(docGateway, embedder, lexicalIndex),
+		repo: repo,
+		base: newBaseRanker(docGateway, opts...),
 	}
 }
 

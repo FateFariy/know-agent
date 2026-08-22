@@ -9,7 +9,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
-	entity2 "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -32,7 +32,7 @@ func (m *MilvusKeyword) BuildIndexes(ctx context.Context, chunks []*entity.Docum
 	return nil
 }
 
-func (m *MilvusKeyword) SearchByKeyword(ctx context.Context, query *channel.DocumentRetrieve) ([]*entity2.DocumentChunk, error) {
+func (m *MilvusKeyword) SearchByKeyword(ctx context.Context, query *channel.DocumentRetrieve) ([]*vo.DocumentChunk, error) {
 	return m.Search(ctx, query)
 }
 
