@@ -575,7 +575,7 @@ func (d *DocumentRepositoryImpl) SelectDocumentProfilesByDocIds(ctx context.Cont
 
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 func (d *DocumentRepositoryImpl) DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error {
-	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.TopicDocumentRelation{}).Error
+	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.KnowledgeTopicDocumentRelation{}).Error
 }
 
 func (d *DocumentRepositoryImpl) InsertParsedArtifactBatch(ctx context.Context, artifacts []*entity.ParseArtifact) error {

@@ -22,11 +22,10 @@ import (
 // ParseStage 解析阶段：调用文本预处理逻辑解析文件内容
 type ParseStage struct {
 	repo     adapter.DocumentRepository
-	port     *adapter.DocumentPort
 	registry *parse.Registry
 }
 
-func NewParseStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *ParseStage {
+func NewParseStage(repo adapter.DocumentRepository) *ParseStage {
 	fallbackParser := &parser.TextParser{}
 	parsers := []parse.Parser{
 		&parser.HTMLParser{},
@@ -37,7 +36,6 @@ func NewParseStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) 
 
 	return &ParseStage{
 		repo:     repo,
-		port:     port,
 		registry: parse.NewRegistry(fallbackParser, parsers...),
 	}
 }

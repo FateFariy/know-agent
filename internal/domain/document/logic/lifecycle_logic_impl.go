@@ -26,25 +26,25 @@ import (
 )
 
 type LifecycleLogicImpl struct {
-	port             *adapter.DocumentPort
 	repo             adapter.DocumentRepository
 	store            adapter.Storage
 	generator        process.ProfileGenerator
 	knowledgeGateway adapter.KnowledgeGateway
+	messageProducer  adapter.MessageProducer
 	parseTopic       string
 	indexTopic       string
 }
 
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
-func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, port *adapter.DocumentPort, store adapter.Storage,
+func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, messageProducer adapter.MessageProducer, store adapter.Storage,
 	repo adapter.DocumentRepository, generator process.ProfileGenerator, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
-		port:             port,
 		repo:             repo,
 		store:            store,
 		generator:        generator,
 		knowledgeGateway: knowledgeGateway,
+		messageProducer:  messageProducer,
 		parseTopic:       svcCtx.Config.MQ.ParseTopic,
 		indexTopic:       svcCtx.Config.MQ.IndexTopic,
 	}
@@ -147,7 +147,7 @@ func (d *LifecycleLogicImpl) Upload(ctx context.Context, file multipart.File, he
 
 	// 发送解析消息至MQ，触发后续解析流程
 	parseMessage := vo.DocumentParseRouteMessage{DocumentId: documentId, TaskId: taskId}
-	if err = d.port.Send(ctx, d.parseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
+	if err = d.messageProducer.Send(ctx, d.parseTopic, strconv.FormatInt(documentId, 10), parseMessage); err != nil {
 		return nil, 0, err
 	}
 
@@ -551,7 +551,7 @@ func (d *LifecycleLogicImpl) BuildIndex(ctx context.Context, documentId, planId,
 
 	// 发送MQ消息触发异步索引构建
 	indexBuildMessage := vo.DocumentIndexBuildMessage{DocumentId: documentId, TaskId: taskId, PlanId: planId}
-	if err = d.port.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
+	if err = d.messageProducer.Send(ctx, d.indexTopic, strconv.FormatInt(documentId, 10), indexBuildMessage); err != nil {
 		// 标记索引构建提交失败状态
 		if err = d.markIndexBuildSubmitFailed(ctx, documentId, taskId, operatorId, err); err != nil {
 			return nil, err

@@ -2,22 +2,17 @@ package process
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
-	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
-	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
@@ -37,7 +32,9 @@ type ProfileGenerateImpl struct {
 }
 
 func NewProfileGenerateImpl(repo adapter.DocumentRepository) *ProfileGenerateImpl {
-	return &ProfileGenerateImpl{repo: repo}
+	return &ProfileGenerateImpl{
+		repo: repo,
+	}
 }
 
 func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, analysisResult *aggregate.AnalysisResult, structureNodes []*entity.StructureNode) (*entity.DocumentProfile, error) {
@@ -51,7 +48,7 @@ func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, an
 
 	parsedText := ""
 	if analysisResult != nil {
-		parsedText = strutil.Trim(analysisResult.ParsedText)
+		parsedText = utils.Trim(analysisResult.ParsedText)
 	}
 	profile := p.buildProfile(document, parsedText, structureNodes)
 
@@ -67,16 +64,7 @@ func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, an
 		profile.ProfileVersion = existing.ProfileVersion + 1
 	}
 
-	document = p.buildDocumentMetadata(document, profile, parsedText, structureNodes)
-	fn := func(txCtx context.Context) error {
-		if document != nil {
-			if err = p.repo.UpdateDocumentById(txCtx, document); err != nil {
-				return err
-			}
-		}
-		return p.repo.SaveProfile(txCtx, profile)
-	}
-	if err = p.repo.Do(ctx, fn); err != nil {
+	if err = p.repo.SaveProfile(ctx, profile); err != nil {
 		return nil, err
 	}
 
@@ -86,8 +74,8 @@ func (p *ProfileGenerateImpl) Generate(ctx context.Context, documentId int64, an
 }
 
 // buildProfile 构建文档画像
-func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText string, structureNodes []*entity.StructureNode) *entity.DocumentProfile {
-	sectionTitles := p.extractSectionTitles(structureNodes)
+func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText string, structureNodes entity.StructureNodes) *entity.DocumentProfile {
+	sectionTitles := structureNodes.ExtractSectionTitles()
 	supportsItemLookup := false
 	for _, node := range structureNodes {
 		if node == nil {
@@ -98,12 +86,10 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 			break
 		}
 	}
-	combined := combinedText(document, parsedText, sectionTitles)
-	docType := enum.InferDocumentType(combined, supportsItemLookup)
+	docType := resolveStructuralDocumentType(sectionTitles, supportsItemLookup, len(sectionTitles) >= 2)
 	coreTopics := p.buildCoreTopics(document, sectionTitles)
-	exampleQuestions := utils.FilterUniqueLimit(coreTopics, 6, func(t string) (string, bool) {
-		question := enum.ExampleQuestion(docType, t)
-		return question, question != ""
+	exampleQuestions := utils.FilterUniqueLimit(coreTopics, 6, func(topic string) (string, bool) {
+		return topic + "包含哪些内容？", true
 	})
 	profile := &entity.DocumentProfile{
 		DocumentId:           document.ID,
@@ -113,84 +99,25 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 		DocumentSummary:      p.buildSummary(document, sectionTitles, parsedText),
 		SupportsGraphOutline: utils.Ternary(len(sectionTitles) >= 2, 1, 0),
 		SupportsItemLookup:   utils.Ternary(supportsItemLookup, 1, 0),
-		GraphFriendly:        utils.Ternary(len(sectionTitles) >= 2 && supportsItemLookup, 1, 0),
+		GraphFriendly:        utils.Ternary(supportsItemLookup || len(sectionTitles) >= 2, 1, 0),
 		SupportsGraphAssist:  1,
 		ProfileSource:        profileSourceAuto,
 		ProfileStatus:        profileStatusSuccess,
 	}
-
 	return profile
-}
-
-// buildDocumentMetadata 构建文档元数据
-func (p *ProfileGenerateImpl) buildDocumentMetadata(document *entity.Document, profile *entity.DocumentProfile, parsedText string, structureNodes []*entity.StructureNode) *entity.Document {
-	sectionTitles := p.extractSectionTitles(structureNodes)
-	combined := combinedText(document, parsedText, sectionTitles)
-	code := klvo.KnowledgeScopeCode(combined)
-	var coreTopics []string
-	_ = json.Unmarshal([]byte(profile.CoreTopics), &coreTopics)
-
-	businessCategory := enum.InferBusinessCategory(code, combined)
-	scopeName := klvo.KnowledgeScopeName(code)
-	updateDoc := &entity.Document{
-		ID: document.ID,
-	}
-
-	changed := false
-	if strutil.IsBlank(document.KnowledgeScopeCode) || strutil.IsBlank(document.KnowledgeScopeName) {
-		updateDoc.KnowledgeScopeCode = code
-		updateDoc.KnowledgeScopeName = scopeName
-		changed = true
-	}
-	if strutil.IsBlank(document.BusinessCategory) {
-		updateDoc.BusinessCategory = businessCategory
-		changed = true
-	}
-	if strutil.IsBlank(document.DocumentTags) {
-		updateDoc.FillDocumentTags(code, profile.DocumentType, coreTopics)
-		changed = true
-	}
-	if changed {
-		return updateDoc
-	}
-	return nil
-}
-
-// extractSectionTitles 提取章节标题（去重、取前 8 条）
-func (p *ProfileGenerateImpl) extractSectionTitles(structureNodes []*entity.StructureNode) []string {
-	if len(structureNodes) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{})
-	result := make([]string, 0, 8)
-	for _, node := range structureNodes {
-		if node == nil || node.NodeType != vo.NodeTypeSection {
-			continue
-		}
-		title := strutil.Trim(node.Title)
-		_, ok := seen[title]
-		if title != "" && !ok {
-			seen[title] = struct{}{}
-			result = append(result, title)
-		}
-		if len(result) >= 8 {
-			break
-		}
-	}
-	return result
 }
 
 // buildCoreTopics 构建核心话题
 func (p *ProfileGenerateImpl) buildCoreTopics(document *entity.Document, sectionTitles []string) []string {
-	fileName := strutil.Trim(document.DocumentName)
+	fileName := utils.Trim(document.DocumentName)
 	fileTopic := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 	sectionTitles = append(sectionTitles, fileTopic)
 	return utils.FilterUniqueLimit(sectionTitles, 6, func(title string) (string, bool) {
-		normalized := strutil.Trim(title)
+		normalized := utils.Trim(title)
 		if normalized == "" {
 			return normalized, false
 		}
-		return strutil.Trim(sectionCodePrefixRegexp.ReplaceAllString(normalized, "")), true
+		return utils.Trim(sectionCodePrefixRegexp.ReplaceAllString(normalized, "")), true
 	})
 }
 
@@ -198,7 +125,7 @@ func (p *ProfileGenerateImpl) buildCoreTopics(document *entity.Document, section
 func (p *ProfileGenerateImpl) buildSummary(document *entity.Document, sectionTitles []string, parsedText string) string {
 	var builder strings.Builder
 	builder.WriteString("文档《")
-	builder.WriteString(utils.BlankToDefault(strutil.Trim(document.DocumentName), "未命名文档"))
+	builder.WriteString(utils.BlankToDefault(utils.Trim(document.DocumentName), "未命名文档"))
 	builder.WriteString("》")
 	if len(sectionTitles) > 0 {
 		sectionTitles = utils.Limit(sectionTitles, 4)
@@ -206,22 +133,27 @@ func (p *ProfileGenerateImpl) buildSummary(document *entity.Document, sectionTit
 		builder.WriteString(strings.Join(sectionTitles, "、"))
 		builder.WriteString("。")
 	}
-	excerpt := whitespaceRegexp.ReplaceAllString(strutil.Trim(parsedText), " ")
+	excerpt := whitespaceRegexp.ReplaceAllString(utils.Trim(parsedText), " ")
 	if utils.Len(excerpt) > 180 {
-		excerpt = strutil.Substring(excerpt, 0, 180)
+		excerpt = utils.Substring(excerpt, 0, 180)
 	}
-	if strutil.IsNotBlank(excerpt) {
+	if utils.IsNotBlank(excerpt) {
 		builder.WriteString("摘要：")
 		builder.WriteString(excerpt)
 	}
-	return strutil.Trim(builder.String())
+	return utils.Trim(builder.String())
 }
 
-func combinedText(document *entity.Document, parsedText string, sectionTitles []string) string {
-	var builder strings.Builder
-	builder.WriteString(strutil.Trim(document.DocumentName))
-	builder.WriteString(strutil.Trim(document.OriginalFileName))
-	builder.WriteString(strings.Join(sectionTitles, " "))
-	builder.WriteString(strutil.Trim(parsedText))
-	return builder.String()
+// resolveStructuralDocumentType 根据文档的结构特征判定其结构化类型
+func resolveStructuralDocumentType(sectionTitles []string, supportsItemLookup bool, supportsGraphOutline bool) string {
+	switch {
+	case supportsItemLookup: //支持条目级检索
+		return "structured_items"
+	case supportsGraphOutline: //支持图结构大纲
+		return "structured_outline"
+	case len(sectionTitles) > 0: //存在章节标题
+		return "structured_section"
+	default:
+		return "plain_text"
+	}
 }

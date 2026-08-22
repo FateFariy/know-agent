@@ -3,8 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
@@ -13,16 +12,20 @@ import (
 
 // ProfileLogicImpl 文档画像逻辑实现
 type ProfileLogicImpl struct {
-	repo adapter.DocumentRepository
-	port *adapter.DocumentPort
-	gen  process.ProfileGenerator
+	repo    adapter.DocumentRepository
+	storage adapter.Storage
+	gen     process.ProfileGenerator
 }
 
 var _ ProfileLogic = (*ProfileLogicImpl)(nil)
 
 // NewProfileLogicImpl 构造函数
-func NewProfileLogicImpl(repo adapter.DocumentRepository, port *adapter.DocumentPort, gen process.ProfileGenerator) *ProfileLogicImpl {
-	return &ProfileLogicImpl{repo: repo, port: port, gen: gen}
+func NewProfileLogicImpl(repo adapter.DocumentRepository, storage adapter.Storage, gen process.ProfileGenerator) *ProfileLogicImpl {
+	return &ProfileLogicImpl{
+		repo:    repo,
+		storage: storage,
+		gen:     gen,
+	}
 }
 
 // GetAllProfiles 根据文档ID获取画像
@@ -42,8 +45,8 @@ func (p *ProfileLogicImpl) RegenerateProfile(ctx context.Context, documentId int
 		return nil, err
 	}
 	var parsedText string
-	if strutil.IsNotBlank(document.ParseTextPath) {
-		parsedText, err = p.port.DownloadText(ctx, document.ParseTextPath)
+	if utils.IsNotBlank(document.ParseTextPath) {
+		parsedText, err = p.storage.DownloadText(ctx, document.ParseTextPath)
 		if err != nil {
 			return nil, err
 		}

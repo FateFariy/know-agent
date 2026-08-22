@@ -215,3 +215,8 @@ func CalcContentHash(parts ...string) string {
 	hash := sha256.Sum256([]byte(builder.String()))
 	return hex.EncodeToString(hash[:])
 }
+
+// Substring 截取字符串
+func Substring(s string, offset int, length uint) string {
+	return strutil.Substring(s, offset, length)
+}

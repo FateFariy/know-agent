@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/swiftbit/know-agent/internal/config"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
@@ -18,7 +19,12 @@ import (
 	doclogic "github.com/swiftbit/know-agent/internal/domain/document/logic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/analysis"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+	chunkllm "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/llm"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
+	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/index"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	knowlogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	knowroute "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
@@ -69,7 +75,7 @@ func bootstrap(c *config.Config) *server.Server {
 	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, adapterForKnowledge, knowroute.WithEmbedding(embedder))
 	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, adapterForKnowledge)
 	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, adapterForKnowledge)
-	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRouter)
+	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
 	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
 	recommender := recommend.NewQuestionRecommendImpl(serviceContext, renderer, chatModel)
@@ -89,18 +95,42 @@ func bootstrap(c *config.Config) *server.Server {
 	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
 		rewriteImpl, knowledgeAdapter, documentRouter, adapterForChat, retrievalEngine, renderer, chatModel, recommender)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
+	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
 
 	analysisChain := analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, documentPort, knowledgeAdapter)
-	indexChain := index.NewBuildIndexChain(documentRepo, documentPort, knowledgeAdapter)
-	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, documentPort, minioStorage, documentRepo)
-	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, documentPort, analysisChain)
+	indexChain := index.NewBuildIndexChain(documentRepo, documentPort, strategyRegistry, knowledgeAdapter, gseTokenizer)
+	generateImpl := process.NewProfileGenerateImpl(documentRepo)
+	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, minioStorage, milvusVector, milvusKeyword, analysisChain, indexChain)
+	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, documentPort, minioStorage, documentRepo, nil, knowledgeAdapter)
+	profileLogicImpl := doclogic.NewProfileLogicImpl(documentRepo, documentPort, generateImpl)
 	parseConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessImpl)
 	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessImpl)
 
 	chatService := handler.NewChatService(conversationLogicImpl)
-	documentService := handler.NewDocumentService(lifecycleLogicImpl)
+	documentService := handler.NewDocumentService(lifecycleLogicImpl, profileLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
 	httpServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
 
 	return server.NewServer(httpServer, parseConsumer, buildIndexConsumer, rocketMQMessageProducer)
+}
+
+func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template adapter.PromptRenderer) *chunk.Registry {
+	chunkers := []chunk.Chunker{
+		// 递归分块
+		recursive.NewChunker(
+			recursive.WithMaxChars(svcCtx.Config.Chunk.RecursiveMaxChars),
+			recursive.WithOverlapChars(svcCtx.Config.Chunk.RecursiveOverlapChars),
+		),
+		// 语义分块
+		semantic.NewChunker(
+			semantic.WithMinChars(svcCtx.Config.Chunk.SemanticMinChars),
+			semantic.WithMaxChars(svcCtx.Config.Chunk.SemanticMaxChars),
+			semantic.WithSimilarityThreshold(svcCtx.Config.Chunk.SemanticSimilarityThreshold),
+		),
+		// 大模型切块
+		chunkllm.NewChunker(chatModel, template,
+			chunkllm.WithLlmSplitPrompt(enum.DocumentLlmSplit),
+		),
+	}
+	return chunk.NewChunkStrategyRegistry(chunkers)
 }

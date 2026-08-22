@@ -2,8 +2,6 @@ package enum
 
 import (
 	"path/filepath"
-
-	"github.com/duke-git/lancet/v2/strutil"
 )
 
 // ============================================================
@@ -190,69 +188,5 @@ func DocumentChunkSourceTypeName(sourceType DocumentChunkSourceType) string {
 		return "GraphRAG 派生证据"
 	default:
 		return "未知"
-	}
-}
-
-type DocumentType = string
-
-// 文档类型
-const (
-	DocTypeFAQ          DocumentType = "faq"             // 常见问题
-	DocTypeTroubleshoot DocumentType = "troubleshooting" // 故障排除
-	DocTypeRule         DocumentType = "rule"            // 规则
-	DocTypeSpec         DocumentType = "spec"            // 规范
-	DocTypeManual       DocumentType = "manual"          // 手册
-	DocTypeIntro        DocumentType = "intro"           // 介绍
-)
-
-// InferDocumentType 推断文档类型
-func InferDocumentType(combinedText string, supportsItemLookup bool) string {
-	if strutil.ContainsAny(combinedText, []string{"faq", "常见问题"}) {
-		return DocTypeFAQ
-	}
-	if strutil.ContainsAny(combinedText, []string{"故障", "排查", "检查顺序"}) {
-		return DocTypeTroubleshoot
-	}
-	if strutil.ContainsAny(combinedText, []string{"规则", "制度"}) {
-		return DocTypeRule
-	}
-	if strutil.ContainsAny(combinedText, []string{"规格", "参数"}) {
-		return DocTypeSpec
-	}
-	if supportsItemLookup || strutil.ContainsAny(combinedText, []string{"手册", "指南", "部署"}) {
-		return DocTypeManual
-	}
-	return DocTypeIntro
-}
-
-func ExampleQuestion(docType, topic string) string {
-	switch docType {
-	case DocTypeTroubleshoot:
-		return topic + "的可能原因有哪些？"
-	case DocTypeManual:
-		return topic + "的步骤是什么？"
-	case DocTypeRule:
-		return topic + "有哪些规则？"
-	default:
-		return topic + "是什么意思？"
-	}
-}
-
-// InferBusinessCategory 推断业务分类
-func InferBusinessCategory(docType DocumentType, parsedText string) string {
-	switch docType {
-	case DocTypeTroubleshoot:
-		return "故障排查"
-	case DocTypeRule:
-		return "规则"
-	case DocTypeSpec:
-		return "规格说明"
-	case DocTypeManual:
-		if strutil.ContainsAny(parsedText, []string{"步骤", "操作", "部署"}) {
-			return "操作手册"
-		}
-		return "手册"
-	default:
-		return "介绍"
 	}
 }

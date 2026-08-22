@@ -17,11 +17,12 @@ import (
 // FinalizationStage 收尾阶段：持久化策略方案、更新文档状态、标记任务完成
 type FinalizationStage struct {
 	repo adapter.DocumentRepository
-	port *adapter.DocumentPort
 }
 
-func NewFinalizationStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *FinalizationStage {
-	return &FinalizationStage{repo: repo, port: port}
+func NewFinalizationStage(repo adapter.DocumentRepository) *FinalizationStage {
+	return &FinalizationStage{
+		repo: repo,
+	}
 }
 
 func (p *FinalizationStage) Name() string {

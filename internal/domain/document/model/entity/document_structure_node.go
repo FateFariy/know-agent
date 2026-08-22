@@ -1,6 +1,11 @@
 package entity
 
-import "github.com/duke-git/lancet/v2/strutil"
+import (
+	"github.com/duke-git/lancet/v2/strutil"
+
+	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
+)
 
 // StructureNode 文档结构节点实体
 type StructureNode struct {
@@ -38,6 +43,20 @@ type StructureNode struct {
 }
 
 type StructureNodes []*StructureNode
+
+// ExtractSectionTitles 提取章节标题（去重、取前 8 条）
+func (n StructureNodes) ExtractSectionTitles() []string {
+	if len(n) == 0 {
+		return nil
+	}
+	return utils.FilterMapUniqueLimit(n, 8, func(node *StructureNode) (string, string, bool) {
+		if node == nil || node.NodeType != vo.NodeTypeSection {
+			return "", "", false
+		}
+		title := utils.Trim(node.Title)
+		return title, title, title != ""
+	})
+}
 
 func (n StructureNodes) FindNodeByPath(sectionPath, canonicalPath string) *StructureNode {
 	if len(n) == 0 {

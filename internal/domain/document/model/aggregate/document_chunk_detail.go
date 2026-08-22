@@ -1,8 +1,7 @@
 package aggregate
 
 import (
-	"github.com/duke-git/lancet/v2/slice"
-
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
 
@@ -21,7 +20,7 @@ func (d *DocumentChunkDetail) FillParentInfo(parentChunk *entity.DocumentParentC
 		d.ParentChunk.FillEnumName()
 		d.Chunk.FillParentInfo(parentChunk)
 		d.Chunk.FillEnumName()
-		slice.ForEach(d.SiblingChunks, func(index int, item *entity.DocumentChunk) {
+		utils.ForEach(d.SiblingChunks, func(index int, item *entity.DocumentChunk) {
 			item.FillParentInfo(parentChunk)
 			item.FillEnumName()
 		})
