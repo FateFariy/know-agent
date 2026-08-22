@@ -16,7 +16,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
@@ -28,7 +27,6 @@ import (
 type LifecycleLogicImpl struct {
 	repo             adapter.DocumentRepository
 	store            adapter.Storage
-	generator        process.ProfileGenerator
 	knowledgeGateway adapter.KnowledgeGateway
 	messageProducer  adapter.MessageProducer
 	parseTopic       string
@@ -38,11 +36,10 @@ type LifecycleLogicImpl struct {
 var _ LifecycleLogic = (*LifecycleLogicImpl)(nil)
 
 func NewLifecycleLogicImpl(svcCtx *svc.ServiceContext, messageProducer adapter.MessageProducer, store adapter.Storage,
-	repo adapter.DocumentRepository, generator process.ProfileGenerator, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
+	repo adapter.DocumentRepository, knowledgeGateway adapter.KnowledgeGateway) *LifecycleLogicImpl {
 	return &LifecycleLogicImpl{
 		repo:             repo,
 		store:            store,
-		generator:        generator,
 		knowledgeGateway: knowledgeGateway,
 		messageProducer:  messageProducer,
 		parseTopic:       svcCtx.Config.MQ.ParseTopic,

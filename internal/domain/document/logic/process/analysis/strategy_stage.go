@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudwego/eino/callbacks"
 	"github.com/duke-git/lancet/v2/slice"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -42,12 +41,6 @@ func (p *StrategyStage) Name() string {
 }
 
 func (p *StrategyStage) Execute(ctx context.Context, parseCtx *Context) (err error) {
-	ctx = callbacks.OnStart(ctx, struct{}{})
-	defer func() {
-		if err != nil {
-			callbacks.OnError(ctx, err)
-		}
-	}()
 	parseCtx.Task.CurrentStage = enum.TaskStageStrategyRoute
 
 	// 推进任务阶段到"策略路由"
@@ -83,8 +76,6 @@ func (p *StrategyStage) Execute(ctx context.Context, parseCtx *Context) (err err
 		return
 	}
 	parseCtx.StrategyPlanDraft = planDraft
-
-	callbacks.OnEnd(ctx, struct{}{})
 
 	return nil
 }

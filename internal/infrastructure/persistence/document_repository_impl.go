@@ -473,11 +473,6 @@ func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Con
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStructureNode{}).Error
 }
 
-func (d *DocumentRepositoryImpl) DeleteStructureNodeBatch(ctx context.Context, documentId int64, nodeIds []int64) error {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.StructureNode, error) {
 	var nodes []*entity.StructureNode
 	err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).

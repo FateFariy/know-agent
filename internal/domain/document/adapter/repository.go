@@ -154,9 +154,6 @@ type DocumentRepository interface {
 	// DeleteStructureNodeByDocumentId 根据文档ID删除结构节点
 	DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error
 
-	// DeleteStructureNodeBatch 批量删除结构节点
-	DeleteStructureNodeBatch(ctx context.Context, documentId int64, nodeIds []int64) error
-
 	// SelectStructureNodeListByDocumentId 根据文档ID查询结构节点列表
 	SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.StructureNode, error)
 

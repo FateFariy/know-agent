@@ -21,20 +21,20 @@ type Save interface {
 
 // SaveStage 保存阶段：按顺序执行文本上传、产物持久化、结构节点持久化等子阶段
 type SaveStage struct {
-	repo   adapter.DocumentRepository
-	phases []Save
+	repo  adapter.DocumentRepository
+	saves []Save
 }
 
 // NewSaveStage 创建保存阶段
-func NewSaveStage(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *SaveStage {
+func NewSaveStage(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, storage adapter.Storage, gen save.ProfileGenerator) *SaveStage {
 	return &SaveStage{
 		repo: repo,
-		phases: []Save{
-			save.NewParsedTextUploadPhase(port),
-			save.NewArtifactPersistPhase(repo, tableRepo, port),
+		saves: []Save{
+			save.NewParsedTextUploadPhase(storage),
+			save.NewArtifactPersistPhase(repo, tableRepo, storage),
 			save.NewStructurePersistPhase(repo),
 			save.NewNavigationUploadPhase(),
-			save.NewProfileGeneratePhase(repo),
+			save.NewProfileGeneratePhase(repo, gen),
 		},
 	}
 }
@@ -54,7 +54,7 @@ func (p *SaveStage) Execute(ctx context.Context, parseCtx *Context) error {
 	}
 
 	// 依次执行各子阶段
-	for _, stage := range p.phases {
+	for _, stage := range p.saves {
 		stageName := stage.Name()
 		startTime := time.Now()
 
@@ -71,7 +71,6 @@ func (p *SaveStage) Execute(ctx context.Context, parseCtx *Context) error {
 
 	detail, _ := json.Marshal(map[string]any{
 		"parsedTextPath":     saveCtx.ParsedTextPath,
-		"artifactCount":      len(saveCtx.AnalysisResult.ParseArtifacts),
 		"blockCount":         len(saveCtx.AnalysisResult.Blocks),
 		"structureNodeCount": len(saveCtx.AnalysisResult.StructureNodes),
 	})
@@ -83,7 +82,7 @@ func (p *SaveStage) Execute(ctx context.Context, parseCtx *Context) error {
 		EventType:    enum.TaskEventComplete,
 		LogLevel:     enum.LogLevelInfo,
 		OperatorType: enum.OperatorTypeSystem,
-		Content:      "解析产物入库完成，已保存 parsed text、artifact、block、structure 和文档画像。",
+		Content:      "解析产物入库完成，已保存 parsed text、block、structure 和文档画像。",
 		DetailJson:   string(detail),
 	}
 	_ = p.repo.InsertTaskLog(ctx, saveLog)

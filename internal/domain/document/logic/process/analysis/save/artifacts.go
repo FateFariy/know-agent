@@ -13,14 +13,14 @@ import (
 type ArtifactPersistPhase struct {
 	repo      adapter.DocumentRepository
 	tableRepo adapter.TableRepository
-	port      *adapter.DocumentPort
+	storage   adapter.Storage
 }
 
-func NewArtifactPersistPhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, port *adapter.DocumentPort) *ArtifactPersistPhase {
+func NewArtifactPersistPhase(repo adapter.DocumentRepository, tableRepo adapter.TableRepository, storage adapter.Storage) *ArtifactPersistPhase {
 	return &ArtifactPersistPhase{
 		repo:      repo,
 		tableRepo: tableRepo,
-		port:      port,
+		storage:   storage,
 	}
 }
 
@@ -85,7 +85,7 @@ func (p *ArtifactPersistPhase) buildDocumentBlockEntities(ctx context.Context, d
 				return nil, err
 			}
 			fileName := utils.BlankToDefault(candidate.ImageFileName, fmt.Sprintf("image_%d.png", candidate.BlockNo))
-			objectName, err := p.port.UploadParseArtifact(ctx, documentId, taskId, fileName, "image/png", content)
+			objectName, err := p.storage.UploadParseArtifact(ctx, documentId, taskId, fileName, "image/png", content)
 			if err != nil {
 				return nil, err
 			}

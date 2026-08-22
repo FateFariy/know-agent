@@ -7,12 +7,12 @@ import (
 )
 
 type ParsedTextUploadPhase struct {
-	port *adapter.DocumentPort
+	storage adapter.Storage
 }
 
-func NewParsedTextUploadPhase(port *adapter.DocumentPort) *ParsedTextUploadPhase {
+func NewParsedTextUploadPhase(storage adapter.Storage) *ParsedTextUploadPhase {
 	return &ParsedTextUploadPhase{
-		port: port,
+		storage: storage,
 	}
 }
 
@@ -21,7 +21,7 @@ func (p *ParsedTextUploadPhase) Name() string {
 }
 
 func (p *ParsedTextUploadPhase) Execute(ctx context.Context, saveCtx *Context) error {
-	parsedTextPath, err := p.port.UploadParsedText(ctx, saveCtx.DocumentId, saveCtx.AnalysisResult.ParsedText)
+	parsedTextPath, err := p.storage.UploadParsedText(ctx, saveCtx.DocumentId, saveCtx.AnalysisResult.ParsedText)
 	if err != nil {
 		return err
 	}
