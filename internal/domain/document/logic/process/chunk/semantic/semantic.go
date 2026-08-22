@@ -6,6 +6,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic/similarity"
@@ -18,9 +19,9 @@ type Chunker struct {
 }
 
 // NewChunker 创建语义分块策略实例，默认使用 JaccardSimilarity 实现相似度计算
-func NewChunker(opts ...chunk.Option) *Chunker {
+func NewChunker(opts ...common.Option) *Chunker {
 	return &Chunker{
-		opt: chunk.GetSpecificOptions(&options{
+		opt: common.GetImplSpecificOptions(&options{
 			maxChars:            defaultMaxChars,
 			minChars:            defaultMinChars,
 			similarityThreshold: defaultSimilarityThreshold,
@@ -35,12 +36,12 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行语义分块
-func (s *Chunker) Chunk(ctx context.Context, input string, opts ...chunk.Option) ([]string, error) {
+func (s *Chunker) Chunk(ctx context.Context, input string, opts ...common.Option) ([]string, error) {
 	text := strings.TrimSpace(input)
 	if text == "" {
 		return nil, nil
 	}
-	opt := chunk.GetSpecificOptions(s.opt, opts...)
+	opt := common.GetImplSpecificOptions(s.opt, opts...)
 
 	// 文本较短时保持原样，避免过碎
 	if utils.Len(text) <= opt.minChars {

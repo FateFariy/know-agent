@@ -12,20 +12,20 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-// PreparationPhase 准备阶段：加载策略步骤、推进任务状态
-type PreparationPhase struct {
+// PreparationStage 准备阶段：加载策略步骤、推进任务状态
+type PreparationStage struct {
 	repo adapter.DocumentRepository
 }
 
-func NewPreparationPhase(repo adapter.DocumentRepository) *PreparationPhase {
-	return &PreparationPhase{repo: repo}
+func NewPreparationStage(repo adapter.DocumentRepository) *PreparationStage {
+	return &PreparationStage{repo: repo}
 }
 
-func (p *PreparationPhase) Name() string {
+func (p *PreparationStage) Name() string {
 	return "准备阶段"
 }
 
-func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error {
+func (p *PreparationStage) Execute(ctx context.Context, buildCtx *Context) error {
 	sourceParseTaskId := p.requireSourceParseTaskId(ctx, buildCtx)
 	if sourceParseTaskId > 0 {
 		return errors.New("索引任务缺少有效且已冻结的源解析任务")
@@ -58,7 +58,7 @@ func (p *PreparationPhase) Execute(ctx context.Context, buildCtx *Context) error
 }
 
 // requireSourceParseTaskId 获取源解析任务 ID
-func (p *PreparationPhase) requireSourceParseTaskId(ctx context.Context, buildCtx *Context) int64 {
+func (p *PreparationStage) requireSourceParseTaskId(ctx context.Context, buildCtx *Context) int64 {
 	// 查询源解析任务
 	var sourceParseTask *entity.DocumentTask
 	indexTask := buildCtx.Task
@@ -82,7 +82,7 @@ func (p *PreparationPhase) requireSourceParseTaskId(ctx context.Context, buildCt
 }
 
 // applyGraphFailureDisposition 应用图谱失败处置
-func (p *PreparationPhase) applyGraphFailureDisposition(ctx context.Context, buildCtx *Context, cause error) {
+func (p *PreparationStage) applyGraphFailureDisposition(ctx context.Context, buildCtx *Context, cause error) {
 	failedStage := enum.TaskStageGraphRag
 	if buildCtx.Task.CurrentStage != 0 {
 		failedStage = buildCtx.Task.CurrentStage

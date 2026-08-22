@@ -12,13 +12,13 @@ import (
 
 // Chain 解析路由阶段责任链
 type Chain struct {
-	phases []Phase
+	phases []Stage
 }
 
 // NewAnalysisChain 创建并注册所有阶段
 func NewAnalysisChain(svcCtx *svc.ServiceContext, repo adapter.DocumentRepository, tableRepo adapter.TableRepository,
 	port *adapter.DocumentPort, resolver IndexingConfigResolver) *Chain {
-	phases := []Phase{
+	phases := []Stage{
 		NewInitializationStage(repo),             // 1. 初始化任务状态，标记解析开始
 		NewDownloadStage(port),                   // 2. 从对象存储下载原始文件
 		NewParseStage(repo, port),                // 3. 解析文件内容，生成分析结果

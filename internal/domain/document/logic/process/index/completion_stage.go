@@ -12,20 +12,20 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-// CompletionPhase 完成阶段：事务性更新任务/方案/文档状态
-type CompletionPhase struct {
+// CompletionStage 完成阶段：事务性更新任务/方案/文档状态
+type CompletionStage struct {
 	repo adapter.DocumentRepository
 }
 
-func NewCompletionPhase(repo adapter.DocumentRepository) *CompletionPhase {
-	return &CompletionPhase{repo: repo}
+func NewCompletionStage(repo adapter.DocumentRepository) *CompletionStage {
+	return &CompletionStage{repo: repo}
 }
 
-func (p *CompletionPhase) Name() string {
+func (p *CompletionStage) Name() string {
 	return "完成阶段"
 }
 
-func (p *CompletionPhase) Execute(ctx context.Context, buildCtx *Context) error {
+func (p *CompletionStage) Execute(ctx context.Context, buildCtx *Context) error {
 	totalCostMillis := time.Since(buildCtx.BuildStartedTime).Milliseconds()
 
 	// 事务性最终状态更新

@@ -29,8 +29,8 @@ type Context struct {
 	ResumeCommittedGraph bool
 }
 
-// Phase 索引构建阶段接口
-type Phase interface {
+// Stage 索引构建阶段接口
+type Stage interface {
 	// Name 阶段名称
 	Name() string
 	// Execute 执行阶段

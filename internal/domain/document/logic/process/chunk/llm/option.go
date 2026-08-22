@@ -1,6 +1,8 @@
 package llm
 
-import "github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+import (
+	"github.com/swiftbit/know-agent/common"
+)
 
 type options struct {
 	llmSplitPrompt string
@@ -9,8 +11,8 @@ type options struct {
 }
 
 // WithLlmSplitPrompt 设置LLM分块提示词
-func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithLlmSplitPrompt(llmSplitPrompt string) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if llmSplitPrompt == "" {
 			llmSplitPrompt = documentLlmSplit
 		}
@@ -18,8 +20,8 @@ func WithLlmSplitPrompt(llmSplitPrompt string) chunk.Option {
 	})
 }
 
-func WithLlmMaxChars(llmMaxChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithLlmMaxChars(llmMaxChars int) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if llmMaxChars <= 50 {
 			llmMaxChars = defaultLLMMaxChars
 		}
@@ -28,8 +30,8 @@ func WithLlmMaxChars(llmMaxChars int) chunk.Option {
 }
 
 // WithEnabled 设置是否启用LLM分块
-func WithEnabled(enabled bool) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithEnabled(enabled bool) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		o.enabled = enabled
 	})
 }

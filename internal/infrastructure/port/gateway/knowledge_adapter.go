@@ -65,6 +65,17 @@ func (r *KnowledgeAdapter) Resolve(ctx context.Context, document *den.Document) 
 	return convert.ToIndexingOptions(options)
 }
 
+func (r *KnowledgeAdapter) RequireEnabled(ctx context.Context, knowledgeBaseId int64) (*den.KnowledgeBase, error) {
+	base, err := r.repo.SelectKnowledgeBaseById(ctx, knowledgeBaseId)
+	if err != nil {
+		return nil, err
+	}
+	return &den.KnowledgeBase{
+		ID:       base.ID,
+		BaseName: base.BaseName,
+	}, nil
+}
+
 func ToRouteContext(input *conversation.KnowledgeRouteInput) *route.Context {
 	routeCtx := route.NewRouteContext(input.Question, input.RewriteQuestion, input.SelectedKnowledgeBaseIds, input.AllowedDocumentIds)
 	routeCtx.ConversationId = input.ConversationId

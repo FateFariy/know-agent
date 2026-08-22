@@ -12,25 +12,25 @@ import (
 
 // BuildIndexChain 阶段责任链
 type BuildIndexChain struct {
-	phases []Phase
+	phases []Stage
 }
 
 func NewBuildIndexChain(
 	repo adapter.DocumentRepository,
 	port *adapter.DocumentPort,
-	registry chunk.Registry,
+	registry *chunk.Registry,
 	resolver IndexingConfigResolver,
 	tokenizer adapter.Tokenizer,
-	builder GraphRagBuilder,
+	// builder GraphRagBuilder,
 ) *BuildIndexChain {
-	phases := []Phase{
-		NewPreparationPhase(repo),                                   // 1. 准备阶段：加载任务、验证状态、推进任务状态
-		NewChunkingPhase(repo, port, registry, resolver, tokenizer), // 2. 切块阶段：执行切块流水线
+	phases := []Stage{
+		NewPreparationStage(repo),                                   // 1. 准备阶段：加载任务、验证状态、推进任务状态
+		NewChunkingStage(repo, port, registry, resolver, tokenizer), // 2. 切块阶段：执行切块流水线
 		NewChunkPostPhase(repo),                                     // 3. 切块后处理阶段：构建父子块实体并持久化
 		NewVectorizePhase(repo, port),                               // 4. 向量化阶段：批量向量化并回写状态
-		NewKeywordIndexPhase(repo, port),                            // 5. 关键词索引阶段：构建关键词索引
-		NewGraphRagPhase(repo, builder),                             // 6. GraphRAG构建阶段：构建实体关系图谱
-		NewCompletionPhase(repo),                                    // 7. 完成阶段：事务性更新任务/方案/文档状态
+		NewKeywordIndexStage(repo, port),                            // 5. 关键词索引阶段：构建关键词索引
+		//NewGraphRagPhase(repo, builder),                             // 6. GraphRAG构建阶段：构建实体关系图谱
+		NewCompletionStage(repo), // 7. 完成阶段：事务性更新任务/方案/文档状态
 	}
 	return &BuildIndexChain{phases: phases}
 }

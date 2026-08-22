@@ -24,8 +24,8 @@ type Context struct {
 	SaveCtx           *save.Context
 }
 
-// Phase 解析路由阶段接口
-type Phase interface {
+// Stage 解析路由阶段接口
+type Stage interface {
 	// Name 阶段名称
 	Name() string
 	// Execute 执行阶段

@@ -3,7 +3,7 @@ package chunk
 import (
 	"regexp"
 
-	"github.com/duke-git/lancet/v2/strutil"
+	"github.com/swiftbit/know-agent/common/utils"
 )
 
 var (
@@ -17,7 +17,7 @@ func SplitByRegex(text string, re *regexp.Regexp) []string {
 	raw := re.Split(text, -1)
 	result := make([]string, 0, len(raw))
 	for _, part := range raw {
-		trimmed := strutil.Trim(part)
+		trimmed := utils.Trim(part)
 		if trimmed != "" {
 			result = append(result, trimmed)
 		}
@@ -29,7 +29,7 @@ func SplitByRegex(text string, re *regexp.Regexp) []string {
 func SplitSentences(text string) []string {
 	indices := SentenceSplitRe.FindAllStringIndex(text, -1)
 	if len(indices) == 0 {
-		trimmed := strutil.Trim(text)
+		trimmed := utils.Trim(text)
 		if trimmed == "" {
 			return nil
 		}
@@ -39,14 +39,14 @@ func SplitSentences(text string) []string {
 	prev := 0
 	for _, idxPair := range indices {
 		end := idxPair[1]
-		segment := strutil.Trim(text[prev:end])
+		segment := utils.Trim(text[prev:end])
 		if segment != "" {
 			result = append(result, segment)
 		}
 		prev = end
 	}
 	if prev < len(text) {
-		tail := strutil.Trim(text[prev:])
+		tail := utils.Trim(text[prev:])
 		if tail != "" {
 			result = append(result, tail)
 		}

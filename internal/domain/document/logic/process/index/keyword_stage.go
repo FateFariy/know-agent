@@ -11,24 +11,24 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-// KeywordIndexPhase 关键词索引阶段
-type KeywordIndexPhase struct {
+// KeywordIndexStage 关键词索引阶段
+type KeywordIndexStage struct {
 	repo adapter.DocumentRepository
 	port *adapter.DocumentPort
 }
 
-func NewKeywordIndexPhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *KeywordIndexPhase {
-	return &KeywordIndexPhase{
+func NewKeywordIndexStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *KeywordIndexStage {
+	return &KeywordIndexStage{
 		repo: repo,
 		port: port,
 	}
 }
 
-func (p *KeywordIndexPhase) Name() string {
+func (p *KeywordIndexStage) Name() string {
 	return "关键词索引阶段"
 }
 
-func (p *KeywordIndexPhase) Execute(ctx context.Context, buildCtx *Context) error {
+func (p *KeywordIndexStage) Execute(ctx context.Context, buildCtx *Context) error {
 	if buildCtx.ResumeCommittedGraph {
 		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过构建关键词，documentId=%d, taskId=%d", buildCtx.DocumentId, buildCtx.TaskId)
 		return nil

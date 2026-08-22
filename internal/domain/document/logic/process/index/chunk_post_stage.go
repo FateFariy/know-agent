@@ -10,19 +10,19 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
 
-type ChunkPostPhase struct {
+type ChunkPostStage struct {
 	repo adapter.DocumentRepository
 }
 
-func NewChunkPostPhase(repo adapter.DocumentRepository) *ChunkPostPhase {
-	return &ChunkPostPhase{repo: repo}
+func NewChunkPostPhase(repo adapter.DocumentRepository) *ChunkPostStage {
+	return &ChunkPostStage{repo: repo}
 }
 
-func (p *ChunkPostPhase) Name() string {
+func (p *ChunkPostStage) Name() string {
 	return "切块后处理阶段"
 }
 
-func (p *ChunkPostPhase) Execute(ctx context.Context, buildCtx *Context) error {
+func (p *ChunkPostStage) Execute(ctx context.Context, buildCtx *Context) error {
 	buildCtx.Task.CurrentStage = enum.TaskStageChunkPostProcess
 	if err := p.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 		ID:           buildCtx.Task.ID,
@@ -72,7 +72,7 @@ func (p *ChunkPostPhase) Execute(ctx context.Context, buildCtx *Context) error {
 }
 
 // buildParentChildEntities 将父块候选转换为可落库的"父块实体 + 子块实体"双列表
-func (p *ChunkPostPhase) buildParentChildEntities(buildCtx *Context) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
+func (p *ChunkPostStage) buildParentChildEntities(buildCtx *Context) ([]*entity.DocumentParentChunk, []*entity.DocumentChunk) {
 	parentChunks := make([]*entity.DocumentParentChunk, 0, len(buildCtx.ParentCandidates))
 	childChunks := make([]*entity.DocumentChunk, 0)
 

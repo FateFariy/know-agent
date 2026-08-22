@@ -32,15 +32,15 @@ const (
 type AsyncProcessImpl struct {
 	repo          adapter.DocumentRepository
 	port          *adapter.DocumentPort
-	analysisChain analysis.Chain
-	indexChain    index.BuildIndexChain
+	analysisChain *analysis.Chain
+	indexChain    *index.BuildIndexChain
 }
 
 // NewAsyncProcessImpl 构造异步处理逻辑实例
 func NewAsyncProcessImpl(repo adapter.DocumentRepository,
 	port *adapter.DocumentPort,
-	analysisChain analysis.Chain,
-	indexChain index.BuildIndexChain) *AsyncProcessImpl {
+	analysisChain *analysis.Chain,
+	indexChain *index.BuildIndexChain) *AsyncProcessImpl {
 	return &AsyncProcessImpl{
 		repo:          repo,
 		port:          port,

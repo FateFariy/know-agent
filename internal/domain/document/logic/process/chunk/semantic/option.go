@@ -1,7 +1,7 @@
 package semantic
 
 import (
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/semantic/similarity"
 )
 
@@ -20,8 +20,8 @@ type options struct {
 }
 
 // WithMaxChars 设置单个块的最大字符数
-func WithMaxChars(maxChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithMaxChars(maxChars int) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if maxChars <= 0 {
 			maxChars = defaultMaxChars
 		}
@@ -30,8 +30,8 @@ func WithMaxChars(maxChars int) chunk.Option {
 }
 
 // WithMinChars 设置触发语义切分的最小字符数
-func WithMinChars(minChars int) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithMinChars(minChars int) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if minChars <= 0 {
 			minChars = defaultMinChars
 		}
@@ -40,8 +40,8 @@ func WithMinChars(minChars int) chunk.Option {
 }
 
 // WithSimilarityThreshold 设置语义相似度阈值
-func WithSimilarityThreshold(threshold float64) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithSimilarityThreshold(threshold float64) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if threshold <= 0 || threshold >= 1 {
 			threshold = defaultSimilarityThreshold
 		}
@@ -50,8 +50,8 @@ func WithSimilarityThreshold(threshold float64) chunk.Option {
 }
 
 // WithSimilarity 注入自定义的相似度计算实现
-func WithSimilarity(calculator similarity.Calculator) chunk.Option {
-	return chunk.WrapSpecificOptFn(func(o *options) {
+func WithSimilarity(calculator similarity.Calculator) common.Option {
+	return common.WrapImplSpecificOptFn(func(o *options) {
 		if calculator == nil {
 			return
 		}

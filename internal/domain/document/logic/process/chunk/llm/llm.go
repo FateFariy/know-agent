@@ -7,10 +7,10 @@ import (
 
 	"github.com/duke-git/lancet/v2/strutil"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk"
 	"github.com/swiftbit/know-agent/internal/domain/document/logic/process/chunk/recursive"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 )
@@ -29,9 +29,9 @@ type Chunker struct {
 }
 
 // NewChunker 创建大模型智能分块器
-func NewChunker(model model.ChatModel, renderer adapter.PromptRenderer, opts ...chunk.Option) *Chunker {
+func NewChunker(model model.ChatModel, renderer adapter.PromptRenderer, opts ...common.Option) *Chunker {
 	return &Chunker{
-		opt: chunk.GetSpecificOptions(&options{
+		opt: common.GetImplSpecificOptions(&options{
 			llmSplitPrompt: documentLlmSplit,
 			llmMaxChars:    defaultLLMMaxChars,
 		}, opts...),
@@ -50,13 +50,13 @@ func (s *Chunker) Name() string {
 }
 
 // Chunk 执行大模型智能分块
-func (s *Chunker) Chunk(ctx context.Context, input string, opts ...chunk.Option) ([]string, error) {
+func (s *Chunker) Chunk(ctx context.Context, input string, opts ...common.Option) ([]string, error) {
 	text := strings.TrimSpace(input)
 	if text == "" {
 		return nil, nil
 	}
 
-	opt := chunk.GetSpecificOptions(s.opt, opts...)
+	opt := common.GetImplSpecificOptions(s.opt, opts...)
 
 	if !opt.enabled || s.model == nil {
 		return nil, errors.New("大模型文本分块器已禁用或者模型为空")
