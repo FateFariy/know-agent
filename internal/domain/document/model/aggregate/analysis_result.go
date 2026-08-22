@@ -21,7 +21,6 @@ type AnalysisResult struct {
 	MarkdownSyntax      *shared.MarkdownSyntax   // Markdown语法分析结果
 	StructureNodes      []*entity.StructureNode  // 文档结构节点列表
 	TableCandidates     []*shared.TableCandidate // 表格候选列表
-	ParseArtifacts      []*entity.ParseArtifact  // 解析产物列表
 	Blocks              []*entity.DocumentBlock  // 内容块列表
 }
 

@@ -84,9 +84,6 @@ func (d *DocumentRepositoryImpl) DeleteDocumentRelatedDataById(ctx context.Conte
 		//if err = d.DeleteTablesByDocumentId(ctx, documentId); err != nil {
 		//	return err
 		//}
-		if err = d.DeleteArtifactsByDocumentId(ctx, documentId); err != nil {
-			return err
-		}
 		if err = d.DeleteTaskLogByDocumentId(ctx, documentId); err != nil {
 			return err
 		}
@@ -576,48 +573,6 @@ func (d *DocumentRepositoryImpl) SelectDocumentProfilesByDocIds(ctx context.Cont
 // DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 func (d *DocumentRepositoryImpl) DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error {
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.KnowledgeTopicDocumentRelation{}).Error
-}
-
-func (d *DocumentRepositoryImpl) InsertParsedArtifactBatch(ctx context.Context, artifacts []*entity.ParseArtifact) error {
-	if len(artifacts) == 0 {
-		return nil
-	}
-	return d.dbWithContext(ctx).Create(convert.ToParseArtifactModelList(artifacts)).Error
-}
-
-// SelectArtifactsByTask 根据文档ID和任务ID查询解析产物列表
-func (d *DocumentRepositoryImpl) SelectArtifactsByTask(ctx context.Context, documentId, taskId int64) ([]*entity.ParseArtifact, error) {
-	var artifacts []*entity.ParseArtifact
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParseArtifact{}).
-		Where("document_id = ? AND task_id = ?", documentId, taskId).
-		Order("id ASC").
-		Find(&artifacts).Error; err != nil {
-		return nil, err
-	}
-	return artifacts, nil
-}
-
-// SelectArtifactObjectNamesByDocumentId 根据文档ID查询解析产物的对象名列表
-func (d *DocumentRepositoryImpl) SelectArtifactObjectNamesByDocumentId(ctx context.Context, documentId int64) ([]string, error) {
-	var names []string
-	if err := d.dbWithContext(ctx).Model(&model.DocumentParseArtifact{}).
-		Where("document_id = ? AND object_name IS NOT NULL AND object_name != ''", documentId).
-		Distinct("object_name").
-		Pluck("object_name", &names).Error; err != nil {
-		return nil, err
-	}
-	return names, nil
-}
-
-// DeleteArtifactsByTask 根据文档ID和任务ID删除解析产物
-func (d *DocumentRepositoryImpl) DeleteArtifactsByTask(ctx context.Context, documentId, taskId int64) error {
-	return d.dbWithContext(ctx).Where("document_id = ? AND task_id = ?", documentId, taskId).
-		Delete(&model.DocumentParseArtifact{}).Error
-}
-
-// DeleteArtifactsByDocumentId 根据文档ID删除解析产物
-func (d *DocumentRepositoryImpl) DeleteArtifactsByDocumentId(ctx context.Context, documentId int64) error {
-	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentParseArtifact{}).Error
 }
 
 // InsertDocumentBlockBatch 批量插入文档块

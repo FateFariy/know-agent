@@ -191,23 +191,6 @@ type DocumentRepository interface {
 	// DeleteTopicDocumentRelationByDocumentId 根据文档ID删除话题关联
 	DeleteTopicDocumentRelationByDocumentId(ctx context.Context, documentId int64) error
 
-	// ========== 解析产物相关 ==========
-
-	// InsertParsedArtifactBatch 批量插入解析产物
-	InsertParsedArtifactBatch(ctx context.Context, artifacts []*entity.ParseArtifact) error
-
-	// SelectArtifactsByTask 根据文档ID和任务ID查询解析产物列表
-	SelectArtifactsByTask(ctx context.Context, documentId, taskId int64) ([]*entity.ParseArtifact, error)
-
-	// SelectArtifactObjectNamesByDocumentId 根据文档ID查询解析产物的对象名列表
-	SelectArtifactObjectNamesByDocumentId(ctx context.Context, documentId int64) ([]string, error)
-
-	// DeleteArtifactsByTask 根据文档ID和任务ID删除解析产物
-	DeleteArtifactsByTask(ctx context.Context, documentId, taskId int64) error
-
-	// DeleteArtifactsByDocumentId 根据文档ID删除解析产物
-	DeleteArtifactsByDocumentId(ctx context.Context, documentId int64) error
-
 	// ========== 文档块相关 ==========
 
 	// InsertDocumentBlockBatch 批量插入文档块

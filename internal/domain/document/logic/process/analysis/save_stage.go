@@ -33,8 +33,8 @@ func NewSaveStage(repo adapter.DocumentRepository, tableRepo adapter.TableReposi
 			save.NewParsedTextUploadPhase(port),
 			save.NewArtifactPersistPhase(repo, tableRepo, port),
 			save.NewStructurePersistPhase(repo),
-			save.NewNavigationUploadPhase(port),
-			save.NewProfileGeneratePhase(),
+			save.NewNavigationUploadPhase(),
+			save.NewProfileGeneratePhase(repo),
 		},
 	}
 }

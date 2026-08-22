@@ -33,7 +33,6 @@ func NewParseStage(repo adapter.DocumentRepository) *ParseStage {
 		&parser.PDFParser{},
 		markdown.NewGoldmarkParser(),
 	}
-
 	return &ParseStage{
 		repo:     repo,
 		registry: parse.NewRegistry(fallbackParser, parsers...),
@@ -55,7 +54,6 @@ func (p *ParseStage) Execute(ctx context.Context, parseCtx *Context) error {
 	structureCandidateCount := len(analysisResult.StructureNodes)
 	// 记录"解析器返回结果"日志
 	parserResultDetail, _ := json.Marshal(map[string]any{
-		"artifactCount":           len(analysisResult.ParseArtifacts),
 		"blockCount":              len(analysisResult.Blocks),
 		"tableCandidateCount":     len(analysisResult.TableCandidates),
 		"structureCandidateCount": structureCandidateCount,
@@ -105,9 +103,6 @@ func (p *ParseStage) process(ctx context.Context, parseCtx *Context) (*aggregate
 	// 5. 表格候选投影
 	tableCandidates := projectTableCandidates(blocks)
 
-	// 6. 解析产物生成
-	parseArtifacts := buildParseArtifacts(parseCtx.Document.OriginalFileName, blocks, structureNodes)
-
 	return &aggregate.AnalysisResult{
 		ParsedText:          parsedText,
 		CharCount:           charCount,
@@ -119,23 +114,8 @@ func (p *ParseStage) process(ctx context.Context, parseCtx *Context) (*aggregate
 		MaxParagraphLength:  maxParagraphLen,
 		StructureNodes:      structureNodes,
 		TableCandidates:     tableCandidates,
-		ParseArtifacts:      parseArtifacts,
 		Blocks:              blocks,
 	}, nil
-}
-
-// calcContentQualityLevel 计算内容质量等级
-func calcContentQualityLevel(charCount, blockCount, maxParagraphLen int) int {
-	if charCount >= 5000 && blockCount >= 10 && maxParagraphLen >= 100 {
-		return enum.ContentQualityLevelHigh
-	}
-	if charCount >= 1000 && blockCount >= 3 {
-		return enum.ContentQualityLevelMedium
-	}
-	if charCount >= 100 {
-		return enum.ContentQualityLevelLow
-	}
-	return 0
 }
 
 // projectStructureNodes 结构节点投影：基于块列表构建文档结构树
@@ -317,51 +297,4 @@ func buildTableCells(rawRow []string) []*shared.TableCell {
 		})
 	}
 	return cells
-}
-
-// buildParseArtifacts 构建解析产物
-func buildParseArtifacts(fileName string, blocks entity.DocumentBlocks, structureNodes []*entity.StructureNode) []*entity.ParseArtifact {
-	var artifacts []*entity.ParseArtifact
-
-	// 构建哈希输入
-	hashParts := []string{fileName}
-	for _, block := range blocks {
-		if block != nil {
-			hashParts = append(hashParts, block.Text)
-		}
-	}
-	for _, node := range structureNodes {
-		if node != nil {
-			hashParts = append(hashParts, node.Title)
-		}
-	}
-	contentHash := utils.CalcContentHash(hashParts...)
-
-	// 基础解析信息产物
-	parserArtifact := &entity.ParseArtifact{
-		ArtifactType:  "DOCUMENT_PARSE_INFO",
-		ObjectName:    fileName,
-		ContentHash:   contentHash,
-		ParserName:    "go-native-parser",
-		ParserVersion: "1.0.0",
-		FileName:      fileName + ".parse-info.json",
-		ContentType:   "application/json;charset=UTF-8",
-	}
-	artifacts = append(artifacts, parserArtifact)
-
-	// 如果有结构节点，添加结构快照
-	if len(structureNodes) > 0 {
-		structureArtifact := &entity.ParseArtifact{
-			ArtifactType:  "STRUCTURE_SNAPSHOT",
-			ObjectName:    fileName,
-			ContentHash:   contentHash,
-			ParserName:    "go-native-parser",
-			ParserVersion: "1.0.0",
-			FileName:      fileName + ".structure.json",
-			ContentType:   "application/json;charset=UTF-8",
-		}
-		artifacts = append(artifacts, structureArtifact)
-	}
-
-	return artifacts
 }
