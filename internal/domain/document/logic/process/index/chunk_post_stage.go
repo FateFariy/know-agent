@@ -23,6 +23,11 @@ func (p *ChunkPostStage) Name() string {
 }
 
 func (p *ChunkPostStage) Execute(ctx context.Context, buildCtx *Context) error {
+	// 检查是否需要从已提交 GraphRAG 结果恢复
+	if buildCtx.ResumeCommittedGraph {
+		return nil
+	}
+
 	buildCtx.Task.CurrentStage = enum.TaskStageChunkPostProcess
 	if err := p.repo.UpdateTaskById(ctx, &entity.DocumentTask{
 		ID:           buildCtx.Task.ID,
@@ -31,9 +36,6 @@ func (p *ChunkPostStage) Execute(ctx context.Context, buildCtx *Context) error {
 		return err
 	}
 	buildCtx.ParentCandidates = buildCtx.ParentCandidates.WithoutValidChildren()
-
-	// todo 带实现大模型增强
-	// applyChunkKeywordQuestionEnrichment(ctx, buildCtx)
 
 	parentChunks, childChunks := p.buildParentChildEntities(buildCtx)
 	buildCtx.ParentChunks = parentChunks

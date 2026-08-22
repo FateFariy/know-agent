@@ -44,3 +44,8 @@ type IndexingConfigResolver interface {
 type GraphRagBuilder interface {
 	RebuildDocumentGraph(ctx context.Context, documentId, taskId int64, chunks []*entity.DocumentChunk) (*vo.GraphRagBuildResult, error)
 }
+
+type Tokenizer interface {
+	// SegmentWords 返回词文本列表，适用于搜索索引等场景
+	SegmentWords(text string) []string
+}

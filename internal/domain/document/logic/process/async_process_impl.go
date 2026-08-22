@@ -36,7 +36,7 @@ func NewAsyncProcessImpl(repo adapter.DocumentRepository, analysisChain *analysi
 
 // HandleParseRoute 处理解析路由任务
 //
-// 整体阶段：initialization → download → parse → upload → structure → strategy → finalization
+// 整体阶段：initialization → download → parse → save → strategy → finalization
 func (d *AsyncProcessImpl) HandleParseRoute(ctx context.Context, documentId, taskId int64) (err error) {
 	// 加载文档与任务实体
 	document, err := d.repo.SelectDocumentById(ctx, documentId)
@@ -105,26 +105,6 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		return nil // 已失败，直接返回
 	}
 
-	startTime := time.Now()
-
-	// 读取已有的 GraphRAG 构建结果（用于断点恢复）
-	//graphRagBuildResult := task.ReadGraphRagBuildResult()
-
-	//// 检查是否需要直接失败
-	//if graphRagBuildResult != nil && graphRagBuildResult.OuterTaskDisposition == enum.OuterTaskDispositionFailIndexTask {
-	//	d.applyGraphFailureDisposition(ctx, document, task, plan.ID, graphRagBuildResult, nil)
-	//	return nil // 直接失败，无需继续执行
-	//}
-	//
-	//defer func() {
-	//	if v := recover(); v != nil {
-	//		var panicErr *vo.GraphRagBuildFailureException
-	//		if errors.As(v, &panicErr) {
-	//			d.handleGraphRagBuildFailure(ctx, document, task, plan, panicErr, startTime)
-	//		}
-	//	}
-	//}()
-
 	// 构建上下文并执行责任链
 	buildCtx := &index.Context{
 		DocumentId: documentId,
@@ -133,9 +113,10 @@ func (d *AsyncProcessImpl) HandleIndexBuild(ctx context.Context, documentId, tas
 		Document:   document,
 		Task:       task,
 		Plan:       plan,
-		StartTime:  startTime,
+		StartTime:  time.Now(),
 	}
 	if err = d.indexChain.Run(ctx, buildCtx); err != nil {
+		d.handleIndexBuildFailure(ctx, document, task, plan, err.Error())
 		return err
 	}
 	logx.Infof("索引构建任务成功，documentId=%d, taskId=%d, planId=%d", documentId, taskId, planId)
@@ -204,11 +185,10 @@ func (d *AsyncProcessImpl) handleIndexBuildFailure(ctx context.Context, document
 		if err := d.repo.UpdateDocumentById(txCtx, &entity.Document{ID: document.ID, IndexStatus: enum.IndexStatusBuildFailed}); err != nil {
 			return err
 		}
-		// chunk：按任务 ID 批量将向量状态置为失败（Milvus 为默认向量库类型）
+		// chunk：按任务 ID 批量将向量状态置为失败
 		failedChunkMarker := &entity.DocumentChunk{
-			TaskId:          task.ID,
-			VectorStatus:    enum.VectorStatusVectorFailed,
-			VectorStoreType: enum.VectorStoreTypeMilvus,
+			TaskId:       task.ID,
+			VectorStatus: enum.VectorStatusVectorFailed,
 		}
 		if err := d.repo.UpdateChunkByTaskId(txCtx, failedChunkMarker); err != nil {
 			return err

@@ -10,6 +10,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
+	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
 // PreparationStage 准备阶段：加载策略步骤、推进任务状态
@@ -26,6 +27,16 @@ func (p *PreparationStage) Name() string {
 }
 
 func (p *PreparationStage) Execute(ctx context.Context, buildCtx *Context) error {
+	// 读取已有的 GraphRAG 构建结果（用于断点恢复）
+	buildCtx.GraphRagBuildResult = buildCtx.Task.ReadGraphRagBuildResult()
+
+	// 检查是否需要直接失败
+	buildCtx.ResumeCommittedGraph = buildCtx.GraphRagBuildResult.IsCommittedGraph()
+
+	if buildCtx.ResumeCommittedGraph {
+		return errorx.ErrGraphRagBuildFailed
+	}
+
 	sourceParseTaskId := p.requireSourceParseTaskId(ctx, buildCtx)
 	if sourceParseTaskId > 0 {
 		return errors.New("索引任务缺少有效且已冻结的源解析任务")
@@ -33,9 +44,6 @@ func (p *PreparationStage) Execute(ctx context.Context, buildCtx *Context) error
 	buildCtx.Task.CurrentStage = enum.TaskStageChunkExecute
 	buildCtx.Task.TaskStatus = enum.TaskStatusRunning
 	buildCtx.Task.StartTime = utils.Pointer(buildCtx.StartTime)
-
-	buildCtx.GraphRagBuildResult = buildCtx.Task.ReadGraphRagBuildResult()
-	buildCtx.ResumeCommittedGraph = buildCtx.GraphRagBuildResult.IsCommittedGraph()
 
 	// 事务性推进任务状态到"切块执行中"
 	markBuildingTx := func(txCtx context.Context) error {

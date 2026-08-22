@@ -81,7 +81,9 @@ func (p *CompletionStage) Execute(ctx context.Context, buildCtx *Context) error 
 			Content:      "索引构建完成",
 			DetailJson:   string(buildCompleteDetail),
 		}
-		return p.repo.InsertTaskLog(txCtx, buildCompleteLog)
+		_ = p.repo.InsertTaskLog(txCtx, buildCompleteLog)
+
+		return nil
 	}
 	if err := p.repo.Do(ctx, finalizeTx); err != nil {
 		return err

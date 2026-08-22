@@ -29,7 +29,7 @@ type GraphRagBuildResult struct {
 // IsCommittedGraph 检查图谱是否已提交
 func (p *GraphRagBuildResult) IsCommittedGraph() bool {
 	return p != nil && p.KgCommitted && p.GraphPersistenceOutcome != "" &&
-		p.GraphPersistenceOutcome != enum.GraphPersistenceOutcomeFailed
+		p.OuterTaskDisposition != enum.OuterTaskDispositionFailIndexTask
 }
 
 // ResultAttempt 结果尝试次数

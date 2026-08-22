@@ -15,12 +15,15 @@ const embeddingBatch = 100 // 默认向量化批大小
 
 // VectorizePhase 向量化阶段：批量向量化并回写状态
 type VectorizePhase struct {
-	repo adapter.DocumentRepository
-	port *adapter.DocumentPort
+	repo    adapter.DocumentRepository
+	indexer adapter.VectorIndexer
 }
 
-func NewVectorizePhase(repo adapter.DocumentRepository, port *adapter.DocumentPort) *VectorizePhase {
-	return &VectorizePhase{repo: repo, port: port}
+func NewVectorizePhase(repo adapter.DocumentRepository, indexer adapter.VectorIndexer) *VectorizePhase {
+	return &VectorizePhase{
+		repo:    repo,
+		indexer: indexer,
+	}
 }
 
 func (p *VectorizePhase) Name() string {
@@ -67,7 +70,7 @@ func (p *VectorizePhase) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 批量向量化
 	vectorStartedTime := time.Now()
-	if err := p.port.BuildVectors(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.indexer.BuildVectors(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
 

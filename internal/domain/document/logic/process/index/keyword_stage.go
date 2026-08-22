@@ -13,14 +13,14 @@ import (
 
 // KeywordIndexStage 关键词索引阶段
 type KeywordIndexStage struct {
-	repo adapter.DocumentRepository
-	port *adapter.DocumentPort
+	repo    adapter.DocumentRepository
+	indexer adapter.KeywordIndexer
 }
 
-func NewKeywordIndexStage(repo adapter.DocumentRepository, port *adapter.DocumentPort) *KeywordIndexStage {
+func NewKeywordIndexStage(repo adapter.DocumentRepository, indexer adapter.KeywordIndexer) *KeywordIndexStage {
 	return &KeywordIndexStage{
-		repo: repo,
-		port: port,
+		repo:    repo,
+		indexer: indexer,
 	}
 }
 
@@ -61,7 +61,7 @@ func (p *KeywordIndexStage) Execute(ctx context.Context, buildCtx *Context) erro
 
 	// 执行关键词索引构建
 	keywordStartedTime := time.Now()
-	if err := p.port.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
+	if err := p.indexer.BuildIndexes(ctx, buildCtx.ChildChunks); err != nil {
 		return err
 	}
 

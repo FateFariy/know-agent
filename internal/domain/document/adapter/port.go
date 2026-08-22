@@ -65,11 +65,6 @@ type VectorIndexer interface {
 	DeleteByDocumentId(ctx context.Context, documentId int64) error
 }
 
-type Tokenizer interface {
-	// SegmentWords 返回词文本列表，适用于搜索索引等场景
-	SegmentWords(text string) []string
-}
-
 type KnowledgeGateway interface {
 	RequireEnabled(ctx context.Context, knowledgeBaseId int64) (*entity.KnowledgeBase, error)
 }

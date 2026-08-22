@@ -26,17 +26,15 @@ import (
 // ChunkingStage 切块阶段：执行切块流水线、构建父子块实体、持久化
 type ChunkingStage struct {
 	repo      adapter.DocumentRepository
-	port      *adapter.DocumentPort
 	registry  *chunk.Registry
 	resolver  IndexingConfigResolver
-	tokenizer adapter.Tokenizer
+	tokenizer Tokenizer
 }
 
 // NewChunkingStage 创建切块阶段
-func NewChunkingStage(repo adapter.DocumentRepository, port *adapter.DocumentPort, registry *chunk.Registry, resolver IndexingConfigResolver, tokenizer adapter.Tokenizer) *ChunkingStage {
+func NewChunkingStage(repo adapter.DocumentRepository, registry *chunk.Registry, resolver IndexingConfigResolver, tokenizer Tokenizer) *ChunkingStage {
 	return &ChunkingStage{
 		repo:      repo,
-		port:      port,
 		registry:  registry,
 		resolver:  resolver,
 		tokenizer: tokenizer,
@@ -49,14 +47,15 @@ func (p *ChunkingStage) Name() string {
 
 func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 	// 检查是否需要从已提交 GraphRAG 结果恢复
+	documentId := buildCtx.DocumentId
 	if buildCtx.ResumeCommittedGraph {
 		logx.Infof("从已提交 GraphRAG outcome 恢复索引任务，跳过切块流水线: documentId=%d, taskId=%d",
-			buildCtx.DocumentId, buildCtx.TaskId)
+			documentId, buildCtx.TaskId)
 		return nil
 	}
 
 	// 查询结构化解析 blocks
-	blocks, err := p.repo.SelectDocumentBlocksByTask(ctx, buildCtx.DocumentId, buildCtx.Task.SourceParseTaskId)
+	blocks, err := p.repo.SelectDocumentBlocksByTask(ctx, documentId, buildCtx.Task.SourceParseTaskId)
 	if err != nil {
 		return err
 	}
@@ -73,7 +72,7 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 	chunkStartDetail, _ := json.Marshal(map[string]any{"strategySnapshot": buildCtx.Plan.StrategySnapshot})
 	chunkStartLog := &entity.DocumentTaskLog{
 		TaskId:       buildCtx.TaskId,
-		DocumentId:   buildCtx.DocumentId,
+		DocumentId:   documentId,
 		StageType:    enum.TaskStageChunkExecute,
 		EventType:    enum.TaskEventStart,
 		LogLevel:     enum.LogLevelInfo,
@@ -89,7 +88,7 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 按步骤执行切块流水线
 	chunkStartTime := time.Now()
-	parentCandidates, err := p.BuildParentBlocks(ctx, buildCtx.Document, pipelineSteps, blocks)
+	parentCandidates, err := p.BuildParentChunks(ctx, buildCtx.Document, pipelineSteps, blocks)
 	if err != nil {
 		return err
 	}
@@ -107,7 +106,7 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 	})
 	chunkEndLog := &entity.DocumentTaskLog{
 		TaskId:       buildCtx.TaskId,
-		DocumentId:   buildCtx.DocumentId,
+		DocumentId:   documentId,
 		StageType:    enum.TaskStageChunkExecute,
 		EventType:    enum.TaskEventComplete,
 		LogLevel:     enum.LogLevelInfo,
@@ -120,8 +119,8 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 	return nil
 }
 
-// BuildParentBlocks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
-func (p *ChunkingStage) BuildParentBlocks(ctx context.Context, document *entity.Document,
+// BuildParentChunks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
+func (p *ChunkingStage) BuildParentChunks(ctx context.Context, document *entity.Document,
 	steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) (vo.ParentChunkCandidates, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
 	parentSteps := steps.GetSortedStepsByPipeline(enum.PipelineTypeParent)
