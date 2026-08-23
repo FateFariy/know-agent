@@ -24,12 +24,10 @@ type ConversationTraceHandler struct {
 	repo adapter.ChatRepository
 }
 
-func NewConversationTraceRecorder(repo adapter.ChatRepository) *ConversationTraceHandler {
-	r := &ConversationTraceHandler{repo: repo}
+func RegisterConversationTraceRecorder(repo adapter.ChatRepository) {
 	registerOnce.Do(func() {
-		callbacks.AppendGlobalHandlers(r)
+		callbacks.AppendGlobalHandlers(&ConversationTraceHandler{repo: repo})
 	})
-	return r
 }
 
 // OnStart 实现 callbacks.Handler，将追踪阶段信息落库

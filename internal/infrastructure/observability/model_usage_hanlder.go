@@ -23,13 +23,11 @@ type ModelUsageHandler struct {
 	configs map[string]*config.LLMConf
 }
 
-// NewModelUsageHandler 创建模型使用量追踪 Handler 并注册为全局 Handler
-func NewModelUsageHandler(configs map[string]*config.LLMConf) *ModelUsageHandler {
-	h := &ModelUsageHandler{configs: configs}
+// RegisterModelUsageHandler 创建模型使用量追踪 Handler 并注册为全局 Handler
+func RegisterModelUsageHandler(configs map[string]*config.LLMConf) {
 	modelUsageRegisterOnce.Do(func() {
-		callbacks.AppendGlobalHandlers(h)
+		callbacks.AppendGlobalHandlers(&ModelUsageHandler{configs: configs})
 	})
-	return h
 }
 
 // OnStart 实现 callbacks.Handler，记录模型调用参数

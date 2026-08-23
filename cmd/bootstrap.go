@@ -28,6 +28,7 @@ import (
 	knowlogic "github.com/swiftbit/know-agent/internal/domain/knowledge/logic"
 	knowroute "github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
+	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	portconfig "github.com/swiftbit/know-agent/internal/infrastructure/port/config"
@@ -71,6 +72,7 @@ func bootstrap(c *config.Config) *server.Server {
 	knowledgeRepo := persistence.NewKnowledgeRepository(serviceContext)
 	documentForKnowledge := gateway.NewDocumentAdapterForKnowledge(documentRepo)
 	documentForChat := gateway.NewDocumentAdapterForChat(documentRepo)
+	observability.RegisterConversationTraceRecorder(chatRepo)
 
 	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, documentForKnowledge, localConfig)
 	opts := []rank.Option{rank.WithLexicalIndex(elasticStorage), rank.WithEmbedding(embedder)}
@@ -99,7 +101,7 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
-		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender, NewAnswerEvaluators(chatModel, renderer))
+		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender, NewAnswerEvaluators(chatModel, renderer, embedder))
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
 	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
 
@@ -141,10 +143,10 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 	return chunk.NewChunkStrategyRegistry(chunkers)
 }
 
-func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer) []conversation.Evaluator {
+func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.Embedder) []conversation.Evaluator {
 	return []conversation.Evaluator{
 		evaluate.NewFaithfulnessEvaluator(llm, renderer),
-		evaluate.NewAnswerRelevancyEvaluator(llm, renderer),
+		evaluate.NewAnswerRelevancyEvaluator(llm, renderer, emb),
 		evaluate.NewContextPrecisionEvaluator(llm, renderer),
 	}
 }

@@ -23,9 +23,12 @@ func NewFaithfulnessEvaluator(llm model.ChatModel, promptRenderer adapter.Prompt
 			templateName:   enum.AnswerFaithfulnessEvaluate,
 			promptRenderer: promptRenderer,
 			llm:            llm,
-			scoreParser:    parseFaithfulnessScore,
 		},
 	}
+}
+
+func (e *FaithfulnessEvaluator) Name() string {
+	return enum.AnswerFaithfulness
 }
 
 func (e *FaithfulnessEvaluator) validate(input *conversation.EvaluationInput) error {
@@ -49,7 +52,7 @@ func (e *FaithfulnessEvaluator) prepareVariables(input *conversation.EvaluationI
 	}
 }
 
-func parseFaithfulnessScore(output string) (float64, error) {
+func (e *FaithfulnessEvaluator) parseFaithfulnessScore(question, output string) (float64, error) {
 	re := regexp.MustCompile(`FAITHFULNESS_SCORE:\s*(0\.\d+)`)
 	matches := re.FindStringSubmatch(output)
 	if len(matches) < 2 {

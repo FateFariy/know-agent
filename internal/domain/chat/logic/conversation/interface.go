@@ -165,6 +165,11 @@ type EvaluationInput struct {
 	GroundTruth string   `json:"ground_truth"` // 标准参考答案
 }
 
+type EvaluationOutput struct {
+	Metrics string
+	Score   float64
+}
+
 type Evaluator interface {
 	// Name 评估器名称
 	Name() string

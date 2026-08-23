@@ -24,9 +24,12 @@ func NewContextPrecisionEvaluator(llm model.ChatModel, promptRenderer adapter.Pr
 			templateName:   enum.ContextPrecisionEvaluate,
 			promptRenderer: promptRenderer,
 			llm:            llm,
-			scoreParser:    parseContextPrecisionScore,
 		},
 	}
+}
+
+func (e *ContextPrecisionEvaluator) Name() string {
+	return enum.ContextPrecision
 }
 
 func (e *ContextPrecisionEvaluator) validate(input *conversation.EvaluationInput) error {
@@ -56,7 +59,7 @@ func (e *ContextPrecisionEvaluator) prepareVariables(input *conversation.Evaluat
 	}
 }
 
-func parseContextPrecisionScore(output string) (float64, error) {
+func (e *ContextPrecisionEvaluator) parseContextPrecisionScore(question, output string) (float64, error) {
 	re := regexp.MustCompile(`CONTEXT_PRECISION_SCORE:\s*(0\.\d+)`)
 	matches := re.FindStringSubmatch(output)
 	if len(matches) < 2 {

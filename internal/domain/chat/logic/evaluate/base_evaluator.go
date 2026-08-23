@@ -14,7 +14,6 @@ type baseEvaluator struct {
 	templateName   string
 	promptRenderer adapter.PromptRenderer
 	llm            model.ChatModel
-	scoreParser    func(string) (float64, error)
 }
 
 // Name 评估器名称
@@ -44,7 +43,7 @@ func (e *baseEvaluator) Evaluate(ctx context.Context, input *conversation.Evalua
 	}
 
 	// 解析分数
-	return e.scoreParser(response)
+	return e.parseContextPrecisionScore(input.Question, response)
 }
 
 func (e *baseEvaluator) validate(input *conversation.EvaluationInput) error {
@@ -53,4 +52,8 @@ func (e *baseEvaluator) validate(input *conversation.EvaluationInput) error {
 
 func (e *baseEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
 	return nil
+}
+
+func (e *baseEvaluator) parseContextPrecisionScore(question, output string) (float64, error) {
+	return 0, nil
 }

@@ -2,7 +2,6 @@ package rank
 
 import (
 	"context"
-	"math"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
@@ -57,7 +56,7 @@ func (b *base) computeSemanticScores(ctx context.Context, rankCtx *Context, rout
 			return make([]float64, len(routeTexts))
 		}
 		for idx, emb := range embeddings {
-			scores[start+idx] = cosineSimilarity(rankCtx.QueryEmbedding, emb)
+			scores[start+idx] = utils.CosineSimilarity(rankCtx.QueryEmbedding, emb)
 		}
 	}
 	return scores
@@ -117,21 +116,4 @@ func (b *base) listRetrievableDocuments(ctx context.Context, rankCtx *Context) (
 		}
 	}
 	return docs, err
-}
-
-// cosineSimilarity 计算两个等长向量的余弦相似度
-func cosineSimilarity(left, right []float64) float64 {
-	if len(left) == 0 || len(right) == 0 || len(left) != len(right) {
-		return 0
-	}
-	var dot, lNorm, rNorm float64
-	for i := 0; i < len(left); i++ {
-		dot += left[i] * right[i]
-		lNorm += left[i] * left[i]
-		rNorm += right[i] * right[i]
-	}
-	if lNorm <= 0 || rNorm <= 0 {
-		return 0
-	}
-	return dot / (math.Sqrt(lNorm) * math.Sqrt(rNorm))
 }

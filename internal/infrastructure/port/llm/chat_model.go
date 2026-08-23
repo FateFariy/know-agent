@@ -33,7 +33,7 @@ type ChatModelImpl[M adk.MessageType] struct {
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
 func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.AgenticMessage] {
-	observability.NewModelUsageHandler(svcCtx.Config.ChatModel)
+	observability.RegisterModelUsageHandler(svcCtx.Config.ChatModel)
 
 	provider := resolveProvider(svcCtx.ChatModel)
 	conf := svcCtx.Config.ChatModel[provider]

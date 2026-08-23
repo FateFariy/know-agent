@@ -23,11 +23,11 @@ func NewRagRetrievalResult(retrievalQuestion string) *RetrievalResult {
 }
 
 // IsEmpty 判断检索上下文是否为空（所有子问题均无证据）
-func (c *RetrievalResult) IsEmpty() bool {
-	if len(c.SubQuestionEvidenceList) == 0 {
+func (r *RetrievalResult) IsEmpty() bool {
+	if len(r.SubQuestionEvidenceList) == 0 {
 		return true
 	}
-	for _, sq := range c.SubQuestionEvidenceList {
+	for _, sq := range r.SubQuestionEvidenceList {
 		if len(sq.References) > 0 {
 			return false
 		}
@@ -36,67 +36,67 @@ func (c *RetrievalResult) IsEmpty() bool {
 }
 
 // FlattenReferences 合并所有子问题的引用
-func (c *RetrievalResult) FlattenReferences() []*SearchReference {
-	if c == nil || len(c.SubQuestionEvidenceList) == 0 {
+func (r *RetrievalResult) FlattenReferences() []*SearchReference {
+	if r == nil || len(r.SubQuestionEvidenceList) == 0 {
 		return nil
 	}
 	var refs []*SearchReference
-	for _, sq := range c.SubQuestionEvidenceList {
+	for _, sq := range r.SubQuestionEvidenceList {
 		refs = append(refs, sq.References...)
 	}
 	return refs
 }
 
 // AddRetrievalNotef 添加检索笔记
-func (c *RetrievalResult) AddRetrievalNotef(format string, args ...any) {
+func (r *RetrievalResult) AddRetrievalNotef(format string, args ...any) {
 	note := fmt.Sprintf(format, args...)
-	c.retrievalNotes.Add(note)
+	r.retrievalNotes.Add(note)
 }
 
 // AddUsedChannel 添加已使用的渠道
-func (c *RetrievalResult) AddUsedChannel(channel string) {
-	if !c.usedChannels.Contain(channel) {
-		c.usedChannels.Add(channel)
+func (r *RetrievalResult) AddUsedChannel(channel string) {
+	if !r.usedChannels.Contain(channel) {
+		r.usedChannels.Add(channel)
 	}
 }
 
 // UsedChannels 获取已使用的渠道
-func (c *RetrievalResult) UsedChannels() []string {
-	size := c.usedChannels.Size()
+func (r *RetrievalResult) UsedChannels() []string {
+	size := r.usedChannels.Size()
 	if size == 0 {
 		return nil
 	}
-	return c.usedChannels.SubList(0, size)
+	return r.usedChannels.SubList(0, size)
 }
 
 // RetrievalNotes 获取检索笔记
-func (c *RetrievalResult) RetrievalNotes() []string {
-	size := c.retrievalNotes.Size()
+func (r *RetrievalResult) RetrievalNotes() []string {
+	size := r.retrievalNotes.Size()
 	if size == 0 {
 		return nil
 	}
-	return c.retrievalNotes.SubList(0, size)
+	return r.retrievalNotes.SubList(0, size)
 }
 
 // ToSnapshot 构建检索阶段快照
-func (c *RetrievalResult) ToSnapshot(plan *RetrievalPlan) map[string]any {
-	references := c.FlattenReferences()
+func (r *RetrievalResult) ToSnapshot(plan *RetrievalPlan) map[string]any {
+	references := r.FlattenReferences()
 	return map[string]any{
-		"retrievalQuestion": c.RetrievalQuestion,
+		"retrievalQuestion": r.RetrievalQuestion,
 		"retrievalPlan":     plan,
-		"usedChannels":      c.UsedChannels(),
-		"retrievalNotes":    c.RetrievalNotes(),
+		"usedChannels":      r.UsedChannels(),
+		"retrievalNotes":    r.RetrievalNotes(),
 		"referenceCount":    len(references),
-		"subQuestionCount":  len(c.SubQuestionEvidenceList),
-		"subQuestions":      c.BuildSubQuestionSnapshots(),
+		"subQuestionCount":  len(r.SubQuestionEvidenceList),
+		"subQuestions":      r.BuildSubQuestionSnapshots(),
 		"references":        ToRefSnapshotList(references),
 	}
 }
 
 // ValidateEvidenceBudgetScope 验证证据预算范围：子问题索引必须为正数且唯一
-func (c *RetrievalResult) ValidateEvidenceBudgetScope() error {
-	indexSet := make(map[int]struct{}, len(c.SubQuestionEvidenceList))
-	for _, sq := range c.SubQuestionEvidenceList {
+func (r *RetrievalResult) ValidateEvidenceBudgetScope() error {
+	indexSet := make(map[int]struct{}, len(r.SubQuestionEvidenceList))
+	for _, sq := range r.SubQuestionEvidenceList {
 		if sq.SubQuestionIndex <= 0 {
 			return fmt.Errorf("证据预算子问题索引必须为正数: index=%d", sq.SubQuestionIndex)
 		}
@@ -109,9 +109,9 @@ func (c *RetrievalResult) ValidateEvidenceBudgetScope() error {
 }
 
 // BuildSubQuestionBudgetDetails 构建子问题预算详情列表
-func (c *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptAssemblyResult) []map[string]any {
-	details := make([]map[string]any, len(c.SubQuestionEvidenceList))
-	for i, sq := range c.SubQuestionEvidenceList {
+func (r *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptAssemblyResult) []map[string]any {
+	details := make([]map[string]any, len(r.SubQuestionEvidenceList))
+	for i, sq := range r.SubQuestionEvidenceList {
 		details[i] = map[string]any{
 			"subQuestionIndex": sq.SubQuestionIndex,
 			"question":         sq.SubQuestion,
@@ -123,10 +123,24 @@ func (c *RetrievalResult) BuildSubQuestionBudgetDetails(promptResult *RagPromptA
 }
 
 // BuildSubQuestionSnapshots 构建子问题追踪快照列表
-func (c *RetrievalResult) BuildSubQuestionSnapshots() []map[string]any {
-	subQuestions := make([]map[string]any, len(c.SubQuestionEvidenceList))
-	for i, sq := range c.SubQuestionEvidenceList {
+func (r *RetrievalResult) BuildSubQuestionSnapshots() []map[string]any {
+	subQuestions := make([]map[string]any, len(r.SubQuestionEvidenceList))
+	for i, sq := range r.SubQuestionEvidenceList {
 		subQuestions[i] = sq.BuildSubQuestionSnapshot()
 	}
 	return subQuestions
+}
+
+// RetrievalContexts 获取检索上下文
+func (r *RetrievalResult) RetrievalContexts() []string {
+	if r == nil {
+		return nil
+	}
+	var contexts []string
+	for _, evidence := range r.SubQuestionEvidenceList {
+		for _, ref := range evidence.References {
+			contexts = append(contexts, ref.Snippet)
+		}
+	}
+	return contexts
 }
