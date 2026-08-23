@@ -17,7 +17,7 @@ type FaithfulnessEvaluator struct {
 	baseEvaluator
 }
 
-func NewFaithfulnessEvaluator(promptRenderer adapter.PromptRenderer, llm model.ChatModel) *FaithfulnessEvaluator {
+func NewFaithfulnessEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer) *FaithfulnessEvaluator {
 	return &FaithfulnessEvaluator{
 		baseEvaluator: baseEvaluator{
 			templateName:   enum.AnswerFaithfulnessEvaluate,

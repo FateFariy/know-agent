@@ -139,10 +139,23 @@ Chat:
 
 ChatModel:
   Ark:
+    Function: "chat"
     Model: doubao-seed-2-0-mini-260428
     BaseURL: https://ark.cn-beijing.volces.com/api/v3
     ApiKey: REPLACE_YOUR_ARK_KEY
     Temperature: 0.1
+    MaxTokens: 1024
+    TopP: 0.3
+    InputTokenCost1k: 0.0001
+    OutputTokenCost1k: 0.0001
+
+JudgeModel:
+  Ark:
+    Function: "judge"
+    Model: deepseek-v4-flash-260425
+    BaseURL: https://ark.cn-beijing.volces.com/api/v3
+    ApiKey: REPLACE_YOUR_ARK_KEY
+    Temperature: 0.0
     MaxTokens: 1024
     TopP: 0.3
     InputTokenCost1k: 0.0001

@@ -5,6 +5,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
@@ -98,7 +99,7 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
-		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender)
+		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender, NewAnswerEvaluators(chatModel, renderer))
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
 	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
 
@@ -138,4 +139,12 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 		),
 	}
 	return chunk.NewChunkStrategyRegistry(chunkers)
+}
+
+func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer) []conversation.Evaluator {
+	return []conversation.Evaluator{
+		evaluate.NewFaithfulnessEvaluator(llm, renderer),
+		evaluate.NewAnswerRelevancyEvaluator(llm, renderer),
+		evaluate.NewContextPrecisionEvaluator(llm, renderer),
+	}
 }

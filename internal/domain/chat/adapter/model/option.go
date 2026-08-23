@@ -5,6 +5,7 @@ import (
 )
 
 type Options struct {
+	Function    string
 	Model       string
 	Temperature *float32
 	TopP        *float32
@@ -12,6 +13,12 @@ type Options struct {
 }
 
 type Option = common.Option
+
+func WithFunction(function string) Option {
+	return common.WrapImplSpecificOptFn(func(opt *Options) {
+		opt.Function = function
+	})
+}
 
 // WithModel 设置模型名称
 func WithModel(model string) Option {

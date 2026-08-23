@@ -1,6 +1,7 @@
 package config
 
 type LLMConf struct {
+	Function          string
 	Model             string
 	ApiKey            string
 	BaseURL           string

@@ -25,9 +25,10 @@ import (
 
 // ChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
 type ChatModelImpl[M adk.MessageType] struct {
-	chatModel eino.BaseModel[M]
-	provider  string
-	options   *model.Options
+	chatModel  eino.BaseModel[M]
+	judgeModel eino.BaseModel[M]
+	provider   string
+	options    *model.Options
 }
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
@@ -37,9 +38,11 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 	provider := resolveProvider(svcCtx.ChatModel)
 	conf := svcCtx.Config.ChatModel[provider]
 	return &ChatModelImpl[*schema.AgenticMessage]{
-		chatModel: svcCtx.ChatModel,
-		provider:  provider,
+		chatModel:  svcCtx.ChatModel,
+		judgeModel: svcCtx.JudgeModel,
+		provider:   provider,
 		options: &model.Options{
+			Function:    "chat",
 			Model:       conf.Model,
 			Temperature: &conf.Temperature,
 			MaxTokens:   conf.MaxTokens,
@@ -51,7 +54,7 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 // Generate 同步调用模型，返回文本响应
 func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	// 调用底层模型执行生成
-	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
+	response, err := o.getChatModel(opts...).Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
 		return "", err
 	}
@@ -67,7 +70,7 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
 	ctx = OnStart(ctx, meta, input)
 
-	response, err := o.chatModel.Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
+	response, err := o.getChatModel(opts...).Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
 		ctx = callbacks.OnError(ctx, err)
 		return "", err
@@ -92,7 +95,7 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 	resultChan := make(chan string, 100)
 
 	// 调用底层模型建立流式连接
-	stream, err := o.chatModel.Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
+	stream, err := o.getChatModel(opts...).Stream(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
 		ctx = callbacks.OnError(ctx, err)
 		return nil, err
@@ -188,6 +191,14 @@ func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
 		}
 		return any(messages).([]M)
 	}
+}
+
+func (o *ChatModelImpl[M]) getChatModel(opts ...common.Option) eino.BaseModel[M] {
+	opt := common.GetImplSpecificOptions(o.options, opts...)
+	if opt.Function == "judge" {
+		return o.judgeModel
+	}
+	return o.chatModel
 }
 
 // convertOptions 转换模型调用选项

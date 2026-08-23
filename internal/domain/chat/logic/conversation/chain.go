@@ -36,6 +36,7 @@ func NewChain(
 	promptRenderer adapter.PromptRenderer,
 	chatModel model.ChatModel,
 	questionRecommender QuestionRecommender,
+	evaluators []Evaluator,
 ) *Chain {
 	chain := &Chain{
 		repo:            repo,
@@ -54,6 +55,7 @@ func NewChain(
 		NewEvidenceBudgetStage(svcCtx, promptRenderer),
 		NewGenerateStage(chatModel),
 		NewRecommendStage(svcCtx, repo, memoryManager, questionRecommender),
+		NewAnswerEvaluateStage(evaluators),
 		NewEndStage(repo),
 	}
 

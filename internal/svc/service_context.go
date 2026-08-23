@@ -28,15 +28,16 @@ import (
 )
 
 type ServiceContext struct {
-	Config    *config.Config
-	Validate  *validator.Validate
-	Minio     *minio.Client
-	Db        *gorm.DB
-	Rdb       *redis.Client
-	RedSync   *redsync.Redsync
-	Emb       embedding.Embedder
-	ChatModel model.BaseModel[*einoschema.AgenticMessage]
-	Milvus    *milvusclient.Client
+	Config     *config.Config
+	Validate   *validator.Validate
+	Minio      *minio.Client
+	Db         *gorm.DB
+	Rdb        *redis.Client
+	RedSync    *redsync.Redsync
+	Emb        embedding.Embedder
+	ChatModel  model.BaseModel[*einoschema.AgenticMessage]
+	JudgeModel model.BaseModel[*einoschema.AgenticMessage]
+	Milvus     *milvusclient.Client
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {
@@ -44,15 +45,16 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return &ServiceContext{
-		Config:    c,
-		Validate:  validator.New(),
-		Rdb:       redisClient,
-		Db:        NewMySQLDB(c),
-		Minio:     NewMinioClient(c),
-		RedSync:   NewRedSync(redisClient),
-		Emb:       NewArkEmbedding(ctx, c),
-		ChatModel: NewArkChatModel(ctx, c),
-		Milvus:    NewMilvusClient(ctx, c),
+		Config:     c,
+		Validate:   validator.New(),
+		Rdb:        redisClient,
+		Db:         NewMySQLDB(c),
+		Minio:      NewMinioClient(c),
+		RedSync:    NewRedSync(redisClient),
+		Emb:        NewArkEmbedding(ctx, c),
+		ChatModel:  NewArkChatModel(ctx, c, "chat"),
+		JudgeModel: NewArkChatModel(ctx, c, "judge"),
+		Milvus:     NewMilvusClient(ctx, c),
 	}
 }
 
@@ -123,8 +125,11 @@ func NewArkEmbedding(ctx context.Context, c *config.Config) embedding.Embedder {
 	return emb
 }
 
-func NewArkChatModel(ctx context.Context, c *config.Config) *agenticark.Model {
+func NewArkChatModel(ctx context.Context, c *config.Config, function string) *agenticark.Model {
 	llmConf := c.ChatModel["Ark"]
+	if function == "judge" {
+		llmConf = c.JudgeModel["Ark"]
+	}
 	chatModel, err := agenticark.New(ctx, &agenticark.Config{
 		APIKey:      llmConf.ApiKey,
 		Model:       llmConf.Model,

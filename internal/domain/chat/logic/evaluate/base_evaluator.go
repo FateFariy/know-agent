@@ -38,7 +38,7 @@ func (e *baseEvaluator) Evaluate(ctx context.Context, input *conversation.Evalua
 	}
 
 	// 调用LLM
-	response, err := e.llm.Generate(ctx, "", prompt)
+	response, err := e.llm.Generate(ctx, "", prompt, model.WithTemperature(0), model.WithFunction("judge"))
 	if err != nil {
 		return 0, fmt.Errorf("LLM调用失败: %w", err)
 	}

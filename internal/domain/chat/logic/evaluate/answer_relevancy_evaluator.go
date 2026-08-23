@@ -16,7 +16,7 @@ type AnswerRelevancyEvaluator struct {
 	baseEvaluator
 }
 
-func NewAnswerRelevancyEvaluator(promptRenderer adapter.PromptRenderer, llm model.ChatModel) *AnswerRelevancyEvaluator {
+func NewAnswerRelevancyEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer) *AnswerRelevancyEvaluator {
 	return &AnswerRelevancyEvaluator{
 		baseEvaluator: baseEvaluator{
 			templateName:   enum.AnswerRelevancyEvaluate,
