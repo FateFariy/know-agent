@@ -18,7 +18,6 @@ type RetrievalPlan struct {
 	DocumentScope             []int64                      // 文档范围ID列表
 	TaskScope                 []int64                      // 任务范围ID列表
 	MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件
-	EvidenceApplicabilityPlan *EvidenceApplicabilityPlan   // 证据适用性计划
 	Channels                  []*RetrievalChannelPlan      // 检索通道计划列表
 	StructureNavigation       *StructureNavigationIntent   // 结构导航意图
 	NavigationAction          string                       // 文档导航动作

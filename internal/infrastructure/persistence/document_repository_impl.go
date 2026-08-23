@@ -469,14 +469,16 @@ func (d *DocumentRepositoryImpl) InsertStructureNodeBatch(ctx context.Context, n
 	return d.dbWithContext(ctx).Create(convert.ToDocumentStructureNodeModelList(nodes)).Error
 }
 
+// DeleteStructureNodeByDocumentId 根据文档ID删除结构节点
 func (d *DocumentRepositoryImpl) DeleteStructureNodeByDocumentId(ctx context.Context, documentId int64) error {
 	return d.dbWithContext(ctx).Where("document_id = ?", documentId).Delete(&model.DocumentStructureNode{}).Error
 }
 
+// SelectStructureNodeListByDocumentId 根据文档ID查询结构节点列表
 func (d *DocumentRepositoryImpl) SelectStructureNodeListByDocumentId(ctx context.Context, documentId int64) ([]*entity.StructureNode, error) {
 	var nodes []*entity.StructureNode
 	err := d.dbWithContext(ctx).Model(&model.DocumentStructureNode{}).
-		Where("document_id = ?", documentId).Order("id ASC").Find(&nodes).Error
+		Where("document_id = ?", documentId).Order("node_no ASC, id ASC").Find(&nodes).Error
 	return nodes, err
 }
 

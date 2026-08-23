@@ -7,7 +7,7 @@ import (
 	"slices"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -39,7 +39,7 @@ func NewRRFFusion() *RRFFusion {
 //  3. 按通道权重、排名权重和原始分数权重计算最终融合分数
 //  4. 按融合分数降序排序，截取候选窗口（plan.CandidateTopK）内的文档
 //  5. 回写融合分数到文档的 RRFScore 字段
-func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.DocumentChunk {
+func (f *RRFFusion) Fuse(_ context.Context, results []*retrieval.RetrievalChannelResult, plan *vo.RetrievalPlan) []*vo.DocumentChunk {
 	if len(results) == 0 || plan == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (f *RRFFusion) Fuse(_ context.Context, results []*rag.RetrievalChannelResul
 }
 
 // accumulateWeightedHybrid 遍历单个通道结果，对每个文档累积加权融合分数
-func (f *RRFFusion) accumulateWeightedHybrid(channelResults []*rag.RetrievalChannelResult, plan *vo.RetrievalPlan) map[string]*candidateHolder {
+func (f *RRFFusion) accumulateWeightedHybrid(channelResults []*retrieval.RetrievalChannelResult, plan *vo.RetrievalPlan) map[string]*candidateHolder {
 	holders := make(map[string]*candidateHolder)
 	channelMap := utils.MapBy(plan.Channels, func(channel *vo.RetrievalChannelPlan) (string, *vo.RetrievalChannelPlan) {
 		return channel.Name, channel

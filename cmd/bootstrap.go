@@ -5,14 +5,13 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/fuse"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval/fuse"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
@@ -86,19 +85,18 @@ func bootstrap(c *config.Config) *server.Server {
 
 	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
 	recommender := recommend.NewQuestionRecommendImpl(serviceContext, renderer, chatModel)
-	channels := []rag.Retrieval{
+	channels := []retrieval.Retrieval{
 		channel.NewVectorRetrievalChannel(serviceContext, milvusVector),
 		channel.NewKeywordRetrievalChannel(serviceContext, milvusKeyword),
 	}
 
 	rrfFusion := fuse.NewRRFFusion()
-	retrievalEngine := rag.NewRetrievalEngine(serviceContext, chatRepo, dashScope, channels, documentForChat, rrfFusion)
+	retrievalEngine := retrieval.NewRetrievalEngine(serviceContext, chatRepo, dashScope, channels, documentForChat, rrfFusion)
 
 	compressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepo, chatModel, renderer)
 	memoryManageImpl := memory.NewSessionMemoryManageImpl(compressionStrategy)
-	graphQuerier := graph.NewDefaultStructureGraphQuerier(serviceContext)
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
-	documentRouter := route.NewDocumentRouter(graphQuerier, nil)
+	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
 		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)

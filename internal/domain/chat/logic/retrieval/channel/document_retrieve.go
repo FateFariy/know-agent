@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval"
 )
 
 // DocumentRetrieve 文档检索
@@ -31,7 +31,7 @@ type DocumentRetrieveFilters struct {
 }
 
 // NewDocumentRetrieve 根据检索执行请求和渠道名称构建文档检索请求。
-func NewDocumentRetrieve(channelName string, input *rag.ExecutionInput) (*DocumentRetrieve, error) {
+func NewDocumentRetrieve(channelName string, input *retrieval.ExecutionInput) (*DocumentRetrieve, error) {
 	if input == nil {
 		return nil, fmt.Errorf("ExecutionInput is required for document retrieval")
 	}

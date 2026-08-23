@@ -7,7 +7,7 @@ type MinioConf struct {
 	BucketName          string `json:",default=super-agent-document"`
 	ObjectPrefix        string `json:",default=rag/document"`
 	ParsedTextPrefix    string `json:",default=rag/parsed-text"`
-	ParseArtifactPrefix string `json:"rag/parse-artifact"`
+	ParseArtifactPrefix string `json:",default=rag/parse-artifact"`
 	UseSSL              bool   `json:",default=false"`
 }
 

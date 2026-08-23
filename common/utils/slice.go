@@ -7,6 +7,7 @@ import (
 	"github.com/duke-git/lancet/v2/slice"
 )
 
+// MapBy 映射切片
 func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]V {
 	if slice == nil {
 		return nil
@@ -24,6 +25,7 @@ func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]
 	return maps
 }
 
+// GroupBy 分组
 func GroupBy[T any, K comparable, V any](slice []T, valueFunc func(T) (K, V)) map[K][]V {
 	if slice == nil {
 		return nil
@@ -36,6 +38,7 @@ func GroupBy[T any, K comparable, V any](slice []T, valueFunc func(T) (K, V)) ma
 	return result
 }
 
+// Map 映射切片
 func Map[T, V any](slice []T, mapper func(T) V) []V {
 	if slice == nil {
 		return nil
@@ -47,6 +50,7 @@ func Map[T, V any](slice []T, mapper func(T) V) []V {
 	return result
 }
 
+// Filter 过滤切片
 func Filter[T any](slice []T, predicate func(T) bool) []T {
 	if slice == nil {
 		return nil
@@ -60,6 +64,7 @@ func Filter[T any](slice []T, predicate func(T) bool) []T {
 	return result
 }
 
+// Limit 截断切片
 func Limit[T any](slice []T, limit int) []T {
 	if slice == nil {
 		return nil
@@ -72,6 +77,7 @@ func Limit[T any](slice []T, limit int) []T {
 	return slice[:limit]
 }
 
+// Distinct 去重
 func Distinct[T any, V comparable](slice []T, keyFunc func(T) V) []T {
 	if len(slice) == 0 {
 		return nil

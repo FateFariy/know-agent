@@ -9,8 +9,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/graph"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -26,10 +24,10 @@ var (
 	stepReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)
 
 	// ordinalReferencePattern 匹配"第几条/点/项/个"
-	ordinalReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(条|点|项|个)`)
+	ordinalReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*([条点项个])`)
 
 	// quotedTextPattern 匹配引号包裹的标题短语
-	quotedTextPattern = regexp.MustCompile(`[""']([^""']{2,40})[""']`)
+	quotedTextPattern = regexp.MustCompile(`["“']([^"”']{2,40})["”']`)
 )
 
 // structureNavigationConfidenceThreshold 结构导航置信度阈值
@@ -45,12 +43,12 @@ const structureNavigationConfidenceThreshold = 0.65
 // 所有文档问答统一输出 ExecutionMode.Retrieval，进入统一多通道混合检索；
 // 结构导航结果只作为检索上下文和观测信号，不得绕过混合检索。
 type DocumentRouterImpl struct {
-	querier graph.GraphQuerier // 结构图谱查询
-	indexer NavigationIndexer  // 可选：章节索引服务
+	querier GraphQuerier      // 结构图谱查询
+	indexer NavigationIndexer // 可选：章节索引服务
 }
 
 // NewDocumentRouter 创建文档路由器
-func NewDocumentRouter(querier graph.GraphQuerier, indexer NavigationIndexer) *DocumentRouterImpl {
+func NewDocumentRouter(querier GraphQuerier, indexer NavigationIndexer) *DocumentRouterImpl {
 	return &DocumentRouterImpl{
 		querier: querier,
 		indexer: indexer,
@@ -104,7 +102,7 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *conversation.Docu
 		extractor.hasExplicitSectionAnchor() ||
 		recognitionResult.HasSectionAnchor()
 
-	var assistedSection *entity.GraphSection
+	var assistedSection *vo.GraphSection
 	if hasExplicitStructureAnchor {
 		assistedSection = r.resolveSection(ctx, input.DocumentId, input.OriginalQuestion, rewrittenQuestion)
 	}
@@ -127,7 +125,7 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *conversation.Docu
 // ============================================================
 
 // buildDecision 构建导航决策
-func (r *DocumentRouterImpl) buildDecision(action string, section *entity.GraphSection,
+func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSection,
 	itemIndex *int, recognitionResult *vo.IntentRecognitionResult,
 	retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
 
@@ -200,7 +198,7 @@ func (r *DocumentRouterImpl) buildDecision(action string, section *entity.GraphS
 // resolveSection 章节定位只允许精确锚点：章节号精确、引号标题精确、导航索引命中。
 // 不再用正文 contains 打分或短语剥离作为结构锚点权威来源；未命中时返回 nil，交混合检索处理。
 func (r *DocumentRouterImpl) resolveSection(ctx context.Context, documentId int64,
-	originalQuestion, rewrittenQuestion string) *entity.GraphSection {
+	originalQuestion, rewrittenQuestion string) *vo.GraphSection {
 
 	if documentId == 0 {
 		return nil
@@ -223,7 +221,7 @@ func (r *DocumentRouterImpl) resolveSection(ctx context.Context, documentId int6
 
 // resolveSectionByQuestion 根据问题定位章节
 func (r *DocumentRouterImpl) resolveSectionByQuestion(ctx context.Context,
-	documentId int64, question string) *entity.GraphSection {
+	documentId int64, question string) *vo.GraphSection {
 
 	// 按章节编号定位
 	byCode := r.resolveBySectionCode(ctx, documentId, question)
@@ -243,7 +241,7 @@ func (r *DocumentRouterImpl) resolveSectionByQuestion(ctx context.Context,
 
 // resolveBySectionCode 按章节编号定位
 func (r *DocumentRouterImpl) resolveBySectionCode(ctx context.Context, documentId int64,
-	question string) *entity.GraphSection {
+	question string) *vo.GraphSection {
 
 	normalized := utils.Trim(question)
 	for _, code := range sectionCodePattern.FindAllString(normalized, -1) {
@@ -258,7 +256,7 @@ func (r *DocumentRouterImpl) resolveBySectionCode(ctx context.Context, documentI
 
 // resolveByQuotedTitle 按引号标题定位
 func (r *DocumentRouterImpl) resolveByQuotedTitle(ctx context.Context, documentId int64,
-	question string) *entity.GraphSection {
+	question string) *vo.GraphSection {
 	extractor := newNavigationExtractor(question)
 
 	quotedPhrases := extractor.collectQuotedPhrases()
@@ -295,7 +293,7 @@ func (r *DocumentRouterImpl) resolveByQuotedTitle(ctx context.Context, documentI
 
 // resolveByNavigationIndex 按导航索引定位
 func (r *DocumentRouterImpl) resolveByNavigationIndex(ctx context.Context, documentId int64,
-	question string) *entity.GraphSection {
+	question string) *vo.GraphSection {
 
 	if r.indexer == nil {
 		return nil

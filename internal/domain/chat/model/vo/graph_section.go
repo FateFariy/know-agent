@@ -1,4 +1,4 @@
-package entity
+package vo
 
 import (
 	"github.com/swiftbit/know-agent/common/utils"

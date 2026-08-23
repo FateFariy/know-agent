@@ -355,7 +355,6 @@ func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.Conversat
 		DocumentScope:             utils.Copy(documentScope),
 		TaskScope:                 utils.Copy(taskScope),
 		MetadataFilters:           vo.NewMetadataFilters(questionPlan.RetrievalQuestion, intentResult),
-		EvidenceApplicabilityPlan: vo.NewEvidenceApplicabilityPlan(questionPlan.CurrentQuestion, intentResult),
 		Channels:                  channels,
 		StructureNavigation:       intentResult.StructureNavigationIntent.Clone(),
 		NavigationAction:          execPlan.NavigationDecision.NavigationActionText(),

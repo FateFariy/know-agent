@@ -3,9 +3,13 @@ package gateway
 import (
 	"context"
 	"strconv"
+	"strings"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
+	"github.com/swiftbit/know-agent/internal/domain/document/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/model/vo"
 )
 
@@ -165,4 +169,68 @@ func (a *DocumentAdapterForChat) FindParentChunks(ctx context.Context, ids []int
 		})
 	}
 	return result, nil
+}
+
+func (a *DocumentAdapterForChat) ListSections(ctx context.Context, documentId int64) ([]*cvo.GraphSection, error) {
+	nodes, err := a.repo.SelectStructureNodeListByDocumentId(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+	return utils.FilterMapUniqueLimit(nodes, -1, func(r *entity.StructureNode) (int64, *cvo.GraphSection, bool) {
+		return r.ID, toGraphSection(r), r != nil && r.NodeType == enum.NodeTypeSection
+	}), nil
+}
+
+func (a *DocumentAdapterForChat) FindSectionById(ctx context.Context, documentId, nodeId int64) (*cvo.GraphSection, error) {
+	if documentId == 0 || nodeId == 0 {
+		return nil, nil
+	}
+	sections, err := a.ListSections(ctx, documentId)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range sections {
+		if s.NodeId == nodeId {
+			return s, nil
+		}
+	}
+	return nil, nil
+}
+
+func (a *DocumentAdapterForChat) FindSectionByCode(ctx context.Context, documentId int64, sectionCode string) (*cvo.GraphSection, error) {
+	if documentId == 0 || utils.IsBlank(sectionCode) {
+		return nil, nil
+	}
+	sections, err := a.ListSections(ctx, documentId)
+	if err != nil || len(sections) == 0 {
+		return nil, err
+	}
+	for _, s := range sections {
+		if strings.EqualFold(strings.TrimSpace(s.NodeCode), strings.TrimSpace(sectionCode)) {
+			return s, nil
+		}
+	}
+	return nil, nil
+}
+
+func toGraphSection(r *entity.StructureNode) *cvo.GraphSection {
+	if r == nil {
+		return nil
+	}
+	return &cvo.GraphSection{
+		NodeId:            r.ID,
+		DocumentId:        r.DocumentId,
+		ParseTaskId:       r.ParseTaskId,
+		NodeNo:            r.NodeNo,
+		Depth:             r.Depth,
+		ParentNodeId:      r.ParentNodeId,
+		PrevSiblingNodeId: r.PrevSiblingNodeId,
+		NextSiblingNodeId: r.NextSiblingNodeId,
+		NodeCode:          r.NodeCode,
+		Title:             r.Title,
+		AnchorText:        r.AnchorText,
+		SectionPath:       r.SectionPath,
+		CanonicalPath:     r.CanonicalPath,
+		ContentText:       r.ContentText,
+	}
 }

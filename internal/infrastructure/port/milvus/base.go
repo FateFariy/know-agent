@@ -21,7 +21,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"

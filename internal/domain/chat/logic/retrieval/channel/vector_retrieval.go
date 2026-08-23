@@ -7,7 +7,7 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -32,7 +32,7 @@ func (c *VectorRetrievalChannel) Name() string {
 
 // Retrieve 执行向量检索
 // 流程：参数校验 → 构建描述符 map → 调用 Milvus 向量相似度查询（topK + 过滤）
-func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, input *rag.ExecutionInput) (*rag.RetrievalChannelResult, error) {
+func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, input *retrieval.ExecutionInput) (*retrieval.RetrievalChannelResult, error) {
 	query, err := NewDocumentRetrieve(c.Name(), input)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *VectorRetrievalChannel) Retrieve(ctx context.Context, input *rag.Execut
 		return doc != nil && doc.Score >= channel.MinimumScore
 	})
 
-	return &rag.RetrievalChannelResult{
+	return &retrieval.RetrievalChannelResult{
 		Name:              c.Name(),
 		RawDocuments:      docs,
 		AcceptedDocuments: accepted,

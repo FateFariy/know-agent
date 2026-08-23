@@ -291,7 +291,7 @@ func tableText(rows [][]string) string {
 	return strings.Join(lines, "\n")
 }
 
-var nonAllowedCharsRegex = regexp.MustCompile(`[^0-9a-zA-Z\u4e00-\u9fff]+`)
+var nonAllowedCharsRegex = regexp.MustCompile(`[^0-9a-zA-Z\p{Han}]+`)
 
 // BuildCanonicalPath 生成规范路径，格式：章节路径-块编号
 func (b *DocumentBlock) BuildCanonicalPath() string {

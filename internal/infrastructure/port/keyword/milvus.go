@@ -8,7 +8,7 @@ import (
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag/channel"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/milvus"

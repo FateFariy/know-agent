@@ -2,6 +2,8 @@ package route
 
 import (
 	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // NavigationSectionHit 章节索引服务返回的命中节点
@@ -24,4 +26,16 @@ type SearchInput struct {
 type NavigationIndexer interface {
 	// SearchSections 按关键词+维度检索匹配的章节命中
 	SearchSections(ctx context.Context, input *SearchInput) ([]*NavigationSectionHit, error)
+}
+
+// GraphQuerier 结构图查询接口
+type GraphQuerier interface {
+	// ListSections 列出指定文档下的所有结构图节点（用于本地短语匹配）
+	ListSections(ctx context.Context, documentId int64) ([]*vo.GraphSection, error)
+
+	// FindSectionById 根据节点 ID 匹配章节节点
+	FindSectionById(ctx context.Context, documentId int64, nodeId int64) (*vo.GraphSection, error)
+
+	// FindSectionByCode 根据编号（如 1.2.3 / 第 3 节）匹配章节节点
+	FindSectionByCode(ctx context.Context, documentId int64, sectionCode string) (*vo.GraphSection, error)
 }

@@ -64,11 +64,9 @@ type DocumentConverter interface {
 	// goverter:map . Model
 	ToDocumentParentBlockModel(src *den.DocumentParentChunk) *model.DocumentParentChunk
 	ToDocumentParentBlockModelList(src []*den.DocumentParentChunk) []*model.DocumentParentChunk
-
 	// goverter:map . Model
 	ToDocumentBlockModel(src *den.DocumentBlock) *model.DocumentBlock
 	ToDocumentBlockModelList(src []*den.DocumentBlock) []*model.DocumentBlock
-
 	// goverter:map . Model
 	ToDocumentTableModel(src *den.DocumentTable) *model.DocumentTable
 	ToDocumentTableModelList(src []*den.DocumentTable) []*model.DocumentTable
