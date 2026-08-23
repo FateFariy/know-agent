@@ -40,15 +40,6 @@ func JSONArrayTo[T any](src JSONArray, parseFunc func(any) T) []T {
 	return result
 }
 
-func JSONArrayToIntSlice(src JSONArray) []int {
-	return JSONArrayTo(src, func(item any) int {
-		if val, ok := item.(int); ok {
-			return val
-		}
-		return 0
-	})
-}
-
 func ToJSONArray[T any](src []T) JSONArray {
 	if src == nil {
 		return nil

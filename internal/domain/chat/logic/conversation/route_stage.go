@@ -7,7 +7,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -25,7 +24,7 @@ const (
 type RouteStage struct {
 	repo            adapter.ChatRepository
 	knowledgeRouter KnowledgeRouter
-	documentRouter  route.DocumentRouter
+	documentRouter  DocumentRouter
 	docGateway      adapter.DocumentGateway
 	noEvidenceReply string
 }
@@ -36,7 +35,7 @@ func NewRouteStage(
 	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	knowledgeRouter KnowledgeRouter,
-	documentRouter route.DocumentRouter,
+	documentRouter DocumentRouter,
 	docGateway adapter.DocumentGateway,
 ) *RouteStage {
 	return &RouteStage{
@@ -138,7 +137,7 @@ func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, 
 	}
 
 	// 记录影子路由（仅用于离线分析，失败只告警）
-	if err := r.knowledgeRouter.RecordShadowRoute(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion)); err != nil {
+	if err := r.knowledgeRouter.RecordShadowRoute(ctx, NewKnowledgeRouteInput(convCtx, execPlan.RewriteQuestion)); err != nil {
 		logx.Warnf("记录影子路由失败: %v", err)
 	}
 
@@ -165,7 +164,7 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在执行知识范围、主题、候选文档路由。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
-	routeDecision, err := r.knowledgeRouter.Route(ctx, NewRouteInput(convCtx, execPlan.RewriteQuestion))
+	routeDecision, err := r.knowledgeRouter.Route(ctx, NewKnowledgeRouteInput(convCtx, execPlan.RewriteQuestion))
 	if err != nil {
 		routeDecision = vo.NewUnavailableRouteDecision("ROUTE_ADVISOR_FAILURE")
 		logx.Warnf("知识路由失败: %v", err)
@@ -232,7 +231,7 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
-	input := &route.DocumentRouteInput{
+	input := &DocumentRouteInput{
 		DocumentId:        convCtx.SelectedDocumentId,
 		OriginalQuestion:  convCtx.Question,
 		RewriteResult:     rewriteResult,

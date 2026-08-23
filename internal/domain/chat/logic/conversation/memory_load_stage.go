@@ -7,8 +7,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -22,12 +20,12 @@ const (
 
 type MemoryLoadStage struct {
 	repo                    adapter.ChatRepository
-	memoryManager           memory.SessionMemoryManager
+	memoryManager           SessionMemoryManager
 	planningHistoryMaxChars int    // 规划历史最大字符数
 	noEvidenceReply         string // 无证据回复
 }
 
-func NewMemoryLoadStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, m memory.SessionMemoryManager) *MemoryLoadStage {
+func NewMemoryLoadStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, m SessionMemoryManager) *MemoryLoadStage {
 	noEvidenceReply := svcCtx.Config.Chat.Rag.NoEvidenceReply
 	noEvidenceReply = utils.BlankToDefault(noEvidenceReply, "当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。")
 	return &MemoryLoadStage{
@@ -74,7 +72,7 @@ func (m *MemoryLoadStage) summarizeHistory(ctx context.Context, convCtx *Context
 	questionHistoryContext := vo.NewQuestionHistoryContext(recentQuestions, m.planningHistoryMaxChars)
 
 	// 判断时间敏感与实时搜索需求（关键词规则判断）
-	analyzer := intent.NewQueryAnalyzer(question)
+	analyzer := NewQueryAnalyzer(question)
 	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
 	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 

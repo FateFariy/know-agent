@@ -90,7 +90,7 @@ type KnowledgeRouter interface {
 	RecordShadowRoute(ctx context.Context, input *KnowledgeRouteInput) error
 }
 
-func NewRouteInput(convCtx *Context, rewriteQuestion string) *KnowledgeRouteInput {
+func NewKnowledgeRouteInput(convCtx *Context, rewriteQuestion string) *KnowledgeRouteInput {
 	mapper := func(doc *vo.DocumentMetadata) int64 { return doc.DocumentId }
 	return &KnowledgeRouteInput{
 		ConversationId:             convCtx.ConversationId,

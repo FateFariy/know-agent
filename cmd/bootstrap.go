@@ -70,19 +70,19 @@ func bootstrap(c *config.Config) *server.Server {
 	tableRepo := persistence.NewTableRepository(serviceContext)
 	chatRepo := persistence.NewChatRepository(serviceContext)
 	knowledgeRepo := persistence.NewKnowledgeRepository(serviceContext)
-	adapterForKnowledge := gateway.NewDocumentAdapterForKnowledge(documentRepo)
-	adapterForChat := gateway.NewDocumentAdapterForChat(documentRepo)
+	documentForKnowledge := gateway.NewDocumentAdapterForKnowledge(documentRepo)
+	documentForChat := gateway.NewDocumentAdapterForChat(documentRepo)
 
-	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, adapterForKnowledge, localConfig)
+	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, documentForKnowledge, localConfig)
 	opts := []rank.Option{rank.WithLexicalIndex(elasticStorage), rank.WithEmbedding(embedder)}
 	rankers := []knowroute.Ranker{
-		rank.NewDocumentRanker(knowledgeRepo, adapterForKnowledge, opts...),
-		rank.NewScopeRanker(knowledgeRepo, adapterForKnowledge, opts...),
-		rank.NewTopicRanker(knowledgeRepo, adapterForKnowledge, opts...),
+		rank.NewDocumentRanker(knowledgeRepo, documentForKnowledge, opts...),
+		rank.NewScopeRanker(knowledgeRepo, documentForKnowledge, opts...),
+		rank.NewTopicRanker(knowledgeRepo, documentForKnowledge, opts...),
 	}
-	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, adapterForKnowledge, rankers, knowroute.WithEmbedding(embedder))
-	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, adapterForKnowledge)
-	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, adapterForKnowledge)
+	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, documentForKnowledge, rankers, knowroute.WithEmbedding(embedder))
+	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, documentForKnowledge)
+	//knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
 	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
@@ -93,7 +93,7 @@ func bootstrap(c *config.Config) *server.Server {
 	}
 
 	rrfFusion := fuse.NewRRFFusion()
-	retrievalEngine := rag.NewRetrievalEngine(serviceContext, chatRepo, dashScope, channels, adapterForChat, rrfFusion)
+	retrievalEngine := rag.NewRetrievalEngine(serviceContext, chatRepo, dashScope, channels, documentForChat, rrfFusion)
 
 	compressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepo, chatModel, renderer)
 	memoryManageImpl := memory.NewSessionMemoryManageImpl(compressionStrategy)
@@ -101,7 +101,7 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(graphQuerier, nil)
 	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
-		rewriteImpl, knowledgeAdapter, documentRouter, adapterForChat, retrievalEngine, renderer, chatModel, recommender)
+		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
 	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
 

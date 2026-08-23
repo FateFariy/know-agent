@@ -3,16 +3,15 @@ package conversation
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type IntentRecognizeStage struct {
-	recognizer intent.Recognizer
+	recognizer Recognizer
 }
 
-func NewIntentRecognizeStage(recognizer intent.Recognizer) *IntentRecognizeStage {
+func NewIntentRecognizeStage(recognizer Recognizer) *IntentRecognizeStage {
 	return &IntentRecognizeStage{
 		recognizer: recognizer,
 	}
@@ -30,7 +29,7 @@ func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) er
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageIntent,
 		enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在分析用户意图。"})
 
-	input := &intent.RecognitionInput{
+	input := &RecognitionInput{
 		OriginalQuestion:         execPlan.OriginalQuestion,
 		RewrittenQuestion:        execPlan.RewriteQuestion,
 		SubQuestions:             execPlan.RewriteSubQuestions,

@@ -19,9 +19,7 @@ func MapBy[T any, K comparable, V any](slice []T, keyFunc func(T) (K, V)) map[K]
 	maps := make(map[K]V, len(slice))
 	for _, item := range slice {
 		key, value := keyFunc(item)
-		if value != nil {
-			maps[key] = value
-		}
+		maps[key] = value
 	}
 	return maps
 }

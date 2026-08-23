@@ -1,4 +1,4 @@
-package intent
+package conversation
 
 import (
 	"regexp"

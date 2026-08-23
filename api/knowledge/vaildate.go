@@ -7,9 +7,6 @@ import (
 )
 
 func (r *KnowledgeScopeSaveReq) Validate() (err error) {
-	if strutil.IsBlank(r.ScopeCode) {
-		return fmt.Errorf("scope_code 不能为空")
-	}
 	if strutil.IsBlank(r.ScopeName) {
 		return fmt.Errorf("scope_name 不能为空")
 	}
@@ -17,22 +14,13 @@ func (r *KnowledgeScopeSaveReq) Validate() (err error) {
 }
 
 func (r *KnowledgeTopicSaveReq) Validate() (err error) {
-	if strutil.IsBlank(r.TopicCode) {
-		return fmt.Errorf("topic_code 不能为空")
-	}
 	if strutil.IsBlank(r.TopicName) {
 		return fmt.Errorf("topic_name 不能为空")
-	}
-	if strutil.IsBlank(r.ScopeCode) {
-		return fmt.Errorf("scope_code 不能为空")
 	}
 	return nil
 }
 
 func (r *TopicDocumentRelationSaveReq) Validate() (err error) {
-	if strutil.IsBlank(r.TopicCode) {
-		return fmt.Errorf("topic_code 不能为空")
-	}
 	if r.DocumentId == "" {
 		return fmt.Errorf("document_id 非法")
 	}
@@ -40,9 +28,6 @@ func (r *TopicDocumentRelationSaveReq) Validate() (err error) {
 }
 
 func (r *TopicDocumentRelationRemoveReq) Validate() (err error) {
-	if strutil.IsBlank(r.TopicCode) {
-		return fmt.Errorf("topic_code 不能为空")
-	}
 	if r.DocumentId == "" {
 		return fmt.Errorf("document_id 非法")
 	}
@@ -50,15 +35,9 @@ func (r *TopicDocumentRelationRemoveReq) Validate() (err error) {
 }
 
 func (r *KnowledgeScopeDeleteReq) Validate() (err error) {
-	if strutil.IsBlank(r.ScopeCode) {
-		return fmt.Errorf("scope_code 不能为空")
-	}
 	return nil
 }
 
 func (r *KnowledgeTopicDeleteReq) Validate() (err error) {
-	if strutil.IsBlank(r.TopicCode) {
-		return fmt.Errorf("topic_code 不能为空")
-	}
 	return nil
 }

@@ -40,8 +40,6 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 	}
 }
 
-var _ Retriever = (*RetrievalEngine)(nil)
-
 // Retrieve RAG 检索入口，执行多子问题并行检索
 func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.RetrievalResult, error) {
 	if err := plan.Validate(); err != nil {
