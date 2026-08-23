@@ -57,7 +57,7 @@ func (t *DocumentTask) ReadGraphRagBuildResult() *vo.GraphRagBuildResult {
 		Result *vo.GraphRagBuildResult `json:"graphRagBuild"`
 	}
 	if err := json.Unmarshal([]byte(t.ExtJson), &wrapper); err != nil {
-		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%t, message=%v", t.ID, err)
+		logx.Warnf("Ignoring unreadable GraphRAG outcome checkpoint: taskId=%d, message=%v", t.ID, err)
 		return nil
 	}
 	return wrapper.Result

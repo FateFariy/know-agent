@@ -8,7 +8,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rewrite"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
@@ -18,7 +17,7 @@ import (
 // 负责对所有非 OpenChat 模式的问题进行改写，生成检索友好的问题表达和子问题拆分。
 // 仅当 RAG 开启时执行，OpenChat 模式跳过。
 type QueryRewriteStage struct {
-	rewriter        rewrite.QueryRewriter
+	rewriter        QueryRewriter
 	enabled         bool
 	ragEnabled      bool
 	maxSubQuestions int
@@ -29,7 +28,7 @@ type QueryRewriteStage struct {
 
 var _ Stage = (*QueryRewriteStage)(nil)
 
-func NewQueryRewriteStage(svcCtx *svc.ServiceContext, rewriter rewrite.QueryRewriter) *QueryRewriteStage {
+func NewQueryRewriteStage(svcCtx *svc.ServiceContext, rewriter QueryRewriter) *QueryRewriteStage {
 	return &QueryRewriteStage{
 		rewriter:        rewriter,
 		enabled:         svcCtx.Config.Chat.Rewrite.Enabled,

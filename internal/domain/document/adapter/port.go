@@ -7,22 +7,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/vo"
 )
 
-type DocumentPort struct {
-	Storage
-	MessageProducer
-	VectorIndexer
-	KeywordIndexer
-}
-
-func NewDocumentPort(storage Storage, messageProducer MessageProducer, vector VectorIndexer, keyword KeywordIndexer) *DocumentPort {
-	return &DocumentPort{
-		Storage:         storage,
-		MessageProducer: messageProducer,
-		VectorIndexer:   vector,
-		KeywordIndexer:  keyword,
-	}
-}
-
 type Storage interface {
 	// Name 返回存储类型名称
 	Name() int

@@ -5,16 +5,15 @@ import (
 	"fmt"
 
 	"github.com/swiftbit/know-agent/common/logx"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/rag"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type RetrievalStage struct {
-	retriever rag.Retriever
+	retriever Retriever
 }
 
-func NewRetrievalStage(retriever rag.Retriever) *RetrievalStage {
+func NewRetrievalStage(retriever Retriever) *RetrievalStage {
 	return &RetrievalStage{
 		retriever: retriever,
 	}

@@ -1071,32 +1071,6 @@ func ToKnowledgeDocumentOptionRespList(source []*vo1.DocumentMetadata) []*docume
 	}
 	return pDocumentKnowledgeDocumentOptionRespList
 }
-func ToParseArtifactModel(source *entity1.ParseArtifact) *model.DocumentParseArtifact {
-	var pModelDocumentParseArtifact *model.DocumentParseArtifact
-	if source != nil {
-		var modelDocumentParseArtifact model.DocumentParseArtifact
-		modelDocumentParseArtifact.Model = entityParseArtifactToCommonModel((*source))
-		modelDocumentParseArtifact.DocumentId = (*source).DocumentId
-		modelDocumentParseArtifact.TaskId = (*source).TaskId
-		modelDocumentParseArtifact.ArtifactType = (*source).ArtifactType
-		modelDocumentParseArtifact.ObjectName = (*source).ObjectName
-		modelDocumentParseArtifact.ContentHash = (*source).ContentHash
-		modelDocumentParseArtifact.ParserName = (*source).ParserName
-		modelDocumentParseArtifact.ParserVersion = (*source).ParserVersion
-		pModelDocumentParseArtifact = &modelDocumentParseArtifact
-	}
-	return pModelDocumentParseArtifact
-}
-func ToParseArtifactModelList(source []*entity1.ParseArtifact) []*model.DocumentParseArtifact {
-	var pModelDocumentParseArtifactList []*model.DocumentParseArtifact
-	if source != nil {
-		pModelDocumentParseArtifactList = make([]*model.DocumentParseArtifact, len(source))
-		for i := 0; i < len(source); i++ {
-			pModelDocumentParseArtifactList[i] = ToParseArtifactModel(source[i])
-		}
-	}
-	return pModelDocumentParseArtifactList
-}
 func ToQueryDocumentChunkDetailResp(source *aggregate1.DocumentChunkDetail) *document.QueryDocumentChunkDetailResp {
 	var pDocumentQueryDocumentChunkDetailResp *document.QueryDocumentChunkDetailResp
 	if source != nil {
@@ -1207,11 +1181,6 @@ func entityDocumentTaskToCommonModel(source entity1.DocumentTask) common.Model {
 	return commonModel
 }
 func entityDocumentToCommonModel(source entity1.Document) common.Model {
-	var commonModel common.Model
-	commonModel.ID = source.ID
-	return commonModel
-}
-func entityParseArtifactToCommonModel(source entity1.ParseArtifact) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel
@@ -1784,6 +1753,8 @@ func pVoDocumentRouteCandidateToPVoDocumentRouteCandidate(source *vo2.DocumentRo
 		voDocumentRouteCandidate.LastIndexTaskId = (*source).LastIndexTaskId
 		voDocumentRouteCandidate.Score = (*source).Score
 		voDocumentRouteCandidate.Reason = NormalizeString((*source).Reason)
+		voDocumentRouteCandidate.Source = NormalizeString((*source).Source)
+		voDocumentRouteCandidate.Features = (*source).Features
 		pVoDocumentRouteCandidate = &voDocumentRouteCandidate
 	}
 	return pVoDocumentRouteCandidate
@@ -1837,9 +1808,12 @@ func pVoScopeRouteCandidateToPVoScopeRouteCandidate(source *vo2.ScopeRouteCandid
 	var pVoScopeRouteCandidate *vo.ScopeRouteCandidate
 	if source != nil {
 		var voScopeRouteCandidate vo.ScopeRouteCandidate
+		voScopeRouteCandidate.ScopeId = (*source).ScopeId
 		voScopeRouteCandidate.ScopeName = NormalizeString((*source).ScopeName)
 		voScopeRouteCandidate.Score = (*source).Score
 		voScopeRouteCandidate.Reason = NormalizeString((*source).Reason)
+		voScopeRouteCandidate.Source = NormalizeString((*source).Source)
+		voScopeRouteCandidate.Features = (*source).Features
 		pVoScopeRouteCandidate = &voScopeRouteCandidate
 	}
 	return pVoScopeRouteCandidate
@@ -1848,9 +1822,13 @@ func pVoTopicRouteCandidateToPVoTopicRouteCandidate(source *vo2.TopicRouteCandid
 	var pVoTopicRouteCandidate *vo.TopicRouteCandidate
 	if source != nil {
 		var voTopicRouteCandidate vo.TopicRouteCandidate
+		voTopicRouteCandidate.TopicId = (*source).TopicId
 		voTopicRouteCandidate.TopicName = NormalizeString((*source).TopicName)
+		voTopicRouteCandidate.ScopeId = (*source).ScopeId
 		voTopicRouteCandidate.Score = (*source).Score
 		voTopicRouteCandidate.Reason = NormalizeString((*source).Reason)
+		voTopicRouteCandidate.Source = NormalizeString((*source).Source)
+		voTopicRouteCandidate.Features = (*source).Features
 		pVoTopicRouteCandidate = &voTopicRouteCandidate
 	}
 	return pVoTopicRouteCandidate

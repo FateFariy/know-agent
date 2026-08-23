@@ -65,7 +65,6 @@ func bootstrap(c *config.Config) *server.Server {
 	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
 	embedder := emb.NewEmbedder(serviceContext)
 
-	documentPort := adapter.NewDocumentPort(minioStorage, rocketMQMessageProducer, milvusVector, milvusKeyword)
 	documentRepo := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	tableRepo := persistence.NewTableRepository(serviceContext)
 	chatRepo := persistence.NewChatRepository(serviceContext)
@@ -109,8 +108,8 @@ func bootstrap(c *config.Config) *server.Server {
 	analysisChain := analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, minioStorage, generateImpl, knowledgeAdapter)
 	indexChain := index.NewBuildIndexChain(documentRepo, milvusVector, milvusKeyword, strategyRegistry, knowledgeAdapter, gseTokenizer)
 	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, analysisChain, indexChain)
-	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, documentPort, minioStorage, documentRepo, knowledgeAdapter)
-	profileLogicImpl := doclogic.NewProfileLogicImpl(documentRepo, documentPort, generateImpl)
+	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, rocketMQMessageProducer, minioStorage, documentRepo, knowledgeAdapter)
+	profileLogicImpl := doclogic.NewProfileLogicImpl(documentRepo, minioStorage, generateImpl)
 	parseConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessImpl)
 	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessImpl)
 

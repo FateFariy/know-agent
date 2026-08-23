@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	routeModeAuto          = "auto"
-	routeModeShadow        = "shadow"
 	lowConfidenceThreshold = 0.55
 )
 

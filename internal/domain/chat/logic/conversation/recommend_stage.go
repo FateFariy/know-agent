@@ -6,8 +6,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -16,13 +14,13 @@ import (
 
 type RecommendStage struct {
 	repo                adapter.ChatRepository
-	manager             memory.SessionMemoryManager
-	recommender         recommend.QuestionRecommender
+	manager             SessionMemoryManager
+	recommender         QuestionRecommender
 	historyPreviewTurns int
 }
 
 func NewRecommendStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
-	manager memory.SessionMemoryManager, recommender recommend.QuestionRecommender) *RecommendStage {
+	manager SessionMemoryManager, recommender QuestionRecommender) *RecommendStage {
 	return &RecommendStage{
 		repo:                repo,
 		manager:             manager,
