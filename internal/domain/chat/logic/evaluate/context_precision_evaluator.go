@@ -8,7 +8,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -33,7 +32,7 @@ func (e *ContextPrecisionEvaluator) Name() string {
 	return enum.ContextPrecision
 }
 
-func (e *ContextPrecisionEvaluator) validate(input *conversation.EvaluationInput) error {
+func (e *ContextPrecisionEvaluator) validate(input *EvaluationInput) error {
 	if input.Question == "" {
 		return errors.New("context precision评估需要question字段")
 	}
@@ -43,7 +42,7 @@ func (e *ContextPrecisionEvaluator) validate(input *conversation.EvaluationInput
 	return nil
 }
 
-func (e *ContextPrecisionEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
+func (e *ContextPrecisionEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
 	// 构建带索引的上下文
 	var contextsWithIndex strings.Builder
 	for i, ctx := range input.Contexts {
@@ -68,7 +67,7 @@ type contextPrecisionOutput struct {
 
 // computeScore 本地计算上下文精度（排名加权累积精度，RAGAS 定义）
 // precision@k = (Σ_{i<=k} relevant@i) / k ；score = Σ_k(precision@k × relevant@k) / 总相关数
-func (e *ContextPrecisionEvaluator) computeScore(input *conversation.EvaluationInput, llmOutput string) (float64, error) {
+func (e *ContextPrecisionEvaluator) computeScore(input *EvaluationInput, llmOutput string) (float64, error) {
 	var out contextPrecisionOutput
 	if err := utils.Unmarshal(llmOutput, &out); err != nil {
 		return 0, fmt.Errorf("解析上下文精度评估结果失败: %w", err)

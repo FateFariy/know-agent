@@ -8,7 +8,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -39,7 +38,7 @@ func (e *AnswerRelevancyEvaluator) Name() string {
 	return enum.AnswerRelevancy
 }
 
-func (e *AnswerRelevancyEvaluator) validate(input *conversation.EvaluationInput) error {
+func (e *AnswerRelevancyEvaluator) validate(input *EvaluationInput) error {
 	if input.Question == "" {
 		return errors.New("answer relevancy评估需要question字段")
 	}
@@ -49,7 +48,7 @@ func (e *AnswerRelevancyEvaluator) validate(input *conversation.EvaluationInput)
 	return nil
 }
 
-func (e *AnswerRelevancyEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
+func (e *AnswerRelevancyEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
 	return map[string]any{
 		"question": input.Question,
 		"answer":   input.Answer,
@@ -57,7 +56,7 @@ func (e *AnswerRelevancyEvaluator) prepareVariables(input *conversation.Evaluati
 }
 
 // computeScore 本地计算答案相关性：LLM 基于答案反推若干问题，再与原始问题做向量余弦相似度平均
-func (e *AnswerRelevancyEvaluator) computeScore(input *conversation.EvaluationInput, llmOutput string) (float64, error) {
+func (e *AnswerRelevancyEvaluator) computeScore(input *EvaluationInput, llmOutput string) (float64, error) {
 	var wrapper struct {
 		GenerateQuestions []string `json:"generate_questions"`
 	}

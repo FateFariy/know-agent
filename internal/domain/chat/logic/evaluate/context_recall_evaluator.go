@@ -8,7 +8,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -34,7 +33,7 @@ func (e *ContextRecallEvaluator) Name() string {
 	return enum.ContextRecall
 }
 
-func (e *ContextRecallEvaluator) validate(input *conversation.EvaluationInput) error {
+func (e *ContextRecallEvaluator) validate(input *EvaluationInput) error {
 	if input.Question == "" {
 		return errors.New("context recall评估需要question字段")
 	}
@@ -47,7 +46,7 @@ func (e *ContextRecallEvaluator) validate(input *conversation.EvaluationInput) e
 	return nil
 }
 
-func (e *ContextRecallEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
+func (e *ContextRecallEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
 	return map[string]any{
 		"question":     input.Question,
 		"contexts":     strings.Join(input.Contexts, "\n"),
@@ -66,7 +65,7 @@ type contextRecallOutput struct {
 }
 
 // computeScore 本地计算上下文召回率：被支持的句子数 / 句子总数
-func (e *ContextRecallEvaluator) computeScore(_ *conversation.EvaluationInput, llmOutput string) (float64, error) {
+func (e *ContextRecallEvaluator) computeScore(_ *EvaluationInput, llmOutput string) (float64, error) {
 	var out contextRecallOutput
 	if err := utils.Unmarshal(llmOutput, &out); err != nil {
 		return 0, fmt.Errorf("解析上下文召回率评估结果失败: %w", err)

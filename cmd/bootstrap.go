@@ -158,8 +158,8 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 	return chunk.NewChunkStrategyRegistry(chunkers)
 }
 
-func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.Embedder) []conversation.Evaluator {
-	return []conversation.Evaluator{
+func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.Embedder) []evaluate.Evaluator {
+	return []evaluate.Evaluator{
 		evaluate.NewAnswerFaithfulnessEvaluator(llm, renderer),
 		evaluate.NewAnswerRelevancyEvaluator(llm, renderer, emb),
 		evaluate.NewContextPrecisionEvaluator(llm, renderer),

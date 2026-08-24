@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 )
 
@@ -21,7 +20,7 @@ func (e *baseEvaluator) Name() string {
 	return ""
 }
 
-func (e *baseEvaluator) Evaluate(ctx context.Context, input *conversation.EvaluationInput) (float64, error) {
+func (e *baseEvaluator) Evaluate(ctx context.Context, input *EvaluationInput) (float64, error) {
 	// 验证输入
 	if err := e.validate(input); err != nil {
 		return 0, err
@@ -47,14 +46,14 @@ func (e *baseEvaluator) Evaluate(ctx context.Context, input *conversation.Evalua
 }
 
 // computeScore 由子类实现：基于 LLM 输出的判断结果在本地计算最终得分
-func (e *baseEvaluator) computeScore(input *conversation.EvaluationInput, llmOutput string) (float64, error) {
+func (e *baseEvaluator) computeScore(input *EvaluationInput, llmOutput string) (float64, error) {
 	return 0, fmt.Errorf("computeScore 未实现")
 }
 
-func (e *baseEvaluator) validate(input *conversation.EvaluationInput) error {
+func (e *baseEvaluator) validate(input *EvaluationInput) error {
 	return nil
 }
 
-func (e *baseEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
+func (e *baseEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
 	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -33,14 +32,14 @@ func (e *AnswerFaithfulnessEvaluator) Name() string {
 	return enum.AnswerFaithfulness
 }
 
-func (e *AnswerFaithfulnessEvaluator) validate(input *conversation.EvaluationInput) error {
+func (e *AnswerFaithfulnessEvaluator) validate(input *EvaluationInput) error {
 	if input.Answer == "" {
 		return errors.New("answer faithfulness评估需要answer字段")
 	}
 	return nil
 }
 
-func (e *AnswerFaithfulnessEvaluator) prepareVariables(input *conversation.EvaluationInput) map[string]any {
+func (e *AnswerFaithfulnessEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
 	return map[string]any{
 		"question": input.Question,
 		"contexts": strings.Join(input.Contexts, "\n"),
@@ -58,7 +57,7 @@ type faithfulnessOutput struct {
 }
 
 // computeScore 本地计算忠实度：受支持声明 / 总声明
-func (e *AnswerFaithfulnessEvaluator) computeScore(_ *conversation.EvaluationInput, llmOutput string) (float64, error) {
+func (e *AnswerFaithfulnessEvaluator) computeScore(_ *EvaluationInput, llmOutput string) (float64, error) {
 	var out faithfulnessOutput
 	if err := utils.Unmarshal(llmOutput, &out); err != nil {
 		return 0, fmt.Errorf("解析忠实度评估结果失败: %w", err)

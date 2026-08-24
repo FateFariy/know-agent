@@ -16,14 +16,14 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// RetrievalEngine RAG 检索引擎实现
-type RetrievalEngine struct {
+// Engine RAG 检索引擎实现
+type Engine struct {
 	docGateway adapter.DocumentGateway
 	pipeline   *Pipeline
 }
 
 func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker rerank.Reranker,
-	channels []Retrieval, docGateway adapter.DocumentGateway, fusion Fusion) *RetrievalEngine {
+	channels []Retrieval, docGateway adapter.DocumentGateway, fusion Fusion) *Engine {
 	maxChars := svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars
 	pipeline := NewPipeline(
 		NewChannelRetrievalStage(channels),
@@ -34,14 +34,14 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 		NewGraphRAGCanonicalStage(),
 		NewObservationStage(repo),
 	)
-	return &RetrievalEngine{
+	return &Engine{
 		docGateway: docGateway,
 		pipeline:   pipeline,
 	}
 }
 
 // Retrieve RAG 检索入口，执行多子问题并行检索
-func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.RetrievalResult, error) {
+func (e *Engine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.RetrievalResult, error) {
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (e *RetrievalEngine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) 
 // -------------------- 子问题并行检索 --------------------
 
 // retrieveSubQuestionParallel 并行检索所有子问题，每个子问题通过管线独立执行完整检索流程
-func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retrievalResult *vo.RetrievalResult, inputs []*ExecutionInput, plan *vo.RetrievalPlan) []*vo.SubQuestionEvidence {
+func (e *Engine) retrieveSubQuestionParallel(ctx context.Context, retrievalResult *vo.RetrievalResult, inputs []*ExecutionInput, plan *vo.RetrievalPlan) []*vo.SubQuestionEvidence {
 	timeoutCtx, cancel := context.WithTimeout(ctx, plan.SubQuestionTimeout)
 	defer cancel()
 
@@ -132,7 +132,7 @@ func (e *RetrievalEngine) retrieveSubQuestionParallel(ctx context.Context, retri
 //  1. 收集需要回填补充的文档 ID，从知识库服务获取文档描述符
 //  2. 用描述符回填文档中缺失的文档名称、知识范围编码和知识范围名称
 //  3. 为每个源文档构建 SearchReference，按唯一键分配递增的引用编号
-func (e *RetrievalEngine) assignReferenceIds(ctx context.Context, evidenceList []*vo.SubQuestionEvidence, plan *vo.RetrievalPlan) {
+func (e *Engine) assignReferenceIds(ctx context.Context, evidenceList []*vo.SubQuestionEvidence, plan *vo.RetrievalPlan) {
 	metadataMap := e.knowledgeBaseReferenceMetadataMap(ctx, evidenceList)
 
 	referenceNumber := 1
@@ -159,7 +159,7 @@ func (e *RetrievalEngine) assignReferenceIds(ctx context.Context, evidenceList [
 }
 
 // knowledgeBaseReferenceMetadataMap 收集需要回填补充的文档 ID，并获取对应的知识库元数据
-func (e *RetrievalEngine) knowledgeBaseReferenceMetadataMap(ctx context.Context, evidenceList []*vo.SubQuestionEvidence) map[int64]*vo.DocumentMetadata {
+func (e *Engine) knowledgeBaseReferenceMetadataMap(ctx context.Context, evidenceList []*vo.SubQuestionEvidence) map[int64]*vo.DocumentMetadata {
 	seen := make(map[int64]struct{}, 30)
 	documentIds := make([]int64, 0, 30)
 	for _, evidence := range evidenceList {

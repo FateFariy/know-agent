@@ -6,14 +6,15 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 type AnswerEvaluateStage struct {
-	evaluator []Evaluator
+	evaluator []evaluate.Evaluator
 }
 
-func NewAnswerEvaluateStage(evaluator []Evaluator) *AnswerEvaluateStage {
+func NewAnswerEvaluateStage(evaluator []evaluate.Evaluator) *AnswerEvaluateStage {
 	return &AnswerEvaluateStage{
 		evaluator: evaluator,
 	}
@@ -29,14 +30,14 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 	if execPlan != nil {
 		contexts = execPlan.RetrievalResult.RetrievalContexts()
 	}
-	input := &EvaluationInput{
+	input := &evaluate.EvaluationInput{
 		Question: convCtx.Question,
 		Contexts: contexts,
 		Answer:   convCtx.Answer(),
 	}
 
 	for _, evaluator := range a.evaluator {
-		go func(evaluator Evaluator) {
+		go func(evaluator evaluate.Evaluator) {
 			info := &callbacks.RunInfo{
 				StartTime: time.Now(),
 				Component: "rag_eval_metrics",
