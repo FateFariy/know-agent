@@ -6,57 +6,33 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
-	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type Chain struct {
 	stages          []Stage
 	repo            adapter.ChatRepository
-	runtime         *runtimeRegistry
+	runtime         *RuntimeRegistry
 	memoryManager   SessionMemoryManager
 	distributedLock adapter.DistributedLock
 }
 
-func NewChain(
-	svcCtx *svc.ServiceContext,
-	repo adapter.ChatRepository,
-	distributedLock adapter.DistributedLock,
-	memoryManager SessionMemoryManager,
-	intentRecognizer Recognizer,
-	queryRewriter QueryRewriter,
-	knowledgeRouter KnowledgeRouter,
-	documentRouter DocumentRouter,
-	docGateway adapter.DocumentGateway,
-	retriever Retriever,
-	promptRenderer adapter.PromptRenderer,
-	chatModel model.ChatModel,
-	questionRecommender QuestionRecommender,
-	evaluators []Evaluator,
-) *Chain {
+func NewChain(repo adapter.ChatRepository, distributedLock adapter.DistributedLock, memoryManager SessionMemoryManager, runtime *RuntimeRegistry, stages []Stage) *Chain {
 	chain := &Chain{
 		repo:            repo,
-		runtime:         &runtimeRegistry{},
+		runtime:         runtime,
 		memoryManager:   memoryManager,
 		distributedLock: distributedLock,
+		stages:          stages,
 	}
-	// 按对话执行流程顺序初始化所有子阶段，顺序不可调整
-	chain.stages = []Stage{
-		NewStartStage(repo, chain.runtime, distributedLock, chain.stop),
-		NewMemoryLoadStage(svcCtx, repo, memoryManager),
-		NewIntentRecognizeStage(intentRecognizer),
-		NewQueryRewriteStage(svcCtx, queryRewriter),
-		NewRouteStage(svcCtx, repo, knowledgeRouter, documentRouter, docGateway),
-		NewRetrievalStage(retriever),
-		NewEvidenceBudgetStage(svcCtx, promptRenderer),
-		NewGenerateStage(chatModel),
-		NewRecommendStage(svcCtx, repo, memoryManager, questionRecommender),
-		NewAnswerEvaluateStage(evaluators),
-		NewEndStage(repo),
+	// 将停止回调注入 StartStage，使其与 Chain 共享运行时注册表与停止逻辑
+	for _, stage := range chain.stages {
+		if s, ok := stage.(*StartStage); ok {
+			s.setStop(chain.stop)
+		}
 	}
 
 	return chain

@@ -2267,25 +2267,16 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": [
+                "knowledgeBaseId"
+              ],
               "properties": {
-                "businessCategory": {
-                  "description": "业务分类",
-                  "type": "string"
-                },
                 "documentName": {
                   "description": "文档名称",
                   "type": "string"
                 },
-                "documentTags": {
-                  "description": "文档标签",
-                  "type": "string"
-                },
-                "knowledgeScopeCode": {
-                  "description": "知识范围编码",
-                  "type": "string"
-                },
-                "knowledgeScopeName": {
-                  "description": "知识范围名称",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
                 "operatorId": {
@@ -2333,7 +2324,7 @@
       }
     }
   },
-  "x-date": "2026-07-16 10:46:03",
+  "x-date": "2026-08-24 20:43:14",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

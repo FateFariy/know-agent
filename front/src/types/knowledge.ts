@@ -2,9 +2,9 @@
 /** 保存知识范围请求 */
 export interface KnowledgeScopeSaveReq {
   id?: string;
-  scopeCode: string;
+  knowledgeBaseId: string;
   scopeName: string;
-  parentScopeCode?: string;
+  parentScopeId?: string;
   description?: string;
   aliases?: string;
   examples?: string;
@@ -14,16 +14,22 @@ export interface KnowledgeScopeSaveReq {
 
 /** 删除知识范围请求 */
 export interface KnowledgeScopeDeleteReq {
-  scopeCode: string;
+  id?: string;
+  knowledgeBaseId?: string;
   operatorId?: string;
+}
+
+/** 查询知识范围列表请求 */
+export interface KnowledgeScopeListReq {
+  knowledgeBaseId?: string;
 }
 
 /** 保存知识主题请求 */
 export interface KnowledgeTopicSaveReq {
   id?: string;
-  topicCode: string;
+  knowledgeBaseId: string;
+  scopeId: string;
   topicName: string;
-  scopeCode: string;
   description?: string;
   aliases?: string;
   examples?: string;
@@ -35,23 +41,27 @@ export interface KnowledgeTopicSaveReq {
 
 /** 删除知识主题请求 */
 export interface KnowledgeTopicDeleteReq {
-  topicCode: string;
+  id: string;
+  knowledgeBaseId: string;
   operatorId?: string;
 }
 
 /** 查询知识主题列表请求 */
 export interface KnowledgeTopicListReq {
-  scopeCode?: string;
+  knowledgeBaseId: string;
+  scopeId: string;
 }
 
 /** 查询主题文档关联列表请求 */
 export interface TopicDocumentRelationListReq {
-  topicCode: string;
+  topicId: string;
+  knowledgeBaseId: string;
 }
 
 /** 保存主题文档关联请求 */
 export interface TopicDocumentRelationSaveReq {
-  topicCode: string;
+  topicId: string;
+  knowledgeBaseId: string;
   documentId: string;
   relationScore?: number;
   relationSource?: string;
@@ -61,14 +71,16 @@ export interface TopicDocumentRelationSaveReq {
 
 /** 移除主题文档关联请求 */
 export interface TopicDocumentRelationRemoveReq {
-  topicCode: string;
+  topicId: string;
+  knowledgeBaseId: string;
   documentId: string;
   operatorId?: string;
 }
 
 /** 分页查询知识路由追踪请求 */
 export interface KnowledgeRouteTracePageReq {
-  conversationId?: string;
+  /** 会话ID（后端必填） */
+  conversationId: string;
   mode?: string;
   routeStatus?: number;
   pageNo?: number;
@@ -95,24 +107,27 @@ export interface KnowledgeRouteTraceItem {
   createTime: string;
 }
 
-/** 路由候选基础类型 */
+/** 路由候选基础类型（由 top*Json 反序列化后再归一化得到） */
 export interface BaseRouteCandidate {
   score: number
   reason: string
+  source: string
+  features?: Record<string, number>
+  /** 前端归一化补充的展示用分数文本 */
   scoreText: string
 }
 
 /** 知识范围路由候选 */
 export interface ScopeRouteCandidate extends BaseRouteCandidate {
-  scopeCode: string
+  scopeId: string
   scopeName: string
 }
 
 /** 主题路由候选 */
 export interface TopicRouteCandidate extends BaseRouteCandidate {
-  topicCode: string
+  topicId: string
   topicName: string
-  scopeCode: string
+  scopeId: string
 }
 
 /** 文档路由候选 */
@@ -126,9 +141,9 @@ export interface DocumentRouteCandidate extends BaseRouteCandidate {
 /** 知识范围响应 */
 export interface KnowledgeScopeResp {
   id: string;
-  scopeCode: string;
+  knowledgeBaseId: string;
   scopeName: string;
-  parentScopeCode: string;
+  parentScopeId: string;
   description: string;
   aliases: string;
   examples: string;
@@ -138,9 +153,9 @@ export interface KnowledgeScopeResp {
 /** 知识主题响应 */
 export interface KnowledgeTopicResp {
   id: string;
-  topicCode: string;
+  knowledgeBaseId: string;
   topicName: string;
-  scopeCode: string;
+  scopeId: string;
   description: string;
   aliases: string;
   examples: string;
@@ -151,13 +166,13 @@ export interface KnowledgeTopicResp {
 
 /** 主题文档关联响应 */
 export interface TopicDocumentRelationResp {
-  topicCode: string;
+  knowledgeBaseId: string;
+  topicId: string;
+  topicName: string;
+  scopeId: string;
+  scopeName: string;
   documentId: string;
   documentName: string;
-  knowledgeScopeCode: string;
-  knowledgeScopeName: string;
-  businessCategory: string;
-  documentTags: string;
   relationScore: number;
   relationSource: string;
   reason: string;
@@ -170,4 +185,29 @@ export interface KnowledgeRouteTracePageResp {
   total: number;
   totalPages: number;
   records: KnowledgeRouteTraceItem[];
+}
+
+/** 知识库明细响应 */
+export interface KnowledgeBaseItemResp {
+  id: string;
+  baseName: string;
+  description: string;
+  embeddingModel: string;
+  retrievalConfigJson: string;
+  graphRagConfigJson: string;
+  raptorConfigJson: string;
+  metadataFilterJson: string;
+  isDefault: number;
+  sortOrder: number;
+  documentCount: number;
+  retrievableDocumentCount: number;
+}
+
+/** 知识库选项响应 */
+export interface KnowledgeBaseOptionResp {
+  id: string;
+  baseName: string;
+  description: string;
+  isDefault: number;
+  retrievableDocumentCount: number;
 }

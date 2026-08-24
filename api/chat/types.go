@@ -145,7 +145,7 @@ type ConversationItemAnchor struct {
 
 type ConversationMemorySummaryResp struct {
 	ConversationId       string          `json:"conversationId"`       // 会话ID
-	IsCompressed         bool            `json:"IsCompressed"`         // 是否执行过记忆压缩
+	IsCompressed         bool            `json:"isCompressed"`         // 是否执行过记忆压缩
 	CoveredExchangeId    string          `json:"coveredExchangeId"`    // 压缩截止交互ID
 	CoveredExchangeCount int             `json:"coveredExchangeCount"` // 压缩覆盖交互轮次
 	CompressionCount     int             `json:"compressionCount"`     // 累计压缩次数

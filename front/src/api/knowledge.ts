@@ -3,6 +3,7 @@ import type {
   KnowledgeRouteTracePageReq,
   KnowledgeRouteTracePageResp,
   KnowledgeScopeDeleteReq,
+  KnowledgeScopeListReq,
   KnowledgeScopeResp,
   KnowledgeScopeSaveReq,
   KnowledgeTopicDeleteReq,
@@ -18,8 +19,8 @@ import type {
 
 export const knowledgeApi = {
   // 查询知识范围列表
-  listScopes(): Promise<Response<KnowledgeScopeResp[]>> {
-    return axios.post('/manage/knowledge/scope/list')
+  listScopes(params?: KnowledgeScopeListReq): Promise<Response<KnowledgeScopeResp[]>> {
+    return axios.post('/manage/knowledge/scope/list', params || {})
   },
 
   // 保存知识范围
@@ -33,8 +34,8 @@ export const knowledgeApi = {
   },
 
   // 查询知识主题列表
-  listTopics(params?: KnowledgeTopicListReq): Promise<Response<KnowledgeTopicResp[]>> {
-    return axios.post('/manage/knowledge/topic/list', params || {})
+  listTopics(params: KnowledgeTopicListReq): Promise<Response<KnowledgeTopicResp[]>> {
+    return axios.post('/manage/knowledge/topic/list', params)
   },
 
   // 保存知识主题

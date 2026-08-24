@@ -509,8 +509,8 @@ onMounted(() => loadTraces(1))
                 <span>{{ selectedRecord.scopes.length }} 个</span>
               </div>
               <div v-if="selectedRecord.scopes.length" class="candidate-chip-list">
-                <span v-for="(c, i) in selectedRecord.scopes" :key="`scope-${c.scopeCode || i}`"
-                      class="candidate-chip">{{ c.scopeName || c.scopeCode }} · {{
+                <span v-for="(c, i) in selectedRecord.scopes" :key="`scope-${c.scopeId || i}`"
+                      class="candidate-chip">{{ c.scopeName || c.scopeId }} · {{
                     c.scoreText
                   }}</span>
               </div>
@@ -522,8 +522,8 @@ onMounted(() => loadTraces(1))
                 <span>{{ selectedRecord.topics.length }} 个</span>
               </div>
               <div v-if="selectedRecord.topics.length" class="candidate-chip-list">
-                <span v-for="(c, i) in selectedRecord.topics" :key="`topic-${c.topicCode || i}`"
-                      class="candidate-chip">{{ c.topicName || c.topicCode }} · {{
+                <span v-for="(c, i) in selectedRecord.topics" :key="`topic-${c.topicId || i}`"
+                      class="candidate-chip">{{ c.topicName || c.topicId }} · {{
                     c.scoreText
                   }}</span>
               </div>

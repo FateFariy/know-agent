@@ -4,6 +4,7 @@
 import {computed, onMounted, reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {documentApi} from '@/api/document'
+import {useKnowledgeBase} from '@/composables/useKnowledgeBase'
 import type {
   DeleteDocumentReq,
   DocumentDetailResp,
@@ -16,13 +17,11 @@ import {formatDateTime, formatFileSize} from '@/utils/format.ts'
 const router = useRouter()
 const OPERATOR_ID = '10001'
 const DEFAULT_PAGE_SIZE = 12
+const {knowledgeBaseId} = useKnowledgeBase()
 
 const uploadForm = reactive<UploadDocumentReq>({
   documentName: '',
-  knowledgeScopeCode: '',
-  knowledgeScopeName: '',
-  businessCategory: '',
-  documentTags: '',
+  knowledgeBaseId: knowledgeBaseId.value,
   file: null
 })
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -64,10 +63,7 @@ function handleFileChange(event: Event): void {
 function clearSelectedFile(): void {
   uploadForm.file = null
   uploadForm.documentName = ''
-  uploadForm.knowledgeScopeCode = ''
-  uploadForm.knowledgeScopeName = ''
-  uploadForm.businessCategory = ''
-  uploadForm.documentTags = ''
+  uploadForm.knowledgeBaseId = knowledgeBaseId.value
   if (fileInputRef.value) {
     fileInputRef.value.value = ''
   }
@@ -152,10 +148,7 @@ async function submitUpload(): Promise<void> {
     const documentReq: UploadDocumentReq = {
       documentName: uploadForm.documentName?.trim() || undefined,
       operatorId: OPERATOR_ID,
-      knowledgeScopeCode: uploadForm.knowledgeScopeCode?.trim() || undefined,
-      knowledgeScopeName: uploadForm.knowledgeScopeName?.trim() || undefined,
-      businessCategory: uploadForm.businessCategory?.trim() || undefined,
-      documentTags: uploadForm.documentTags?.trim() || undefined,
+      knowledgeBaseId: uploadForm.knowledgeBaseId,
       file: uploadForm.file
     }
     const {data} = await documentApi.uploadFile(uploadForm.file, documentReq)
@@ -243,26 +236,8 @@ onMounted(() => {
           </label>
 
           <label class="field">
-            <span>知识域编码</span>
-            <input v-model="uploadForm.knowledgeScopeCode" placeholder="例如 operation_rule"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>知识域名称</span>
-            <input v-model="uploadForm.knowledgeScopeName" placeholder="例如 运营规则"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>业务分类</span>
-            <input v-model="uploadForm.businessCategory" placeholder="例如 手册 / 规则 / 介绍"
-                   type="text"/>
-          </label>
-
-          <label class="field">
-            <span>文档标签</span>
-            <input v-model="uploadForm.documentTags" placeholder="多个标签用英文逗号分隔"
+            <span>知识库ID</span>
+            <input v-model="uploadForm.knowledgeBaseId" placeholder="文档归属的知识库ID，必填"
                    type="text"/>
           </label>
 

@@ -23,6 +23,16 @@ const placeholder = computed(() =>
 )
 const hasContent = computed(() => value.value.trim().length > 0)
 
+const KB_MODE_OPTIONS = [
+  { label: '跟随文档', value: 'document' as const },
+  { label: '全部知识库', value: 'all' as const },
+  { label: '不检索', value: 'none' as const }
+]
+
+function selectKbMode(value: 'document' | 'none' | 'all') {
+  store.setKnowledgeBaseSelection(value)
+}
+
 function focusInput() {
   const el = textareaRef.value
   if (!el) return
@@ -126,6 +136,18 @@ onBeforeUnmount(() => {
             v-if="store.deepThinkingEnabled"
             class="chat-input__chip-dot"
           />
+        </button>
+        <button
+          v-for="opt in KB_MODE_OPTIONS"
+          :key="opt.value"
+          :aria-pressed="store.knowledgeBaseSelectionMode === opt.value"
+          :class="{ 'chat-input__chip--active': store.knowledgeBaseSelectionMode === opt.value }"
+          :disabled="store.isStreaming"
+          class="chat-input__chip"
+          type="button"
+          @click="selectKbMode(opt.value)"
+        >
+          {{ opt.label }}
         </button>
         <button
           :aria-label="store.isStreaming ? '停止生成' : '发送消息'"

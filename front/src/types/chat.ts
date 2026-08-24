@@ -6,7 +6,14 @@ export interface ChatReq {
   /** 聊天模式 */
   chatMode: 'document' | 'open_chat' | 'auto_document';
   selectedDocumentId?: string;
+  /** 知识库选择模式：document=跟随选中文档 / none=不使用知识库 / all=全部知识库 */
+  knowledgeBaseSelectionMode: KnowledgeBaseSelectionMode;
+  /** 指定参与检索的知识库ID列表 */
+  selectedKnowledgeBaseIds?: string[];
 }
+
+/** 知识库选择模式 */
+export type KnowledgeBaseSelectionMode = 'document' | 'none' | 'all'
 
 /** 会话标识请求 */
 export interface ConversationIdentityReq {

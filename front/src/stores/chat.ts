@@ -2,12 +2,14 @@ import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import {ElMessage} from 'element-plus'
 import {chatApi, type StreamHandlers} from '@/api/chat'
+import {useKnowledgeBase} from '@/composables/useKnowledgeBase'
 import type {SearchReference} from '@/types/chat'
 import type {
   ChatReq,
   ConversationExchange,
   ConversationIdentityReq,
-  ConversationSessionResp
+  ConversationSessionResp,
+  KnowledgeBaseSelectionMode
 } from '@/types'
 
 /**
@@ -104,6 +106,11 @@ export const useChatStore = defineStore('chat', () => {
   const isCreatingNew = ref(false)
   const deepThinkingEnabled = ref(false)
   const thinkingStartAt = ref<number | null>(null)
+  /** 知识库选择模式：跟随选中文档 / 不使用知识库 / 全部知识库 */
+  const knowledgeBaseSelectionMode = ref<KnowledgeBaseSelectionMode>('document')
+  /** 指定参与检索的知识库ID列表（mode 为 all 时生效） */
+  const selectedKnowledgeBaseIds = ref<string[]>([])
+  const {knowledgeBaseId} = useKnowledgeBase()
   const streamAbort = ref<(() => void) | null>(null)
   const streamingMessageId = ref<string | null>(null)
   const cancelRequested = ref(false)
@@ -203,6 +210,11 @@ export const useChatStore = defineStore('chat', () => {
 
   function setDeepThinkingEnabled(enabled: boolean) {
     deepThinkingEnabled.value = enabled
+  }
+
+  function setKnowledgeBaseSelection(mode: KnowledgeBaseSelectionMode, ids?: string[]) {
+    knowledgeBaseSelectionMode.value = mode
+    selectedKnowledgeBaseIds.value = ids ?? []
   }
 
   // ====== 流式响应辅助 ======
@@ -369,7 +381,13 @@ export const useChatStore = defineStore('chat', () => {
     const req: ChatReq = {
       question: trimmed,
       conversationId,
-      chatMode: 'auto_document'
+      chatMode: 'auto_document',
+      knowledgeBaseSelectionMode: knowledgeBaseSelectionMode.value,
+      selectedKnowledgeBaseIds: knowledgeBaseSelectionMode.value === 'all'
+        ? selectedKnowledgeBaseIds.value.length
+          ? selectedKnowledgeBaseIds.value
+          : [knowledgeBaseId.value]
+        : undefined
     }
 
     const handlers: StreamHandlers = {
@@ -524,12 +542,15 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     isCreatingNew,
     deepThinkingEnabled,
+    knowledgeBaseSelectionMode,
+    selectedKnowledgeBaseIds,
     showWelcome,
     fetchSessions,
     createSession,
     selectSession,
     deleteSession,
     setDeepThinkingEnabled,
+    setKnowledgeBaseSelection,
     sendMessage,
     cancelGeneration,
     submitFeedback

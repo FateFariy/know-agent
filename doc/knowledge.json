@@ -35,6 +35,9 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": [
+                "conversationId"
+              ],
               "properties": {
                 "conversationId": {
                   "description": "会话ID",
@@ -198,16 +201,17 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": [
-                "scopeCode"
-              ],
               "properties": {
-                "operatorId": {
-                  "description": "操作人ID",
+                "id": {
+                  "description": "主键ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
                   "type": "string"
                 }
               }
@@ -226,6 +230,9 @@
     },
     "/manage/knowledge/scope/list": {
       "post": {
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -234,6 +241,22 @@
         ],
         "summary": "查询知识范围列表",
         "operationId": "knowledgeListKnowledgeScope",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -243,9 +266,9 @@
                 "type": "object",
                 "required": [
                   "id",
-                  "scopeCode",
+                  "knowledgeBaseId",
                   "scopeName",
-                  "parentScopeCode",
+                  "parentScopeId",
                   "description",
                   "aliases",
                   "examples",
@@ -268,12 +291,12 @@
                     "description": "主键ID",
                     "type": "string"
                   },
-                  "parentScopeCode": {
-                    "description": "上级范围编码",
+                  "knowledgeBaseId": {
+                    "description": "知识库ID",
                     "type": "string"
                   },
-                  "scopeCode": {
-                    "description": "范围编码",
+                  "parentScopeId": {
+                    "description": "上级范围ID",
                     "type": "string"
                   },
                   "scopeName": {
@@ -303,12 +326,12 @@
                   "description": "主键ID",
                   "type": "string"
                 },
-                "parentScopeCode": {
-                  "description": "上级范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "范围编码",
+                "parentScopeId": {
+                  "description": "上级范围ID",
                   "type": "string"
                 },
                 "scopeName": {
@@ -346,7 +369,7 @@
             "schema": {
               "type": "object",
               "required": [
-                "scopeCode",
+                "knowledgeBaseId",
                 "scopeName"
               ],
               "properties": {
@@ -366,16 +389,16 @@
                   "description": "主键ID",
                   "type": "string"
                 },
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
                 "operatorId": {
                   "description": "操作人ID",
                   "type": "string"
                 },
-                "parentScopeCode": {
-                  "description": "上级范围编码",
-                  "type": "string"
-                },
-                "scopeCode": {
-                  "description": "范围编码",
+                "parentScopeId": {
+                  "description": "上级范围ID",
                   "type": "string"
                 },
                 "scopeName": {
@@ -412,12 +435,12 @@
                   "description": "主键ID",
                   "type": "string"
                 },
-                "parentScopeCode": {
-                  "description": "上级范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "范围编码",
+                "parentScopeId": {
+                  "description": "上级范围ID",
                   "type": "string"
                 },
                 "scopeName": {
@@ -455,15 +478,20 @@
             "schema": {
               "type": "object",
               "required": [
-                "topicCode"
+                "id",
+                "knowledgeBaseId"
               ],
               "properties": {
-                "operatorId": {
-                  "description": "操作人ID",
+                "id": {
+                  "description": "主键ID",
                   "type": "string"
                 },
-                "topicCode": {
-                  "description": "主题编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "operatorId": {
+                  "description": "操作人ID",
                   "type": "string"
                 }
               }
@@ -501,11 +529,16 @@
             "schema": {
               "type": "object",
               "required": [
-                "topicCode"
+                "topicId",
+                "knowledgeBaseId"
               ],
               "properties": {
-                "topicCode": {
-                  "description": "主题编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "topicId": {
+                  "description": "主题ID",
                   "type": "string"
                 }
               }
@@ -520,22 +553,18 @@
               "items": {
                 "type": "object",
                 "required": [
-                  "topicCode",
+                  "knowledgeBaseId",
+                  "topicId",
+                  "topicName",
+                  "scopeId",
+                  "scopeName",
                   "documentId",
                   "documentName",
-                  "knowledgeScopeCode",
-                  "knowledgeScopeName",
-                  "businessCategory",
-                  "documentTags",
                   "relationScore",
                   "relationSource",
                   "reason"
                 ],
                 "properties": {
-                  "businessCategory": {
-                    "description": "业务分类",
-                    "type": "string"
-                  },
                   "documentId": {
                     "description": "文档ID",
                     "type": "string"
@@ -544,16 +573,8 @@
                     "description": "文档名称",
                     "type": "string"
                   },
-                  "documentTags": {
-                    "description": "文档标签",
-                    "type": "string"
-                  },
-                  "knowledgeScopeCode": {
-                    "description": "知识范围编码",
-                    "type": "string"
-                  },
-                  "knowledgeScopeName": {
-                    "description": "知识范围名称",
+                  "knowledgeBaseId": {
+                    "description": "知识库ID",
                     "type": "string"
                   },
                   "reason": {
@@ -568,17 +589,25 @@
                     "description": "关联来源",
                     "type": "string"
                   },
-                  "topicCode": {
-                    "description": "主题编码",
+                  "scopeId": {
+                    "description": "所属范围ID",
+                    "type": "string"
+                  },
+                  "scopeName": {
+                    "description": "所属范围名称",
+                    "type": "string"
+                  },
+                  "topicId": {
+                    "description": "主题ID",
+                    "type": "string"
+                  },
+                  "topicName": {
+                    "description": "主题名称",
                     "type": "string"
                   }
                 }
               },
               "properties": {
-                "businessCategory": {
-                  "description": "业务分类",
-                  "type": "string"
-                },
                 "documentId": {
                   "description": "文档ID",
                   "type": "string"
@@ -587,16 +616,8 @@
                   "description": "文档名称",
                   "type": "string"
                 },
-                "documentTags": {
-                  "description": "文档标签",
-                  "type": "string"
-                },
-                "knowledgeScopeCode": {
-                  "description": "知识范围编码",
-                  "type": "string"
-                },
-                "knowledgeScopeName": {
-                  "description": "知识范围名称",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
                 "reason": {
@@ -611,8 +632,20 @@
                   "description": "关联来源",
                   "type": "string"
                 },
-                "topicCode": {
-                  "description": "主题编码",
+                "scopeId": {
+                  "description": "所属范围ID",
+                  "type": "string"
+                },
+                "scopeName": {
+                  "description": "所属范围名称",
+                  "type": "string"
+                },
+                "topicId": {
+                  "description": "主题ID",
+                  "type": "string"
+                },
+                "topicName": {
+                  "description": "主题名称",
                   "type": "string"
                 }
               }
@@ -642,7 +675,8 @@
             "schema": {
               "type": "object",
               "required": [
-                "topicCode",
+                "topicId",
+                "knowledgeBaseId",
                 "documentId"
               ],
               "properties": {
@@ -650,12 +684,16 @@
                   "description": "文档ID",
                   "type": "string"
                 },
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
                 "operatorId": {
                   "description": "操作人ID",
                   "type": "string"
                 },
-                "topicCode": {
-                  "description": "主题编码",
+                "topicId": {
+                  "description": "主题ID",
                   "type": "string"
                 }
               }
@@ -693,12 +731,17 @@
             "schema": {
               "type": "object",
               "required": [
-                "topicCode",
+                "topicId",
+                "knowledgeBaseId",
                 "documentId"
               ],
               "properties": {
                 "documentId": {
                   "description": "文档ID",
+                  "type": "string"
+                },
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
                 "operatorId": {
@@ -717,8 +760,8 @@
                   "description": "关联来源",
                   "type": "string"
                 },
-                "topicCode": {
-                  "description": "主题编码",
+                "topicId": {
+                  "description": "主题ID",
                   "type": "string"
                 }
               }
@@ -731,10 +774,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "businessCategory": {
-                  "description": "业务分类",
-                  "type": "string"
-                },
                 "documentId": {
                   "description": "文档ID",
                   "type": "string"
@@ -743,16 +782,8 @@
                   "description": "文档名称",
                   "type": "string"
                 },
-                "documentTags": {
-                  "description": "文档标签",
-                  "type": "string"
-                },
-                "knowledgeScopeCode": {
-                  "description": "知识范围编码",
-                  "type": "string"
-                },
-                "knowledgeScopeName": {
-                  "description": "知识范围名称",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
                   "type": "string"
                 },
                 "reason": {
@@ -767,8 +798,20 @@
                   "description": "关联来源",
                   "type": "string"
                 },
-                "topicCode": {
-                  "description": "主题编码",
+                "scopeId": {
+                  "description": "所属范围ID",
+                  "type": "string"
+                },
+                "scopeName": {
+                  "description": "所属范围名称",
+                  "type": "string"
+                },
+                "topicId": {
+                  "description": "主题ID",
+                  "type": "string"
+                },
+                "topicName": {
+                  "description": "主题名称",
                   "type": "string"
                 }
               }
@@ -797,9 +840,17 @@
             "required": true,
             "schema": {
               "type": "object",
+              "required": [
+                "knowledgeBaseId",
+                "scopeId"
+              ],
               "properties": {
-                "scopeCode": {
-                  "description": "所属范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "scopeId": {
+                  "description": "范围ID",
                   "type": "string"
                 }
               }
@@ -815,9 +866,9 @@
                 "type": "object",
                 "required": [
                   "id",
-                  "topicCode",
+                  "knowledgeBaseId",
                   "topicName",
-                  "scopeCode",
+                  "scopeId",
                   "description",
                   "aliases",
                   "examples",
@@ -850,17 +901,17 @@
                     "description": "主键ID",
                     "type": "string"
                   },
-                  "scopeCode": {
-                    "description": "所属范围编码",
+                  "knowledgeBaseId": {
+                    "description": "知识库ID",
+                    "type": "string"
+                  },
+                  "scopeId": {
+                    "description": "所属范围ID",
                     "type": "string"
                   },
                   "sortOrder": {
                     "description": "排序",
                     "type": "integer"
-                  },
-                  "topicCode": {
-                    "description": "主题编码",
-                    "type": "string"
                   },
                   "topicName": {
                     "description": "主题名称",
@@ -893,17 +944,17 @@
                   "description": "主键ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "所属范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "scopeId": {
+                  "description": "所属范围ID",
                   "type": "string"
                 },
                 "sortOrder": {
                   "description": "排序",
                   "type": "integer"
-                },
-                "topicCode": {
-                  "description": "主题编码",
-                  "type": "string"
                 },
                 "topicName": {
                   "description": "主题名称",
@@ -936,9 +987,9 @@
             "schema": {
               "type": "object",
               "required": [
-                "topicCode",
-                "topicName",
-                "scopeCode"
+                "knowledgeBaseId",
+                "scopeId",
+                "topicName"
               ],
               "properties": {
                 "aliases": {
@@ -965,21 +1016,21 @@
                   "description": "主键ID",
                   "type": "string"
                 },
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
                 "operatorId": {
                   "description": "操作人ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "所属范围编码",
+                "scopeId": {
+                  "description": "范围ID",
                   "type": "string"
                 },
                 "sortOrder": {
                   "description": "排序",
                   "type": "integer"
-                },
-                "topicCode": {
-                  "description": "主题编码",
-                  "type": "string"
                 },
                 "topicName": {
                   "description": "主题名称",
@@ -1019,17 +1070,17 @@
                   "description": "主键ID",
                   "type": "string"
                 },
-                "scopeCode": {
-                  "description": "所属范围编码",
+                "knowledgeBaseId": {
+                  "description": "知识库ID",
+                  "type": "string"
+                },
+                "scopeId": {
+                  "description": "所属范围ID",
                   "type": "string"
                 },
                 "sortOrder": {
                   "description": "排序",
                   "type": "integer"
-                },
-                "topicCode": {
-                  "description": "主题编码",
-                  "type": "string"
                 },
                 "topicName": {
                   "description": "主题名称",
@@ -1042,7 +1093,7 @@
       }
     }
   },
-  "x-date": "2026-07-16 10:45:49",
+  "x-date": "2026-08-24 20:43:44",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

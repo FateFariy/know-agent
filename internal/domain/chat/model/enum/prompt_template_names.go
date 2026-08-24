@@ -10,6 +10,7 @@ const (
 	AnswerFaithfulnessEvaluate   = "answer-faithfulness-evaluate"
 	AnswerRelevancyEvaluate      = "answer-relevancy-evaluate"
 	ContextPrecisionEvaluate     = "context-precision-evaluate"
+	ContextRecallEvaluate        = "context-recall-evaluate"
 	DocumentIntentRecognition    = "document-intent-recognition"
 	RagAnswerDocumentReference   = "rag-answer-document-reference"
 	RagAnswerNoEvidence          = "rag-answer-no-evidence"

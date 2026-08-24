@@ -101,8 +101,22 @@ func bootstrap(c *config.Config) *server.Server {
 	memoryManageImpl := memory.NewSessionMemoryManageImpl(compressionStrategy)
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
-	chain := conversation.NewChain(serviceContext, chatRepo, redisMutexLock, memoryManageImpl, intentRecognizer,
-		rewriteImpl, knowledgeAdapter, documentRouter, documentForChat, retrievalEngine, renderer, chatModel, recommender, NewAnswerEvaluators(chatModel, renderer, embedder))
+	chainRuntime := conversation.NewRuntimeRegistry()
+	// 按对话执行流程顺序初始化所有子阶段，顺序不可调整
+	stages := []conversation.Stage{
+		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
+		conversation.NewMemoryLoadStage(serviceContext, chatRepo, memoryManageImpl),
+		conversation.NewIntentRecognizeStage(intentRecognizer),
+		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
+		conversation.NewRouteStage(serviceContext, chatRepo, knowledgeAdapter, documentRouter, documentForChat),
+		conversation.NewRetrievalStage(retrievalEngine),
+		conversation.NewEvidenceBudgetStage(serviceContext, renderer),
+		conversation.NewGenerateStage(chatModel),
+		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),
+		conversation.NewRecommendStage(serviceContext, chatRepo, memoryManageImpl, recommender),
+		conversation.NewEndStage(chatRepo),
+	}
+	chain := conversation.NewChain(chatRepo, redisMutexLock, memoryManageImpl, chainRuntime, stages)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
 	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
 

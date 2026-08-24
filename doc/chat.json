@@ -301,7 +301,7 @@
                     "recommendations",
                     "usedTools",
                     "debugTrace",
-                    "status",
+                    "turnStatus",
                     "errorMessage",
                     "firstResponseTimeMs",
                     "totalResponseTimeMs",
@@ -844,10 +844,6 @@
                         }
                       }
                     },
-                    "status": {
-                      "description": "对话状态",
-                      "type": "integer"
-                    },
                     "thinkingSteps": {
                       "description": "思维步骤列表",
                       "type": "array",
@@ -857,6 +853,10 @@
                     },
                     "totalResponseTimeMs": {
                       "description": "总响应时间毫秒",
+                      "type": "integer"
+                    },
+                    "turnStatus": {
+                      "description": "对话状态",
                       "type": "integer"
                     },
                     "updateTime": {
@@ -941,7 +941,7 @@
                       },
                       "stageState": {
                         "description": "阶段状态",
-                        "type": "string"
+                        "type": "integer"
                       },
                       "startTime": {
                         "description": "开始时间",
@@ -1026,6 +1026,8 @@
                   "isElevated",
                   "isSelected",
                   "selectionReason",
+                  "documentId",
+                  "documentName",
                   "chunkId",
                   "chunkNo",
                   "parentBlockId",
@@ -1066,6 +1068,14 @@
                   },
                   "createTime": {
                     "description": "创建时间",
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "description": "文档ID",
+                    "type": "string"
+                  },
+                  "documentName": {
+                    "description": "文档名称",
                     "type": "string"
                   },
                   "exchangeId": {
@@ -1169,6 +1179,14 @@
                 },
                 "createTime": {
                   "description": "创建时间",
+                  "type": "string"
+                },
+                "documentId": {
+                  "description": "文档ID",
+                  "type": "string"
+                },
+                "documentName": {
+                  "description": "文档名称",
                   "type": "string"
                 },
                 "exchangeId": {
@@ -1313,7 +1331,7 @@
                       "recommendations",
                       "usedTools",
                       "debugTrace",
-                      "status",
+                      "turnStatus",
                       "errorMessage",
                       "firstResponseTimeMs",
                       "totalResponseTimeMs",
@@ -1856,10 +1874,6 @@
                           }
                         }
                       },
-                      "status": {
-                        "description": "对话状态",
-                        "type": "integer"
-                      },
                       "thinkingSteps": {
                         "description": "思维步骤列表",
                         "type": "array",
@@ -1869,6 +1883,10 @@
                       },
                       "totalResponseTimeMs": {
                         "description": "总响应时间毫秒",
+                        "type": "integer"
+                      },
+                      "turnStatus": {
+                        "description": "对话状态",
                         "type": "integer"
                       },
                       "updateTime": {
@@ -1899,7 +1917,7 @@
                 },
                 "latestTurnStatus": {
                   "description": "本轮交互状态",
-                  "type": "string"
+                  "type": "integer"
                 },
                 "latestUserMessage": {
                   "description": "最新用户提问",
@@ -1910,7 +1928,7 @@
                   "type": "object",
                   "required": [
                     "conversationId",
-                    "IsCompressed",
+                    "isCompressed",
                     "coveredExchangeId",
                     "coveredExchangeCount",
                     "compressionCount",
@@ -1921,10 +1939,6 @@
                     "updateTime"
                   ],
                   "properties": {
-                    "IsCompressed": {
-                      "description": "是否执行过记忆压缩",
-                      "type": "boolean"
-                    },
                     "compressionCount": {
                       "description": "累计压缩次数",
                       "type": "integer"
@@ -1940,6 +1954,10 @@
                     "coveredExchangeId": {
                       "description": "压缩截止交互ID",
                       "type": "string"
+                    },
+                    "isCompressed": {
+                      "description": "是否执行过记忆压缩",
+                      "type": "boolean"
                     },
                     "lastSourceUpdateTime": {
                       "description": "原始对话最后更新时间",
@@ -2160,7 +2178,7 @@
                             "recommendations",
                             "usedTools",
                             "debugTrace",
-                            "status",
+                            "turnStatus",
                             "errorMessage",
                             "firstResponseTimeMs",
                             "totalResponseTimeMs",
@@ -2703,10 +2721,6 @@
                                 }
                               }
                             },
-                            "status": {
-                              "description": "对话状态",
-                              "type": "integer"
-                            },
                             "thinkingSteps": {
                               "description": "思维步骤列表",
                               "type": "array",
@@ -2716,6 +2730,10 @@
                             },
                             "totalResponseTimeMs": {
                               "description": "总响应时间毫秒",
+                              "type": "integer"
+                            },
+                            "turnStatus": {
+                              "description": "对话状态",
                               "type": "integer"
                             },
                             "updateTime": {
@@ -2746,7 +2764,7 @@
                       },
                       "latestTurnStatus": {
                         "description": "本轮交互状态",
-                        "type": "string"
+                        "type": "integer"
                       },
                       "latestUserMessage": {
                         "description": "最新用户提问",
@@ -2757,7 +2775,7 @@
                         "type": "object",
                         "required": [
                           "conversationId",
-                          "IsCompressed",
+                          "isCompressed",
                           "coveredExchangeId",
                           "coveredExchangeCount",
                           "compressionCount",
@@ -2768,10 +2786,6 @@
                           "updateTime"
                         ],
                         "properties": {
-                          "IsCompressed": {
-                            "description": "是否执行过记忆压缩",
-                            "type": "boolean"
-                          },
                           "compressionCount": {
                             "description": "累计压缩次数",
                             "type": "integer"
@@ -2787,6 +2801,10 @@
                           "coveredExchangeId": {
                             "description": "压缩截止交互ID",
                             "type": "string"
+                          },
+                          "isCompressed": {
+                            "description": "是否执行过记忆压缩",
+                            "type": "boolean"
                           },
                           "lastSourceUpdateTime": {
                             "description": "原始对话最后更新时间",
@@ -3063,10 +3081,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "IsCompressed": {
-                  "description": "是否执行过记忆压缩",
-                  "type": "boolean"
-                },
                 "compressionCount": {
                   "description": "累计压缩次数",
                   "type": "integer"
@@ -3082,6 +3096,10 @@
                 "coveredExchangeId": {
                   "description": "压缩截止交互ID",
                   "type": "string"
+                },
+                "isCompressed": {
+                  "description": "是否执行过记忆压缩",
+                  "type": "boolean"
                 },
                 "lastSourceUpdateTime": {
                   "description": "原始对话最后更新时间",
@@ -3185,7 +3203,8 @@
               "type": "object",
               "required": [
                 "question",
-                "chatMode"
+                "chatMode",
+                "knowledgeBaseSelectionMode"
               ],
               "properties": {
                 "chatMode": {
@@ -3201,6 +3220,15 @@
                   "description": "会话ID",
                   "type": "string"
                 },
+                "knowledgeBaseSelectionMode": {
+                  "description": "知识库选择模式",
+                  "type": "string",
+                  "enum": [
+                    "document",
+                    "none",
+                    "all"
+                  ]
+                },
                 "question": {
                   "description": "问题内容",
                   "type": "string"
@@ -3208,6 +3236,13 @@
                 "selectedDocumentId": {
                   "description": "选中的文档ID",
                   "type": "string"
+                },
+                "selectedKnowledgeBaseIds": {
+                  "description": "选择的知识库Ids",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -3222,7 +3257,7 @@
       }
     }
   },
-  "x-date": "2026-07-16 10:45:56",
+  "x-date": "2026-08-24 20:43:05",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

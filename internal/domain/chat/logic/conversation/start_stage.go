@@ -21,25 +21,24 @@ const (
 
 type StartStage struct {
 	repo            adapter.ChatRepository
-	runtimeRegistry *runtimeRegistry
+	runtime         *RuntimeRegistry
 	distributedLock adapter.DistributedLock
 	stop            func(context.Context, *Context, string) (string, bool)
 }
 
 var _ Stage = (*StartStage)(nil)
 
-func NewStartStage(
-	repo adapter.ChatRepository,
-	runtimeRegistry *runtimeRegistry,
-	distributedLock adapter.DistributedLock,
-	stop func(context.Context, *Context, string) (string, bool),
-) *StartStage {
+func NewStartStage(repo adapter.ChatRepository, runtimeRegistry *RuntimeRegistry, distributedLock adapter.DistributedLock) *StartStage {
 	return &StartStage{
 		repo:            repo,
-		runtimeRegistry: runtimeRegistry,
+		runtime:         runtimeRegistry,
 		distributedLock: distributedLock,
-		stop:            stop,
 	}
+}
+
+// setStop 注入会话停止回调，在阶段由外部构建后与 Chain 共享
+func (s *StartStage) setStop(stop func(context.Context, *Context, string) (string, bool)) {
+	s.stop = stop
 }
 
 // Name 阶段名称
@@ -64,7 +63,7 @@ func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) 
 	cancelCtx = vo.WithTrace(cancelCtx, convCtx.Trace)
 
 	// 注册对话上下文到运行注册表；注册失败意味着会话正被其他执行接管
-	if !s.runtimeRegistry.Register(convCtx) {
+	if !s.runtime.Register(convCtx) {
 		return errorx.ErrSessionRunning
 	}
 

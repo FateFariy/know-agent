@@ -3,11 +3,8 @@
 export interface UploadDocumentReq {
   documentName?: string;
   operatorId?: string;
-  knowledgeScopeCode?: string;
-  knowledgeScopeName?: string;
-  businessCategory?: string;
-  documentTags?: string;
-  file: File | null;
+  /** 知识库ID（必填） */
+  knowledgeBaseId: string;
 }
 
 /** 分页查询文档列表请求 */

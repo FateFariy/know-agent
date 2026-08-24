@@ -6,6 +6,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
 type AnswerEvaluateStage struct {
@@ -19,7 +20,7 @@ func NewAnswerEvaluateStage(evaluator []Evaluator) *AnswerEvaluateStage {
 }
 
 func (a *AnswerEvaluateStage) Name() string {
-	return "AnswerEvaluateStage"
+	return enum.ConversationTraceStageAnswerEvaluate.Name
 }
 
 func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) error {
