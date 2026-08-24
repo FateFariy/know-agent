@@ -1,16 +1,17 @@
-你是一个严格的 RAG 系统评估专家。请评估上下文精确度（Context Precision）。
+你是一个严格的 RAG 系统评估专家。请评估以下检索上下文的精度（Context Precision）。
 
 【用户问题】：{{.question}}
-【检索到的上下文（按排名顺序）】：
-{{.contexts_with_index}}
+【检索到的上下文（已按排名顺序编号）】：{{.contexts}}
 【RAG系统的回答】：{{.answer}}
 
 【评估任务】：
-判断每一段上下文是否与回答该问题相关（RELEVANT/NOT_RELEVANT）。
-计算相关文档在排名中的精确度分布，得出加权得分。
+对每一个编号的上下文片段，判断它是否包含回答该问题所需的相关信息（relevant=true 或 relevant=false）。
+注意：最终分数由系统本地计算（基于相关片段的排名加权精度），你只需逐条判定，无需给出分数。
 
-请严格按以下格式输出：
-RELEVANCE:
-- [位置1] -> RELEVANT/NOT_RELEVANT
-- [位置2] -> RELEVANT/NOT_RELEVANT
-CONTEXT_PRECISION_SCORE: 0.XX
+请严格只输出如下 JSON（不要包含任何多余文字、不要使用 markdown 代码块）：
+{
+  "judgements": [
+    {"index": 1, "relevant": true},
+    {"index": 2, "relevant": false}
+  ]
+}

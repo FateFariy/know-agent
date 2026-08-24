@@ -5,12 +5,14 @@
 【RAG系统的回答】：{{.answer}}
 
 【评估任务】：
-1. 将回答拆解为独立的原子声明（每行一条）。
-2. 对每条声明，判断上下文是否明确支持（SUPPORTED）或不支持（NOT_SUPPORTED）。
-3. 忠实度 = SUPPORTED 数量 / 总声明数量。
+1. 将回答拆解为独立的原子声明。
+2. 对每条声明，判断检索上下文是否明确支持（supported=true）或不支持（supported=false）。
+注意：最终分数由系统本地计算（supported 数量 / 总声明数量），你只需逐条判定，无需给出分数。
 
-请严格按以下格式输出，不要包含任何多余文字：
-CLAIMS:
-- [声明1] -> SUPPORTED/NOT_SUPPORTED
-- [声明2] -> SUPPORTED/NOT_SUPPORTED
-FAITHFULNESS_SCORE: 0.XX
+请严格只输出如下 JSON（不要包含任何多余文字、不要使用 markdown 代码块）：
+{
+  "claims": [
+    {"claim": "声明内容", "supported": true},
+    {"claim": "声明内容", "supported": false}
+  ]
+}

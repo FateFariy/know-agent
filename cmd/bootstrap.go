@@ -73,6 +73,7 @@ func bootstrap(c *config.Config) *server.Server {
 	documentForKnowledge := gateway.NewDocumentAdapterForKnowledge(documentRepo)
 	documentForChat := gateway.NewDocumentAdapterForChat(documentRepo)
 	observability.RegisterConversationTraceRecorder(chatRepo)
+	observability.RegisterRagEvalMetricsHandler(chatRepo)
 
 	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, documentForKnowledge, localConfig)
 	opts := []rank.Option{rank.WithLexicalIndex(elasticStorage), rank.WithEmbedding(embedder)}
@@ -83,7 +84,7 @@ func bootstrap(c *config.Config) *server.Server {
 	}
 	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, documentForKnowledge, rankers, knowroute.WithEmbedding(embedder))
 	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, documentForKnowledge)
-	//knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
+	// knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
 	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
@@ -145,7 +146,7 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 
 func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.Embedder) []conversation.Evaluator {
 	return []conversation.Evaluator{
-		evaluate.NewFaithfulnessEvaluator(llm, renderer),
+		evaluate.NewAnswerFaithfulnessEvaluator(llm, renderer),
 		evaluate.NewAnswerRelevancyEvaluator(llm, renderer, emb),
 		evaluate.NewContextPrecisionEvaluator(llm, renderer),
 	}
