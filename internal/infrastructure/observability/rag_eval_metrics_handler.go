@@ -2,11 +2,17 @@ package observability
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/swiftbit/know-agent/common/logx"
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ragEvaluationScore 是一个带标签的直方图指标构造器，
@@ -58,15 +64,15 @@ var (
 	)
 )
 
-func init() {
-	registerRagEvalMetricsHandler()
+// ragEvalMetricsHandler 实现 Handler 接口，用于记录 Prometheus 指标，以及持久化评估结果
+type ragEvalMetricsHandler struct {
+	repo adapter.ChatRepository
 }
 
-// ragEvalMetricsHandler 实现 Handler 接口，用于记录 Prometheus 指标
-type ragEvalMetricsHandler struct{}
-
-func registerRagEvalMetricsHandler() {
-	callbacks.AppendGlobalHandlers(&ragEvalMetricsHandler{})
+func RegisterRagEvalMetricsHandler(repo adapter.ChatRepository) {
+	callbacks.AppendGlobalHandlers(&ragEvalMetricsHandler{
+		repo: repo,
+	})
 	prometheus.MustRegister(
 		RagEvaluationScore,
 		FaithfulnessScore,
@@ -93,6 +99,9 @@ func (h *ragEvalMetricsHandler) OnEnd(ctx context.Context, info *callbacks.RunIn
 	score := output.(float64)
 	observeScore(metricName, score, nil)
 
+	// 在线持久化评估结果到 chat_exchange_eval
+	h.persistEval(ctx, metricName, score, info.StartTime, nil)
+
 	return ctx
 }
 
@@ -108,7 +117,53 @@ func (h *ragEvalMetricsHandler) OnError(ctx context.Context, info *callbacks.Run
 	}
 	observeScore(metricName, 0, err)
 
+	// 在线持久化评估失败结果到 chat_exchange_eval
+	h.persistEval(ctx, metricName, 0, info.StartTime, err)
+
 	return ctx
+}
+
+// persistEval 将单次评估结果直接写入仓储（best-effort，失败仅告警不阻塞主流程）
+func (h *ragEvalMetricsHandler) persistEval(ctx context.Context, metricName string, score float64, startTime time.Time, err error) {
+	trace := vo.TraceFromCtx(ctx)
+	conversationId := trace.ConversationId()
+	exchangeId := trace.ExchangeId()
+	if conversationId == "" || exchangeId == 0 {
+		return
+	}
+	errMsg, status := "", 0
+	if err != nil {
+		errMsg = err.Error()
+		status = 1
+	}
+	eval := &entity.ChatExchangeEval{
+		ConversationId: conversationId,
+		ExchangeId:     exchangeId,
+		MetricName:     metricName,
+		MetricLabel:    metricLabel(metricName),
+		Score:          score,
+		LatencyMs:      time.Since(startTime),
+		Status:         int8(status),
+		ErrorMsg:       utils.Pointer(errMsg),
+	}
+	if err := h.repo.InsertExchangeEval(ctx, []*entity.ChatExchangeEval{eval}); err != nil {
+		logx.Warnf("RAG 评估结果落库失败, conversationId=%s, exchangeId=%d, metric=%s, err=%v",
+			conversationId, exchangeId, metricName, err)
+	}
+}
+
+// metricLabel 指标编码转展示名
+func metricLabel(name string) string {
+	switch name {
+	case enum.AnswerFaithfulness:
+		return "答案忠实度"
+	case enum.AnswerRelevancy:
+		return "答案相关性"
+	case enum.ContextPrecision:
+		return "上下文精度"
+	default:
+		return name
+	}
 }
 
 // observeScore 根据指标名称向对应的独立直方图指标记录一次成功得分，

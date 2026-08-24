@@ -33,8 +33,9 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 		Contexts: contexts,
 		Answer:   convCtx.Answer(),
 	}
+
 	for _, evaluator := range a.evaluator {
-		go func() {
+		go func(evaluator Evaluator) {
 			info := &callbacks.RunInfo{
 				StartTime: time.Now(),
 				Component: "rag_eval_metrics",
@@ -46,9 +47,10 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 			if err != nil {
 				logx.Warnf("evaluate error: %v", err)
 				callbacks.OnError(ctx, err)
+				return
 			}
 			callbacks.OnEnd(ctx, score)
-		}()
+		}(evaluator)
 	}
 	return nil
 }

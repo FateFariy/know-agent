@@ -1,5 +1,5 @@
 -- 1. 通道执行记录
-CREATE TABLE `chat_channel_execution`
+CREATE TABLE IF NOT EXISTS `chat_channel_execution`
 (
     `id`                   BIGINT         NOT NULL COMMENT '主键ID',
     `conversation_id`      VARCHAR(64)    NOT NULL COMMENT '对话ID',
@@ -32,7 +32,7 @@ CREATE TABLE `chat_channel_execution`
   COLLATE = utf8mb4_unicode_ci COMMENT ='通道执行记录';
 
 -- 2. 会话记录表
-CREATE TABLE `chat_dialogue`
+CREATE TABLE IF NOT EXISTS `chat_dialogue`
 (
     `id`                                 BIGINT       NOT NULL COMMENT '主键ID',
     `conversation_id`                    VARCHAR(64)  NOT NULL COMMENT '会话ID',
@@ -53,7 +53,7 @@ CREATE TABLE `chat_dialogue`
   COLLATE = utf8mb4_unicode_ci COMMENT ='会话记录表';
 
 -- 3. 对话记录表（交换）
-CREATE TABLE `chat_exchange`
+CREATE TABLE IF NOT EXISTS `chat_exchange`
 (
     `id`                                 BIGINT      NOT NULL COMMENT '主键ID',
     `conversation_id`                    VARCHAR(64) NOT NULL COMMENT '会话ID',
@@ -82,7 +82,7 @@ CREATE TABLE `chat_exchange`
   COLLATE = utf8mb4_unicode_ci COMMENT ='对话记录表';
 
 -- 4. 追踪阶段表
-CREATE TABLE `chat_exchange_trace_stage`
+CREATE TABLE IF NOT EXISTS `chat_exchange_trace_stage`
 (
     `id`              BIGINT       NOT NULL COMMENT '主键ID',
     `conversation_id` VARCHAR(64)  NOT NULL COMMENT '对话ID',
@@ -113,7 +113,7 @@ CREATE TABLE `chat_exchange_trace_stage`
   COLLATE = utf8mb4_unicode_ci COMMENT ='追踪阶段表';
 
 -- 5. 会话记忆摘要
-CREATE TABLE `chat_memory_summary`
+CREATE TABLE IF NOT EXISTS `chat_memory_summary`
 (
     `id`                      BIGINT      NOT NULL COMMENT '主键ID',
     `conversation_id`         VARCHAR(64) NOT NULL COMMENT '对话ID',
@@ -134,7 +134,7 @@ CREATE TABLE `chat_memory_summary`
   COLLATE = utf8mb4_unicode_ci COMMENT ='会话记忆摘要';
 
 -- 6. 检索结果表
-CREATE TABLE `chat_retrieval_result`
+CREATE TABLE IF NOT EXISTS `chat_retrieval_result`
 (
     `id`                       BIGINT         NOT NULL COMMENT '主键ID',
     `conversation_id`          VARCHAR(64)    NOT NULL COMMENT '对话ID',
@@ -189,8 +189,29 @@ CREATE TABLE `chat_retrieval_result`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='检索结果表';
 
+-- 6.5 RAG 质量评估表
+CREATE TABLE IF NOT EXISTS `chat_exchange_eval`
+(
+    `id`               BIGINT       NOT NULL COMMENT '主键ID',
+    `conversation_id`  VARCHAR(64)  NOT NULL COMMENT '对话ID',
+    `exchange_id`      BIGINT       NOT NULL COMMENT '交互ID',
+    `metric_name`      VARCHAR(64)  NOT NULL COMMENT '指标编码(answer_faithfulness/answer_relevancy/context_precision)',
+    `metric_label`     VARCHAR(64)  NOT NULL COMMENT '指标展示名',
+    `score`            DECIMAL(10,4) NOT NULL DEFAULT 0 COMMENT '评估得分(0~1)',
+    `latency_ms`       BIGINT       NOT NULL DEFAULT 0 COMMENT '评估耗时(ms)',
+    `status`           TINYINT      NOT NULL DEFAULT 0 COMMENT '评估状态(0:成功,1:失败)',
+    `error_msg`        VARCHAR(512) COMMENT '错误信息',
+    `create_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`          TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    PRIMARY KEY (`id`),
+    INDEX `idx_exchange` (`conversation_id`, `exchange_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='RAG质量评估表';
+
 -- 7. 文档主表
-CREATE TABLE `document`
+CREATE TABLE IF NOT EXISTS `document`
 (
     `id`                    BIGINT       NOT NULL COMMENT '主键ID',
     `document_name`         VARCHAR(255) NOT NULL COMMENT '文档名称',
@@ -228,7 +249,7 @@ CREATE TABLE `document`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档主表';
 
 -- 8. 文档块表
-CREATE TABLE `document_block`
+CREATE TABLE IF NOT EXISTS `document_block`
 (
     `id`                  BIGINT      NOT NULL COMMENT '主键ID',
     `document_id`         BIGINT      NOT NULL COMMENT '文档ID',
@@ -258,7 +279,7 @@ CREATE TABLE `document_block`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档块表';
 
 -- 9. 文档文本块表
-CREATE TABLE `document_chunk`
+CREATE TABLE IF NOT EXISTS `document_chunk`
 (
     `id`                  BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`         BIGINT   NOT NULL COMMENT '文档ID',
@@ -300,7 +321,7 @@ CREATE TABLE `document_chunk`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档文本块表';
 
 -- 10. 文档父块表
-CREATE TABLE `document_parent_chunk`
+CREATE TABLE IF NOT EXISTS `document_parent_chunk`
 (
     `id`                  BIGINT       NOT NULL COMMENT '主键ID',
     `document_id`         BIGINT       NOT NULL COMMENT '文档ID',
@@ -333,7 +354,7 @@ CREATE TABLE `document_parent_chunk`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档父块表';
 
 -- 11. 文档画像表
-CREATE TABLE `document_profile`
+CREATE TABLE IF NOT EXISTS `document_profile`
 (
     `id`                     BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`            BIGINT   NOT NULL COMMENT '文档ID',
@@ -359,7 +380,7 @@ CREATE TABLE `document_profile`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档画像表';
 
 -- 12. 策略方案表
-CREATE TABLE `document_strategy_plan`
+CREATE TABLE IF NOT EXISTS `document_strategy_plan`
 (
     `id`                BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`       BIGINT   NOT NULL COMMENT '文档ID',
@@ -382,7 +403,7 @@ CREATE TABLE `document_strategy_plan`
   COLLATE = utf8mb4_unicode_ci COMMENT ='策略方案表';
 
 -- 13. 策略步骤表
-CREATE TABLE `document_strategy_step`
+CREATE TABLE IF NOT EXISTS `document_strategy_step`
 (
     `id`               BIGINT       NOT NULL COMMENT '主键ID',
     `plan_id`          BIGINT       NOT NULL COMMENT '计划ID',
@@ -405,7 +426,7 @@ CREATE TABLE `document_strategy_step`
   COLLATE = utf8mb4_unicode_ci COMMENT ='策略步骤表';
 
 -- 14. 文档结构节点表
-CREATE TABLE `document_structure_node`
+CREATE TABLE IF NOT EXISTS `document_structure_node`
 (
     `id`                    BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`           BIGINT   NOT NULL COMMENT '文档ID',
@@ -446,7 +467,7 @@ CREATE TABLE `document_structure_node`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档结构节点表';
 
 -- 15. 文档表格表
-CREATE TABLE `document_table`
+CREATE TABLE IF NOT EXISTS `document_table`
 (
     `id`            BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`   BIGINT   NOT NULL COMMENT '文档ID',
@@ -474,7 +495,7 @@ CREATE TABLE `document_table`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档表格表';
 
 -- 16. 文档表格单元格表
-CREATE TABLE `document_table_cell`
+CREATE TABLE IF NOT EXISTS `document_table_cell`
 (
     `id`               BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`      BIGINT   NOT NULL COMMENT '文档ID',
@@ -503,7 +524,7 @@ CREATE TABLE `document_table_cell`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档表格单元格表';
 
 -- 17. 文档表格列表
-CREATE TABLE `document_table_column`
+CREATE TABLE IF NOT EXISTS `document_table_column`
 (
     `id`              BIGINT       NOT NULL COMMENT '主键ID',
     `document_id`     BIGINT       NOT NULL COMMENT '文档ID',
@@ -525,7 +546,7 @@ CREATE TABLE `document_table_column`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档表格列表';
 
 -- 18. 文档表格行表
-CREATE TABLE `document_table_row`
+CREATE TABLE IF NOT EXISTS `document_table_row`
 (
     `id`          BIGINT   NOT NULL COMMENT '主键ID',
     `document_id` BIGINT   NOT NULL COMMENT '文档ID',
@@ -545,7 +566,7 @@ CREATE TABLE `document_table_row`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档表格行表';
 
 -- 19. 文档任务表
-CREATE TABLE `document_task`
+CREATE TABLE IF NOT EXISTS `document_task`
 (
     `id`                   BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`          BIGINT   NOT NULL COMMENT '文档ID',
@@ -575,7 +596,7 @@ CREATE TABLE `document_task`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档任务表';
 
 -- 20. 文档任务日志表
-CREATE TABLE `document_task_log`
+CREATE TABLE IF NOT EXISTS `document_task_log`
 (
     `id`            BIGINT   NOT NULL COMMENT '主键ID',
     `task_id`       BIGINT   NOT NULL COMMENT '任务ID',
@@ -598,7 +619,7 @@ CREATE TABLE `document_task_log`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档任务日志表';
 
 -- 21. 知识库表
-CREATE TABLE `knowledge_base`
+CREATE TABLE IF NOT EXISTS `knowledge_base`
 (
     `id`                    BIGINT       NOT NULL COMMENT '主键ID',
     `base_name`             VARCHAR(255) NOT NULL COMMENT '基础名称',
@@ -620,7 +641,7 @@ CREATE TABLE `knowledge_base`
   COLLATE = utf8mb4_unicode_ci COMMENT ='知识库表';
 
 -- 22. 文档画像（知识库）表
-CREATE TABLE `knowledge_document_profile`
+CREATE TABLE IF NOT EXISTS `knowledge_document_profile`
 (
     `id`                     BIGINT   NOT NULL COMMENT '主键ID',
     `document_id`            BIGINT   NOT NULL COMMENT '文档ID',
@@ -646,7 +667,7 @@ CREATE TABLE `knowledge_document_profile`
   COLLATE = utf8mb4_unicode_ci COMMENT ='文档画像（知识库）表';
 
 -- 23. 知识路由追踪表
-CREATE TABLE `knowledge_route_trace`
+CREATE TABLE IF NOT EXISTS `knowledge_route_trace`
 (
     `id`                                 BIGINT         NOT NULL COMMENT '主键ID',
     `conversation_id`                    VARCHAR(255)   NOT NULL COMMENT '会话ID',
@@ -677,7 +698,7 @@ CREATE TABLE `knowledge_route_trace`
   COLLATE = utf8mb4_unicode_ci COMMENT ='知识路由追踪表';
 
 -- 24. 知识范围节点表
-CREATE TABLE `knowledge_scope_node`
+CREATE TABLE IF NOT EXISTS `knowledge_scope_node`
 (
     `id`                BIGINT       NOT NULL COMMENT '主键ID',
     `knowledge_base_id` BIGINT       NOT NULL COMMENT '知识库ID',
@@ -698,7 +719,7 @@ CREATE TABLE `knowledge_scope_node`
   COLLATE = utf8mb4_unicode_ci COMMENT ='知识范围节点表';
 
 -- 25. 主题-文档映射关系表
-CREATE TABLE `knowledge_topic_document_relation`
+CREATE TABLE IF NOT EXISTS `knowledge_topic_document_relation`
 (
     `id`                BIGINT         NOT NULL COMMENT '主键ID',
     `knowledge_base_id` BIGINT         NOT NULL COMMENT '所属知识库ID',
@@ -719,7 +740,7 @@ CREATE TABLE `knowledge_topic_document_relation`
   COLLATE = utf8mb4_unicode_ci COMMENT ='主题-文档映射关系表';
 
 -- 26. 知识话题节点表
-CREATE TABLE `knowledge_topic_node`
+CREATE TABLE IF NOT EXISTS `knowledge_topic_node`
 (
     `id`                   BIGINT       NOT NULL COMMENT '主键ID',
     `knowledge_base_id`    BIGINT       NOT NULL COMMENT '知识库ID',

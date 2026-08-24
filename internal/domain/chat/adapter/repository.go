@@ -101,4 +101,15 @@ type ChatRepository interface {
 
 	// DeleteChannelExecutionsByConversationId 删除会话所有渠道执行记录
 	DeleteChannelExecutionsByConversationId(ctx context.Context, conversationId string) error
+
+	// ========== RAG 质量评估相关 ==========
+
+	// InsertExchangeEval 插入对话级 RAG 质量评估结果
+	InsertExchangeEval(ctx context.Context, evals []*entity.ChatExchangeEval) error
+
+	// SelectExchangeEval 查询某次交互的评估结果
+	SelectExchangeEval(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeEval, error)
+
+	// DeleteExchangeEvalByConversationId 删除会话所有评估结果
+	DeleteExchangeEvalByConversationId(ctx context.Context, conversationId string) error
 }

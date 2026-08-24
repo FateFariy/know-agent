@@ -52,8 +52,8 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		Minio:      NewMinioClient(c),
 		RedSync:    NewRedSync(redisClient),
 		Emb:        NewArkEmbedding(ctx, c),
-		ChatModel:  NewArkChatModel(ctx, c, "chat"),
-		JudgeModel: NewArkChatModel(ctx, c, "judge"),
+		ChatModel:  NewArkChatModel(ctx, c.ChatModel["Ark"]),
+		JudgeModel: NewArkChatModel(ctx, c.JudgeModel["Ark"]),
 		Milvus:     NewMilvusClient(ctx, c),
 	}
 }
@@ -125,17 +125,13 @@ func NewArkEmbedding(ctx context.Context, c *config.Config) embedding.Embedder {
 	return emb
 }
 
-func NewArkChatModel(ctx context.Context, c *config.Config, function string) *agenticark.Model {
-	llmConf := c.ChatModel["Ark"]
-	if function == "judge" {
-		llmConf = c.JudgeModel["Ark"]
-	}
+func NewArkChatModel(ctx context.Context, c *config.LLMConf) *agenticark.Model {
 	chatModel, err := agenticark.New(ctx, &agenticark.Config{
-		APIKey:      llmConf.ApiKey,
-		Model:       llmConf.Model,
-		MaxTokens:   utils.Pointer(llmConf.MaxTokens),
-		Temperature: utils.Pointer(llmConf.Temperature),
-		TopP:        utils.Pointer(llmConf.TopP),
+		APIKey:      c.ApiKey,
+		Model:       c.Model,
+		MaxTokens:   utils.Pointer(c.MaxTokens),
+		Temperature: utils.Pointer(c.Temperature),
+		TopP:        utils.Pointer(c.TopP),
 	})
 	if err != nil {
 		panic(err)

@@ -410,6 +410,35 @@ func (r *ChatRepositoryImpl) DeleteChannelExecutionsByConversationId(ctx context
 		Delete(&model.ChatChannelExecution{}).Error
 }
 
+// ========== RAG 质量评估相关 ==========
+
+// InsertExchangeEval 插入对话级 RAG 质量评估结果
+func (r *ChatRepositoryImpl) InsertExchangeEval(ctx context.Context, evals []*entity.ChatExchangeEval) error {
+	if len(evals) == 0 {
+		return nil
+	}
+	return r.dbWithContext(ctx).Create(convert.ToChatExchangeEvalModelList(evals)).Error
+}
+
+// SelectExchangeEval 查询某次交互的评估结果
+func (r *ChatRepositoryImpl) SelectExchangeEval(ctx context.Context, conversationId string, exchangeId int64) ([]*entity.ChatExchangeEval, error) {
+	var evals []*entity.ChatExchangeEval
+	err := r.dbWithContext(ctx).
+		Where("conversation_id = ? AND exchange_id = ?", conversationId, exchangeId).
+		Find(&evals).Error
+	if err != nil {
+		return nil, err
+	}
+	return evals, nil
+}
+
+// DeleteExchangeEvalByConversationId 删除会话所有评估结果
+func (r *ChatRepositoryImpl) DeleteExchangeEvalByConversationId(ctx context.Context, conversationId string) error {
+	return r.dbWithContext(ctx).
+		Where("conversation_id = ?", conversationId).
+		Delete(&model.ChatExchangeEval{}).Error
+}
+
 // toChatArchiveRecord 转换为会话记录
 func (r *ChatRepositoryImpl) toChatArchiveRecord(dialogue *entity.ChatDialogue, chatExchanges []*entity.ChatExchange) *aggregate.ConversationArchiveRecord {
 	return &aggregate.ConversationArchiveRecord{

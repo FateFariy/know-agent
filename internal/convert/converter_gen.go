@@ -128,6 +128,33 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 	}
 	return pModelChatDialogue
 }
+func ToChatExchangeEvalModel(source *entity.ChatExchangeEval) *model.ChatExchangeEval {
+	var pModelChatExchangeEval *model.ChatExchangeEval
+	if source != nil {
+		var modelChatExchangeEval model.ChatExchangeEval
+		modelChatExchangeEval.Model = entityChatExchangeEvalToCommonModel((*source))
+		modelChatExchangeEval.ConversationId = (*source).ConversationId
+		modelChatExchangeEval.ExchangeId = (*source).ExchangeId
+		modelChatExchangeEval.MetricName = (*source).MetricName
+		modelChatExchangeEval.MetricLabel = (*source).MetricLabel
+		modelChatExchangeEval.Score = (*source).Score
+		modelChatExchangeEval.LatencyMs = int64((*source).LatencyMs)
+		modelChatExchangeEval.Status = (*source).Status
+		modelChatExchangeEval.ErrorMsg = (*source).ErrorMsg
+		pModelChatExchangeEval = &modelChatExchangeEval
+	}
+	return pModelChatExchangeEval
+}
+func ToChatExchangeEvalModelList(source []*entity.ChatExchangeEval) []*model.ChatExchangeEval {
+	var pModelChatExchangeEvalList []*model.ChatExchangeEval
+	if source != nil {
+		pModelChatExchangeEvalList = make([]*model.ChatExchangeEval, len(source))
+		for i := 0; i < len(source); i++ {
+			pModelChatExchangeEvalList[i] = ToChatExchangeEvalModel(source[i])
+		}
+	}
+	return pModelChatExchangeEvalList
+}
 func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 	var pModelChatExchange *model.ChatExchange
 	if source != nil {
@@ -360,6 +387,11 @@ func entityChatChannelExecutionToCommonModel(source entity.ChatChannelExecution)
 	return commonModel
 }
 func entityChatDialogueToCommonModel(source entity.ChatDialogue) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
+}
+func entityChatExchangeEvalToCommonModel(source entity.ChatExchangeEval) common.Model {
 	var commonModel common.Model
 	commonModel.ID = source.ID
 	return commonModel

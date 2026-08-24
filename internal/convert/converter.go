@@ -119,6 +119,9 @@ type ChatConverter interface {
 	// goverter:map . Model
 	ToChatChannelExecutionModel(src *cen.ChatChannelExecution) *model.ChatChannelExecution
 	ToChatChannelExecutionModelList(src []*cen.ChatChannelExecution) []*model.ChatChannelExecution
+	// goverter:map . Model
+	ToChatExchangeEvalModel(src *cen.ChatExchangeEval) *model.ChatExchangeEval
+	ToChatExchangeEvalModelList(src []*cen.ChatExchangeEval) []*model.ChatExchangeEval
 }
 
 // goverter:converter
