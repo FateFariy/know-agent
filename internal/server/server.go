@@ -51,8 +51,8 @@ func NewHTTPServer(svcCtx *svc.ServiceContext, docSrv document.HTTPServer, chatS
 		}, nil, "*"),
 	}
 	server := rest.MustNewServer(svcCtx.Config.Http, opts...)
-	document.RegisterHandlers(server, svcCtx, docSrv)
-	chat.RegisterHandlers(server, svcCtx, chatSrv)
-	knowledge.RegisterHandlers(server, svcCtx, knowledgeSrv)
+	document.RegisterHandlers(server, docSrv)
+	chat.RegisterHandlers(server, chatSrv)
+	knowledge.RegisterHandlers(server, knowledgeSrv)
 	return server
 }

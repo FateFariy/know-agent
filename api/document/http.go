@@ -8,7 +8,6 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 
 	"github.com/swiftbit/know-agent/common"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type HTTPServer interface {
@@ -56,7 +55,7 @@ type HTTPServer interface {
 }
 
 // UploadDocumentHandler 上传文档
-func UploadDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func UploadDocumentHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UploadDocumentReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -77,7 +76,7 @@ func UploadDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 }
 
 // QueryDocumentPageHandler 分页查询文档列表
-func QueryDocumentPageHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryDocumentPageHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentPageReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -91,7 +90,7 @@ func QueryDocumentPageHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 }
 
 // QueryDocumentDetailHandler 查询文档详情
-func QueryDocumentDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryDocumentDetailHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -105,7 +104,7 @@ func QueryDocumentDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 }
 
 // GetDocumentOptionsHandler 获取知识文档选项
-func GetDocumentOptionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetDocumentOptionsHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp, err := srv.GetDocumentOptions(r.Context())
 		common.Response(w, resp, "", err)
@@ -113,7 +112,7 @@ func GetDocumentOptionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // DeleteDocumentHandler 删除文档
-func DeleteDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func DeleteDocumentHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DeleteDocumentReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -127,7 +126,7 @@ func DeleteDocumentHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 }
 
 // QueryStrategyPlanHandler 查询策略方案
-func QueryStrategyPlanHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryStrategyPlanHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryStrategyPlanReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -141,7 +140,7 @@ func QueryStrategyPlanHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 }
 
 // ConfirmStrategyHandler 确认策略
-func ConfirmStrategyHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ConfirmStrategyHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConfirmStrategyReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -155,7 +154,7 @@ func ConfirmStrategyHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Han
 }
 
 // BuildIndexHandler 构建索引
-func BuildIndexHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func BuildIndexHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req BuildIndexReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -169,7 +168,7 @@ func BuildIndexHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 }
 
 // QueryDocumentChunksHandler 查询文档chunk列表
-func QueryDocumentChunksHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryDocumentChunksHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentChunksReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -183,7 +182,7 @@ func QueryDocumentChunksHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 }
 
 // QueryDocumentChunkDetailHandler 查询文档chunk详情
-func QueryDocumentChunkDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryDocumentChunkDetailHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryDocumentChunkDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -197,7 +196,7 @@ func QueryDocumentChunkDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer)
 }
 
 // QueryTaskLogsHandler 查询任务日志
-func QueryTaskLogsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryTaskLogsHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueryTaskLogsReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -211,7 +210,7 @@ func QueryTaskLogsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Handl
 }
 
 // GetDocumentProfileHandler 查询文档画像详情
-func GetDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetDocumentProfileHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileDetailReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -225,7 +224,7 @@ func GetDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // RegenerateDocumentProfileHandler 重新生成文档画像
-func RegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func RegenerateDocumentProfileHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileRegenerateReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -239,7 +238,7 @@ func RegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 }
 
 // BatchRegenerateDocumentProfileHandler 批量重新生成文档画像
-func BatchRegenerateDocumentProfileHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func BatchRegenerateDocumentProfileHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DocumentProfileBatchRegenerateReq
 		if err := httpx.Parse(r, &req); err != nil {

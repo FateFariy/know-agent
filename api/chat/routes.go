@@ -4,53 +4,51 @@ import (
 	"net/http"
 
 	"github.com/zeromicro/go-zero/rest"
-
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // RegisterHandlers 注册聊天服务路由
-func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPServer) {
+func RegisterHandlers(server *rest.Server, srv HTTPServer) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
 				Method:  http.MethodPost,
 				Path:    "/session/stop",
-				Handler: StopConversationHandler(svcCtx, srv),
+				Handler: StopConversationHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/session/detail",
-				Handler: GetSessionDetailHandler(svcCtx, srv),
+				Handler: GetSessionDetailHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/exchange/detail",
-				Handler: GetExchangeDetailHandler(svcCtx, srv),
+				Handler: GetExchangeDetailHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/session/list",
-				Handler: ListSessionsHandler(svcCtx, srv),
+				Handler: ListSessionsHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/session/reset",
-				Handler: ResetConversationHandler(svcCtx, srv),
+				Handler: ResetConversationHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/session/summary/rebuild",
-				Handler: RebuildSummaryHandler(svcCtx, srv),
+				Handler: RebuildSummaryHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/exchange/retrieval/results",
-				Handler: GetRetrievalResultsHandler(svcCtx, srv),
+				Handler: GetRetrievalResultsHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/exchange/channel/executions",
-				Handler: GetChannelExecutionsHandler(svcCtx, srv),
+				Handler: GetChannelExecutionsHandler(srv),
 			},
 		},
 		rest.WithPrefix("/chat"),
@@ -59,7 +57,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPS
 		{
 			Method:  http.MethodPost,
 			Path:    "/stream",
-			Handler: StreamChatHandler(svcCtx, srv),
+			Handler: StreamChatHandler(srv),
 		},
 	}, rest.WithPrefix("/chat"), rest.WithSSE())
 }

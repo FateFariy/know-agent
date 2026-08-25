@@ -7,82 +7,80 @@ import (
 	"net/http"
 
 	"github.com/zeromicro/go-zero/rest"
-
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPServer) {
+func RegisterHandlers(server *rest.Server, srv HTTPServer) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
 				Method:  http.MethodPost,
 				Path:    "/upload",
-				Handler: UploadDocumentHandler(svcCtx, srv),
+				Handler: UploadDocumentHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/page/query",
-				Handler: QueryDocumentPageHandler(svcCtx, srv),
+				Handler: QueryDocumentPageHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/detail/query",
-				Handler: QueryDocumentDetailHandler(svcCtx, srv),
+				Handler: QueryDocumentDetailHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/delete",
-				Handler: DeleteDocumentHandler(svcCtx, srv),
+				Handler: DeleteDocumentHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/strategy/plan/query",
-				Handler: QueryStrategyPlanHandler(svcCtx, srv),
+				Handler: QueryStrategyPlanHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/strategy/confirm",
-				Handler: ConfirmStrategyHandler(svcCtx, srv),
+				Handler: ConfirmStrategyHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/index/build",
-				Handler: BuildIndexHandler(svcCtx, srv),
+				Handler: BuildIndexHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/chunk/query",
-				Handler: QueryDocumentChunksHandler(svcCtx, srv),
+				Handler: QueryDocumentChunksHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/chunk/detail/query",
-				Handler: QueryDocumentChunkDetailHandler(svcCtx, srv),
+				Handler: QueryDocumentChunkDetailHandler(srv),
 			},
 			{
 				Method:  http.MethodGet,
 				Path:    "/options",
-				Handler: GetDocumentOptionsHandler(svcCtx, srv),
+				Handler: GetDocumentOptionsHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/task/log/query",
-				Handler: QueryTaskLogsHandler(svcCtx, srv),
+				Handler: QueryTaskLogsHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/profile/detail",
-				Handler: GetDocumentProfileHandler(svcCtx, srv),
+				Handler: GetDocumentProfileHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/profile/regenerate",
-				Handler: RegenerateDocumentProfileHandler(svcCtx, srv),
+				Handler: RegenerateDocumentProfileHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/profile/batch/regenerate",
-				Handler: BatchRegenerateDocumentProfileHandler(svcCtx, srv),
+				Handler: BatchRegenerateDocumentProfileHandler(srv),
 			},
 		},
 		rest.WithPrefix("/manage/document"),

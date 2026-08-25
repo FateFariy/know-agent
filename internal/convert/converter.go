@@ -146,6 +146,7 @@ type KnowledgeConverter interface {
 	// goverter:map RouteStatus | ToRouteStatus
 	ToKnowledgeRouteTraceItem(src *klen.KnowledgeRouteTrace) *knowledge.KnowledgeRouteTraceItem
 	ToKnowledgeRouteTraceItemList(src []*klen.KnowledgeRouteTrace) []*knowledge.KnowledgeRouteTraceItem
+	ToKnowledgeBaseItemRespList(src []*klen.KnowledgeBase) []*knowledge.KnowledgeBaseItemResp
 
 	// goverter:map . Model
 	ToKnowledgeScopeNodeModel(src *klen.KnowledgeScopeNode) *model.KnowledgeScopeNode

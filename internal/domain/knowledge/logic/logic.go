@@ -66,21 +66,12 @@ type KnowledgeBaseLogic interface {
 	// GetEnabledKnowledgeBase 根据ID获取启用的知识库（不存在或已停用则返回错误）
 	GetEnabledKnowledgeBase(ctx context.Context, id int64) (*entity.KnowledgeBase, error)
 
-	// ListKnowledgeBaseOptions	查询知识库选项列表（包含可检索文档数量）
-	ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error)
+	// ListKnowledgeBaseItems 查询知识库列表（包含文档数量和可检索文档数量）
+	ListKnowledgeBaseItems(ctx context.Context) ([]*entity.KnowledgeBase, error)
 }
 
 // KnowledgeBaseRetrievalLogic 知识库检索范围
 type KnowledgeBaseRetrievalLogic interface {
 	// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
 	DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
-}
-
-// KnowledgeConfigOption 知识库选项（用于下拉选择等场景）
-type KnowledgeConfigOption struct {
-	ID               int64  // 知识库ID
-	BaseName         string // 知识库名称
-	Description      string // 描述
-	IsDefault        int    // 是否默认
-	RetrievableCount int64  // 可检索文档数量
 }

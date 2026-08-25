@@ -15,6 +15,143 @@
   },
   "basePath": "/",
   "paths": {
+    "/manage/knowledge/base/list": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "https"
+        ],
+        "summary": "查询知识库列表",
+        "operationId": "knowledgeListKnowledgeBase",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "baseName",
+                  "description",
+                  "embeddingModel",
+                  "retrievalConfigJson",
+                  "graphRagConfigJson",
+                  "raptorConfigJson",
+                  "metadataFilterJson",
+                  "isDefault",
+                  "sortOrder",
+                  "documentCount",
+                  "retrievableDocumentCount"
+                ],
+                "properties": {
+                  "baseName": {
+                    "description": "知识库名称",
+                    "type": "string"
+                  },
+                  "description": {
+                    "description": "描述",
+                    "type": "string"
+                  },
+                  "documentCount": {
+                    "description": "文档数量",
+                    "type": "integer"
+                  },
+                  "embeddingModel": {
+                    "description": "嵌入模型",
+                    "type": "string"
+                  },
+                  "graphRagConfigJson": {
+                    "description": "图谱RAG配置JSON",
+                    "type": "string"
+                  },
+                  "id": {
+                    "description": "主键ID",
+                    "type": "string"
+                  },
+                  "isDefault": {
+                    "description": "是否默认",
+                    "type": "integer"
+                  },
+                  "metadataFilterJson": {
+                    "description": "元数据过滤JSON",
+                    "type": "string"
+                  },
+                  "raptorConfigJson": {
+                    "description": "RAPTOR配置JSON",
+                    "type": "string"
+                  },
+                  "retrievableDocumentCount": {
+                    "description": "可检索文档数量",
+                    "type": "integer"
+                  },
+                  "retrievalConfigJson": {
+                    "description": "检索配置JSON",
+                    "type": "string"
+                  },
+                  "sortOrder": {
+                    "description": "排序",
+                    "type": "integer"
+                  }
+                }
+              },
+              "properties": {
+                "baseName": {
+                  "description": "知识库名称",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "描述",
+                  "type": "string"
+                },
+                "documentCount": {
+                  "description": "文档数量",
+                  "type": "integer"
+                },
+                "embeddingModel": {
+                  "description": "嵌入模型",
+                  "type": "string"
+                },
+                "graphRagConfigJson": {
+                  "description": "图谱RAG配置JSON",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "主键ID",
+                  "type": "string"
+                },
+                "isDefault": {
+                  "description": "是否默认",
+                  "type": "integer"
+                },
+                "metadataFilterJson": {
+                  "description": "元数据过滤JSON",
+                  "type": "string"
+                },
+                "raptorConfigJson": {
+                  "description": "RAPTOR配置JSON",
+                  "type": "string"
+                },
+                "retrievableDocumentCount": {
+                  "description": "可检索文档数量",
+                  "type": "integer"
+                },
+                "retrievalConfigJson": {
+                  "description": "检索配置JSON",
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "description": "排序",
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/manage/knowledge/route/trace/page/query": {
       "post": {
         "consumes": [
@@ -1093,7 +1230,7 @@
       }
     }
   },
-  "x-date": "2026-08-24 20:43:44",
+  "x-date": "2026-08-25 11:15:14",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

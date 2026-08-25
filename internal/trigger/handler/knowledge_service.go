@@ -11,14 +11,15 @@ import (
 
 // KnowledgeService 知识管理 HTTP 服务
 type KnowledgeService struct {
-	l logic.KnowledgeLogic
+	l   logic.KnowledgeLogic
+	kbl logic.KnowledgeBaseLogic
 }
 
 var _ knowledge.HTTPServer = (*KnowledgeService)(nil)
 
 // NewKnowledgeService 构造函数
-func NewKnowledgeService(l logic.KnowledgeLogic) *KnowledgeService {
-	return &KnowledgeService{l: l}
+func NewKnowledgeService(l logic.KnowledgeLogic, kbl logic.KnowledgeBaseLogic) *KnowledgeService {
+	return &KnowledgeService{l: l, kbl: kbl}
 }
 
 // ==================== 知识范围 ====================
@@ -112,4 +113,13 @@ func (k *KnowledgeService) QueryKnowledgeRouteTracePage(ctx context.Context, req
 		TotalPages: int(totalPages),
 		Records:    result,
 	}, nil
+}
+
+// ListKnowledgeBase 查询知识库列表
+func (k *KnowledgeService) ListKnowledgeBase(ctx context.Context) ([]*knowledge.KnowledgeBaseItemResp, error) {
+	items, err := k.kbl.ListKnowledgeBaseItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return convert.ToKnowledgeBaseItemRespList(items), nil
 }

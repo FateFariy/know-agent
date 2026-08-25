@@ -1429,6 +1429,16 @@ func ToKnowledgeBaseEntity(source *model.KnowledgeBase) *entity2.KnowledgeBase {
 	}
 	return pEntityKnowledgeBase
 }
+func ToKnowledgeBaseItemRespList(source []*entity2.KnowledgeBase) []*knowledge.KnowledgeBaseItemResp {
+	var pKnowledgeKnowledgeBaseItemRespList []*knowledge.KnowledgeBaseItemResp
+	if source != nil {
+		pKnowledgeKnowledgeBaseItemRespList = make([]*knowledge.KnowledgeBaseItemResp, len(source))
+		for i := 0; i < len(source); i++ {
+			pKnowledgeKnowledgeBaseItemRespList[i] = pEntityKnowledgeBaseToPKnowledgeKnowledgeBaseItemResp(source[i])
+		}
+	}
+	return pKnowledgeKnowledgeBaseItemRespList
+}
 func ToKnowledgeBaseModel(source *entity2.KnowledgeBase) *model.KnowledgeBase {
 	var pModelKnowledgeBase *model.KnowledgeBase
 	if source != nil {
@@ -1742,6 +1752,28 @@ func jsonRawMessageToDatatypesJSON(source json.RawMessage) datatypes.JSON {
 }
 func jsonRawMessageToJsonRawMessage(source json.RawMessage) json.RawMessage {
 	return source
+}
+func pEntityKnowledgeBaseToPKnowledgeKnowledgeBaseItemResp(source *entity2.KnowledgeBase) *knowledge.KnowledgeBaseItemResp {
+	var pKnowledgeKnowledgeBaseItemResp *knowledge.KnowledgeBaseItemResp
+	if source != nil {
+		var knowledgeKnowledgeBaseItemResp knowledge.KnowledgeBaseItemResp
+		knowledgeKnowledgeBaseItemResp.ID = Int64ToString((*source).ID)
+		knowledgeKnowledgeBaseItemResp.BaseName = NormalizeString((*source).BaseName)
+		knowledgeKnowledgeBaseItemResp.Description = NormalizeString((*source).Description)
+		knowledgeKnowledgeBaseItemResp.EmbeddingModel = NormalizeString((*source).EmbeddingModel)
+		knowledgeKnowledgeBaseItemResp.RetrievalConfigJson = RawMessageToString((*source).RetrievalConfigJson)
+		knowledgeKnowledgeBaseItemResp.GraphRagConfigJson = RawMessageToString((*source).GraphRagConfigJson)
+		knowledgeKnowledgeBaseItemResp.RaptorConfigJson = RawMessageToString((*source).RaptorConfigJson)
+		knowledgeKnowledgeBaseItemResp.MetadataFilterJson = RawMessageToString((*source).MetadataFilterJson)
+		if (*source).IsDefault != nil {
+			knowledgeKnowledgeBaseItemResp.IsDefault = *(*source).IsDefault
+		}
+		knowledgeKnowledgeBaseItemResp.SortOrder = (*source).SortOrder
+		knowledgeKnowledgeBaseItemResp.DocumentCount = (*source).DocumentCount
+		knowledgeKnowledgeBaseItemResp.RetrievableDocumentCount = (*source).RetrievableDocumentCount
+		pKnowledgeKnowledgeBaseItemResp = &knowledgeKnowledgeBaseItemResp
+	}
+	return pKnowledgeKnowledgeBaseItemResp
 }
 func pEntityKnowledgeBaseToPVoKnowledgeBase(source *entity2.KnowledgeBase) *vo.KnowledgeBase {
 	var pVoKnowledgeBase *vo.KnowledgeBase

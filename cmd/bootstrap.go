@@ -84,7 +84,7 @@ func bootstrap(c *config.Config) *server.Server {
 	}
 	knowledgeRouter := knowroute.NewKnowledgeRouteImpl(knowledgeRepo, documentForKnowledge, rankers, knowroute.WithEmbedding(embedder))
 	knowledgeLogicImpl := knowlogic.NewKnowledgeLogicImpl(knowledgeRepo, documentForKnowledge)
-	// knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
+	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
 	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
@@ -131,7 +131,7 @@ func bootstrap(c *config.Config) *server.Server {
 
 	chatService := handler.NewChatService(conversationLogicImpl)
 	documentService := handler.NewDocumentService(lifecycleLogicImpl, profileLogicImpl)
-	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl)
+	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl, knowledgeBaseLogicImpl)
 	httpServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
 
 	return server.NewServer(httpServer, parseConsumer, buildIndexConsumer, rocketMQMessageProducer)

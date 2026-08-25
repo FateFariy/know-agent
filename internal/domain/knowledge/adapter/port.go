@@ -13,6 +13,9 @@ type Embedder interface {
 }
 
 type DocumentGateway interface {
+	// CountDocumentsByKbIds 按知识库ID列表统计文档数量（返回 map[kbId]count）
+	CountDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)
+
 	// CountRetrievableDocumentsByKbIds 按知识库ID列表统计可检索文档数量（返回 map[kbId]count）
 	CountRetrievableDocumentsByKbIds(ctx context.Context, kbIds []int64) (map[int64]int64, error)
 

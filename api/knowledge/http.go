@@ -7,7 +7,6 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 
 	"github.com/swiftbit/know-agent/common"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 type HTTPServer interface {
@@ -40,10 +39,13 @@ type HTTPServer interface {
 
 	// QueryKnowledgeRouteTracePage 分页查询知识路由追踪
 	QueryKnowledgeRouteTracePage(ctx context.Context, req *KnowledgeRouteTracePageReq) (*KnowledgeRouteTracePageResp, error)
+
+	// ListKnowledgeBase 查询知识库列表
+	ListKnowledgeBase(ctx context.Context) ([]*KnowledgeBaseItemResp, error)
 }
 
 // SaveKnowledgeScopeHandler 保存知识范围节点
-func SaveKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func SaveKnowledgeScopeHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeScopeSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -57,7 +59,7 @@ func SaveKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // DeleteKnowledgeScopeHandler 删除知识范围节点
-func DeleteKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func DeleteKnowledgeScopeHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeScopeDeleteReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -71,7 +73,7 @@ func DeleteKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 }
 
 // ListKnowledgeScopeHandler 查询知识范围列表
-func ListKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ListKnowledgeScopeHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp, err := srv.ListKnowledgeScope(r.Context())
 		common.Response(w, resp, "", err)
@@ -79,7 +81,7 @@ func ListKnowledgeScopeHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // SaveKnowledgeTopicHandler 保存知识主题节点
-func SaveKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func SaveKnowledgeTopicHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -93,7 +95,7 @@ func SaveKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // DeleteKnowledgeTopicHandler 删除知识主题节点
-func DeleteKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func DeleteKnowledgeTopicHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicDeleteReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -107,7 +109,7 @@ func DeleteKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) htt
 }
 
 // ListKnowledgeTopicHandler 查询知识主题列表
-func ListKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ListKnowledgeTopicHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeTopicListReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -121,7 +123,7 @@ func ListKnowledgeTopicHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.
 }
 
 // ListTopicDocumentRelationHandler 查询主题文档关联
-func ListTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ListTopicDocumentRelationHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationListReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -135,7 +137,7 @@ func ListTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 }
 
 // SaveTopicDocumentRelationHandler 保存主题文档关联
-func SaveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func SaveTopicDocumentRelationHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationSaveReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -149,7 +151,7 @@ func SaveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer
 }
 
 // RemoveTopicDocumentRelationHandler 移除主题文档关联
-func RemoveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func RemoveTopicDocumentRelationHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req TopicDocumentRelationRemoveReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -163,7 +165,7 @@ func RemoveTopicDocumentRelationHandler(svcCtx *svc.ServiceContext, srv HTTPServ
 }
 
 // QueryKnowledgeRouteTracePageHandler 分页查询知识路由追踪
-func QueryKnowledgeRouteTracePageHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func QueryKnowledgeRouteTracePageHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req KnowledgeRouteTracePageReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -172,6 +174,14 @@ func QueryKnowledgeRouteTracePageHandler(svcCtx *svc.ServiceContext, srv HTTPSer
 		}
 
 		resp, err := srv.QueryKnowledgeRouteTracePage(r.Context(), &req)
+		common.Response(w, resp, "", err)
+	}
+}
+
+// ListKnowledgeBaseHandler 查询知识库列表
+func ListKnowledgeBaseHandler(srv HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resp, err := srv.ListKnowledgeBase(r.Context())
 		common.Response(w, resp, "", err)
 	}
 }

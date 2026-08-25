@@ -8,7 +8,6 @@ import (
 	"github.com/zeromicro/go-zero/rest/httpx"
 
 	"github.com/swiftbit/know-agent/common"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // HTTPServer 聊天服务HTTP接口
@@ -42,7 +41,7 @@ type HTTPServer interface {
 }
 
 // StreamChatHandler 流式聊天
-func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func StreamChatHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ChatReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -57,7 +56,7 @@ func StreamChatHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerF
 }
 
 // StopConversationHandler 停止会话
-func StopConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func StopConversationHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -71,7 +70,7 @@ func StopConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Ha
 }
 
 // GetSessionDetailHandler 获取会话详情
-func GetSessionDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetSessionDetailHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -85,7 +84,7 @@ func GetSessionDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Ha
 }
 
 // GetExchangeDetailHandler 获取对话详情
-func GetExchangeDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetExchangeDetailHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationExchangeDetailQueryReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -99,7 +98,7 @@ func GetExchangeDetailHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 }
 
 // ListSessionsHandler 获取会话列表
-func ListSessionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ListSessionsHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationSessionListReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -113,7 +112,7 @@ func ListSessionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Handle
 }
 
 // ResetConversationHandler 重置会话
-func ResetConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func ResetConversationHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -127,7 +126,7 @@ func ResetConversationHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.H
 }
 
 // RebuildSummaryHandler 重建会话摘要
-func RebuildSummaryHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func RebuildSummaryHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConversationIdentityReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -141,7 +140,7 @@ func RebuildSummaryHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.Hand
 }
 
 // GetRetrievalResultsHandler 获取检索结果
-func GetRetrievalResultsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetRetrievalResultsHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RetrievalObserveReq
 		if err := httpx.Parse(r, &req); err != nil {
@@ -155,7 +154,7 @@ func GetRetrievalResultsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http
 }
 
 // GetChannelExecutionsHandler 获取渠道执行结果
-func GetChannelExecutionsHandler(svcCtx *svc.ServiceContext, srv HTTPServer) http.HandlerFunc {
+func GetChannelExecutionsHandler(srv HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RetrievalObserveReq
 		if err := httpx.Parse(r, &req); err != nil {

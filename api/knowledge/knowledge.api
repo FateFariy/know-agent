@@ -224,5 +224,8 @@ service knowledge {
 	@doc "分页查询知识路由追踪"
 	@handler QueryKnowledgeRouteTracePage
 	post /route/trace/page/query (KnowledgeRouteTracePageReq) returns (KnowledgeRouteTracePageResp)
-}
 
+	@doc "查询知识库列表"
+	@handler ListKnowledgeBase
+	post /base/list returns ([]*KnowledgeBaseItemResp)
+}

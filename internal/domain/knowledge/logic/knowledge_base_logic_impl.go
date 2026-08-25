@@ -144,39 +144,29 @@ func (k *KnowledgeBaseLogicImpl) GetEnabledKnowledgeBase(ctx context.Context, id
 	return base, nil
 }
 
-// ListKnowledgeBaseOptions 查询知识库选项列表
-func (k *KnowledgeBaseLogicImpl) ListKnowledgeBaseOptions(ctx context.Context) ([]*KnowledgeConfigOption, error) {
+// ListKnowledgeBaseItems 查询知识库列表（包含文档数量和可检索文档数量）
+func (k *KnowledgeBaseLogicImpl) ListKnowledgeBaseItems(ctx context.Context) ([]*entity.KnowledgeBase, error) {
 	bases, err := k.repo.SelectKnowledgeBases(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(bases) == 0 {
-		return []*KnowledgeConfigOption{}, nil
+		return nil, nil
 	}
 
-	// 收集所有知识库ID
-	kbIds := make([]int64, 0, len(bases))
-	for _, c := range bases {
-		kbIds = append(kbIds, c.ID)
+	kbIds := utils.Map(bases, func(base *entity.KnowledgeBase) int64 { return base.ID })
+	documentCounts, err := k.docGateway.CountDocumentsByKbIds(ctx, kbIds)
+	if err != nil {
+		return nil, err
 	}
-
-	// 批量统计可检索文档数量
 	retrievableCounts, err := k.docGateway.CountRetrievableDocumentsByKbIds(ctx, kbIds)
 	if err != nil {
 		return nil, err
 	}
-
-	// 构建选项列表
-	options := make([]*KnowledgeConfigOption, 0, len(bases))
-	for _, c := range bases {
-		option := &KnowledgeConfigOption{
-			ID:               c.ID,
-			BaseName:         c.BaseName,
-			Description:      c.Description,
-			IsDefault:        utils.PointerOrDefault(c.IsDefault, 0),
-			RetrievableCount: retrievableCounts[c.ID],
-		}
-		options = append(options, option)
+	for _, base := range bases {
+		base.DocumentCount = int(documentCounts[base.ID])
+		base.RetrievableDocumentCount = int(retrievableCounts[base.ID])
 	}
-	return options, nil
+
+	return bases, nil
 }

@@ -7,62 +7,65 @@ import (
 	"net/http"
 
 	"github.com/zeromicro/go-zero/rest"
-
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext, srv HTTPServer) {
+func RegisterHandlers(server *rest.Server, srv HTTPServer) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
 				Method:  http.MethodPost,
 				Path:    "/scope/save",
-				Handler: SaveKnowledgeScopeHandler(svcCtx, srv),
+				Handler: SaveKnowledgeScopeHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/scope/delete",
-				Handler: DeleteKnowledgeScopeHandler(svcCtx, srv),
+				Handler: DeleteKnowledgeScopeHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/scope/list",
-				Handler: ListKnowledgeScopeHandler(svcCtx, srv),
+				Handler: ListKnowledgeScopeHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/save",
-				Handler: SaveKnowledgeTopicHandler(svcCtx, srv),
+				Handler: SaveKnowledgeTopicHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/delete",
-				Handler: DeleteKnowledgeTopicHandler(svcCtx, srv),
+				Handler: DeleteKnowledgeTopicHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/list",
-				Handler: ListKnowledgeTopicHandler(svcCtx, srv),
+				Handler: ListKnowledgeTopicHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/document/list",
-				Handler: ListTopicDocumentRelationHandler(svcCtx, srv),
+				Handler: ListTopicDocumentRelationHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/document/save",
-				Handler: SaveTopicDocumentRelationHandler(svcCtx, srv),
+				Handler: SaveTopicDocumentRelationHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/topic/document/remove",
-				Handler: RemoveTopicDocumentRelationHandler(svcCtx, srv),
+				Handler: RemoveTopicDocumentRelationHandler(srv),
 			},
 			{
 				Method:  http.MethodPost,
 				Path:    "/route/trace/page/query",
-				Handler: QueryKnowledgeRouteTracePageHandler(svcCtx, srv),
+				Handler: QueryKnowledgeRouteTracePageHandler(srv),
+			},
+			{
+				Method:  http.MethodPost,
+				Path:    "base/list",
+				Handler: ListKnowledgeBaseHandler(srv),
 			},
 		},
 		rest.WithPrefix("/manage/knowledge"),
