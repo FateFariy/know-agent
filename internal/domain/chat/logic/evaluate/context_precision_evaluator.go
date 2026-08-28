@@ -19,13 +19,14 @@ type ContextPrecisionEvaluator struct {
 }
 
 func NewContextPrecisionEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer) *ContextPrecisionEvaluator {
-	return &ContextPrecisionEvaluator{
-		baseEvaluator: baseEvaluator{
-			templateName:   enum.ContextPrecisionEvaluate,
-			promptRenderer: promptRenderer,
-			llm:            llm,
-		},
+	c := &ContextPrecisionEvaluator{}
+	c.baseEvaluator = baseEvaluator{
+		templateName:   enum.ContextPrecisionEvaluate,
+		promptRenderer: promptRenderer,
+		llm:            llm,
+		evaluator:      c,
 	}
+	return c
 }
 
 func (e *ContextPrecisionEvaluator) Name() string {

@@ -2,7 +2,6 @@ package recommend
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/duke-git/lancet/v2/stream"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -24,54 +22,27 @@ const (
 
 // QuestionRecommendImpl 追问推荐实现
 type QuestionRecommendImpl struct {
-	properties     config.RecommendationConf
-	promptTemplate adapter.PromptRenderer
-	chatModel      model.ChatModel
+	promptTemplate      adapter.PromptRenderer
+	chatModel           model.ChatModel
+	historyPreviewTurns int
 }
 
 func NewQuestionRecommendImpl(svcCtx *svc.ServiceContext, promptTemplate adapter.PromptRenderer, chatModel model.ChatModel) *QuestionRecommendImpl {
 	return &QuestionRecommendImpl{
-		properties:     svcCtx.Config.Chat.Recommendation,
-		promptTemplate: promptTemplate,
-		chatModel:      chatModel,
+		chatModel:           chatModel,
+		promptTemplate:      promptTemplate,
+		historyPreviewTurns: svcCtx.Config.Chat.Recommendation.HistoryPreviewTurns,
 	}
 }
 
 // Generate 生成推荐追问
 func (r *QuestionRecommendImpl) Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) ([]string, error) {
-	// 检查是否启用推荐且回答不为空
-	if !r.properties.Enabled || strutil.IsBlank(answer) {
+	if strutil.IsBlank(answer) {
 		return []string{}, nil
 	}
-
-	// 使用通道处理超时
-	resultChan := make(chan []string, 1)
-	errChan := make(chan error, 1)
-	timeoutCtx, cancelFunc := context.WithTimeout(ctx, r.properties.Timeout)
-
-	defer close(errChan)
-	defer cancelFunc()
-
-	go func() {
-		defer close(resultChan)
-		result, err := r.generateRecommendations(timeoutCtx, question, answer, recentExchanges)
-		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			errChan <- err
-			return
-		}
-		resultChan <- result
-	}()
-
-	// 等待结果或超时
-	var result []string
-	select {
-	case result = <-resultChan:
-	case err := <-errChan:
-		logx.Warnf("生成推荐问题失败: %v", err)
-	case <-timeoutCtx.Done():
-		logx.Warnf("生成推荐问题超时: %v", r.properties.Timeout)
-	case <-ctx.Done():
-		logx.Warnf("生成推荐问题被取消: %v", ctx.Err())
+	result, err := r.generateRecommendations(ctx, question, answer, recentExchanges)
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
@@ -120,7 +91,7 @@ func (r *QuestionRecommendImpl) buildRecentContext(recentExchanges []*entity.Cha
 	}
 
 	var sb strings.Builder
-	historyTurns := max(r.properties.HistoryPreviewTurns, 3)
+	historyTurns := max(r.historyPreviewTurns, 3)
 	startIndex := max(len(recentExchanges)-historyTurns, 0)
 	for i := startIndex; i < len(recentExchanges); i++ {
 		exchange := recentExchanges[i]

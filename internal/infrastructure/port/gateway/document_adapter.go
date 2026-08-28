@@ -36,7 +36,7 @@ func (a *DocumentAdapterForKnowledge) CountRetrievableDocumentsByKbIds(ctx conte
 
 // FindRetrievableByKbIds 根据知识库ID列表查询可检索的文档元数据
 func (a *DocumentAdapterForKnowledge) FindRetrievableByKbIds(ctx context.Context, kbIds []int64) ([]*vo.DocumentMetadata, error) {
-	documentMetadata, err := a.repo.SelectRetrievableDocumentsByIds(ctx, kbIds...)
+	documentMetadata, err := a.repo.SelectRetrievableDocumentsByKbIds(ctx, kbIds...)
 	if err != nil {
 		return nil, err
 	}

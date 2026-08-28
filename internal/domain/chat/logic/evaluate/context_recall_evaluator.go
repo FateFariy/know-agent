@@ -20,13 +20,14 @@ type ContextRecallEvaluator struct {
 }
 
 func NewContextRecallEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer) *ContextRecallEvaluator {
-	return &ContextRecallEvaluator{
-		baseEvaluator: baseEvaluator{
-			templateName:   enum.ContextRecallEvaluate,
-			promptRenderer: promptRenderer,
-			llm:            llm,
-		},
+	c := &ContextRecallEvaluator{}
+	c.baseEvaluator = baseEvaluator{
+		templateName:   enum.ContextRecallEvaluate,
+		promptRenderer: promptRenderer,
+		llm:            llm,
+		evaluator:      c,
 	}
+	return c
 }
 
 func (e *ContextRecallEvaluator) Name() string {

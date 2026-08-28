@@ -24,14 +24,16 @@ type AnswerRelevancyEvaluator struct {
 }
 
 func NewAnswerRelevancyEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer, emb Embedder) *AnswerRelevancyEvaluator {
-	return &AnswerRelevancyEvaluator{
-		baseEvaluator: baseEvaluator{
-			templateName:   enum.AnswerRelevancyEvaluate,
-			promptRenderer: promptRenderer,
-			llm:            llm,
-		},
+	a := &AnswerRelevancyEvaluator{
 		emb: emb,
 	}
+	a.baseEvaluator = baseEvaluator{
+		templateName:   enum.AnswerRelevancyEvaluate,
+		promptRenderer: promptRenderer,
+		llm:            llm,
+		evaluator:      a,
+	}
+	return a
 }
 
 func (e *AnswerRelevancyEvaluator) Name() string {

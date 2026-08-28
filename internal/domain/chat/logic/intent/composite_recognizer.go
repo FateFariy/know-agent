@@ -42,7 +42,7 @@ func (s *CompositeIntentRecognizer) Recognize(ctx context.Context, input *conver
 	fallback, _ := s.fallback.Recognize(ctx, input)
 	advised, err := s.advisor.Recognize(ctx, input)
 	if err != nil {
-		logx.Warnf("查询理解 advisor 调用失败，回退确定性结构信号: question=%q, err=%v", input.OriginalQuestion, err)
+		logx.Warnf("意图分析 advisor 调用失败，回退确定性结构信号: question=%q, err=%v", input.OriginalQuestion, err)
 	}
 	return s.validate(advised, fallback), nil
 }

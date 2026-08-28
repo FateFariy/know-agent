@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
@@ -38,11 +39,21 @@ func NewChain(repo adapter.ChatRepository, distributedLock adapter.DistributedLo
 	return chain
 }
 
-func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
+func (c *Chain) Run(ctx context.Context, convCtx *Context) (err error) {
 	defer c.final(convCtx)
 
-	for _, stage := range c.stages {
-		if err := stage.Execute(ctx, convCtx); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+	convCtx.CancelFunc = cancelFunc
+
+	for i, stage := range c.stages {
+		if i == 1 {
+			ctx = vo.WithTrace(ctx, convCtx.Trace)
+		}
+		stageName := stage.Name()
+		startTime := time.Now()
+		logx.Infof("[ChatChain] 开始执行阶段: %s, ConversationId=%s", stageName, convCtx.ConversationId)
+		if err = stage.Execute(ctx, convCtx); err != nil {
+			logx.Errorf("[ChatChain] 阶段 %s 执行失败: %v", stageName, err)
 			if errors.Is(err, errorx.ErrSessionRunning) {
 				_ = c.startFailed(ctx, convCtx)
 			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -52,6 +63,7 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) error {
 			}
 			return err
 		}
+		logx.Infof("[ChatChain] 阶段 %s 执行成功, costMillis=%d", stageName, time.Since(startTime).Milliseconds())
 	}
 	return nil
 }

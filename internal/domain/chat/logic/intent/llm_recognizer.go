@@ -98,7 +98,7 @@ type structureNavigationAdvice struct {
 func (r *LlmAdvisorRecognizer) parseAdvice(raw string) (*vo.IntentRecognitionResult, error) {
 	var payload queryUnderstandingAdvicePayload
 	if err := utils.Unmarshal(raw, &payload); err != nil {
-		return nil, fmt.Errorf("解析查询理解 LLM 输出失败: raw=%q, err=%w", raw, err)
+		return nil, fmt.Errorf("解析意图识别 LLM 输出失败: raw=%q, err=%w", raw, err)
 	}
 	keyOf := func(entity string) (string, string, bool) {
 		trim := utils.Trim(entity)

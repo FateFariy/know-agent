@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -16,16 +17,19 @@ type RecommendStage struct {
 	repo                adapter.ChatRepository
 	manager             SessionMemoryManager
 	recommender         QuestionRecommender
+	enabled             bool
+	timeout             time.Duration
 	historyPreviewTurns int
 }
 
 func NewRecommendStage(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 	manager SessionMemoryManager, recommender QuestionRecommender) *RecommendStage {
 	return &RecommendStage{
-		repo:                repo,
-		manager:             manager,
-		recommender:         recommender,
-		historyPreviewTurns: svcCtx.Config.Chat.Recommendation.HistoryPreviewTurns,
+		repo:        repo,
+		manager:     manager,
+		recommender: recommender,
+		timeout:     svcCtx.Config.Chat.Recommendation.Timeout,
+		enabled:     svcCtx.Config.Chat.Recommendation.Enabled,
 	}
 }
 
@@ -41,15 +45,22 @@ func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 发送 final 事件
 	_ = convCtx.PublishFinish()
 
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
 	// 生成推荐追问
 	// - 若本次交互是澄清（NeedClarification 为真），则直接使用澄清选项作为推荐
 	// - 否则，拉取最近交互记录，由 recommender 基于当前问答与历史生成推荐
 	var recommendations []string
+	var err error
 	if convCtx.NeedClarification() {
 		recommendations = convCtx.ClarificationOptions()
-	} else {
+	} else if r.enabled {
 		recentExchanges := r.fetchRecentExchanges(ctx, convCtx.ConversationId, convCtx.ExchangeId)
-		recommendations, _ = r.recommender.Generate(ctx, convCtx.Question, convCtx.Answer(), recentExchanges)
+		recommendations, err = r.recommender.Generate(ctx, convCtx.Question, convCtx.Answer(), recentExchanges)
+		if err != nil {
+			logx.Warnf("生成推荐问题失败: %v", err)
+		}
 	}
 
 	// 完成 recommendation 追踪阶段，并写入推荐数量快照
@@ -58,8 +69,7 @@ func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
 
 	// 向客户端流补发推荐事件
 	if len(recommendations) > 0 {
-		err := convCtx.Sink.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId)
-		if err != nil {
+		if err = convCtx.Sink.Recommendations(recommendations, convCtx.ConversationId, convCtx.ExchangeId); err != nil {
 			logx.Warnf("发送推荐事件失败, conversationId=%s, exchangeId=%d, err=%v", convCtx.ConversationId, convCtx.ExchangeId, err)
 		}
 	}

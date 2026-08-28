@@ -19,13 +19,14 @@ type AnswerFaithfulnessEvaluator struct {
 }
 
 func NewAnswerFaithfulnessEvaluator(llm model.ChatModel, promptRenderer adapter.PromptRenderer) *AnswerFaithfulnessEvaluator {
-	return &AnswerFaithfulnessEvaluator{
-		baseEvaluator: baseEvaluator{
-			templateName:   enum.AnswerFaithfulnessEvaluate,
-			promptRenderer: promptRenderer,
-			llm:            llm,
-		},
+	a := &AnswerFaithfulnessEvaluator{}
+	a.baseEvaluator = baseEvaluator{
+		templateName:   enum.AnswerFaithfulnessEvaluate,
+		promptRenderer: promptRenderer,
+		llm:            llm,
+		evaluator:      a,
 	}
+	return a
 }
 
 func (e *AnswerFaithfulnessEvaluator) Name() string {

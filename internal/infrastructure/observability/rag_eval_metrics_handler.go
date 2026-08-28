@@ -146,7 +146,7 @@ func (h *ragEvalMetricsHandler) persistEval(ctx context.Context, metricName stri
 		Status:         int8(status),
 		ErrorMsg:       utils.Pointer(errMsg),
 	}
-	if err := h.repo.InsertExchangeEval(ctx, []*entity.ChatExchangeEval{eval}); err != nil {
+	if err = h.repo.InsertExchangeEval(context.Background(), []*entity.ChatExchangeEval{eval}); err != nil {
 		logx.Warnf("RAG 评估结果落库失败, conversationId=%s, exchangeId=%d, metric=%s, err=%v",
 			conversationId, exchangeId, metricName, err)
 	}

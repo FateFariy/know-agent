@@ -8,6 +8,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type AnswerEvaluateStage struct {
@@ -35,7 +36,7 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 		Contexts: contexts,
 		Answer:   convCtx.Answer(),
 	}
-
+	ctx = vo.WithTrace(context.Background(), convCtx.Trace)
 	for _, evaluator := range a.evaluator {
 		go func(evaluator evaluate.Evaluator) {
 			info := &callbacks.RunInfo{

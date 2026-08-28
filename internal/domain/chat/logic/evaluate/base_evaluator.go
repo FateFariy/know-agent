@@ -8,16 +8,18 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 )
 
+type evaluator interface {
+	validate(input *EvaluationInput) error
+	prepareVariables(input *EvaluationInput) map[string]any
+	computeScore(input *EvaluationInput, llmOutput string) (float64, error)
+}
+
 // ========== 基础评估器 ==========
 type baseEvaluator struct {
 	templateName   string
 	promptRenderer adapter.PromptRenderer
 	llm            model.ChatModel
-}
-
-// Name 评估器名称
-func (e *baseEvaluator) Name() string {
-	return ""
+	evaluator
 }
 
 func (e *baseEvaluator) Evaluate(ctx context.Context, input *EvaluationInput) (float64, error) {
@@ -43,17 +45,4 @@ func (e *baseEvaluator) Evaluate(ctx context.Context, input *EvaluationInput) (f
 
 	// 本地根据 LLM 的判断结果计算分数
 	return e.computeScore(input, response)
-}
-
-// computeScore 由子类实现：基于 LLM 输出的判断结果在本地计算最终得分
-func (e *baseEvaluator) computeScore(input *EvaluationInput, llmOutput string) (float64, error) {
-	return 0, fmt.Errorf("computeScore 未实现")
-}
-
-func (e *baseEvaluator) validate(input *EvaluationInput) error {
-	return nil
-}
-
-func (e *baseEvaluator) prepareVariables(input *EvaluationInput) map[string]any {
-	return nil
 }

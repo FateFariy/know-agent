@@ -56,18 +56,13 @@ func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) 
 
 	// 完善对话上下文，绑定可取消的 context（用于后续终止生成）
 	convCtx.Finalize(exchange)
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	convCtx.CancelFunc = cancelFunc
-
-	// 将 ConversationTrace 存入上下文，供下游 callbacks.Handler 使用
-	cancelCtx = vo.WithTrace(cancelCtx, convCtx.Trace)
 
 	// 注册对话上下文到运行注册表；注册失败意味着会话正被其他执行接管
 	if !s.runtime.Register(convCtx) {
 		return errorx.ErrSessionRunning
 	}
 
-	return s.activateGeneration(cancelCtx, convCtx)
+	return s.activateGeneration(ctx, convCtx)
 }
 
 func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*entity.ChatExchange, error) {
