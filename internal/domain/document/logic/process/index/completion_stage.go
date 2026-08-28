@@ -32,7 +32,8 @@ func (p *CompletionStage) Execute(ctx context.Context, buildCtx *Context) error 
 	finalizeTx := func(txCtx context.Context) error {
 		// 任务阶段推进到"存储完成"
 		if err := p.repo.UpdateTaskById(txCtx, &entity.DocumentTask{
-			ID: buildCtx.TaskId, CurrentStage: enum.TaskStageStoreComplete,
+			ID:           buildCtx.TaskId,
+			CurrentStage: enum.TaskStageStoreComplete,
 		}); err != nil {
 			return err
 		}
@@ -61,7 +62,7 @@ func (p *CompletionStage) Execute(ctx context.Context, buildCtx *Context) error 
 			ErrorCode:    utils.Pointer(""),
 			ErrorMsg:     utils.Pointer(""),
 		}
-		if err := p.repo.UpdateTaskById(ctx, completeTask); err != nil {
+		if err := p.repo.UpdateTaskById(txCtx, completeTask); err != nil {
 			return err
 		}
 		// 索引构建完成日志

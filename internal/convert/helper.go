@@ -3,14 +3,11 @@ package convert
 import (
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/duke-git/lancet/v2/strutil"
 
 	"github.com/swiftbit/know-agent/api/chat"
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	cvo "github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	klvo "github.com/swiftbit/know-agent/internal/domain/knowledge/model/enum"
@@ -180,47 +177,6 @@ func ToChatLimitStats(src *cvo.ChatLimitStats) *chat.ChatLimitStats {
 		LimitTriggered:        src.LimitTriggered,
 		LimitReason:           src.LimitReason,
 	}
-}
-
-func JsonArrayToStringSlice(src common.JSONArray) []string {
-	return common.JSONArrayTo(src, func(item any) string {
-		return item.(string)
-	})
-}
-
-func StringToStringSlice(src string) []string {
-	return strings.Split(src, ",")
-}
-
-func JsonArrayToSearchReferences(src common.JSONArray) []*chat.SearchReference {
-	return common.JSONArrayTo(src, func(item any) *chat.SearchReference {
-		refMap := item.(map[string]any)
-		return &chat.SearchReference{
-			ReferenceId:        refMap["referenceId"].(string),
-			SourceType:         refMap["sourceType"].(string),
-			Title:              refMap["title"].(string),
-			Url:                refMap["url"].(string),
-			Snippet:            refMap["snippet"].(string),
-			DocumentId:         convertor.ToString(refMap["documentId"]),
-			DocumentName:       refMap["documentName"].(string),
-			ChunkId:            convertor.ToString(refMap["chunkId"]),
-			ParentBlockId:      convertor.ToString(refMap["parentBlockId"]),
-			ParentBlockNo:      int(refMap["parentBlockNo"].(float64)),
-			ChunkNo:            int(refMap["chunkNo"].(float64)),
-			SectionPath:        refMap["sectionPath"].(string),
-			StructureNodeId:    convertor.ToString(refMap["structureNodeId"]),
-			StructureNodeType:  int(refMap["structureNodeType"].(float64)),
-			CanonicalPath:      refMap["canonicalPath"].(string),
-			ItemIndex:          int(refMap["itemIndex"].(float64)),
-			Score:              refMap["score"].(float64),
-			SubQuestionIndex:   int(refMap["subQuestionIndex"].(float64)),
-			SubQuestion:        refMap["subQuestion"].(string),
-			Channel:            refMap["channel"].(string),
-			ToolName:           refMap["toolName"].(string),
-			KnowledgeScopeCode: refMap["knowledgeScopeCode"].(string),
-			KnowledgeScopeName: refMap["knowledgeScopeName"].(string),
-		}
-	})
 }
 
 func ToRouteStatus(code int) string {

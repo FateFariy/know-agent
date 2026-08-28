@@ -172,7 +172,7 @@ func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, 
 
 			// 判定是否被选入最终 Prompt
 			if view.GatePassed == 0 {
-				view.SelectionReason = s.resolveGateFilteredReason(nil, channelName)
+				view.SelectionReason = s.resolveGateFilteredReason(state, channelName)
 			} else if rank, ok := finalRankMap[doc.ParentChunkId]; ok {
 				view.IsSelected = 1
 				view.FinalRank = rank

@@ -298,7 +298,7 @@ func (r *RouteStage) loadRecentEvidenceAnchors(ctx context.Context, conversation
 		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
 			continue
 		}
-		for _, ref := range exchange.ParseReferences() {
+		for _, ref := range exchange.References {
 			anchor := ref.ToEvidenceAnchor(maxSnippetChars)
 			if anchor == nil {
 				continue

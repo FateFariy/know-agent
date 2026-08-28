@@ -10,7 +10,6 @@ import (
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -78,22 +77,21 @@ func (c *Context) Finalize(exchange *entity.ChatExchange) {
 // BuildChatExchange 构建会话交换对象
 func (c *Context) BuildChatExchange(turnStatus int, errorMsg string) *entity.ChatExchange {
 	return &entity.ChatExchange{
-		ID:                             c.ExchangeId,
-		ConversationId:                 c.ConversationId,
-		Question:                       c.Question,
-		Answer:                         c.Answer(),
-		ThinkingSteps:                  common.ToJSONArray(c.SnapshotThinkingSteps()),
-		References:                     common.ToJSONArray(c.UniqueReferences()),
-		UsedTools:                      common.ToJSONArray(c.SnapshotUsedTools()),
-		DebugTrace:                     c.DebugTraceJSON(),
-		TurnStatus:                     turnStatus,
-		ErrorMessage:                   errorMsg,
-		FirstResponseTimeMs:            c.FirstResponseTimeMs.Load(),
-		TotalResponseTimeMs:            time.Since(c.StartTime).Milliseconds(),
-		KnowledgeBaseSelectionMode:     c.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
-		SelectedKnowledgeBaseIdsJson:   c.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
-		SelectedKnowledgeBaseNamesJson: c.KnowledgeBaseSelectionSnapshot.SelectionNames(),
-		RetrievalConfigSnapshot:        c.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
+		ID:                         c.ExchangeId,
+		ConversationId:             c.ConversationId,
+		Question:                   c.Question,
+		Answer:                     c.Answer(),
+		ThinkingSteps:              c.SnapshotThinkingSteps(),
+		References:                 c.UniqueReferences(),
+		DebugTrace:                 c.DebugTraceJSON(),
+		TurnStatus:                 turnStatus,
+		ErrorMessage:               errorMsg,
+		FirstResponseTimeMs:        c.FirstResponseTimeMs.Load(),
+		TotalResponseTimeMs:        time.Since(c.StartTime).Milliseconds(),
+		KnowledgeBaseSelectionMode: c.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
+		SelectedKnowledgeBaseIds:   c.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds,
+		SelectedKnowledgeBaseNames: c.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
+		RetrievalConfigSnapshot:    c.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
 	}
 }
 

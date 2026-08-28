@@ -122,8 +122,8 @@ func ToChatDialogueModel(source *entity.ChatDialogue) *model.ChatDialogue {
 		modelChatDialogue.SelectedDocumentId = (*source).SelectedDocumentId
 		modelChatDialogue.SelectedDocumentName = (*source).SelectedDocumentName
 		modelChatDialogue.KnowledgeBaseSelectionMode = (*source).KnowledgeBaseSelectionMode
-		modelChatDialogue.SelectedKnowledgeBaseIdsJson = (*source).SelectedKnowledgeBaseIdsJson
-		modelChatDialogue.SelectedKnowledgeBaseNamesJson = (*source).SelectedKnowledgeBaseNamesJson
+		modelChatDialogue.SelectedKnowledgeBaseIds = (*source).SelectedKnowledgeBaseIds
+		modelChatDialogue.SelectedKnowledgeBaseNames = (*source).SelectedKnowledgeBaseNames
 		pModelChatDialogue = &modelChatDialogue
 	}
 	return pModelChatDialogue
@@ -164,17 +164,17 @@ func ToChatExchangeModel(source *entity.ChatExchange) *model.ChatExchange {
 		modelChatExchange.Question = (*source).Question
 		modelChatExchange.Answer = (*source).Answer
 		modelChatExchange.TurnStatus = (*source).TurnStatus
-		modelChatExchange.ThinkingSteps = commonJSONArrayToCommonJSONArray((*source).ThinkingSteps)
-		modelChatExchange.References = commonJSONArrayToCommonJSONArray((*source).References)
-		modelChatExchange.Recommendations = commonJSONArrayToCommonJSONArray((*source).Recommendations)
-		modelChatExchange.UsedTools = commonJSONArrayToCommonJSONArray((*source).UsedTools)
+		modelChatExchange.ThinkingSteps = (*source).ThinkingSteps
+		modelChatExchange.References = (*source).References
+		modelChatExchange.Recommendations = (*source).Recommendations
+		modelChatExchange.UsedTools = (*source).UsedTools
 		modelChatExchange.DebugTrace = (*source).DebugTrace
 		modelChatExchange.ErrorMessage = (*source).ErrorMessage
 		modelChatExchange.FirstResponseTimeMs = (*source).FirstResponseTimeMs
 		modelChatExchange.TotalResponseTimeMs = (*source).TotalResponseTimeMs
 		modelChatExchange.KnowledgeBaseSelectionMode = (*source).KnowledgeBaseSelectionMode
-		modelChatExchange.SelectedKnowledgeBaseIdsJson = (*source).SelectedKnowledgeBaseIdsJson
-		modelChatExchange.SelectedKnowledgeBaseNamesJson = (*source).SelectedKnowledgeBaseNamesJson
+		modelChatExchange.SelectedKnowledgeBaseIds = (*source).SelectedKnowledgeBaseIds
+		modelChatExchange.SelectedKnowledgeBaseNames = (*source).SelectedKnowledgeBaseNames
 		modelChatExchange.RetrievalConfigSnapshot = (*source).RetrievalConfigSnapshot
 		pModelChatExchange = &modelChatExchange
 	}
@@ -273,10 +273,15 @@ func ToConversationExchange(source *entity.ChatExchange) *chat.ConversationExcha
 		chatConversationExchange.ID = Int64ToString((*source).ID)
 		chatConversationExchange.Question = (*source).Question
 		chatConversationExchange.Answer = (*source).Answer
-		chatConversationExchange.ThinkingSteps = JsonArrayToStringSlice((*source).ThinkingSteps)
-		chatConversationExchange.References = JsonArrayToSearchReferences((*source).References)
-		chatConversationExchange.Recommendations = JsonArrayToStringSlice((*source).Recommendations)
-		chatConversationExchange.UsedTools = JsonArrayToStringSlice((*source).UsedTools)
+		chatConversationExchange.ThinkingSteps = (*source).ThinkingSteps
+		if (*source).References != nil {
+			chatConversationExchange.References = make([]*chat.SearchReference, len((*source).References))
+			for i := 0; i < len((*source).References); i++ {
+				chatConversationExchange.References[i] = pVoSearchReferenceToPChatSearchReference((*source).References[i])
+			}
+		}
+		chatConversationExchange.Recommendations = (*source).Recommendations
+		chatConversationExchange.UsedTools = (*source).UsedTools
 		chatConversationExchange.DebugTrace = ToChatDebugTrace((*source).DebugTrace)
 		chatConversationExchange.TurnStatus = (*source).TurnStatus
 		chatConversationExchange.ErrorMessage = (*source).ErrorMessage
@@ -377,9 +382,6 @@ func ToRetrievalResultRespList(source []*entity.ChatRetrievalResult) []*chat.Ret
 		}
 	}
 	return pChatRetrievalResultRespList
-}
-func commonJSONArrayToCommonJSONArray(source common.JSONArray) common.JSONArray {
-	return source
 }
 func entityChatChannelExecutionToCommonModel(source entity.ChatChannelExecution) common.Model {
 	var commonModel common.Model
@@ -501,6 +503,33 @@ func pVoConversationSummaryToPChatSummaryPayload(source *vo.ConversationSummary)
 		pChatSummaryPayload = &chatSummaryPayload
 	}
 	return pChatSummaryPayload
+}
+func pVoSearchReferenceToPChatSearchReference(source *vo.SearchReference) *chat.SearchReference {
+	var pChatSearchReference *chat.SearchReference
+	if source != nil {
+		var chatSearchReference chat.SearchReference
+		chatSearchReference.ReferenceId = (*source).ReferenceId
+		chatSearchReference.SourceType = (*source).SourceType
+		chatSearchReference.Title = (*source).Title
+		chatSearchReference.Url = (*source).Url
+		chatSearchReference.Snippet = (*source).Snippet
+		chatSearchReference.DocumentId = Int64ToString((*source).DocumentId)
+		chatSearchReference.DocumentName = (*source).DocumentName
+		chatSearchReference.ChunkId = Int64ToString((*source).ChunkId)
+		chatSearchReference.ChunkNo = (*source).ChunkNo
+		chatSearchReference.SectionPath = (*source).SectionPath
+		chatSearchReference.StructureNodeId = Int64ToString((*source).StructureNodeId)
+		chatSearchReference.StructureNodeType = (*source).StructureNodeType
+		chatSearchReference.CanonicalPath = (*source).CanonicalPath
+		chatSearchReference.ItemIndex = (*source).ItemIndex
+		chatSearchReference.Score = (*source).Score
+		chatSearchReference.SubQuestionIndex = (*source).SubQuestionIndex
+		chatSearchReference.SubQuestion = (*source).SubQuestion
+		chatSearchReference.Channel = (*source).Channel
+		chatSearchReference.ToolName = (*source).ToolName
+		pChatSearchReference = &chatSearchReference
+	}
+	return pChatSearchReference
 }
 func timeTimeToTimeTime(source time.Time) time.Time {
 	return source

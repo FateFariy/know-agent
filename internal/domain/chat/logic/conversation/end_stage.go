@@ -3,7 +3,6 @@ package conversation
 import (
 	"context"
 
-	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
@@ -45,7 +44,7 @@ func (e *EndStage) Execute(ctx context.Context, convCtx *Context) error {
 
 	// 组装成功态 ChatExchange，调用 completeExchange 落库；并根据落库结果完成或标记 finalize 追踪阶段
 	successExchange := convCtx.BuildChatExchange(enum.ChatTurnStatusCompleted, "")
-	successExchange.Recommendations = common.ToJSONArray(recommendations)
+	successExchange.Recommendations = recommendations
 	if err := e.completeExchange(ctx, successExchange); err == nil {
 		// 落库成功：完成 finalize 追踪阶段，写入完成快照（含推荐、引用、答案长度）
 		snapshot := map[string]any{

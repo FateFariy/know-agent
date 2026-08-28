@@ -68,25 +68,25 @@ func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) 
 func (s *StartStage) startExchange(ctx context.Context, convCtx *Context) (*entity.ChatExchange, error) {
 	// 构造对话实体（按 ConversationId 聚合整个会话），状态初始化为 Running
 	dialogue := &entity.ChatDialogue{
-		ConversationId:                 convCtx.ConversationId,
-		SessionStatus:                  enum.ChatSessionStatusRunning,
-		ChatMode:                       convCtx.ChatMode,
-		SelectedDocumentId:             convCtx.SelectedDocumentId,
-		SelectedDocumentName:           convCtx.SelectedDocumentName,
-		KnowledgeBaseSelectionMode:     convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
-		SelectedKnowledgeBaseIdsJson:   convCtx.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
-		SelectedKnowledgeBaseNamesJson: convCtx.KnowledgeBaseSelectionSnapshot.SelectionNames(),
+		ConversationId:             convCtx.ConversationId,
+		SessionStatus:              enum.ChatSessionStatusRunning,
+		ChatMode:                   convCtx.ChatMode,
+		SelectedDocumentId:         convCtx.SelectedDocumentId,
+		SelectedDocumentName:       convCtx.SelectedDocumentName,
+		KnowledgeBaseSelectionMode: convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
+		SelectedKnowledgeBaseIds:   convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds,
+		SelectedKnowledgeBaseNames: convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
 	}
 	// 构造本轮交互实体，状态 Running
 	chatExchange := &entity.ChatExchange{
-		ID:                             utils.GetSnowflakeNextID(),
-		ConversationId:                 convCtx.ConversationId,
-		Question:                       convCtx.Question,
-		TurnStatus:                     enum.ChatTurnStatusRunning,
-		KnowledgeBaseSelectionMode:     convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
-		SelectedKnowledgeBaseIdsJson:   convCtx.KnowledgeBaseSelectionSnapshot.SelectionIDs(),
-		SelectedKnowledgeBaseNamesJson: convCtx.KnowledgeBaseSelectionSnapshot.SelectionNames(),
-		RetrievalConfigSnapshot:        convCtx.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
+		ID:                         utils.GetSnowflakeNextID(),
+		ConversationId:             convCtx.ConversationId,
+		Question:                   convCtx.Question,
+		TurnStatus:                 enum.ChatTurnStatusRunning,
+		KnowledgeBaseSelectionMode: convCtx.KnowledgeBaseSelectionSnapshot.SelectionModeName(),
+		SelectedKnowledgeBaseIds:   convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseIds,
+		SelectedKnowledgeBaseNames: convCtx.KnowledgeBaseSelectionSnapshot.SelectedKnowledgeBaseNames,
+		RetrievalConfigSnapshot:    convCtx.KnowledgeBaseSelectionSnapshot.RagRuntimeConfigSnapshot(),
 	}
 	// 事务中原子执行：Upsert 对话 + 插入新交互
 	startFn := func(txCtx context.Context) error {

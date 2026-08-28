@@ -2,7 +2,6 @@ package vo
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -25,30 +24,6 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectionModeName() string {
 	return s.SelectionMode
 }
 
-func (s *KnowledgeBaseSelectionSnapshot) SelectionIDs() string {
-	if s == nil || len(s.SelectedKnowledgeBaseIds) == 0 {
-		return ""
-	}
-	ids, _ := json.Marshal(s.SelectedKnowledgeBaseIds)
-	return string(ids)
-}
-
-// SelectionNames 返回所有选中的知识库名称
-func (s *KnowledgeBaseSelectionSnapshot) SelectionNames() string {
-	if s == nil || len(s.SelectedKnowledgeBaseNames) == 0 {
-		return ""
-	}
-	names := make([]string, 0, len(s.SelectedKnowledgeBaseNames))
-	for _, name := range s.SelectedKnowledgeBaseNames {
-		trimmed := strings.TrimSpace(name)
-		if trimmed != "" {
-			names = append(names, trimmed)
-		}
-	}
-	marshal, _ := json.Marshal(names)
-	return string(marshal)
-}
-
 // SelectedDocumentIds 返回所有允许文档的ID列表
 func (s *KnowledgeBaseSelectionSnapshot) SelectedDocumentIds() []int64 {
 	if s == nil || len(s.AllowedDocuments) == 0 {
@@ -66,7 +41,6 @@ func (s *KnowledgeBaseSelectionSnapshot) SelectedTaskIds() []int64 {
 	}
 	return utils.Map(s.AllowedDocuments, func(doc *DocumentMetadata) int64 {
 		return doc.LastIndexTaskId
-
 	})
 }
 

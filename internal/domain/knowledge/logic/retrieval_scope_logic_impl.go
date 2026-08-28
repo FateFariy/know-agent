@@ -100,7 +100,8 @@ func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx conte
 	snapshot.SelectedKnowledgeBaseNames = selectedBaseNames
 	snapshot.SelectedKnowledgeBases = selectedBases
 	snapshot.AllowedDocuments = allowedDocuments
-	snapshot.RagRuntimeOptions = s.resolver.ResolveRagRuntimeOptions(selectedBases)
+	// todo 暂时注释掉，后续根据需要开启
+	//snapshot.RagRuntimeOptions = s.resolver.ResolveRagRuntimeOptions(selectedBases)
 
 	return snapshot, nil
 }

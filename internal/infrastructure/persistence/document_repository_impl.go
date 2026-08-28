@@ -136,7 +136,7 @@ func (d *DocumentRepositoryImpl) SelectDocumentById(ctx context.Context, documen
 
 // UpdateDocumentById 根据ID更新文档
 func (d *DocumentRepositoryImpl) UpdateDocumentById(ctx context.Context, document *entity.Document) error {
-	return d.dbWithContext(ctx).Where("id = ?", document.ID).Updates(convert.ToDocumentModel(document)).Error
+	return d.dbWithContext(ctx).Updates(convert.ToDocumentModel(document)).Error
 }
 
 // DeleteDocumentById  根据ID删除文档
