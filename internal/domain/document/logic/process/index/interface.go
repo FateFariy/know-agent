@@ -16,6 +16,7 @@ type Context struct {
 	Document             *entity.Document
 	Task                 *entity.DocumentTask
 	Plan                 *entity.DocumentStrategyPlan
+	RawFileBytes         []byte
 	StartTime            time.Time
 	BuildStartedTime     time.Time
 	PipelineSteps        vo.DocumentStrategyStepDrafts

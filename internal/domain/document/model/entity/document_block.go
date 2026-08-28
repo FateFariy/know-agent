@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -16,29 +17,28 @@ import (
 
 // DocumentBlock 文档块实体
 type DocumentBlock struct {
-	ID                 int64          `gorm:"column:id"`                  // 主键ID
-	DocumentId         int64          `gorm:"column:document_id"`         // 文档ID
-	TaskId             int64          `gorm:"column:task_id"`             // 任务ID
-	BlockNo            int            `gorm:"column:block_no"`            // 块序号
-	BlockType          string         `gorm:"column:block_type"`          // 块类型
-	ParentBlockId      int64          `gorm:"column:parent_block_id"`     // 父块ID
-	SectionPath        string         `gorm:"column:section_path"`        // 章节路径
-	CanonicalPath      string         `gorm:"column:canonical_path"`      // 规范路径
-	PageNo             int            `gorm:"column:page_no"`             // 页码
-	PageRange          string         `gorm:"column:page_range"`          // 页码范围
-	BboxJson           string         `gorm:"column:bbox_json"`           // 边界框 JSON
-	Text               string         `gorm:"column:text"`                // 文本内容
-	ContentWithWeight  string         `gorm:"column:content_with_weight"` // 带权重的内容
-	TableHTML          string         `gorm:"column:table_html"`          // 表格 HTML
-	ImageObjectName    string         `gorm:"column:image_object_name"`   // 图片对象名
-	ImageCaption       string         `gorm:"column:image_caption"`       // 图片说明
-	MetadataJson       string         `gorm:"column:metadata_json"`       // 元数据 JSON
-	Metadata           map[string]any `gorm:"-"`                          // 元数据
-	ParentBlockNo      int            `gorm:"-"`                          // 父块编号
-	BoundingBoxJSON    string         `gorm:"-"`                          // 边界框JSON
-	TableRows          [][]string     `gorm:"-"`                          // 表格行数据
-	ImageFileName      string         `gorm:"-"`                          // 图片文件名
-	ImageContentBase64 string         `gorm:"-"`                          // 图片Base64内容
+	ID                 int64          `gorm:"column:id"`                                      // 主键ID
+	DocumentId         int64          `gorm:"column:document_id"`                             // 文档ID
+	TaskId             int64          `gorm:"column:task_id"`                                 // 任务ID
+	BlockNo            int            `gorm:"column:block_no"`                                // 块序号
+	BlockType          string         `gorm:"column:block_type"`                              // 块类型
+	ParentBlockId      int64          `gorm:"column:parent_block_id"`                         // 父块ID
+	SectionPath        string         `gorm:"column:section_path"`                            // 章节路径
+	CanonicalPath      string         `gorm:"column:canonical_path"`                          // 规范路径
+	PageNo             int            `gorm:"column:page_no"`                                 // 页码
+	PageRange          string         `gorm:"column:page_range"`                              // 页码范围
+	BboxJson           string         `gorm:"column:bbox_json"`                               // 边界框 JSON
+	Text               string         `gorm:"column:text"`                                    // 文本内容
+	ContentWithWeight  string         `gorm:"column:content_with_weight"`                     // 带权重的内容
+	TableHTML          string         `gorm:"column:table_html"`                              // 表格 HTML
+	ImageObjectName    string         `gorm:"column:image_object_name"`                       // 图片对象名
+	ImageCaption       string         `gorm:"column:image_caption"`                           // 图片说明
+	Metadata           map[string]any `gorm:"column:metadata_json;type:json;serializer:json"` // 元数据
+	ParentBlockNo      int            `gorm:"-"`                                              // 父块编号
+	BoundingBoxJSON    string         `gorm:"-"`                                              // 边界框JSON
+	TableRows          [][]string     `gorm:"-"`                                              // 表格行数据
+	ImageFileName      string         `gorm:"-"`                                              // 图片文件名
+	ImageContentBase64 string         `gorm:"-"`                                              // 图片Base64内容
 }
 
 // HasBlockContent 检查块是否有内容
@@ -305,8 +305,20 @@ func (b *DocumentBlock) BuildCanonicalPath() string {
 	return fmt.Sprintf("/%s/%d", section, b.BlockNo)
 }
 
+// ResumeRawText 从原始字节中恢复块的文本内容
+func (b *DocumentBlock) ResumeRawText(rawBytes []byte) {
+	if b == nil || len(rawBytes) == 0 {
+		return
+	}
+	var sourceSpan shared.SourceSpan
+	marshal, _ := json.Marshal(b.Metadata["sourceSpan"])
+	_ = json.Unmarshal(marshal, &sourceSpan)
+	b.Text = string(rawBytes[sourceSpan.StartByte:sourceSpan.EndByte])
+}
+
 type DocumentBlocks []*DocumentBlock
 
+// FirstPageNo 获取块列表第一个块的页码
 func (b DocumentBlocks) FirstPageNo() int {
 	for _, block := range b {
 		if block == nil {

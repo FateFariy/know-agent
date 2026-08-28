@@ -194,7 +194,7 @@ type DocumentRepository interface {
 	InsertDocumentBlockBatch(ctx context.Context, blocks []*entity.DocumentBlock) error
 
 	// SelectDocumentBlocksByTask 根据文档ID和任务ID查询文档块列表
-	SelectDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentBlock, error)
+	SelectDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) (entity.DocumentBlocks, error)
 
 	// DeleteDocumentBlocksByTask 根据文档ID和任务ID删除文档块
 	DeleteDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) error

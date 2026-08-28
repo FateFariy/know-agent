@@ -63,6 +63,11 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 		return errors.New("当前文档没有结构化解析 blocks，无法执行 Parent/Child 切块。")
 	}
 
+	// 恢复 blocks 的原始文本内容
+	for _, block := range blocks {
+		block.ResumeRawText(buildCtx.RawFileBytes)
+	}
+
 	// 查询策略步骤列表
 	pipelineSteps, err := p.repo.SelectStepListByPlanId(ctx, buildCtx.PlanId)
 	if err != nil {

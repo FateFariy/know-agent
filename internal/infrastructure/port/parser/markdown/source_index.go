@@ -2,15 +2,12 @@ package markdown
 
 import (
 	"errors"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/document/model/shared"
 )
-
-var re = regexp.MustCompile(`\r\n|\n|\r`)
 
 type sourceIndex struct {
 	sourceText  string
@@ -26,10 +23,24 @@ func newSourceIndex(sourceText string) *sourceIndex {
 }
 
 func (s *sourceIndex) buildLineStarts() {
-	matches := re.FindAllStringIndex(s.sourceText, -1)
 	s.lineStarts = []int{0}
-	for _, m := range matches {
-		s.lineStarts = append(s.lineStarts, m[1])
+	runes := []rune(s.sourceText)
+	n := len(runes)
+	i := 0
+	for i < n {
+		r := runes[i]
+		if r == '\n' {
+			i++
+			s.lineStarts = append(s.lineStarts, i)
+		} else if r == '\r' {
+			i++
+			if i < n && runes[i] == '\n' {
+				i++ // 吞掉 \r\n 中紧随的 \n
+			}
+			s.lineStarts = append(s.lineStarts, i)
+		} else {
+			i++
+		}
 	}
 }
 

@@ -122,7 +122,7 @@ func bootstrap(c *config.Config) *server.Server {
 
 	generateImpl := process.NewProfileGenerateImpl(documentRepo)
 	analysisChain := analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, minioStorage, generateImpl, knowledgeAdapter)
-	indexChain := index.NewBuildIndexChain(documentRepo, milvusVector, milvusKeyword, strategyRegistry, knowledgeAdapter, gseTokenizer)
+	indexChain := index.NewBuildIndexChain(documentRepo, minioStorage, milvusVector, milvusKeyword, strategyRegistry, knowledgeAdapter, gseTokenizer)
 	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, analysisChain, indexChain)
 	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, rocketMQMessageProducer, minioStorage, documentRepo, knowledgeAdapter)
 	profileLogicImpl := doclogic.NewProfileLogicImpl(documentRepo, minioStorage, generateImpl)

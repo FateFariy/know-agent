@@ -22,7 +22,11 @@ const (
 )
 
 func DetectFileType(fileName string) FileType {
-	switch filepath.Ext(fileName)[1:] {
+	ext := filepath.Ext(fileName)
+	if ext == "" {
+		return FileTypeUnknown
+	}
+	switch ext[1:] {
 	case "pdf":
 		return FileTypePDF
 	case "docx":

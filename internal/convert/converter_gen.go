@@ -590,7 +590,7 @@ func ToDocumentBlockModel(source *entity1.DocumentBlock) *model.DocumentBlock {
 		modelDocumentBlock.TableHTML = (*source).TableHTML
 		modelDocumentBlock.ImageObjectName = (*source).ImageObjectName
 		modelDocumentBlock.ImageCaption = (*source).ImageCaption
-		modelDocumentBlock.MetadataJson = (*source).MetadataJson
+		modelDocumentBlock.Metadata = (*source).Metadata
 		pModelDocumentBlock = &modelDocumentBlock
 	}
 	return pModelDocumentBlock

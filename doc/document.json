@@ -2250,7 +2250,7 @@
     "/manage/document/upload": {
       "post": {
         "consumes": [
-          "application/json"
+          "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
@@ -2262,29 +2262,25 @@
         "operationId": "documentUploadDocument",
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "required": [
-                "knowledgeBaseId"
-              ],
-              "properties": {
-                "documentName": {
-                  "description": "文档名称",
-                  "type": "string"
-                },
-                "knowledgeBaseId": {
-                  "description": "知识库ID",
-                  "type": "string"
-                },
-                "operatorId": {
-                  "description": "操作人ID",
-                  "type": "string"
-                }
-              }
-            }
+            "type": "string",
+            "description": "文档名称",
+            "name": "documentName",
+            "in": "formData",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "string",
+            "description": "操作人ID",
+            "name": "operatorId",
+            "in": "formData",
+            "allowEmptyValue": true
+          },
+          {
+            "type": "string",
+            "description": "知识库ID",
+            "name": "knowledgeBaseId",
+            "in": "formData",
+            "required": true
           }
         ],
         "responses": {
@@ -2324,7 +2320,7 @@
       }
     }
   },
-  "x-date": "2026-08-24 20:43:14",
+  "x-date": "2026-08-28 14:28:05",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

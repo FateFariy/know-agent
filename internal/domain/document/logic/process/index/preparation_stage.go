@@ -15,11 +15,15 @@ import (
 
 // PreparationStage 准备阶段：加载策略步骤、推进任务状态
 type PreparationStage struct {
-	repo adapter.DocumentRepository
+	repo    adapter.DocumentRepository
+	storage adapter.Storage
 }
 
-func NewPreparationStage(repo adapter.DocumentRepository) *PreparationStage {
-	return &PreparationStage{repo: repo}
+func NewPreparationStage(repo adapter.DocumentRepository, storage adapter.Storage) *PreparationStage {
+	return &PreparationStage{
+		repo:    repo,
+		storage: storage,
+	}
 }
 
 func (p *PreparationStage) Name() string {
@@ -41,6 +45,15 @@ func (p *PreparationStage) Execute(ctx context.Context, buildCtx *Context) error
 	if sourceParseTaskId > 0 {
 		return errors.New("索引任务缺少有效且已冻结的源解析任务")
 	}
+
+	// 下载原始文件内容
+	rawFileBytes, err := p.storage.DownloadObject(ctx, buildCtx.Document.ObjectName)
+	if err != nil {
+		return err
+	}
+	buildCtx.RawFileBytes = rawFileBytes
+
+	// 推进任务状态到"切块执行中"
 	buildCtx.Task.CurrentStage = enum.TaskStageChunkExecute
 	buildCtx.Task.TaskStatus = enum.TaskStatusRunning
 	buildCtx.Task.StartTime = utils.Pointer(buildCtx.StartTime)

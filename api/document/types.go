@@ -294,9 +294,9 @@ type TaskLog struct {
 }
 
 type UploadDocumentReq struct {
-	DocumentName    string `json:"documentName,optional"` // 文档名称
-	OperatorId      string `json:"operatorId,optional"`   // 操作人ID
-	KnowledgeBaseId string `json:"knowledgeBaseId"`       // 知识库ID
+	DocumentName    string `form:"documentName,optional"` // 文档名称
+	OperatorId      string `form:"operatorId,optional"`   // 操作人ID
+	KnowledgeBaseId string `form:"knowledgeBaseId"`       // 知识库ID
 }
 
 type UploadDocumentResp struct {

@@ -19,6 +19,7 @@ type BuildIndexChain struct {
 
 func NewBuildIndexChain(
 	repo adapter.DocumentRepository,
+	storage adapter.Storage,
 	vecIndexer adapter.VectorIndexer,
 	keyIndexer adapter.KeywordIndexer,
 	registry *chunk.Registry,
@@ -27,7 +28,7 @@ func NewBuildIndexChain(
 	// builder GraphRagBuilder,
 ) *BuildIndexChain {
 	stages := []Stage{
-		NewPreparationStage(repo),                             // 1. 准备阶段：加载任务、验证状态、推进任务状态
+		NewPreparationStage(repo, storage),                    // 1. 准备阶段：加载任务、验证状态、下载原始文本内容、推进任务状态
 		NewChunkingStage(repo, registry, resolver, tokenizer), // 2. 切块阶段：执行切块流水线
 		NewChunkPostPhase(repo),                               // 3. 切块后处理阶段：构建父子块实体并持久化
 		NewVectorizePhase(repo, vecIndexer),                   // 4. 向量化阶段：批量向量化并回写状态

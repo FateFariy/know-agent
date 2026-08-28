@@ -581,7 +581,7 @@ func (d *DocumentRepositoryImpl) InsertDocumentBlockBatch(ctx context.Context, b
 }
 
 // SelectDocumentBlocksByTask 根据文档ID和任务ID查询文档块列表
-func (d *DocumentRepositoryImpl) SelectDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) ([]*entity.DocumentBlock, error) {
+func (d *DocumentRepositoryImpl) SelectDocumentBlocksByTask(ctx context.Context, documentId, taskId int64) (entity.DocumentBlocks, error) {
 	var blocks []*entity.DocumentBlock
 	if err := d.dbWithContext(ctx).Model(&model.DocumentBlock{}).
 		Where("document_id = ? AND task_id = ?", documentId, taskId).
