@@ -10,6 +10,7 @@ import type {
   KnowledgeTopicListReq,
   KnowledgeTopicResp,
   KnowledgeTopicSaveReq,
+  KnowledgeBaseItemResp,
   Response,
   TopicDocumentRelationListReq,
   TopicDocumentRelationRemoveReq,
@@ -18,6 +19,13 @@ import type {
 } from '@/types'
 
 export const knowledgeApi = {
+  // ==================== 知识库管理接口 ====================
+  // 查询知识库列表
+  listKnowledgeBases(): Promise<Response<KnowledgeBaseItemResp[]>> {
+    return axios.post('/manage/knowledge/base/list', {})
+  },
+
+  // ==================== 知识管理接口 ====================
   // 查询知识范围列表
   listScopes(params?: KnowledgeScopeListReq): Promise<Response<KnowledgeScopeResp[]>> {
     return axios.post('/manage/knowledge/scope/list', params || {})
@@ -64,7 +72,7 @@ export const knowledgeApi = {
   },
 
   // 查询知识路由轨迹分页列表
-  queryRouteTracePage(params?: KnowledgeRouteTracePageReq): Promise<Response<KnowledgeRouteTracePageResp>> {
+  queryRouteTracePage(params: KnowledgeRouteTracePageReq): Promise<Response<KnowledgeRouteTracePageResp>> {
     return axios.post('/manage/knowledge/route/trace/page/query', params)
   },
 }

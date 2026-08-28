@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import {computed, onMounted, reactive, ref} from 'vue'
+import {ElMessage} from 'element-plus'
 import {knowledgeApi} from '@/api/knowledge'
 import MarkdownView from '@/components/common/MarkdownView.vue'
 import type {KnowledgeRouteTraceItem, KnowledgeRouteTracePageReq} from '@/types'
@@ -167,10 +168,14 @@ function selectRecord(item: NormalizedRouteTrace): void {
 }
 
 async function loadTraces(nextPage: number = page.pageNo): Promise<void> {
+  if (!filters.conversationId?.trim()) {
+    ElMessage.warning('请输入会话 ID 后再查询')
+    return
+  }
   loading.value = true
   try {
     const params: KnowledgeRouteTracePageReq = {
-      conversationId: filters.conversationId || undefined,
+      conversationId: filters.conversationId.trim(),
       mode: filters.mode || undefined,
       routeStatus: filters.routeStatus ? Number(filters.routeStatus) : undefined,
       pageNo: nextPage,

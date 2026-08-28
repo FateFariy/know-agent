@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `chat_exchange`
 (
     `id`                                 BIGINT      NOT NULL COMMENT '主键ID',
     `conversation_id`                    VARCHAR(64) NOT NULL COMMENT '会话ID',
-    `user_prompt`                        TEXT        NOT NULL COMMENT '用户提问',
+    `question`                        TEXT        NOT NULL COMMENT '用户提问',
     `reply_content`                      TEXT        NOT NULL COMMENT '回复内容',
     `exchange_state`                     TINYINT     NOT NULL DEFAULT 0 COMMENT '交互状态',
     `thinking_steps`                     JSON COMMENT '思维步骤',

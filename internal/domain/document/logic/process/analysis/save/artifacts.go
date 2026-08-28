@@ -78,7 +78,6 @@ func (p *ArtifactPersistPhase) buildDocumentBlockEntities(ctx context.Context, d
 		candidate.DocumentId = documentId
 		candidate.TaskId = taskId
 		candidate.ParentBlockId = idsMap[candidate.ParentBlockNo]
-		candidate.Text = utils.ClipHead(candidate.Text, 200)
 
 		if candidate.ImageContentBase64 != "" {
 			content, err := decodeBase64(candidate.ImageContentBase64, fmt.Sprintf("图片 %d", candidate.BlockNo))

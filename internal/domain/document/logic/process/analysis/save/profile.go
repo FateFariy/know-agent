@@ -21,7 +21,10 @@ type ProfileGeneratePhase struct {
 
 // NewProfileGeneratePhase 创建文档画像生成阶段
 func NewProfileGeneratePhase(repo adapter.DocumentRepository, gen ProfileGenerator) *ProfileGeneratePhase {
-	return &ProfileGeneratePhase{repo: repo}
+	return &ProfileGeneratePhase{
+		repo: repo,
+		gen:  gen,
+	}
 }
 
 func (p *ProfileGeneratePhase) Name() string {

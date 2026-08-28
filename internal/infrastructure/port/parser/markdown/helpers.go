@@ -75,19 +75,21 @@ func getNodeLineMap(n ast.Node, source []byte) []int {
 	}
 	lines := n.Lines()
 	if lines.Len() > 0 {
-		seg := lines.At(0)
+		firstSeg := lines.At(0)
+		lastSeg := lines.At(lines.Len() - 1)
+
 		startLine := 0
 		for i, b := range source {
 			if b == '\n' {
 				startLine++
 			}
-			if i >= seg.Start {
+			if i >= firstSeg.Start {
 				break
 			}
 		}
-		// Count lines in segment
+		// 从第一个 segment 的起始到最后一个 segment 的结尾统计总行数
 		lineCount := 0
-		for i := seg.Start; i < seg.Stop && i < len(source); i++ {
+		for i := firstSeg.Start; i < lastSeg.Stop && i < len(source); i++ {
 			if source[i] == '\n' {
 				lineCount++
 			}

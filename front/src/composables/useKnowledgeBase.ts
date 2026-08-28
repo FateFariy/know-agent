@@ -1,14 +1,15 @@
 import { computed, ref } from 'vue'
+import { knowledgeApi } from '@/api/knowledge'
+import type { KnowledgeBaseItemResp } from '@/types'
 
 /**
  * 知识库上下文。
  *
- * 后端最新 API 已将知识范围 / 主题 / 关联 / 文档上传全部改为按 knowledgeBaseId 维度隔离，
- * 但当前 api 定义中尚未提供“知识库列表”查询接口，因此这里以模块级单例维护当前知识库ID，
- * 默认取环境变量 VITE_DEFAULT_KNOWLEDGE_BASE_ID（缺省为 '1'，即库内默认知识库）。
- *
- * 后续后端补充 KnowledgeBaseOptionResp 列表接口后，只需在此处接入即可，
- * 上层业务代码无需改动。
+ * 后端最新 API 已将知识范围 / 主题 / 关联 / 文档上传全部改为按 knowledgeBaseId 维度隔离。
+ * 此 composable 负责：
+ * 1. 维护当前选中的知识库 ID（持久化到 localStorage）
+ * 2. 加载并缓存可用的知识库列表
+ * 3. 提供切换知识库的方法
  */
 const DEFAULT_KNOWLEDGE_BASE_ID = String(
   import.meta.env.VITE_DEFAULT_KNOWLEDGE_BASE_ID || '1'
@@ -25,8 +26,20 @@ function readPersisted(): string {
 }
 
 const currentKnowledgeBaseId = ref<string>(readPersisted())
+const knowledgeBaseList = ref<KnowledgeBaseItemResp[]>([])
+const loading = ref<boolean>(false)
+const loaded = ref<boolean>(false)
 
 export function useKnowledgeBase() {
+  /** 当前选中的知识库 */
+  const knowledgeBaseId = computed<string>(() => currentKnowledgeBaseId.value)
+
+  /** 当前选中的知识库详情 */
+  const currentKnowledgeBase = computed<KnowledgeBaseItemResp | null>(() => {
+    return knowledgeBaseList.value.find((item) => item.id === currentKnowledgeBaseId.value) || null
+  })
+
+  /** 设置当前知识库 ID */
   function setKnowledgeBaseId(id: string): void {
     const normalized = String(id || '').trim() || DEFAULT_KNOWLEDGE_BASE_ID
     currentKnowledgeBaseId.value = normalized
@@ -37,9 +50,41 @@ export function useKnowledgeBase() {
     }
   }
 
+  /** 加载知识库列表 */
+  async function loadKnowledgeBases(force: boolean = false): Promise<void> {
+    if (loaded.value && !force) {
+      return
+    }
+    loading.value = true
+    try {
+      const { data } = await knowledgeApi.listKnowledgeBases()
+      knowledgeBaseList.value = data || []
+      loaded.value = true
+
+      // 如果当前选中的 ID 不在列表中，则选择第一个或默认
+      if (knowledgeBaseList.value.length > 0) {
+        const exists = knowledgeBaseList.value.some((item) => item.id === currentKnowledgeBaseId.value)
+        if (!exists) {
+          const defaultItem = knowledgeBaseList.value.find((item) => item.isDefault === 1)
+          setKnowledgeBaseId(defaultItem?.id || knowledgeBaseList?.value?.[0]?.id || DEFAULT_KNOWLEDGE_BASE_ID)
+        }
+      }
+    } catch (error) {
+      console.error('加载知识库列表失败', error)
+      knowledgeBaseList.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
-    knowledgeBaseId: computed<string>(() => currentKnowledgeBaseId.value),
+    knowledgeBaseId,
+    currentKnowledgeBase,
+    knowledgeBaseList,
+    loading,
+    loaded,
     setKnowledgeBaseId,
+    loadKnowledgeBases,
     DEFAULT_KNOWLEDGE_BASE_ID
   }
 }

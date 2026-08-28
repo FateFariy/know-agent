@@ -1,17 +1,28 @@
 <script lang="ts" setup>
-import {computed, ref} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {RouterLink, RouterView, useRoute} from 'vue-router'
 import {
   Bars3Icon,
+  CircleStackIcon,
   ClipboardDocumentListIcon,
   CommandLineIcon,
   EyeIcon,
   HomeModernIcon,
   ShareIcon
 } from '@heroicons/vue/24/outline'
+import {useKnowledgeBase} from '@/composables/useKnowledgeBase'
 
 const route = useRoute()
 const sidebarOpen = ref(false)
+
+const {
+  knowledgeBaseId,
+  knowledgeBaseList,
+  currentKnowledgeBase,
+  loading: kbLoading,
+  loadKnowledgeBases,
+  setKnowledgeBaseId
+} = useKnowledgeBase()
 
 const navItems = [
   {to: '/admin/dashboard', label: '运营总览', icon: HomeModernIcon},
@@ -30,6 +41,15 @@ function isNavItemActive(targetPath: string) {
   }
   return route.path === targetPath
 }
+
+function handleKnowledgeBaseChange(event: Event) {
+  const target = event.target as HTMLSelectElement
+  setKnowledgeBaseId(target.value)
+}
+
+onMounted(() => {
+  loadKnowledgeBases()
+})
 </script>
 
 <template>
@@ -48,6 +68,30 @@ function isNavItemActive(targetPath: string) {
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
+
+      <!-- 知识库选择器 -->
+      <div class="kb-selector-section">
+        <span class="nav-group-label">当前知识库</span>
+        <div class="kb-selector-wrapper">
+          <CircleStackIcon class="kb-icon"/>
+          <select
+            class="kb-select"
+            :value="knowledgeBaseId"
+            @change="handleKnowledgeBaseChange"
+            :disabled="kbLoading"
+          >
+            <option v-if="kbLoading" value="">加载中...</option>
+            <option v-else-if="!knowledgeBaseList.length" value="">暂无知识库</option>
+            <option v-else v-for="kb in knowledgeBaseList" :key="kb.id" :value="kb.id">
+              {{ kb.baseName }}
+              <span v-if="kb.isDefault === 1"> (默认)</span>
+            </option>
+          </select>
+        </div>
+        <div v-if="currentKnowledgeBase" class="kb-info">
+          <span class="kb-doc-count">{{ currentKnowledgeBase.documentCount }} 篇文档</span>
+        </div>
+      </div>
 
       <div class="sidebar-footer">
         <div class="sidebar-user-card">
@@ -198,6 +242,62 @@ function isNavItemActive(targetPath: string) {
   width: 18px;
   height: 18px;
   flex: none;
+}
+
+/* ── 知识库选择器 ── */
+.kb-selector-section {
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kb-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.kb-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex: none;
+}
+
+.kb-select {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--color-text-strong);
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.kb-select:disabled {
+  cursor: not-allowed;
+  color: var(--color-muted);
+}
+
+.kb-select option {
+  background: #fff;
+  color: var(--color-text-strong);
+}
+
+.kb-info {
+  margin-top: 6px;
+  padding: 0 2px;
+}
+
+.kb-doc-count {
+  font-size: 11px;
+  color: var(--color-muted);
 }
 
 /* ── Sidebar 底部用户 ── */

@@ -8,7 +8,7 @@ import (
 type ChatExchange struct {
 	common.Model
 	ConversationId                 string           `gorm:"column:conversation_id;type:varchar(64)"`               // 会话ID
-	Question                       string           `gorm:"column:user_prompt;type:text"`                          // 用户提问
+	Question                       string           `gorm:"column:question;type:text"`                             // 用户提问
 	Answer                         string           `gorm:"column:reply_content;type:text"`                        // 回复内容
 	TurnStatus                     int              `gorm:"column:exchange_state;type:tinyint"`                    // 交互状态
 	ThinkingSteps                  common.JSONArray `gorm:"column:thinking_steps;type:json"`                       // 思维步骤

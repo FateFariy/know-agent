@@ -42,7 +42,7 @@ func (p *PreparationStage) Execute(ctx context.Context, buildCtx *Context) error
 	}
 
 	sourceParseTaskId := p.requireSourceParseTaskId(ctx, buildCtx)
-	if sourceParseTaskId > 0 {
+	if sourceParseTaskId == 0 {
 		return errors.New("索引任务缺少有效且已冻结的源解析任务")
 	}
 

@@ -62,7 +62,7 @@ type openingFields struct {
 	cellCharSpan [2]int
 }
 
-const Markdown = "native_markdown"
+const Markdown = "md"
 
 func (p *GoldmarkParser) Name() string {
 	return Markdown

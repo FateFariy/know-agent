@@ -11,7 +11,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
 
-const Html = "native_html"
+const Html = "html"
 
 type HTMLParser struct {
 }

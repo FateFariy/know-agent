@@ -9,7 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/document/model/entity"
 )
 
-const Text = "native_text"
+const Text = "txt"
 
 type TextParser struct {
 }

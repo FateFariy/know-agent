@@ -85,10 +85,11 @@ func (p *ParseStage) process(ctx context.Context, parseCtx *Context) (*aggregate
 	if err != nil {
 		return nil, err
 	}
-	blocks = blocks.Normalize()
 
 	// 2. 提取解析文本
 	parsedText := blocks.ExtractParsedText()
+
+	blocks = blocks.Normalize()
 
 	// 3. 计算统计指标
 	charCount := len([]rune(parsedText))

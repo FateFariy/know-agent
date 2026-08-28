@@ -162,7 +162,7 @@ func (p ParentChunkCandidates) WithoutValidChildren() ParentChunkCandidates {
 	}
 	for _, candidate := range p {
 		if candidate == nil || len(candidate.ChildChunks) == 0 ||
-			strutil.IsBlank(candidate.Text) || slices.ContainsFunc(candidate.ChildChunks, fn) {
+			strutil.IsBlank(candidate.Text) || !slices.ContainsFunc(candidate.ChildChunks, fn) {
 			continue
 		}
 		candidates = append(candidates, candidate)

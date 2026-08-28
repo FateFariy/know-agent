@@ -314,6 +314,7 @@ func (b *DocumentBlock) ResumeRawText(rawBytes []byte) {
 	marshal, _ := json.Marshal(b.Metadata["sourceSpan"])
 	_ = json.Unmarshal(marshal, &sourceSpan)
 	b.Text = string(rawBytes[sourceSpan.StartByte:sourceSpan.EndByte])
+	b.ContentWithWeight = b.BuildContentWithWeight()
 }
 
 type DocumentBlocks []*DocumentBlock
@@ -597,6 +598,7 @@ func (b DocumentBlocks) Normalize() DocumentBlocks {
 
 	for _, block := range b {
 		text := utils.CleanupSpace(block.Text)
+		text = utils.ClipHead(text, 200)
 		// 过滤掉无文本、无表格 HTML、无图片说明的空块
 		if text == "" && block.TableHTML == "" && block.ImageCaption == "" {
 			continue
