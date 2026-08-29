@@ -40,3 +40,10 @@ func WithTopP(topP float32) Option {
 		opt.TopP = &topP
 	})
 }
+
+// WithMaxTokens 设置单次调用的最大输出 token 数
+func WithMaxTokens(maxTokens int) Option {
+	return common.WrapImplSpecificOptFn(func(opt *Options) {
+		opt.MaxTokens = maxTokens
+	})
+}

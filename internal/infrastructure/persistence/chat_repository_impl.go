@@ -243,9 +243,12 @@ func (r *ChatRepositoryImpl) InsertMemorySummary(ctx context.Context, summary *e
 }
 
 // UpdateMemorySummaryById 更新会话记忆摘要
+// Select 必须传字段切片：传逗号拼接的单个字符串时 GORM 会把整串当成一个列名，
+// 导致所有字段都被白名单过滤掉，只剩带 autoUpdateTime 的 update_time 被更新
 func (r *ChatRepositoryImpl) UpdateMemorySummaryById(ctx context.Context, summary *entity.ChatMemorySummary) error {
-	fields := "covered_exchange_id,covered_exchange_count,compression_count,summary_version,summary_text,summary_json,last_source_update_time,update_time"
-	return r.dbWithContext(ctx).Select(fields).Where("id = ?", summary.ID).
+	return r.dbWithContext(ctx).Model(&model.ChatMemorySummary{}).
+		Select([]string{"covered_exchange_id", "covered_exchange_count", "compression_count", "summary_version",
+			"summary_text", "summary_json", "last_source_update_time"}).Where("id = ?", summary.ID).
 		Updates(convert.ToChatMemorySummaryModel(summary)).Error
 }
 

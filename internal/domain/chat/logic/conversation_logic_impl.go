@@ -54,9 +54,9 @@ func (c *ConversationLogicImpl) OpenConversationStream(ctx context.Context, sink
 	logx.Infof("====== request 内容：%s", string(cmdJSON))
 
 	leaseKey := chatRunningLeasePrefix + cmd.ConversationId
+	defer c.releaseConversationLock(leaseKey)
 	defer func() {
 		if err != nil {
-			c.releaseConversationLock(leaseKey)
 			logx.Errorf("会话启动失败, conversationId=%s, question=%s, err=%v",
 				cmd.ConversationId, cmd.Question, err)
 			if err = sink.Error(err.Error(), cmd.ConversationId, 0); err != nil {

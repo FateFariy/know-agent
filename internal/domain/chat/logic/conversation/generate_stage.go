@@ -78,8 +78,8 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 func (g *GenerateStage) reuseCachedAnswer(ctx context.Context, convCtx *Context, plan *vo.ConversationExecutionPlan) error {
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, plan.Mode.Name(), &vo.StageInput{SummaryText: "命中语义缓存，复用答案。"})
 
+	// PublishText 内部已写入答案缓冲区，此处不可再额外写入，否则答案会被累积两份
 	answer := convCtx.cache.CacheEntry().AnswerDraft
-	convCtx.WriteAnswerBuffer(answer)
 	if err := convCtx.PublishText(answer); err != nil {
 		return err
 	}

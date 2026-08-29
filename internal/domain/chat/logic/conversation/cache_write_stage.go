@@ -38,7 +38,12 @@ func (s *CacheWriteStage) Order() int {
 
 // ShouldExecute 仅当语义缓存已启用且存储可用时执行
 func (s *CacheWriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
-	return s.enabled && s.store != nil
+	if !s.enabled || s.store == nil {
+		return false
+	}
+	entry := convCtx.cache.CacheEntry()
+	return !(convCtx.cache.IsCacheHit() && convCtx.cache.ReuseStrategy() == enum.ReuseAnswerAndRetrieval &&
+		entry != nil && utils.IsNotBlank(entry.AnswerDraft))
 }
 
 func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {

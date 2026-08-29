@@ -12,13 +12,13 @@ import (
 
 // ConversationSummary 会话摘要
 type ConversationSummary struct {
-	Summary          string   // 摘要
-	ConversationGoal string   // 会话目标
-	StableFacts      []string // 稳定事实
-	UserPreferences  []string // 用户偏好
-	ResolvedPoints   []string // 解决的点
-	PendingQuestions []string // 待解决的问题
-	RetrievalHints   []string // 检索提示
+	Summary          string   `json:"summary"`           // 摘要
+	ConversationGoal string   `json:"conversation_goal"` // 会话目标
+	StableFacts      []string `json:"stable_facts"`      // 稳定事实
+	UserPreferences  []string `json:"user_preferences"`  // 用户偏好
+	ResolvedPoints   []string `json:"resolved_points"`   // 解决的点
+	PendingQuestions []string `json:"pending_questions"` // 待解决的问题
+	RetrievalHints   []string `json:"retrieval_hints"`   // 检索提示
 }
 
 // CopySummary 复制摘要

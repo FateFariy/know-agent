@@ -229,13 +229,14 @@ func extractResponseText(response any) string {
 	case *schema.Message:
 		return resp.Content
 	case *schema.AgenticMessage:
+		// 模型可能把一次回复拆成多个文本块返回，需全部拼接，只取首块会造成内容截断
 		blocks := slice.Filter(resp.ContentBlocks, func(index int, item *schema.ContentBlock) bool {
-			return item.Type == schema.ContentBlockTypeAssistantGenText
+			return item.Type == schema.ContentBlockTypeAssistantGenText && item.AssistantGenText != nil
 		})
-		if len(blocks) == 0 {
-			return ""
-		}
-		return blocks[0].AssistantGenText.Text
+		texts := slice.Map(blocks, func(index int, item *schema.ContentBlock) string {
+			return item.AssistantGenText.Text
+		})
+		return strings.Join(texts, "")
 	default:
 		return ""
 	}

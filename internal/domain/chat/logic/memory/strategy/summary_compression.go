@@ -23,10 +23,14 @@ import (
 )
 
 const (
-	maxSectionItems    = 6
-	maxItemLength      = 80
-	maxGoalLength      = 120
-	SummaryCompression = "summary_compression" // 摘要压缩策略
+	maxSectionItems        = 6
+	maxItemLength          = 80
+	maxGoalLength          = 120
+	SummaryCompression     = "summary_compression" // 摘要压缩策略
+	summarySectionCount    = 5                     // 摘要 JSON 中的数组字段数量
+	summaryJsonOverhead    = 256                   // JSON 键名、括号与转义字符的预估开销
+	summaryReasoningBudget = 1024                  // 推理模型思维链预留，其 token 同样计入 max_tokens
+	summaryMinMaxTokens    = 2048                  // 摘要阶段输出 token 下限
 )
 
 var (
@@ -299,8 +303,13 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 		return nil, err
 	}
 
-	// 调用LLM生成合并后的摘要
-	content, err := s.chatModel.GenerateWithTrace(ctx, enum.ChatStageSummary, systemPrompt, userPrompt)
+	// 调用LLM生成合并后的摘要，摘要需一次性输出全部结构化字段，
+	// 输出预算必须覆盖各字段长度上限之和，否则 JSON 会在 max_tokens 处被截断
+	content, err := s.chatModel.GenerateWithTrace(ctx, enum.ChatStageSummary, systemPrompt, userPrompt,
+		model.WithMaxTokens(s.summaryMaxTokens()))
+	if err != nil {
+		return nil, err
+	}
 	if err = summary.Unmarshal(content); err != nil {
 		return nil, err
 	}
@@ -308,6 +317,13 @@ func (s *SummaryCompressionStrategy) mergeSummaryByLLM(ctx context.Context, oldS
 	// 规范化摘要（限制字段长度、去重）
 	summary.Normalize(s.historySummary.MaxChars, maxGoalLength, maxItemLength, maxSectionItems)
 	return summary, nil
+}
+
+// summaryMaxTokens 依据摘要各字段的长度上限推算所需输出 token 预算
+func (s *SummaryCompressionStrategy) summaryMaxTokens() int {
+	contentChars := s.historySummary.MaxChars + maxGoalLength +
+		summarySectionCount*maxSectionItems*maxItemLength
+	return max(contentChars+summaryJsonOverhead+summaryReasoningBudget, summaryMinMaxTokens)
 }
 
 // fallbackMerge 回退合并策略（当LLM合并失败时使用规则合并）
