@@ -53,6 +53,11 @@ func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) err
 		return nil
 	}
 
+	// 语义缓存命中：Prompt 已由缓存提供，跳过证据预算与 Prompt 组装
+	if convCtx.IsCacheHit() {
+		return nil
+	}
+
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageEvidenceBudget, s.Name(),
 		&vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})
 

@@ -34,6 +34,11 @@ func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
 		return fmt.Errorf("invalid value")
 	}
 
+	// 语义缓存命中：检索结果已由缓存提供，跳过检索
+	if convCtx.IsCacheHit() {
+		return nil
+	}
+
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRAGRetrieve, r.Name(), &vo.StageInput{SummaryText: "正在执行多通道混合检索。"})
 	if err := convCtx.PublishThinking("正在根据问题规划知识检索范围。"); err != nil {
 		return err

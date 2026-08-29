@@ -44,15 +44,15 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 				Component: "rag_eval_metrics",
 				Payload:   evaluator.Name(),
 			}
-			ctx = callbacks.EnsureRunInfo(ctx, info)
-			ctx = callbacks.OnStart(ctx, struct{}{})
-			score, err := evaluator.Evaluate(ctx, input)
+			valueCtx := callbacks.EnsureRunInfo(ctx, info)
+			valueCtx = callbacks.OnStart(valueCtx, struct{}{})
+			score, err := evaluator.Evaluate(valueCtx, input)
 			if err != nil {
 				logx.Warnf("evaluate error: %v", err)
-				callbacks.OnError(ctx, err)
+				callbacks.OnError(valueCtx, err)
 				return
 			}
-			callbacks.OnEnd(ctx, score)
+			callbacks.OnEnd(valueCtx, score)
 		}(evaluator)
 	}
 	return nil

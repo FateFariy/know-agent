@@ -48,7 +48,7 @@ func ClipTail(text string, maxChars int) string {
 	if maxChars <= 1 {
 		return ""
 	}
-	start := max(0, len(normalized)-maxChars+1)
+	start := max(0, len(runes)-maxChars+1)
 	return "…" + string(runes[start:])
 }
 

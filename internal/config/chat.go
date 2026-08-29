@@ -71,6 +71,16 @@ type RagConf struct {
 	Hybrid                         HybridConf            // 混合检索权重
 	GraphRagQueryPlan              GraphRagQueryPlanConf // 图RAG查询计划
 	AutoRoute                      AutoRouteConf         // 自动路由配置
+	SemanticCache                  SemanticCacheConf     // 语义缓存配置
+}
+
+// SemanticCacheConf 语义缓存配置
+type SemanticCacheConf struct {
+	Enabled             bool          `json:",default=false"` // 是否启用语义缓存
+	SimilarityThreshold float64       `json:",default=0.92"`  // ANN 相似度阈值
+	TopK                int           `json:",default=3"`     // ANN 候选数
+	TTL                 time.Duration `json:",default=24h"`   // 缓存条目 TTL
+	ReuseAnswer         bool          `json:",default=false"` // true=命中时同时复用答案
 }
 
 type KeywordConf struct {

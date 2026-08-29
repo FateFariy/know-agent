@@ -64,6 +64,11 @@ func (r *RouteStage) Execute(ctx context.Context, convCtx *Context) error {
 		return nil
 	}
 
+	// 语义缓存命中：检索链路结果已由缓存提供，跳过路由
+	if convCtx.IsCacheHit() {
+		return nil
+	}
+
 	var err error
 	switch convCtx.ChatMode {
 	case enum.ChatQueryModeOpenChat:

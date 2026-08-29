@@ -36,6 +36,20 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 		return fmt.Errorf("invalid value")
 	}
 
+	// 语义缓存命中：检索/证据阶段已被跳过，这里补发引用（两种策略都需要），
+	// 并在「复用答案」策略下直接复用缓存答案、跳过生成。
+	if convCtx.IsCacheHit() {
+		if refs := plan.RetrievalResult.FlattenReferences(); len(refs) > 0 {
+			_ = convCtx.PublishReferences(refs)
+		}
+		if convCtx.ReuseStrategy() == enum.ReuseAnswerAndRetrieval &&
+			utils.IsNotBlank(convCtx.CacheEntry().AnswerDraft) {
+			return g.reuseCachedAnswer(ctx, convCtx, plan)
+		}
+		// 否则：复用检索结果，落到下方正常生成（命中 + ReuseRetrievalOnly，
+		// 或配置要复用答案但历史条目无 AnswerDraft 时的兼容降级）
+	}
+
 	if plan.RetrievalResult.IsEmpty() {
 		text := utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply)
 		if err := convCtx.PublishText(text); err != nil {
@@ -52,6 +66,31 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 		return g.agentExecute(ctx, convCtx)
 	}
 
+	return nil
+}
+
+// reuseCachedAnswer 命中且复用答案策略：直接采用缓存答案，跳过 LLM 生成。
+// 引用已在 Execute 入口补发；答案文本与溯源信息从缓存条目获取。
+func (g *GenerateStage) reuseCachedAnswer(ctx context.Context, convCtx *Context, plan *vo.ConversationExecutionPlan) error {
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, plan.Mode.Name(), &vo.StageInput{SummaryText: "命中语义缓存，复用答案。"})
+
+	if err := convCtx.PublishThinking("命中语义缓存，复用答案。"); err != nil {
+		return nil
+	}
+
+	answer := convCtx.CacheEntry().AnswerDraft
+	convCtx.WriteAnswerBuffer(answer)
+	if err := convCtx.PublishText(answer); err != nil {
+		return err
+	}
+
+	vo.OnEnd(ctx, &vo.StageOutput{
+		SummaryText: "已复用缓存答案。",
+		Snapshot: map[string]any{
+			"cacheHit":   true,
+			"similarity": convCtx.CacheSimilarity(),
+		},
+	})
 	return nil
 }
 

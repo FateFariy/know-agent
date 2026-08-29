@@ -142,7 +142,7 @@ func (h *ragEvalMetricsHandler) persistEval(ctx context.Context, metricName stri
 		MetricName:     metricName,
 		MetricLabel:    metricLabel(metricName),
 		Score:          score,
-		LatencyMs:      time.Since(startTime),
+		LatencyMs:      time.Since(startTime).Milliseconds(),
 		Status:         int8(status),
 		ErrorMsg:       utils.Pointer(errMsg),
 	}

@@ -77,17 +77,3 @@ const (
 	ConversationTraceStageStateFailed                                           // 失败
 	ConversationTraceStageStateSkipped                                          // 跳过
 )
-
-func ConversationTraceStageStateName(code int) string {
-	switch code {
-	case ConversationTraceStageStateRunning:
-		return "进行中"
-	case ConversationTraceStageStateCompleted:
-		return "已完成"
-	case ConversationTraceStageStateFailed:
-		return "失败"
-	case ConversationTraceStageStateSkipped:
-		return "跳过"
-	}
-	return ""
-}

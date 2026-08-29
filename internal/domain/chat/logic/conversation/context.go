@@ -52,6 +52,7 @@ type Context struct {
 	References                     *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
 	UsedTools                      *list.CopyOnWriteList[string]                // 已使用的工具集合
 	Recommendations                []string                                     // 推荐追问列表
+	cache                          *semanticCacheCtx                            // 语义缓存状态（集中管理）
 	StartTime                      time.Time                                    // 开始时间（毫秒精度）
 	FirstResponseTimeMs            atomic.Int64                                 // 首次响应耗时（毫秒）
 	Finalized                      atomic.Bool                                  // 是否已完成
@@ -252,4 +253,92 @@ func (c *Context) DebugTraceJSON() string {
 		return ""
 	}
 	return dt.Serialize()
+}
+
+// ============================================================================
+// 语义缓存状态（集中管理，所有 Stage 单一来源）
+// ============================================================================
+
+// semanticCacheCtx 集中保存一次请求中的语义缓存相关状态，避免各 Stage 重复查询与状态不一致
+type semanticCacheCtx struct {
+	hit         bool
+	entry       *CacheEntry
+	strategy    enum.ReuseStrategy
+	similarity  float64
+	queryTexts  []string
+	queryVector []float64
+}
+
+// resetCache 初始化缓存状态
+func (c *Context) resetCache(strategy enum.ReuseStrategy) {
+	c.cache = &semanticCacheCtx{strategy: strategy}
+}
+
+// MarkCacheHit 记录命中：挂载缓存条目与相似度
+func (c *Context) MarkCacheHit(h *CacheHit) {
+	if c.cache == nil {
+		c.cache = &semanticCacheCtx{}
+	}
+	c.cache.hit = true
+	c.cache.entry = h.Entry
+	c.cache.similarity = h.Similarity
+}
+
+// markCacheMiss 记录未命中
+func (c *Context) markCacheMiss() {
+	if c.cache != nil {
+		c.cache.hit = false
+	}
+}
+
+// IsCacheHit 是否已命中语义缓存
+func (c *Context) IsCacheHit() bool {
+	return c.cache != nil && c.cache.hit
+}
+
+// CacheEntry 返回命中的缓存条目
+func (c *Context) CacheEntry() *CacheEntry {
+	if c.cache == nil {
+		return nil
+	}
+	return c.cache.entry
+}
+
+// ReuseStrategy 本次请求生效的复用策略
+func (c *Context) ReuseStrategy() enum.ReuseStrategy {
+	if c.cache == nil {
+		return enum.ReuseRetrievalOnly
+	}
+	return c.cache.strategy
+}
+
+// CacheSimilarity 命中相似度（埋点用）
+func (c *Context) CacheSimilarity() float64 {
+	if c.cache == nil {
+		return 0
+	}
+	return c.cache.similarity
+}
+
+// recordCacheQuery 记录用于回写的查询文本列表与组合向量（未命中时供 CacheWriteStage 构造条目）
+// queryTexts：改写问题 + 各子问题，每条对应一条 Milvus 向量记录；vec：组合查询向量，用于 Search
+func (c *Context) recordCacheQuery(texts []string, vec []float64) {
+	if c.cache != nil {
+		c.cache.queryTexts = texts
+		c.cache.queryVector = vec
+	}
+}
+
+// applyCachedExecution 命中后将缓存的必要字段回填进当前执行计划，
+// 保留当前请求的私有上下文（历史/时间/追问锚点）不被覆盖
+func (c *Context) applyCachedExecution(ce *CachedExecution) {
+	ep := c.ExecutionPlan.Load()
+	if ce == nil || ep == nil {
+		return
+	}
+	ep.Mode = ce.Mode
+	ep.NavigationDecision = ce.NavigationDecision
+	ep.RetrievalPlan = ce.RetrievalPlan
+	ep.RetrievalResult = ce.RetrievalResult
+	ep.PromptAssemblyResult = ce.PromptAssemblyResult
 }

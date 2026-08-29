@@ -14,7 +14,7 @@ var (
 	decimalSectionPattern = regexp.MustCompile(`\b\d+(?:\.\d+){0,3}\s*(?:节|章节|部分|章|节)\b`)
 
 	// namedSectionPattern 匹配具名章节提示（如"第三章"、"附录A"）
-	namedSectionPattern = regexp.MustCompile(`(?:第\s*[一二三四五六七八九十百千\d]+\s*[章节部分]|附录\s*[A-Za-z一二三四五六七八九十\d]+)`)
+	namedSectionPattern = regexp.MustCompile(`第\s*[一二三四五六七八九十百千\d]+\s*[章节部分]|附录\s*[A-Za-z一二三四五六七八九十\d]+`)
 )
 
 // RetrievalMetadataFilters 检索元数据过滤条件
