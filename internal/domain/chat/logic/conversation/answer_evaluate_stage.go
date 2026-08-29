@@ -29,6 +29,18 @@ func (a *AnswerEvaluateStage) Order() int {
 	return enum.ConversationTraceStageAnswerEvaluate.Order
 }
 
+// ShouldExecute 仅当非开放闲聊、执行计划与检索结果就绪且语义缓存未命中时执行
+func (a *AnswerEvaluateStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
+		return false
+	}
+	execPlan := convCtx.ExecutionPlan.Load()
+	if execPlan == nil || execPlan.RetrievalResult == nil {
+		return false
+	}
+	return !convCtx.cache.IsCacheHit()
+}
+
 func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
 	var contexts []string

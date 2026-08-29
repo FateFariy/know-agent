@@ -22,6 +22,8 @@ import (
 //  2. 对证据块进行预算裁剪（总预算 + 每个子问题预算）
 //  3. 复用已渲染引用（避免重复输出相同证据块）
 //  4. 统计渲染/省略引用详情，供上层跟踪。
+var _ ConditionalStage = (*EvidenceBudgetStage)(nil)
+
 type EvidenceBudgetStage struct {
 	promptRenderer               adapter.PromptRenderer
 	totalEvidenceBudget          int    // 总证据预算（字符数）
@@ -46,21 +48,21 @@ func (s *EvidenceBudgetStage) Order() int {
 	return enum.ConversationTraceStageEvidenceBudget.Order
 }
 
-// Execute 执行证据预算与 Prompt 组装阶段，负责校验执行上下文、处理空证据兜底、发布引用、组装 Prompt 并填充调试轨迹
-func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) error {
+// ShouldExecute 仅当非开放闲聊、执行计划与检索结果就绪且语义缓存未命中时执行
+func (s *EvidenceBudgetStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
 	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return nil
+		return false
 	}
-
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil || execPlan.RetrievalResult == nil {
-		return nil
+		return false
 	}
+	return !convCtx.cache.IsCacheHit()
+}
 
-	// 语义缓存命中：Prompt 已由缓存提供，跳过证据预算与 Prompt 组装
-	if convCtx.cache.IsCacheHit() {
-		return nil
-	}
+// Execute 执行证据预算与 Prompt 组装阶段，负责校验执行上下文、处理空证据兜底、发布引用、组装 Prompt 并填充调试轨迹
+func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) error {
+	execPlan := convCtx.ExecutionPlan.Load()
 
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageEvidenceBudget, s.Name(),
 		&vo.StageInput{SummaryText: "正在组装证据与 Prompt 预算。"})

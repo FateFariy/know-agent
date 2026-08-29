@@ -32,6 +32,8 @@ type cacheOptions struct {
 
 var _ Stage = (*SemanticCacheStage)(nil)
 
+var _ ConditionalStage = (*SemanticCacheStage)(nil)
+
 func NewSemanticCacheStage(sevCtx *svc.ServiceContext, store SemanticCacheStore) *SemanticCacheStage {
 	return &SemanticCacheStage{
 		store: store,
@@ -51,22 +53,25 @@ func (s *SemanticCacheStage) Order() int {
 	return enum.ConversationTraceStageSemanticCache.Order
 }
 
-func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) error {
-	// 未启用或存储不可用：直接走正常链路
+// ShouldExecute 仅当语义缓存已启用、执行计划就绪且非实时/时间敏感/开放闲聊时执行
+func (s *SemanticCacheStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
 	if !s.enabled || s.store == nil {
-		return nil
+		return false
 	}
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil {
-		return nil
+		return false
 	}
-	convCtx.cache = &semanticCacheCtx{strategy: s.reuseStrategy}
-
-	// 不缓存场景：实时/时间敏感/OpenChat → 降级走正常链路
 	if execPlan.RequiresRealTimeSearch || execPlan.RequiresCurrentDateAnchoring ||
 		convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return nil
+		return false
 	}
+	return true
+}
+
+func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) error {
+	convCtx.cache = &semanticCacheCtx{strategy: s.reuseStrategy}
+	execPlan := convCtx.ExecutionPlan.Load()
 
 	// 启动语义缓存追踪阶段
 	input := &vo.StageInput{

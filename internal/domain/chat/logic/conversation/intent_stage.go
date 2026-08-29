@@ -7,6 +7,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
+var _ ConditionalStage = (*IntentRecognizeStage)(nil)
+
 type IntentRecognizeStage struct {
 	recognizer Recognizer
 }
@@ -25,11 +27,17 @@ func (i *IntentRecognizeStage) Order() int {
 	return enum.ConversationTraceStageIntent.Order
 }
 
+// ShouldExecute 仅当执行计划已就绪且语义缓存未命中时执行
+func (i *IntentRecognizeStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+	if convCtx.ExecutionPlan.Load() == nil {
+		return false
+	}
+	return !convCtx.cache.IsCacheHit()
+}
+
 func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
-	if execPlan == nil {
-		return nil
-	}
+
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageIntent,
 		enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在分析用户意图。"})
 

@@ -26,8 +26,6 @@ type QueryRewriteStage struct {
 	thinking        bool
 }
 
-var _ Stage = (*QueryRewriteStage)(nil)
-
 func NewQueryRewriteStage(svcCtx *svc.ServiceContext, rewriter QueryRewriter) *QueryRewriteStage {
 	return &QueryRewriteStage{
 		rewriter:        rewriter,
@@ -50,22 +48,22 @@ func (q *QueryRewriteStage) Order() int {
 	return enum.ConversationTraceStageRewrite.Order
 }
 
+// ShouldExecute 仅当非开放闲聊且执行计划已就绪时执行（RAG 未启用作为错误在 Execute 中处理）
+func (q *QueryRewriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
+		return false
+	}
+	return convCtx.ExecutionPlan.Load() != nil
+}
+
 // Execute 执行问题改写
 func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error {
-	// OpenChat 模式不需要问题改写, 且未选择任何库时也不执行
-	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return nil
-	}
-
 	// RAG 未启用时返回错误
 	if !q.ragEnabled {
 		return fmt.Errorf("当前文档问答模式未启用，请先开启聊天侧 RAG 编排")
 	}
 
 	execPlan := convCtx.ExecutionPlan.Load()
-	if execPlan == nil {
-		return nil
-	}
 	question := utils.Trim(convCtx.Question)
 	historySummary := execPlan.HistorySummary
 

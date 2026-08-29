@@ -19,6 +19,8 @@ type CacheWriteStage struct {
 
 var _ Stage = (*CacheWriteStage)(nil)
 
+var _ ConditionalStage = (*CacheWriteStage)(nil)
+
 func NewCacheWriteStage(svcCtx *svc.ServiceContext, store SemanticCacheStore) *CacheWriteStage {
 	return &CacheWriteStage{
 		store:   store,
@@ -34,11 +36,12 @@ func (s *CacheWriteStage) Order() int {
 	return enum.ConversationTraceStageCacheWrite.Order
 }
 
-func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
-	if !s.enabled || s.store == nil {
-		return nil
-	}
+// ShouldExecute 仅当语义缓存已启用且存储可用时执行
+func (s *CacheWriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+	return s.enabled && s.store != nil
+}
 
+func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 启动缓存写入追踪阶段
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageCacheWrite, enum.ExecutionModeRetrieval.String(),
 		&vo.StageInput{SummaryText: "正在回写语义缓存。"})

@@ -31,6 +31,8 @@ type RouteStage struct {
 
 var _ Stage = (*RouteStage)(nil)
 
+var _ ConditionalStage = (*RouteStage)(nil)
+
 func NewRouteStage(
 	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
@@ -57,6 +59,14 @@ func (r *RouteStage) Order() int {
 	return enum.ConversationTraceStageRoute.Order
 }
 
+// ShouldExecute 仅当执行计划已就绪且语义缓存未命中时执行
+func (r *RouteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+	if convCtx.ExecutionPlan.Load() == nil {
+		return false
+	}
+	return !convCtx.cache.IsCacheHit()
+}
+
 // Execute 执行路由判定
 //
 // 根据 chatMode 分发到对应的路由策略：
@@ -65,14 +75,6 @@ func (r *RouteStage) Order() int {
 //  3. AutoDocument → prepareAutoDocumentMode（自动知识路由 + 文档内导航）
 func (r *RouteStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
-	if execPlan == nil {
-		return nil
-	}
-
-	// 语义缓存命中：检索链路结果已由缓存提供，跳过路由
-	if convCtx.cache.IsCacheHit() {
-		return nil
-	}
 
 	var err error
 	switch convCtx.ChatMode {

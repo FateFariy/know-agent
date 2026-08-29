@@ -9,6 +9,8 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
+var _ ConditionalStage = (*RetrievalStage)(nil)
+
 type RetrievalStage struct {
 	retriever Retriever
 }
@@ -27,20 +29,19 @@ func (r *RetrievalStage) Order() int {
 	return enum.ConversationTraceStageRAGRetrieve.Order
 }
 
-func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
+// ShouldExecute 非开放闲聊且语义缓存未命中时执行（执行计划缺失作为错误在 Execute 中处理）
+func (r *RetrievalStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
 	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return nil
+		return false
 	}
+	return !convCtx.cache.IsCacheHit()
+}
 
+func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 加载执行计划，缺失时直接报错
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil {
 		return fmt.Errorf("invalid value")
-	}
-
-	// 语义缓存命中：检索结果已由缓存提供，跳过检索
-	if convCtx.cache.IsCacheHit() {
-		return nil
 	}
 
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRAGRetrieve, r.Name(), &vo.StageInput{SummaryText: "正在执行多通道混合检索。"})

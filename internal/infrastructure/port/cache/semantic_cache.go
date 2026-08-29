@@ -191,7 +191,7 @@ func (s *SemanticCache) insertVector(ctx context.Context, entry *entity.ChatCach
 		milvuscol.NewColumnInt64(cacheIDField, []int64{entry.ID}),
 		milvuscol.NewColumnFloatVector(vectorField, s.dim, [][]float32{vec}),
 		milvuscol.NewColumnVarChar(queryTextField, []string{entry.QueryText}),
-		milvuscol.NewColumnVarChar(chatModeField, []string{strconv.Itoa(int(entry.ChatMode))}),
+		milvuscol.NewColumnVarChar(chatModeField, []string{strconv.Itoa(entry.ChatMode)}),
 		milvuscol.NewColumnJSONBytes(docIDsField, [][]byte{docIDs}),
 		milvuscol.NewColumnJSONBytes(taskIDsField, [][]byte{taskIDs}),
 		milvuscol.NewColumnJSONBytes(kbIDsField, [][]byte{kbIDs}),

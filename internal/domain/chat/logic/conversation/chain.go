@@ -51,6 +51,9 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) (err error) {
 		if i == 1 {
 			ctx = vo.WithTrace(ctx, convCtx.Trace)
 		}
+		if cs, ok := stage.(ConditionalStage); ok && !cs.ShouldExecute(ctx, convCtx) {
+			continue
+		}
 		stageName := stage.Name()
 		startTime := time.Now()
 		logx.Infof("[ChatChain] 开始执行阶段: %s, ConversationId=%s", stageName, convCtx.ConversationId)
