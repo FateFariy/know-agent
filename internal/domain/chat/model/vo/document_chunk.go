@@ -83,13 +83,6 @@ type DocumentChunk struct {
 	Extra map[string]any `json:"extra"` // 扩展数据
 }
 
-func (d *DocumentChunk) FillKnowledge(knowledge *DocumentMetadata) {
-	if knowledge == nil {
-		return
-	}
-	d.DocumentName = knowledge.DocumentName
-}
-
 // NeedsMetadataFallback 判断文档是否需要从知识库回填元数据
 // 当文档名称、知识范围编码或知识范围名称为空时，认为需要回填
 func (d *DocumentChunk) NeedsMetadataFallback() bool {

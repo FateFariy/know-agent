@@ -78,7 +78,7 @@ func (r *KnowledgeRouteImpl) Route(ctx context.Context, routeCtx *Context) (*vo.
 	if len(rankCtx.DocumentCandidates) > 0 {
 		topDocName = rankCtx.DocumentCandidates[0].DocumentName
 	}
-	logx.Infof("知识范围路由完成: question='%s', rewriteQuestion='%s', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f, source=%s, degraded=%v, topDocument='%r'",
+	logx.Infof("知识范围路由完成: question='%s', rewriteQuestion='%s', scopeCount=%d, topicCount=%d, documentCount=%d, confidence=%.4f, source=%s, degraded=%v, topDocument='%s'",
 		routeCtx.Question, routeCtx.RewriteQuestion, len(rankCtx.ScopeCandidates), len(rankCtx.TopicCandidates), len(rankCtx.DocumentCandidates),
 		decision.Confidence, decision.Source, decision.IsDegraded, topDocName)
 	return decision, nil

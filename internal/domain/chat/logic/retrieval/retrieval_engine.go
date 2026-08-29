@@ -9,7 +9,6 @@ import (
 	"github.com/duke-git/lancet/v2/slice"
 
 	"github.com/swiftbit/know-agent/common/logx"
-	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/rerank"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -18,15 +17,14 @@ import (
 
 // Engine RAG 检索引擎实现
 type Engine struct {
-	docGateway adapter.DocumentGateway
-	pipeline   *Pipeline
+	pipeline *Pipeline
 }
 
 func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository, reranker rerank.Reranker,
 	channels []Retrieval, docGateway adapter.DocumentGateway, fusion Fusion) *Engine {
 	maxChars := svcCtx.Config.Chat.Rag.ParentEvidenceMaxChars
 	pipeline := NewPipeline(
-		NewChannelRetrievalStage(channels),
+		NewChannelRetrievalStage(channels, docGateway),
 		NewFusionStage(fusion),
 		NewParentElevationStage(docGateway, maxChars),
 		NewRerankStage(reranker),
@@ -35,8 +33,7 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 		NewObservationStage(repo),
 	)
 	return &Engine{
-		docGateway: docGateway,
-		pipeline:   pipeline,
+		pipeline: pipeline,
 	}
 }
 
@@ -63,7 +60,7 @@ func (e *Engine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.Retr
 	logx.Infof("RAG 检索完成: retrievalQuestion='%s', originalSubQuestionCount=%d, acceptedSubQuestionCount=%d, notes=%v",
 		retrievalResult.RetrievalQuestion, len(evidenceList), acceptedCount, retrievalResult.RetrievalNotes())
 
-	e.assignReferenceIds(ctx, evidenceList, plan)
+	e.assignReferenceIds(evidenceList)
 	retrievalResult.SubQuestionEvidenceList = evidenceList
 
 	return retrievalResult, nil
@@ -126,22 +123,14 @@ func (e *Engine) retrieveSubQuestionParallel(ctx context.Context, retrievalResul
 
 // -------------------- 引用 ID 分配 --------------------
 
-// assignReferenceIds 为检索证据分配引用 ID，并回填知识库元数据
-//
-// 处理流程：
-//  1. 收集需要回填补充的文档 ID，从知识库服务获取文档描述符
-//  2. 用描述符回填文档中缺失的文档名称、知识范围编码和知识范围名称
-//  3. 为每个源文档构建 SearchReference，按唯一键分配递增的引用编号
-func (e *Engine) assignReferenceIds(ctx context.Context, evidenceList []*vo.SubQuestionEvidence, plan *vo.RetrievalPlan) {
-	metadataMap := e.knowledgeBaseReferenceMetadataMap(ctx, evidenceList)
-
+// assignReferenceIds 为检索证据分配引用 ID
+func (e *Engine) assignReferenceIds(evidenceList []*vo.SubQuestionEvidence) {
 	referenceNumber := 1
 	assignedIds := make(map[string]string)
 
 	for _, evidence := range evidenceList {
 		references := make([]*vo.SearchReference, 0, len(evidence.SourceDocuments))
 		for _, doc := range evidence.SourceDocuments {
-			doc.EnrichFromMetadata(metadataMap[doc.DocumentId])
 			ref := doc.ToSearchReference(evidence.SubQuestionIndex, 0, evidence.SubQuestion)
 			uniqueKey := ref.UniqueKey()
 
@@ -156,30 +145,4 @@ func (e *Engine) assignReferenceIds(ctx context.Context, evidenceList []*vo.SubQ
 		}
 		evidence.References = references
 	}
-}
-
-// knowledgeBaseReferenceMetadataMap 收集需要回填补充的文档 ID，并获取对应的知识库元数据
-func (e *Engine) knowledgeBaseReferenceMetadataMap(ctx context.Context, evidenceList []*vo.SubQuestionEvidence) map[int64]*vo.DocumentMetadata {
-	seen := make(map[int64]struct{}, 30)
-	documentIds := make([]int64, 0, 30)
-	for _, evidence := range evidenceList {
-		for _, doc := range evidence.SourceDocuments {
-			if doc != nil && doc.NeedsMetadataFallback() {
-				seen[doc.DocumentId] = struct{}{}
-				documentIds = append(documentIds, doc.DocumentId)
-			}
-		}
-	}
-	if len(documentIds) == 0 {
-		return nil
-	}
-
-	metadata, err := e.docGateway.FindRetrieveDocumentByIds(ctx, documentIds...)
-	if err != nil {
-		logx.Warnf("获取知识库元数据失败: seen=%v, error=%v", documentIds, err)
-	}
-
-	return utils.MapBy(metadata, func(item *vo.DocumentMetadata) (int64, *vo.DocumentMetadata) {
-		return item.DocumentId, item
-	})
 }

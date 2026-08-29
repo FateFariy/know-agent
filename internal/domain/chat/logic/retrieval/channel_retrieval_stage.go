@@ -5,18 +5,21 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 // ChannelRetrievalStage 并行调用各检索通道，收集原始检索结果
 type ChannelRetrievalStage struct {
-	channels []Retrieval
+	channels   []Retrieval
+	docGateway adapter.DocumentGateway
 }
 
 // NewChannelRetrievalStage 创建通道检索阶段
-func NewChannelRetrievalStage(channels []Retrieval) *ChannelRetrievalStage {
+func NewChannelRetrievalStage(channels []Retrieval, docGateway adapter.DocumentGateway) *ChannelRetrievalStage {
 	return &ChannelRetrievalStage{
-		channels: channels,
+		channels:   channels,
+		docGateway: docGateway,
 	}
 }
 
@@ -24,7 +27,7 @@ func (s *ChannelRetrievalStage) Name() string {
 	return "ChannelRetrieval"
 }
 
-// Execute 并行检索所有支持的通道，结果写入 state.ChannelResults
+// Execute 并行检索所有支持的通道，结果写入 state.ChannelResults，并提前回填原始文档元数据
 func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalState) error {
 	retrievalResult := state.RetrievalResult
 	subQuestionIndex := state.Input.SubQuestionIndex
@@ -80,5 +83,39 @@ func (s *ChannelRetrievalStage) Execute(ctx context.Context, state *RetrievalSta
 	state.ChannelResults = channelResults
 	state.ChannelTraces = channelTraces
 
+	// 检索完成后提前回填各通道召回的原始文档元数据
+	s.enrichRawDocumentsMetadata(ctx, state)
+
 	return nil
+}
+
+// enrichRawDocumentsMetadata 检索完成后为各通道召回的原始文档补全知识库元数据
+func (s *ChannelRetrievalStage) enrichRawDocumentsMetadata(ctx context.Context, state *RetrievalState) {
+	seen := make(map[int64]struct{}, 64)
+	documentIds := make([]int64, 0, 64)
+	for _, result := range state.ChannelResults {
+		for _, doc := range result.RawDocuments {
+			if _, ok := seen[doc.DocumentId]; !ok && doc.NeedsMetadataFallback() {
+				seen[doc.DocumentId] = struct{}{}
+				documentIds = append(documentIds, doc.DocumentId)
+			}
+		}
+	}
+	if len(documentIds) == 0 {
+		return
+	}
+
+	metadata, err := s.docGateway.FindRetrieveDocumentByIds(ctx, documentIds...)
+	if err != nil {
+		logx.Warnf("获取知识库元数据失败: documentIds=%v, error=%v", documentIds, err)
+		return
+	}
+	metadataMap := utils.MapBy(metadata, func(item *vo.DocumentMetadata) (int64, *vo.DocumentMetadata) {
+		return item.DocumentId, item
+	})
+	for _, result := range state.ChannelResults {
+		for _, doc := range result.RawDocuments {
+			doc.EnrichFromMetadata(metadataMap[doc.DocumentId])
+		}
+	}
 }

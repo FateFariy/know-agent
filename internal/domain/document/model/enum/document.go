@@ -132,19 +132,6 @@ const (
 	ContentQualityLevelHigh                                  // 高质量
 )
 
-func ContentQualityLevelName(level ContentQualityLevel) string {
-	switch level {
-	case ContentQualityLevelLow:
-		return "低质量"
-	case ContentQualityLevelMedium:
-		return "中质量"
-	case ContentQualityLevelHigh:
-		return "高质量"
-	default:
-		return ""
-	}
-}
-
 // ============================================================
 // StructureLevel 文档结构等级
 // ============================================================
@@ -156,19 +143,6 @@ const (
 	StructureLevelMedium                           // 中结构化
 	StructureLevelHigh                             // 高结构化
 )
-
-func StructureLevelName(level StructureLevel) string {
-	switch level {
-	case StructureLevelLow:
-		return "低结构化"
-	case StructureLevelMedium:
-		return "中结构化"
-	case StructureLevelHigh:
-		return "高结构化"
-	default:
-		return ""
-	}
-}
 
 // ============================================================
 // DocumentChunkSourceType 文档切块来源类型

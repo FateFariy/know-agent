@@ -89,14 +89,3 @@ const (
 	VectorStoreTypeMilvus VectorStoreType = iota + 1
 	VectorStoreTypePgVector
 )
-
-func VectorStoreTypeName(vs VectorStoreType) string {
-	switch vs {
-	case VectorStoreTypeMilvus:
-		return "Milvus"
-	case VectorStoreTypePgVector:
-		return "PgVector"
-	default:
-		return ""
-	}
-}

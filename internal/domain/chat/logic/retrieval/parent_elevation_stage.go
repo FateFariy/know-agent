@@ -120,9 +120,14 @@ func (s *ParentElevationStage) buildParentEvidenceDocument(parentChunk *vo.Docum
 
 	return &vo.DocumentChunk{
 		ID:                fmt.Sprintf("parent-%s", parentChunk.ID),
+		Score:             parentScore,
 		Content:           s.renderParentEvidenceText(parentChunk, childDocuments, maxChars),
+		SourceType:        parentChunk.SourceType,
+		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
+		TaskId:            parentChunk.TaskId,
 		ParentChunkId:     utils.StringToInt64(parentChunk.ID),
-		ParentChunkNo:     parentChunk.ChunkNo,
+		DocumentId:        parentChunk.DocumentId,
+		ChunkNo:           parentChunk.ChunkNo,
 		SectionPath:       parentChunk.SectionPath,
 		StructureNodeId:   parentChunk.StructureNodeId,
 		StructureNodeType: parentChunk.StructureNodeType,
@@ -130,8 +135,7 @@ func (s *ParentElevationStage) buildParentEvidenceDocument(parentChunk *vo.Docum
 		ItemIndex:         parentChunk.ItemIndex,
 		OriginalSnippet:   parentChunk.Content,
 		IsElevated:        1,
-		Score:             parentScore,
-		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
+		ParentChunkNo:     parentChunk.ChunkNo,
 		Extra:             bestChild.Extra,
 	}
 }
