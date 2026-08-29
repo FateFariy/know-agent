@@ -20,6 +20,7 @@ import (
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
+	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval/channel"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -29,22 +30,29 @@ import (
 
 // Base Milvus 共享基础设施
 type Base struct {
-	client     *milvusclient.Client
-	retriever  retriever.Retriever
+	client    *milvusclient.Client
+	retriever retriever.Retriever
+	*options
+}
+
+type options struct {
 	collection string
 }
 
+type Option = common.Option
+
 func NewBase(svcCtx *svc.ServiceContext, retriever retriever.Retriever) *Base {
 	return &Base{
-		client:     svcCtx.Milvus,
-		retriever:  retriever,
-		collection: svcCtx.Config.Milvus.Collection,
+		client:    svcCtx.Milvus,
+		retriever: retriever,
+		options:   &options{collection: svcCtx.Config.Milvus.Collection},
 	}
 }
 
-func (b *Base) DeleteByDocumentId(ctx context.Context, documentId int64) error {
+func (b *Base) DeleteByDocumentId(ctx context.Context, documentId int64, opts ...Option) error {
+	o := common.GetImplSpecificOptions(b.options, opts...)
 	expr := fmt.Sprintf("document_id == %d", documentId)
-	_, err := b.client.Delete(ctx, milvusclient.NewDeleteOption(b.collection).WithExpr(expr))
+	_, err := b.client.Delete(ctx, milvusclient.NewDeleteOption(o.collection).WithExpr(expr))
 	return err
 }
 

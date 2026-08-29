@@ -70,13 +70,6 @@ func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) err
 		return nil
 	}
 
-	// 发布检索引用（仅在存在引用时）
-	if references := execPlan.RetrievalResult.FlattenReferences(); len(references) > 0 {
-		if err := convCtx.PublishReferences(references); err != nil {
-			return err
-		}
-	}
-
 	// 组装 Prompt（系统提示 + 用户提示）
 	promptResult, err := s.assemble(execPlan)
 	if err != nil {

@@ -58,12 +58,6 @@ func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
 			return err
 		}
 	}
-	references := retrievalResult.FlattenReferences()
-	if len(references) > 0 {
-		if err = convCtx.PublishReferences(references); err != nil {
-			return err
-		}
-	}
 
 	// 合并渠道记录到上下文与调试轨迹
 	chs := retrievalResult.UsedChannels()

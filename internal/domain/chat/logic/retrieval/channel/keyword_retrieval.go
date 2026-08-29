@@ -12,7 +12,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/retrieval"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 // KeywordRetrievalChannel 关键词检索通道
@@ -21,7 +20,7 @@ type KeywordRetrievalChannel struct {
 }
 
 // NewKeywordRetrievalChannel 创建关键词检索通道
-func NewKeywordRetrievalChannel(svcCtx *svc.ServiceContext, retriever KeywordRetriever) *KeywordRetrievalChannel {
+func NewKeywordRetrievalChannel(retriever KeywordRetriever) *KeywordRetrievalChannel {
 	return &KeywordRetrievalChannel{
 		retriever: retriever,
 	}

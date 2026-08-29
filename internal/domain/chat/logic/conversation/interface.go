@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"time"
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
@@ -156,4 +157,26 @@ type Retriever interface {
 type QuestionRecommender interface {
 	// Generate 生成推荐追问
 	Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) ([]string, error)
+}
+
+// SemanticCacheStore 语义缓存存储接口（领域定义，基础设施层实现；领域层不负责向量化）
+//
+// 推荐实现分工（Milvus 向量索引 + MySQL 真值存储）：
+//   - Milvus 仅存一条轻量索引：cache_id + query_text(改写问题) + query_vector + scope + expire_at；
+//     不存放 AnswerDraft / RetrievalResult 等大体积 payload。向量化在 Put/Search 内部完成（实现层持有 embedder）。
+//   - MySQL 存完整 CacheEntry 真值（answer_draft + execution_plan 等 JSON），是主数据源。
+//
+// 一致性要点：ReuseRetrievalOnly 命中后 Generate 产出新答案，仅更新 MySQL answer_draft + updated_at，
+type SemanticCacheStore interface {
+	// Search 在 scope 内对查询文本做 ANN 检索（向量化由实现层负责），返回相似度达标的最相似完整
+	Search(ctx context.Context, scope *CacheScope, queryText string, topK int, threshold float64) (*CacheHit, error)
+
+	// Put 写入/更新一条缓存：实现层写 MySQL 真值 + 由 entry.QueryText 向量化后写一条 Milvus 向量记录
+	Put(ctx context.Context, entry *CacheEntry, ttl time.Duration) error
+
+	// Touch 仅刷新 TTL（命中且复用答案、答案无变化时调用，避免无效全量写）
+	Touch(ctx context.Context, id string, ttl time.Duration) error
+
+	// Invalidate 按 scope 批量失效（知识库/文档索引完成时调用，保证 RAG 正确性）
+	Invalidate(ctx context.Context, scope *CacheScope) error
 }

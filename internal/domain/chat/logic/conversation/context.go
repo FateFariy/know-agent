@@ -261,12 +261,10 @@ func (c *Context) DebugTraceJSON() string {
 
 // semanticCacheCtx 集中保存一次请求中的语义缓存相关状态，避免各 Stage 重复查询与状态不一致
 type semanticCacheCtx struct {
-	hit         bool
-	entry       *CacheEntry
-	strategy    enum.ReuseStrategy
-	similarity  float64
-	queryTexts  []string
-	queryVector []float64
+	hit        bool
+	entry      *CacheEntry
+	strategy   enum.ReuseStrategy
+	similarity float64
 }
 
 // resetCache 初始化缓存状态
@@ -320,15 +318,6 @@ func (c *Context) CacheSimilarity() float64 {
 	return c.cache.similarity
 }
 
-// recordCacheQuery 记录用于回写的查询文本列表与组合向量（未命中时供 CacheWriteStage 构造条目）
-// queryTexts：改写问题 + 各子问题，每条对应一条 Milvus 向量记录；vec：组合查询向量，用于 Search
-func (c *Context) recordCacheQuery(texts []string, vec []float64) {
-	if c.cache != nil {
-		c.cache.queryTexts = texts
-		c.cache.queryVector = vec
-	}
-}
-
 // applyCachedExecution 命中后将缓存的必要字段回填进当前执行计划，
 // 保留当前请求的私有上下文（历史/时间/追问锚点）不被覆盖
 func (c *Context) applyCachedExecution(ce *CachedExecution) {
@@ -337,7 +326,6 @@ func (c *Context) applyCachedExecution(ce *CachedExecution) {
 		return
 	}
 	ep.Mode = ce.Mode
-	ep.NavigationDecision = ce.NavigationDecision
 	ep.RetrievalPlan = ce.RetrievalPlan
 	ep.RetrievalResult = ce.RetrievalResult
 	ep.PromptAssemblyResult = ce.PromptAssemblyResult

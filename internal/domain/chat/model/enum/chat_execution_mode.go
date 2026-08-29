@@ -28,6 +28,7 @@ const (
 	memory         = "MEMORY"
 	intent         = "INTENT"
 	rewrite        = "REWRITE"
+	semanticCache  = "SEMANTIC_CACHE"
 	route          = "ROUTE"
 	ragRetrieve    = "RAG_RETRIEVE"
 	evidenceBudget = "EVIDENCE_BUDGET"
@@ -35,12 +36,14 @@ const (
 	reActAgent     = "REACT_AGENT"
 	answerEvaluate = "ANSWER_EVALUATE"
 	recommendation = "RECOMMENDATION"
+	cacheWrite     = "CACHE_WRITE"
 	finalize       = "FINALIZE"
 )
 
 var (
 	ConversationTraceStageMemory         = &ConversationTraceStage{memory, "会话记忆", 10}
 	ConversationTraceStageRewrite        = &ConversationTraceStage{rewrite, "问题改写", 20}
+	ConversationTraceStageSemanticCache  = &ConversationTraceStage{semanticCache, "语义缓存查询", 25}
 	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
@@ -49,5 +52,6 @@ var (
 	ConversationTraceStageReActAgent     = &ConversationTraceStage{reActAgent, "ReAct Agent", 75}
 	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 76}
 	ConversationTraceStageRecommendation = &ConversationTraceStage{recommendation, "推荐问题", 80}
+	ConversationTraceStageCacheWrite     = &ConversationTraceStage{cacheWrite, "缓存写入", 85}
 	ConversationTraceStageFinalize       = &ConversationTraceStage{finalize, "收尾归档", 90}
 )

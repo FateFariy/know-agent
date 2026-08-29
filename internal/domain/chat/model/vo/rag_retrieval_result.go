@@ -24,7 +24,7 @@ func NewRagRetrievalResult(retrievalQuestion string) *RetrievalResult {
 
 // IsEmpty 判断检索上下文是否为空（所有子问题均无证据）
 func (r *RetrievalResult) IsEmpty() bool {
-	if len(r.SubQuestionEvidenceList) == 0 {
+	if r == nil || len(r.SubQuestionEvidenceList) == 0 {
 		return true
 	}
 	for _, sq := range r.SubQuestionEvidenceList {
