@@ -1,5 +1,5 @@
 {
-  "collection_name": "document_chunk_collection",
+  "collection_name": "document_chunk",
   "description": "文档分块向量集合，稠密FloatVector + 稀疏SparseFloatVector",
   "fields": [
     {

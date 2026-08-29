@@ -264,7 +264,7 @@ type semanticCacheCtx struct {
 	hit        bool
 	entry      *entity.ChatCacheEntry
 	strategy   enum.ReuseStrategy
-	similarity float64
+	similarity float32
 }
 
 // MarkCacheHit 记录命中：挂载缓存条目与相似度
@@ -307,7 +307,7 @@ func (c *semanticCacheCtx) ReuseStrategy() enum.ReuseStrategy {
 }
 
 // CacheSimilarity 命中相似度（埋点用）
-func (c *semanticCacheCtx) CacheSimilarity() float64 {
+func (c *semanticCacheCtx) CacheSimilarity() float32 {
 	if c == nil {
 		return 0
 	}

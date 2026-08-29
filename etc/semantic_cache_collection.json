@@ -1,0 +1,16 @@
+{
+  "collection_name": "semantic_cache",
+  "description": "语义缓存向量索引",
+  "fields": [
+    {"name": "cache_id", "data_type": 5, "is_primary_key": true, "autoID": false, "description": "关联 MySQL chat_cache_entry.id(int64)"},
+    {"name": "vector", "data_type": 101, "dim": 1024, "description": "QueryText 的稠密向量"},
+    {"name": "query_text", "data_type": 21, "max_length": 4096, "description": "缓存的查询问题(重写后)"},
+    {"name": "chat_mode", "data_type": 21, "max_length": 32, "description": "对话模式(枚举), 用于 scope 过滤"},
+    {"name": "scope_document_ids", "data_type": 23, "description": "允许的文档 id 数组(JSON), 用于 json_contains 子集匹配"},
+    {"name": "scope_task_ids", "data_type": 23, "description": "允许的任务 id 数组(JSON)"},
+    {"name": "scope_knowledge_base_ids", "data_type": 23, "description": "允许的知识库 id 数组(JSON)"}
+  ],
+  "indexes": [
+    {"name": "vector", "index_type": "HNSW", "metric_type": "COSINE", "params": {"M": 16, "efConstruction": 200}}
+  ]
+}

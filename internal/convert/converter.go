@@ -122,6 +122,8 @@ type ChatConverter interface {
 	// goverter:map . Model
 	ToChatExchangeEvalModel(src *cen.ChatExchangeEval) *model.ChatExchangeEval
 	ToChatExchangeEvalModelList(src []*cen.ChatExchangeEval) []*model.ChatExchangeEval
+	// goverter:map . Model
+	ToChatCacheEntryModel(src *cen.ChatCacheEntry) *model.ChatCacheEntry
 }
 
 // goverter:converter

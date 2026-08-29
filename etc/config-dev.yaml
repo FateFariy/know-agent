@@ -136,7 +136,11 @@ Chat:
     RecommendationTimeout: 5s
     SystemPrompt:
     RecommendationPrompt:
-
+  SemanticCache:
+    Enabled:         
+    Collection:
+    SimilarityThreshold:           
+    ReuseAnswer:
 ChatModel:
   Ark:
     Function: "chat"

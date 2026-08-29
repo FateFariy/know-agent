@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `chat_channel_execution`
     `error_message`        TEXT COMMENT '错误信息',
     `create_time`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`              TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`              TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_exchange_id` (`exchange_id`),
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS `chat_dialogue`
     `selected_knowledge_base_names_json` JSON COMMENT '选中知识库名称列表JSON',
     `create_time`                        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`                        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                            TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                            TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`)
 ) ENGINE = InnoDB
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS `chat_exchange`
     `retrieval_config_snapshot_json`     JSON COMMENT '检索配置快照JSON',
     `create_time`                        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`                        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                            TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                            TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`)
 ) ENGINE = InnoDB
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS `chat_exchange_trace_stage`
     `snapshot_json`   TEXT COMMENT '快照JSON',
     `create_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`         TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`         TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_exchange_id` (`exchange_id`),
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS `chat_memory_summary`
     `last_source_update_time` DATETIME    NOT NULL COMMENT '源数据最后编辑时间',
     `create_time`             DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`             DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                 TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                 TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`)
 ) ENGINE = InnoDB
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS `chat_retrieval_result`
     `source_evidence_resolved` TINYINT        NOT NULL DEFAULT 0 COMMENT '源证据已解析',
     `create_time`              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                  TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                  TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_exchange_id` (`exchange_id`),
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `chat_exchange_eval`
     `error_msg`       VARCHAR(512) COMMENT '错误信息',
     `create_time`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`         TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`         TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_exchange` (`conversation_id`, `exchange_id`)
 ) ENGINE = InnoDB
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS `document`
     `last_index_task_id`    BIGINT       NOT NULL DEFAULT 0 COMMENT '最后索引任务ID',
     `create_time`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`               TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`               TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_knowledge_base_id` (`knowledge_base_id`),
     INDEX `idx_document_name` (`document_name`)
@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS `document_block`
     `metadata_json`       TEXT COMMENT '元数据JSON',
     `create_time`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`             TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`             TINYINT     NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`)
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS `document_chunk`
     `source_block_ids`    TEXT COMMENT '源块ID列表',
     `create_time`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`             TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`             TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -344,7 +344,7 @@ CREATE TABLE IF NOT EXISTS `document_parent_chunk`
     `source_block_ids`    TEXT COMMENT '源块ID列表',
     `create_time`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`             TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`             TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -372,7 +372,7 @@ CREATE TABLE IF NOT EXISTS `document_profile`
     `error_msg`              TEXT COMMENT '错误信息',
     `create_time`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`)
 ) ENGINE = InnoDB
@@ -395,7 +395,7 @@ CREATE TABLE IF NOT EXISTS `document_strategy_plan`
     `confirm_time`      DATETIME COMMENT '确认时间',
     `create_time`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`           TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`           TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`)
 ) ENGINE = InnoDB
@@ -417,7 +417,7 @@ CREATE TABLE IF NOT EXISTS `document_strategy_step`
     `recommend_reason` TEXT COMMENT '推荐理由',
     `create_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`          TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`          TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_plan_id` (`plan_id`),
     INDEX `idx_document_id` (`document_id`)
@@ -457,7 +457,7 @@ CREATE TABLE IF NOT EXISTS `document_structure_node`
     `source_end_column`     INT      NOT NULL DEFAULT 0 COMMENT '源结束列',
     `create_time`           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`               TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`               TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_parse_task_id` (`parse_task_id`),
@@ -485,7 +485,7 @@ CREATE TABLE IF NOT EXISTS `document_table`
     `metadata_json` TEXT COMMENT '元数据JSON',
     `create_time`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`       TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`       TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -514,7 +514,7 @@ CREATE TABLE IF NOT EXISTS `document_table_cell`
     `metadata_json`    TEXT COMMENT '元数据JSON',
     `create_time`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`          TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`          TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -536,7 +536,7 @@ CREATE TABLE IF NOT EXISTS `document_table_column`
     `value_type`      VARCHAR(50) COMMENT '值类型',
     `create_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`         TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`         TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -556,7 +556,7 @@ CREATE TABLE IF NOT EXISTS `document_table_row`
     `row_text`    TEXT COMMENT '行文本',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`     TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`     TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_task_id` (`task_id`),
@@ -586,7 +586,7 @@ CREATE TABLE IF NOT EXISTS `document_task`
     `ext_json`             TEXT COMMENT '扩展JSON',
     `create_time`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`              TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`              TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`),
     INDEX `idx_plan_id` (`plan_id`),
@@ -610,7 +610,7 @@ CREATE TABLE IF NOT EXISTS `document_task_log`
     `detail_json`   TEXT COMMENT '详情JSON',
     `create_time`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`       TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`       TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_task_id` (`task_id`),
     INDEX `idx_document_id` (`document_id`)
@@ -633,7 +633,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_base`
     `sort_order`            INT          NOT NULL DEFAULT 0 COMMENT '排序顺序',
     `create_time`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`               TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`               TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_base_name` (`base_name`)
 ) ENGINE = InnoDB
@@ -659,7 +659,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_document_profile`
     `error_msg`              TEXT COMMENT '错误信息',
     `create_time`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_document_id` (`document_id`)
 ) ENGINE = InnoDB
@@ -689,7 +689,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_route_trace`
     `error_msg`                          TEXT COMMENT '错误信息',
     `create_time`                        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`                        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`                            TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`                            TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_conversation_id` (`conversation_id`),
     INDEX `idx_exchange_id` (`exchange_id`)
@@ -710,7 +710,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_scope_node`
     `sort_order`        INT          NOT NULL DEFAULT 0 COMMENT '排序序号',
     `create_time`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`           TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`           TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_knowledge_base_id` (`knowledge_base_id`),
     INDEX `idx_parent_scope_id` (`parent_scope_id`)
@@ -730,7 +730,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_topic_document_relation`
     `reason`            TEXT COMMENT '关联原因',
     `create_time`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`           TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`           TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_knowledge_base_id` (`knowledge_base_id`),
     INDEX `idx_topic_id` (`topic_id`),
@@ -754,10 +754,31 @@ CREATE TABLE IF NOT EXISTS `knowledge_topic_node`
     `sort_order`           INT          NOT NULL DEFAULT 0 COMMENT '排序顺序',
     `create_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`              TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(1:未删除,0:已删除)',
+    `deleted`              TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_knowledge_base_id` (`knowledge_base_id`),
     INDEX `idx_scope_id` (`scope_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='知识话题节点表';
+
+-- 27. 语义缓存条目表
+CREATE TABLE IF NOT EXISTS `chat_cache_entry`
+(
+    `id`                   BIGINT       NOT NULL COMMENT '主键ID',
+    `chat_mode`            INT          NOT NULL DEFAULT 0 COMMENT '会话模式',
+    `allowed_document_ids` JSON COMMENT '允许文档ID',
+    `allowed_task_ids`     JSON COMMENT '允许任务ID',
+    `knowledge_base_ids`   JSON COMMENT '知识库ID列表',
+    `query_text`           TEXT COMMENT '用户查询文本',
+    `execution`            JSON COMMENT '执行结果缓存',
+    `answer_draft`         TEXT COMMENT '回答草稿',
+    `create_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`              TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
+    PRIMARY KEY (`id`),
+    INDEX `idx_chat_mode` (`chat_mode`),
+    INDEX `idx_query_text` (`query_text`(255))
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='语义缓存条目表';

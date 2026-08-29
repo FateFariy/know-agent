@@ -9,6 +9,7 @@ type ChatConf struct {
 	Rewrite               RewriteConf        // 问题改写配置
 	Recommendation        RecommendationConf // 推荐配置
 	Rag                   RagConf            // RAG配置
+	SemanticCache         SemanticCacheConf  // 语义缓存配置
 	Agent                 AgentConf          // Agent配置
 }
 
@@ -71,15 +72,15 @@ type RagConf struct {
 	Hybrid                         HybridConf            // 混合检索权重
 	GraphRagQueryPlan              GraphRagQueryPlanConf // 图RAG查询计划
 	AutoRoute                      AutoRouteConf         // 自动路由配置
-	SemanticCache                  SemanticCacheConf     // 语义缓存配置
+
 }
 
 // SemanticCacheConf 语义缓存配置
 type SemanticCacheConf struct {
-	Enabled             bool          `json:",default=false"` // 是否启用语义缓存
-	SimilarityThreshold float64       `json:",default=0.92"`  // ANN 相似度阈值
-	TTL                 time.Duration `json:",default=24h"`   // 缓存条目 TTL
-	ReuseAnswer         bool          `json:",default=false"` // true=命中时同时复用答案
+	Enabled             bool    `json:",default=false"`          // 是否启用语义缓存
+	Collection          string  `json:",default=semantic_cache"` // Milvus 向量集合名
+	SimilarityThreshold float32 `json:",default=0.92"`           // ANN 相似度阈值
+	ReuseAnswer         bool    `json:",default=false"`          // true=命中时同时复用答案
 }
 
 type KeywordConf struct {

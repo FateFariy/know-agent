@@ -74,6 +74,22 @@ func ToChannelExecutionRespList(source []*entity.ChatChannelExecution) []*chat.C
 	}
 	return pChatChannelExecutionRespList
 }
+func ToChatCacheEntryModel(source *entity.ChatCacheEntry) *model.ChatCacheEntry {
+	var pModelChatCacheEntry *model.ChatCacheEntry
+	if source != nil {
+		var modelChatCacheEntry model.ChatCacheEntry
+		modelChatCacheEntry.Model = entityChatCacheEntryToCommonModel((*source))
+		modelChatCacheEntry.ChatMode = (*source).ChatMode
+		modelChatCacheEntry.AllowedDocumentIds = (*source).AllowedDocumentIds
+		modelChatCacheEntry.AllowedTaskIds = (*source).AllowedTaskIds
+		modelChatCacheEntry.KnowledgeBaseIds = (*source).KnowledgeBaseIds
+		modelChatCacheEntry.QueryText = (*source).QueryText
+		modelChatCacheEntry.Execution = (*source).Execution
+		modelChatCacheEntry.AnswerDraft = (*source).AnswerDraft
+		pModelChatCacheEntry = &modelChatCacheEntry
+	}
+	return pModelChatCacheEntry
+}
 func ToChatChannelExecutionModel(source *entity.ChatChannelExecution) *model.ChatChannelExecution {
 	var pModelChatChannelExecution *model.ChatChannelExecution
 	if source != nil {
@@ -138,7 +154,7 @@ func ToChatExchangeEvalModel(source *entity.ChatExchangeEval) *model.ChatExchang
 		modelChatExchangeEval.MetricName = (*source).MetricName
 		modelChatExchangeEval.MetricLabel = (*source).MetricLabel
 		modelChatExchangeEval.Score = (*source).Score
-		modelChatExchangeEval.LatencyMs = int64((*source).LatencyMs)
+		modelChatExchangeEval.LatencyMs = (*source).LatencyMs
 		modelChatExchangeEval.Status = (*source).Status
 		modelChatExchangeEval.ErrorMsg = (*source).ErrorMsg
 		pModelChatExchangeEval = &modelChatExchangeEval
@@ -382,6 +398,11 @@ func ToRetrievalResultRespList(source []*entity.ChatRetrievalResult) []*chat.Ret
 		}
 	}
 	return pChatRetrievalResultRespList
+}
+func entityChatCacheEntryToCommonModel(source entity.ChatCacheEntry) common.Model {
+	var commonModel common.Model
+	commonModel.ID = source.ID
+	return commonModel
 }
 func entityChatChannelExecutionToCommonModel(source entity.ChatChannelExecution) common.Model {
 	var commonModel common.Model

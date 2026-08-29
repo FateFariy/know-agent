@@ -161,13 +161,13 @@ type QuestionRecommender interface {
 // CacheHit 语义缓存命中结果
 type CacheHit struct {
 	Entry      *entity.ChatCacheEntry
-	Similarity float64
+	Similarity float32
 }
 
 // SearchInput 聚合 ANN 检索所需的查询参数
 type SearchInput struct {
 	QueryText string         // 查询文本
-	Threshold float64        // 相似度阈值
+	Threshold float32        // 相似度阈值
 	Scope     *vo.CacheScope // 检索作用域
 }
 
@@ -178,7 +178,4 @@ type SemanticCacheStore interface {
 
 	// Put 写入/更新一条缓存
 	Put(ctx context.Context, entry *entity.ChatCacheEntry) error
-
-	// Invalidate 按 scope 批量失效（知识库/文档索引完成时调用，保证 RAG 正确性）
-	Invalidate(ctx context.Context, scope *vo.CacheScope) error
 }

@@ -3,7 +3,6 @@ package conversation
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
@@ -27,8 +26,7 @@ type SemanticCacheStage struct {
 
 type cacheOptions struct {
 	enabled             bool               // 是否启用语义缓存
-	similarityThreshold float64            // ANN 相似度阈值
-	ttl                 time.Duration      // 缓存条目 TTL
+	similarityThreshold float32            // ANN 相似度阈值
 	reuseStrategy       enum.ReuseStrategy // 复用策略
 }
 
@@ -38,10 +36,9 @@ func NewSemanticCacheStage(sevCtx *svc.ServiceContext, store SemanticCacheStore)
 	return &SemanticCacheStage{
 		store: store,
 		cacheOptions: &cacheOptions{
-			enabled:             sevCtx.Config.Chat.Rag.SemanticCache.Enabled,
-			similarityThreshold: sevCtx.Config.Chat.Rag.SemanticCache.SimilarityThreshold,
-			ttl:                 sevCtx.Config.Chat.Rag.SemanticCache.TTL,
-			reuseStrategy:       utils.Ternary(sevCtx.Config.Chat.Rag.SemanticCache.ReuseAnswer, enum.ReuseRetrievalOnly, enum.ReuseAnswerAndRetrieval),
+			enabled:             sevCtx.Config.Chat.SemanticCache.Enabled,
+			similarityThreshold: sevCtx.Config.Chat.SemanticCache.SimilarityThreshold,
+			reuseStrategy:       utils.Ternary(sevCtx.Config.Chat.SemanticCache.ReuseAnswer, enum.ReuseRetrievalOnly, enum.ReuseAnswerAndRetrieval),
 		},
 	}
 }

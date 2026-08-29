@@ -30,6 +30,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/cache"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	portconfig "github.com/swiftbit/know-agent/internal/infrastructure/port/config"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/emb"
@@ -65,6 +66,7 @@ func bootstrap(c *config.Config) *server.Server {
 	elasticStorage := storage.NewElasticStorage(serviceContext)
 	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
 	embedder := emb.NewEmbedder(serviceContext)
+	semanticCacheStore := cache.NewSemanticCache(serviceContext)
 
 	documentRepo := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	tableRepo := persistence.NewTableRepository(serviceContext)
@@ -91,7 +93,7 @@ func bootstrap(c *config.Config) *server.Server {
 	recommender := recommend.NewQuestionRecommendImpl(serviceContext, renderer, chatModel)
 	channels := []retrieval.Retrieval{
 		channel.NewVectorRetrievalChannel(serviceContext, milvusVector),
-		channel.NewKeywordRetrievalChannel(serviceContext, milvusKeyword),
+		channel.NewKeywordRetrievalChannel(milvusKeyword),
 	}
 
 	rrfFusion := fuse.NewRRFFusion()
@@ -102,16 +104,17 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chainRuntime := conversation.NewRuntimeRegistry()
-	// 按对话执行流程顺序初始化所有子阶段，顺序不可调整
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
 		conversation.NewMemoryLoadStage(serviceContext, chatRepo, memoryManageImpl),
 		conversation.NewIntentRecognizeStage(intentRecognizer),
 		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
+		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore),
 		conversation.NewRouteStage(serviceContext, chatRepo, knowledgeAdapter, documentRouter, documentForChat),
 		conversation.NewRetrievalStage(retrievalEngine),
 		conversation.NewEvidenceBudgetStage(serviceContext, renderer),
 		conversation.NewGenerateStage(chatModel),
+		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore),
 		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),
 		conversation.NewRecommendStage(serviceContext, chatRepo, memoryManageImpl, recommender),
 		conversation.NewEndStage(chatRepo),
