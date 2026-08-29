@@ -45,6 +45,11 @@ func (q *QueryRewriteStage) Name() string {
 	return enum.ConversationTraceStageRewrite.Name
 }
 
+// Order 阶段顺序
+func (q *QueryRewriteStage) Order() int {
+	return enum.ConversationTraceStageRewrite.Order
+}
+
 // Execute 执行问题改写
 func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	// OpenChat 模式不需要问题改写, 且未选择任何库时也不执行

@@ -14,6 +14,9 @@ type Stage interface {
 	// Name 返回阶段名称
 	Name() string
 
+	// Order 返回阶段顺序
+	Order() int
+
 	// Execute 执行阶段逻辑
 	// ctx: 标准上下文，用于控制取消、超时和传递请求作用域的值
 	// convCtx: 对话上下文，携带会话状态和业务数据

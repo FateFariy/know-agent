@@ -46,6 +46,11 @@ func (s *StartStage) Name() string {
 	return "启动会话"
 }
 
+// Order 阶段顺序
+func (s *StartStage) Order() int {
+	return 0
+}
+
 // Execute 执行逻辑
 func (s *StartStage) Execute(ctx context.Context, convCtx *Context) (err error) {
 	// 启动本轮交互（写入 ChatDialogue + ChatExchange，状态置为 Running）

@@ -14,6 +14,7 @@ import (
 	milvuscol "github.com/milvus-io/milvus/client/v2/column"
 	milvusentity "github.com/milvus-io/milvus/client/v2/entity"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
+	"gorm.io/gorm/clause"
 
 	"gorm.io/gorm"
 
@@ -110,19 +111,25 @@ func (s *SemanticCache) Search(ctx context.Context, input *conversation.SearchIn
 	}
 
 	entries := make([]*entity.ChatCacheEntry, 0, len(results))
-	for i, rs := range results {
+	for _, rs := range results {
 		col := rs.GetColumn(cacheIDField)
 		if col == nil {
 			continue
 		}
-		id, _ := col.GetAsInt64(i)
-		if rs.Scores[i] >= input.Threshold {
-			entries = append(entries, &entity.ChatCacheEntry{ID: id, Similarity: rs.Scores[i]})
+		cv, ok := col.(*milvuscol.ColumnInt64)
+		if !ok {
+			continue
+		}
+		ids := cv.Data()
+		for i := 0; i < len(ids) && i < len(rs.Scores); i++ {
+			if rs.Scores[i] >= input.Threshold {
+				entries = append(entries, &entity.ChatCacheEntry{ID: ids[i], Similarity: rs.Scores[i]})
+			}
 		}
 	}
 	slices.SortFunc(entries, func(a, b *entity.ChatCacheEntry) int { return cmp.Compare(b.Similarity, a.Similarity) })
 
-	if len(entries) == 0 || (entries[0].Similarity-entries[1].Similarity) < minSimMargin {
+	if len(entries) == 0 || (len(entries) > 1 && entries[0].Similarity-entries[1].Similarity < minSimMargin) {
 		return nil, nil
 	}
 
@@ -138,7 +145,7 @@ func (s *SemanticCache) Search(ctx context.Context, input *conversation.SearchIn
 
 // loadEntry 按主键从 MySQL 回查完整缓存真值
 func (s *SemanticCache) loadEntry(ctx context.Context, id int64) (*entity.ChatCacheEntry, error) {
-	var entry *entity.ChatCacheEntry
+	entry := &entity.ChatCacheEntry{}
 	if err := s.db.WithContext(ctx).Where("id = ?", id).First(entry).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -153,7 +160,12 @@ func (s *SemanticCache) Put(ctx context.Context, entry *entity.ChatCacheEntry) e
 	if entry.ID == 0 {
 		entry.ID = utils.GetSnowflakeNextID()
 	}
-	if err := s.db.WithContext(ctx).Save(convert.ToChatCacheEntryModel(entry)).Error; err != nil {
+	assignments := clause.AssignmentColumns([]string{"answer_draft"})
+	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: gorm.Expr("NOW()")})
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: assignments,
+	}).Create(convert.ToChatCacheEntryModel(entry)).Error; err != nil {
 		return fmt.Errorf("语义缓存: 写入 MySQL 失败: %w", err)
 	}
 

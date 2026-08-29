@@ -30,6 +30,10 @@ func (s *CacheWriteStage) Name() string {
 	return enum.ConversationTraceStageCacheWrite.Name
 }
 
+func (s *CacheWriteStage) Order() int {
+	return enum.ConversationTraceStageCacheWrite.Order
+}
+
 func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	if !s.enabled || s.store == nil {
 		return nil

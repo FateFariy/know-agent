@@ -42,6 +42,10 @@ func (s *EvidenceBudgetStage) Name() string {
 	return enum.ConversationTraceStageEvidenceBudget.Name
 }
 
+func (s *EvidenceBudgetStage) Order() int {
+	return enum.ConversationTraceStageEvidenceBudget.Order
+}
+
 // Execute 执行证据预算与 Prompt 组装阶段，负责校验执行上下文、处理空证据兜底、发布引用、组装 Prompt 并填充调试轨迹
 func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) error {
 	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {

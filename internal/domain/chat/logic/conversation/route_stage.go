@@ -52,6 +52,11 @@ func (r *RouteStage) Name() string {
 	return enum.ConversationTraceStageRoute.Name
 }
 
+// Order 阶段顺序
+func (r *RouteStage) Order() int {
+	return enum.ConversationTraceStageRoute.Order
+}
+
 // Execute 执行路由判定
 //
 // 根据 chatMode 分发到对应的路由策略：

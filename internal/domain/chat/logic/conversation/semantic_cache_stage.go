@@ -38,13 +38,17 @@ func NewSemanticCacheStage(sevCtx *svc.ServiceContext, store SemanticCacheStore)
 		cacheOptions: &cacheOptions{
 			enabled:             sevCtx.Config.Chat.SemanticCache.Enabled,
 			similarityThreshold: sevCtx.Config.Chat.SemanticCache.SimilarityThreshold,
-			reuseStrategy:       utils.Ternary(sevCtx.Config.Chat.SemanticCache.ReuseAnswer, enum.ReuseRetrievalOnly, enum.ReuseAnswerAndRetrieval),
+			reuseStrategy:       utils.Ternary(sevCtx.Config.Chat.SemanticCache.ReuseAnswer, enum.ReuseAnswerAndRetrieval, enum.ReuseRetrievalOnly),
 		},
 	}
 }
 
 func (s *SemanticCacheStage) Name() string {
 	return enum.ConversationTraceStageSemanticCache.Name
+}
+
+func (s *SemanticCacheStage) Order() int {
+	return enum.ConversationTraceStageSemanticCache.Order
 }
 
 func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) error {

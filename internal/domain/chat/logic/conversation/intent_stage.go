@@ -21,6 +21,10 @@ func (i *IntentRecognizeStage) Name() string {
 	return enum.ConversationTraceStageIntent.Name
 }
 
+func (i *IntentRecognizeStage) Order() int {
+	return enum.ConversationTraceStageIntent.Order
+}
+
 func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil {

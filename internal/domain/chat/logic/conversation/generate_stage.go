@@ -30,6 +30,10 @@ func (g *GenerateStage) Name() string {
 	return enum.ConversationTraceStageAnswerGenerate.Name
 }
 
+func (g *GenerateStage) Order() int {
+	return enum.ConversationTraceStageAnswerGenerate.Order
+}
+
 func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 	plan := convCtx.ExecutionPlan.Load()
 	if plan == nil {

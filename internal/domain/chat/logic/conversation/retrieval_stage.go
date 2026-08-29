@@ -23,6 +23,10 @@ func (r *RetrievalStage) Name() string {
 	return enum.ConversationTraceStageRAGRetrieve.Name
 }
 
+func (r *RetrievalStage) Order() int {
+	return enum.ConversationTraceStageRAGRetrieve.Order
+}
+
 func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
 	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
 		return nil

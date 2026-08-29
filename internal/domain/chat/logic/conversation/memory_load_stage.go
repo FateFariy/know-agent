@@ -40,6 +40,10 @@ func (m *MemoryLoadStage) Name() string {
 	return enum.ConversationTraceStageMemory.Name
 }
 
+func (m *MemoryLoadStage) Order() int {
+	return enum.ConversationTraceStageMemory.Order
+}
+
 func (m *MemoryLoadStage) Execute(ctx context.Context, convCtx *Context) error {
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
 

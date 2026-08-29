@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -44,6 +45,7 @@ func (c *Chain) Run(ctx context.Context, convCtx *Context) (err error) {
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	convCtx.CancelFunc = cancelFunc
+	slices.SortFunc(c.stages, func(a, b Stage) int { return a.Order() - b.Order() })
 
 	for i, stage := range c.stages {
 		if i == 1 {
@@ -161,9 +163,6 @@ func (c *Chain) finishFailed(ctx context.Context, convCtx *Context, err error) {
 
 // final 会话收尾，确保仅首次调用生效，避免重复收尾
 func (c *Chain) final(convCtx *Context) {
-	if !convCtx.Finalized.CompareAndSwap(false, true) {
-		return
-	}
 	c.memoryManager.RefreshConversationSummaryAsync(convCtx.ConversationId)
 	c.refreshDebugTraceRuntimeStats(convCtx)
 	c.runtime.Remove(convCtx.ConversationId, convCtx)

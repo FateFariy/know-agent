@@ -25,6 +25,10 @@ func (a *AnswerEvaluateStage) Name() string {
 	return enum.ConversationTraceStageAnswerEvaluate.Name
 }
 
+func (a *AnswerEvaluateStage) Order() int {
+	return enum.ConversationTraceStageAnswerEvaluate.Order
+}
+
 func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
 	var contexts []string

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"gorm.io/gorm"
@@ -38,25 +37,6 @@ func NewChatRepository(svcCtx *svc.ServiceContext) *ChatRepositoryImpl {
 // InsertExchange 插入对话记录
 func (r *ChatRepositoryImpl) InsertExchange(ctx context.Context, exchange *entity.ChatExchange) error {
 	return r.dbWithContext(ctx).Create(convert.ToChatExchangeModel(exchange)).Error
-}
-
-// StartExchange 创建对话记录
-func (r *ChatRepositoryImpl) StartExchange(ctx context.Context, dialogue *entity.ChatDialogue) (*entity.ChatExchange, error) {
-	chatExchange := &entity.ChatExchange{
-		ID:             utils.GetSnowflakeNextID(),
-		ConversationId: dialogue.ConversationId,
-		Question:       dialogue.Question,
-		TurnStatus:     enum.ChatTurnStatusRunning,
-		CreateTime:     time.Now(),
-		UpdateTime:     time.Now(),
-	}
-	return chatExchange, r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		dialogue.SessionStatus = enum.ChatSessionStatusRunning
-		if err := r.UpsertDialogue(ctx, dialogue); err != nil {
-			return err
-		}
-		return r.dbWithContext(ctx).Create(convert.ToChatExchangeModel(chatExchange)).Error
-	})
 }
 
 // UpdateExchangeById 更新对话记录

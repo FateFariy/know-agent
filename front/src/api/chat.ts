@@ -94,6 +94,7 @@ export const chatApi = {
   streamChat(req: ChatReq, handlers: StreamHandlers): { stop: () => void } {
     const controller = new AbortController()
     let stopped = false
+    req.knowledgeBaseSelectionMode = "all"
 
     const stop = () => {
       if (stopped) return

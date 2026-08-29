@@ -27,6 +27,11 @@ func (e *EndStage) Name() string {
 	return enum.ConversationTraceStageFinalize.Name
 }
 
+// Order 阶段顺序
+func (e *EndStage) Order() int {
+	return enum.ConversationTraceStageFinalize.Order
+}
+
 // Execute 执行逻辑
 func (e *EndStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 原子检查 Finalized 标志（CAS），确保仅首次调用生效，避免重复收尾

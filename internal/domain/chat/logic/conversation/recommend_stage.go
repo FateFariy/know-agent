@@ -37,6 +37,10 @@ func (r *RecommendStage) Name() string {
 	return enum.ConversationTraceStageRecommendation.Name
 }
 
+func (r *RecommendStage) Order() int {
+	return enum.ConversationTraceStageRecommendation.Order
+}
+
 func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 启动 recommendation 阶段
 	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation,
