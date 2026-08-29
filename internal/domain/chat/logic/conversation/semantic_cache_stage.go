@@ -28,7 +28,6 @@ type SemanticCacheStage struct {
 type cacheOptions struct {
 	enabled             bool               // 是否启用语义缓存
 	similarityThreshold float64            // ANN 相似度阈值
-	topK                int                // ANN 候选数
 	ttl                 time.Duration      // 缓存条目 TTL
 	reuseStrategy       enum.ReuseStrategy // 复用策略
 }
@@ -41,7 +40,6 @@ func NewSemanticCacheStage(sevCtx *svc.ServiceContext, store SemanticCacheStore)
 		cacheOptions: &cacheOptions{
 			enabled:             sevCtx.Config.Chat.Rag.SemanticCache.Enabled,
 			similarityThreshold: sevCtx.Config.Chat.Rag.SemanticCache.SimilarityThreshold,
-			topK:                sevCtx.Config.Chat.Rag.SemanticCache.TopK,
 			ttl:                 sevCtx.Config.Chat.Rag.SemanticCache.TTL,
 			reuseStrategy:       utils.Ternary(sevCtx.Config.Chat.Rag.SemanticCache.ReuseAnswer, enum.ReuseRetrievalOnly, enum.ReuseAnswerAndRetrieval),
 		},
@@ -61,7 +59,7 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	if execPlan == nil {
 		return nil
 	}
-	convCtx.resetCache(s.reuseStrategy)
+	convCtx.cache = &semanticCacheCtx{strategy: s.reuseStrategy}
 
 	// 不缓存场景：实时/时间敏感/OpenChat → 降级走正常链路
 	if execPlan.RequiresRealTimeSearch || execPlan.RequiresCurrentDateAnchoring ||
@@ -75,7 +73,6 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 		Snapshot: map[string]any{
 			"rewriteQuestion":     utils.Trim(execPlan.RewriteQuestion),
 			"chatMode":            enum.ChatQueryModeName(convCtx.ChatMode),
-			"topK":                s.topK,
 			"similarityThreshold": s.similarityThreshold,
 			"reuseStrategy":       s.reuseStrategy,
 		},
@@ -83,16 +80,19 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageSemanticCache, enum.ExecutionModeRetrieval.String(), input)
 
 	// 故障降级：查询失败视为未命中，不阻塞主链路
-	scope := buildCacheScope(convCtx)
-	hit, err := s.store.Search(ctx, scope, execPlan.RewriteQuestion, s.topK, s.similarityThreshold)
+	hit, err := s.store.Search(ctx, &SearchInput{
+		Scope:     buildCacheScope(convCtx),
+		QueryText: execPlan.RewriteQuestion,
+		Threshold: s.similarityThreshold,
+	})
 	if err != nil {
 		logx.Warnf("语义缓存查询失败，降级未命中: conversationId=%s, error=%v", convCtx.ConversationId, err)
 		ctx = vo.OnError(ctx, "语义缓存查询失败，降级未命中。", err)
-		convCtx.markCacheMiss()
+		convCtx.cache.MarkCacheMiss()
 		return nil
 	}
 	if hit == nil {
-		convCtx.markCacheMiss()
+		convCtx.cache.MarkCacheMiss()
 		ctx = vo.OnEnd(ctx, &vo.StageOutput{
 			SummaryText: "语义缓存未命中。",
 			Snapshot: map[string]any{
@@ -109,14 +109,14 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	// 轻量校验：检索结果合法性 + Prompt 完整性（防配置漂移导致复用了不符预期的产物）
 	if !hit.Entry.Validate() {
 		logx.Warnf("语义缓存条目校验失败，降级未命中: conversationId=%s", convCtx.ConversationId)
-		convCtx.markCacheMiss()
+		convCtx.cache.MarkCacheMiss()
 		ctx = vo.OnError(ctx, "语义缓存条目校验失败，降级未命中。", fmt.Errorf("cache entry validation failed, entryId=%s", hit.Entry.ID))
 		return nil
 	}
 
-	// 单一挂载点：回填必要字段 + 打标（保留当前请求私有上下文）
+	// 回填必要字段
 	convCtx.applyCachedExecution(hit.Entry.Execution)
-	convCtx.MarkCacheHit(hit)
+	convCtx.cache.MarkCacheHit(hit)
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{
 		SummaryText: "语义缓存命中，复用已有执行产物。",
@@ -136,25 +136,12 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 }
 
 // buildCacheScope 仅包含数据隔离维度
-func buildCacheScope(convCtx *Context) *CacheScope {
+func buildCacheScope(convCtx *Context) *vo.CacheScope {
 	snap := convCtx.KnowledgeBaseSelectionSnapshot
-	return &CacheScope{
+	return &vo.CacheScope{
 		ChatMode:           convCtx.ChatMode,
 		AllowedDocumentIds: snap.SelectedDocumentIds(),
 		AllowedTaskIds:     snap.SelectedTaskIds(),
 		KnowledgeBaseIds:   snap.SelectedKnowledgeBaseIds,
-	}
-}
-
-// buildCachedExecution 从当前执行计划抽取可复用的执行产物
-func buildCachedExecution(plan *vo.ConversationExecutionPlan) *CachedExecution {
-	if plan == nil {
-		return nil
-	}
-	return &CachedExecution{
-		Mode:                 plan.Mode,
-		RetrievalPlan:        plan.RetrievalPlan,
-		RetrievalResult:      plan.RetrievalResult,
-		PromptAssemblyResult: plan.PromptAssemblyResult,
 	}
 }

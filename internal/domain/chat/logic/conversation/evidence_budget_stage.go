@@ -54,7 +54,7 @@ func (s *EvidenceBudgetStage) Execute(ctx context.Context, convCtx *Context) err
 	}
 
 	// 语义缓存命中：Prompt 已由缓存提供，跳过证据预算与 Prompt 组装
-	if convCtx.IsCacheHit() {
+	if convCtx.cache.IsCacheHit() {
 		return nil
 	}
 

@@ -262,65 +262,61 @@ func (c *Context) DebugTraceJSON() string {
 // semanticCacheCtx 集中保存一次请求中的语义缓存相关状态，避免各 Stage 重复查询与状态不一致
 type semanticCacheCtx struct {
 	hit        bool
-	entry      *CacheEntry
+	entry      *entity.ChatCacheEntry
 	strategy   enum.ReuseStrategy
 	similarity float64
 }
 
-// resetCache 初始化缓存状态
-func (c *Context) resetCache(strategy enum.ReuseStrategy) {
-	c.cache = &semanticCacheCtx{strategy: strategy}
-}
-
 // MarkCacheHit 记录命中：挂载缓存条目与相似度
-func (c *Context) MarkCacheHit(h *CacheHit) {
-	if c.cache == nil {
-		c.cache = &semanticCacheCtx{}
+func (c *semanticCacheCtx) MarkCacheHit(h *CacheHit) {
+	if c == nil {
+		return
 	}
-	c.cache.hit = true
-	c.cache.entry = h.Entry
-	c.cache.similarity = h.Similarity
+	c.hit = true
+	c.entry = h.Entry
+	c.similarity = h.Similarity
 }
 
-// markCacheMiss 记录未命中
-func (c *Context) markCacheMiss() {
-	if c.cache != nil {
-		c.cache.hit = false
+// MarkCacheMiss 记录未命中
+func (c *semanticCacheCtx) MarkCacheMiss() {
+	if c == nil {
+		return
 	}
+	c.hit = false
 }
 
 // IsCacheHit 是否已命中语义缓存
-func (c *Context) IsCacheHit() bool {
-	return c.cache != nil && c.cache.hit
+func (c *semanticCacheCtx) IsCacheHit() bool {
+	return c != nil && c.hit
 }
 
 // CacheEntry 返回命中的缓存条目
-func (c *Context) CacheEntry() *CacheEntry {
-	if c.cache == nil {
+func (c *semanticCacheCtx) CacheEntry() *entity.ChatCacheEntry {
+	if c == nil {
 		return nil
 	}
-	return c.cache.entry
+	return c.entry
 }
 
 // ReuseStrategy 本次请求生效的复用策略
-func (c *Context) ReuseStrategy() enum.ReuseStrategy {
-	if c.cache == nil {
+func (c *semanticCacheCtx) ReuseStrategy() enum.ReuseStrategy {
+	if c == nil {
 		return enum.ReuseRetrievalOnly
 	}
-	return c.cache.strategy
+	return c.strategy
 }
 
 // CacheSimilarity 命中相似度（埋点用）
-func (c *Context) CacheSimilarity() float64 {
-	if c.cache == nil {
+func (c *semanticCacheCtx) CacheSimilarity() float64 {
+	if c == nil {
 		return 0
 	}
-	return c.cache.similarity
+	return c.similarity
 }
 
 // applyCachedExecution 命中后将缓存的必要字段回填进当前执行计划，
 // 保留当前请求的私有上下文（历史/时间/追问锚点）不被覆盖
-func (c *Context) applyCachedExecution(ce *CachedExecution) {
+func (c *Context) applyCachedExecution(ce *vo.CachedExecution) {
 	ep := c.ExecutionPlan.Load()
 	if ce == nil || ep == nil {
 		return

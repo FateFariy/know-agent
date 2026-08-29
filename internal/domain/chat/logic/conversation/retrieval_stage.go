@@ -35,7 +35,7 @@ func (r *RetrievalStage) Execute(ctx context.Context, convCtx *Context) error {
 	}
 
 	// 语义缓存命中：检索结果已由缓存提供，跳过检索
-	if convCtx.IsCacheHit() {
+	if convCtx.cache.IsCacheHit() {
 		return nil
 	}
 

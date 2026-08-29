@@ -44,9 +44,9 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 	}
 
 	// 语义缓存命中：检索/证据阶段已被跳过，并在「复用答案」策略下直接复用缓存答案、跳过生成
-	if convCtx.IsCacheHit() {
-		if convCtx.ReuseStrategy() == enum.ReuseAnswerAndRetrieval &&
-			utils.IsNotBlank(convCtx.CacheEntry().AnswerDraft) {
+	if convCtx.cache.IsCacheHit() {
+		if convCtx.cache.ReuseStrategy() == enum.ReuseAnswerAndRetrieval &&
+			utils.IsNotBlank(convCtx.cache.CacheEntry().AnswerDraft) {
 			return g.reuseCachedAnswer(ctx, convCtx, plan)
 		}
 	}
@@ -74,7 +74,7 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 func (g *GenerateStage) reuseCachedAnswer(ctx context.Context, convCtx *Context, plan *vo.ConversationExecutionPlan) error {
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerGenerate, plan.Mode.Name(), &vo.StageInput{SummaryText: "命中语义缓存，复用答案。"})
 
-	answer := convCtx.CacheEntry().AnswerDraft
+	answer := convCtx.cache.CacheEntry().AnswerDraft
 	convCtx.WriteAnswerBuffer(answer)
 	if err := convCtx.PublishText(answer); err != nil {
 		return err
@@ -84,7 +84,7 @@ func (g *GenerateStage) reuseCachedAnswer(ctx context.Context, convCtx *Context,
 		SummaryText: "已复用缓存答案。",
 		Snapshot: map[string]any{
 			"cacheHit":   true,
-			"similarity": convCtx.CacheSimilarity(),
+			"similarity": convCtx.cache.CacheSimilarity(),
 		},
 	})
 	return nil
