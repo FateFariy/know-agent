@@ -3,8 +3,7 @@ package aggregate
 import (
 	"time"
 
-	"github.com/duke-git/lancet/v2/strutil"
-
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 )
 
@@ -30,16 +29,16 @@ type ConversationArchiveRecord struct {
 // FillSummaryFields 根据 Exchanges 列表计算并填充会话归档记录的摘要字段
 func (c *ConversationArchiveRecord) FillSummaryFields() {
 	for _, exchange := range c.Exchanges {
-		if strutil.IsNotBlank(exchange.Question) {
+		if utils.IsNotBlank(exchange.Question) {
 			c.MessageCount++
 		}
-		if strutil.IsNotBlank(exchange.Answer) {
+		if utils.IsNotBlank(exchange.Answer) {
 			c.MessageCount++
 		}
-		if strutil.IsBlank(c.LatestUserMessage) {
+		if utils.IsBlank(c.LatestUserMessage) {
 			c.LatestUserMessage = exchange.Question
 		}
-		if strutil.IsBlank(c.LatestAssistantMessage) {
+		if utils.IsBlank(c.LatestAssistantMessage) {
 			c.LatestAssistantMessage = exchange.Answer
 		}
 	}

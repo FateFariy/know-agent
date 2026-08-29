@@ -1936,6 +1936,8 @@ func voChunkOptionsToVoChunkOptions(source vo2.ChunkOptions) vo1.ChunkOptions {
 	voChunkOptions.ChildSemanticMaxChars = source.ChildSemanticMaxChars
 	voChunkOptions.ChildSemanticMinChars = source.ChildSemanticMinChars
 	voChunkOptions.ChildSemanticSimilarityThreshold = source.ChildSemanticSimilarityThreshold
+	voChunkOptions.ParentChunkMaxChars = source.ParentChunkMaxChars
+	voChunkOptions.ParentChunkOverlapChars = source.ParentChunkOverlapChars
 	voChunkOptions.ParentSemanticMaxChars = source.ParentSemanticMaxChars
 	voChunkOptions.ParentSemanticMinChars = source.ParentSemanticMinChars
 	return voChunkOptions

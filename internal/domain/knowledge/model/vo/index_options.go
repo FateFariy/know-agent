@@ -12,8 +12,8 @@ type ChunkOptions struct {
 	ChildSemanticMaxChars            int     `json:"childSemanticMaxChars"`
 	ChildSemanticMinChars            int     `json:"childSemanticMinChars"`
 	ChildSemanticSimilarityThreshold float64 `json:"childSemanticSimilarityThreshold"`
-	ParentBlockMaxChars              int     `json:"parentBlockMaxChars"`
-	ParentBlockOverlapChars          int     `json:"parentBlockOverlapChars"`
+	ParentChunkMaxChars              int     `json:"parentChunkMaxChars"`
+	ParentChunkOverlapChars          int     `json:"parentChunkOverlapChars"`
 	ParentSemanticMaxChars           int     `json:"parentSemanticMaxChars"`
 	ParentSemanticMinChars           int     `json:"parentSemanticMinChars"`
 }

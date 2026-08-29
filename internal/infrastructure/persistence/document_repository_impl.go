@@ -398,10 +398,10 @@ func (d *DocumentRepositoryImpl) SelectChunkById(ctx context.Context, chunkId, d
 }
 
 // SelectChunkListByParentChunkId 根据父块ID查询块列表
-func (d *DocumentRepositoryImpl) SelectChunkListByParentChunkId(ctx context.Context, documentId, taskId, parentBlockId int64) ([]*entity.DocumentChunk, error) {
+func (d *DocumentRepositoryImpl) SelectChunkListByParentChunkId(ctx context.Context, documentId, taskId, parentChunkId int64) ([]*entity.DocumentChunk, error) {
 	var chunks []*entity.DocumentChunk
 	if err := d.dbWithContext(ctx).Model(&model.DocumentChunk{}).
-		Where("document_id = ? AND task_id = ? AND parent_block_id = ?", documentId, taskId, parentBlockId).
+		Where("document_id = ? AND task_id = ? AND parent_chunk_id = ?", documentId, taskId, parentChunkId).
 		Order("chunk_no ASC").Find(&chunks).Error; err != nil {
 		return nil, err
 	}

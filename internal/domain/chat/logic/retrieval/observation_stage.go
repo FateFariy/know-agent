@@ -128,7 +128,7 @@ func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, 
 
 	// 按 RRFScore 降序排序 fusedDocs，构建 RrfRank 映射
 	slices.SortFunc(state.FusedDocs, func(a, b *vo.DocumentChunk) int {
-		return cmp.Compare(a.RRFScore, b.RRFScore)
+		return cmp.Compare(b.RRFScore, a.RRFScore)
 	})
 	rrfRankMap := make(map[string]int)
 	rrfScoreMap := make(map[string]float64)

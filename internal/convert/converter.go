@@ -21,7 +21,7 @@ import (
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString StringToStringSlice Int64ToString StringToInt64
+// goverter:extend TimeToString Int64ToString StringToInt64
 // goverter:skipCopySameType
 //
 //go:generate goverter gen .
@@ -86,7 +86,7 @@ type DocumentConverter interface {
 // goverter:output:file ./converter_gen.go
 // goverter:useZeroValueOnPointerInconsistency
 // goverter:ignoreMissing
-// goverter:extend TimeToString ToChatQueryModeName JsonArrayToStringSlice JsonArrayToSearchReferences Int64ToString StringToInt64
+// goverter:extend TimeToString ToChatQueryModeName Int64ToString StringToInt64
 // goverter:skipCopySameType
 type ChatConverter interface {
 	FromChatReq(src *chat.ChatReq) *cvo.ChatCommand

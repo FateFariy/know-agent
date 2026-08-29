@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -51,8 +52,8 @@ func (c *KeywordRetrievalChannel) Retrieve(ctx context.Context, input *retrieval
 	channel, _ := input.RequireChannel(c.Name())
 	topScore := 1.0
 	if len(docs) > 1 {
-		cmp := func(a, b *vo.DocumentChunk) int { return int(a.Score - b.Score) }
-		topScore = slices.MaxFunc(docs, cmp).Score
+		cmpFunc := func(a, b *vo.DocumentChunk) int { return cmp.Compare(a.Score, b.Score) }
+		topScore = slices.MaxFunc(docs, cmpFunc).Score
 	}
 	if topScore <= 0 {
 		return &retrieval.RetrievalChannelResult{

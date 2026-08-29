@@ -91,7 +91,7 @@ func (s *ParentElevationStage) elevateToParentChunks(ctx context.Context, childD
 
 	slices.SortFunc(elevatedDocuments, func(a, b *vo.DocumentChunk) int {
 		if a.Score != b.Score {
-			return int(b.Score - a.Score)
+			return cmp.Compare(b.Score, a.Score)
 		} else if a.ParentChunkNo != b.ParentChunkNo {
 			return a.ParentChunkNo - b.ParentChunkNo
 		}

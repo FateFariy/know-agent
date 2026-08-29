@@ -63,11 +63,6 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 		return errors.New("当前文档没有结构化解析 blocks，无法执行 Parent/Child 切块。")
 	}
 
-	// 恢复 blocks 的原始文本内容
-	for _, block := range blocks {
-		block.ResumeRawText(buildCtx.RawFileBytes)
-	}
-
 	// 查询策略步骤列表
 	pipelineSteps, err := p.repo.SelectStepListByPlanId(ctx, buildCtx.PlanId)
 	if err != nil {
@@ -93,7 +88,7 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 
 	// 按步骤执行切块流水线
 	chunkStartTime := time.Now()
-	parentCandidates, err := p.BuildParentChunks(ctx, buildCtx.Document, pipelineSteps, blocks)
+	parentCandidates, err := p.BuildParentChunks(ctx, buildCtx, pipelineSteps, blocks)
 	if err != nil {
 		return err
 	}
@@ -125,8 +120,7 @@ func (p *ChunkingStage) Execute(ctx context.Context, buildCtx *Context) error {
 }
 
 // BuildParentChunks 执行完整的父-子块构建流程：先通过父块流水线生成父种子，再针对每个父种子走子块流水线产出子块
-func (p *ChunkingStage) BuildParentChunks(ctx context.Context, document *entity.Document,
-	steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) (vo.ParentChunkCandidates, error) {
+func (p *ChunkingStage) BuildParentChunks(ctx context.Context, buildCtx *Context, steps entity.DocumentStrategySteps, blocks entity.DocumentBlocks) (vo.ParentChunkCandidates, error) {
 	// 按父/子流水线拆分并排序步骤；任一缺失则返回相应错误
 	parentSteps := steps.GetSortedStepsByPipeline(enum.PipelineTypeParent)
 	childSteps := steps.GetSortedStepsByPipeline(enum.PipelineTypeChild)
@@ -135,6 +129,12 @@ func (p *ChunkingStage) BuildParentChunks(ctx context.Context, document *entity.
 	}
 	if len(childSteps) == 0 {
 		return nil, errorx.ErrChildBlockMissing
+	}
+
+	document := buildCtx.Document
+	// 恢复 blocks 的原始文本内容
+	for _, block := range blocks {
+		block.ResumeRawText(buildCtx.RawFileBytes)
 	}
 
 	orderedBlocks := blocks.CleanupAndSort()

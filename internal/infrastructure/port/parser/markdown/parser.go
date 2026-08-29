@@ -109,14 +109,19 @@ func (p *GoldmarkParser) Parse(_ context.Context, sourceText []byte) (entity.Doc
 		}
 		if entering {
 			if isContainerNode(n) {
-				lm := getNodeLineMap(n, sourceText)
-				cs, ce, err := si.CharacterSpan(lm)
-				if err != nil {
-					return ast.WalkStop, err
+				var span [2]int
+				hasSpan := false
+				if n.Lines().Len() > 0 {
+					lm := getNodeLineMap(n, sourceText)
+					cs, ce, err := si.CharacterSpan(lm)
+					if err != nil {
+						return ast.WalkStop, err
+					}
+					span = [2]int{cs, ce}
+					hasSpan = true
 				}
-				span := [2]int{cs, ce}
 				fields := p.fillOpeningFields(n, nodeType, parentId, draftMap, tableRowCount, rowColIndex, si, span)
-				draft := appendNode(nodeType, parentId, span, true)
+				draft := appendNode(nodeType, parentId, span, hasSpan)
 				draft.level = fields.level
 				draft.marker = fields.marker
 				draft.ordinal = fields.ordinal
@@ -126,6 +131,7 @@ func (p *GoldmarkParser) Parse(_ context.Context, sourceText []byte) (entity.Doc
 				draft.columnIndex = fields.columnIndex
 				if fields.cellSpanSet {
 					draft.charSpan = fields.cellCharSpan
+					draft.hasSpan = true
 				}
 				stack = append(stack, draft.nodeId)
 			} else {

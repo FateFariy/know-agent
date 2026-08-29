@@ -133,7 +133,7 @@ func (f *RRFFusion) sortAndFinalize(holders map[string]*candidateHolder, plan *v
 		holder.calculateHybridScore(plan)
 		result = append(result, holder)
 	}
-	slices.SortFunc(result, func(a, b *candidateHolder) int { return cmp.Compare(a.score, b.score) })
+	slices.SortFunc(result, func(a, b *candidateHolder) int { return cmp.Compare(b.score, a.score) })
 	return result
 }
 
