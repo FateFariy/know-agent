@@ -1,6 +1,6 @@
-# Know-Agent · 企业级知识库 RAG 系统
+# Know-RAG · 企业级知识库 RAG 系统
 
-> 一套面向企业私有知识场景、可生产落地的 **RAG（Retrieval‑Augmented Generation）** 一体化系统。提供文档解析、结构化分块、向量检索、混合召回、查询改写、对话记忆、引用溯源、可观测追踪等完整能力。
+> 一套面向企业私有知识场景、可生产落地的 **RAG（Retrieval‑Augmented Generation）** 系统。提供文档解析、结构化分块、向量检索、混合召回、查询改写、对话记忆、引用溯源、可观测追踪等完整能力。
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42B883?logo=vuedotjs&logoColor=white)](https://vuejs.org)
@@ -30,7 +30,7 @@
 
 ## 项目概述
 
-**Know-Agent**（模块名 `github.com/swiftbit/know-agent`）是一套面向**企业私有知识库**场景的 **RAG** 一体化服务，专注于解决以下工程问题：
+**Know-RAG**是一套面向**企业私有知识库**场景的 **RAG** 服务，专注于解决以下工程问题：
 
 - **结构化文档解析**：识别标题层级、章节、列表、表格、引用、附录等结构信号，构造文档骨架并自动生成最优分块策略。
 - **高质量分块**：内置 `Recursive / Semantic / LLM` 等多种分块策略，自动按文档特征推荐，支持人工微调。
