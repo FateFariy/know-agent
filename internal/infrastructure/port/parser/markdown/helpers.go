@@ -14,6 +14,8 @@ func mapNodeType(n ast.Node) string {
 		return NodeHeading
 	case ast.KindParagraph:
 		return NodeParagraph
+	case ast.KindTextBlock:
+		return NodeParagraph
 	case ast.KindList:
 		lst := n.(*ast.List)
 		if lst.IsOrdered() {
@@ -47,7 +49,7 @@ func mapNodeType(n ast.Node) string {
 // isContainerNode checks if a node type is a container (has children)
 func isContainerNode(n ast.Node) bool {
 	switch n.Kind() {
-	case ast.KindHeading, ast.KindParagraph, ast.KindList,
+	case ast.KindHeading, ast.KindParagraph, ast.KindTextBlock, ast.KindList,
 		ast.KindListItem, ast.KindBlockquote,
 		extensionAst.KindTable, extensionAst.KindTableHeader,
 		extensionAst.KindTableRow,

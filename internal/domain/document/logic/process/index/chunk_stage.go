@@ -310,7 +310,15 @@ func (p *ChunkingStage) buildBlockChildSeeds(parentSeed *vo.ChunkCandidate, bloc
 		if !exists || block == nil {
 			continue
 		}
-		child := p.toBlockChunkCandidate(block)
+
+		var child *vo.ChunkCandidate
+		// 拆分父种子场景：父种子是超长块被递归切分出的子片段（仅一个源块且文本不同于该块全文），
+		// 其子块应继承父种子的切分文本，而非重新取回整块全文，避免多个拆分父块派生出相同的子块
+		if len(sourceBlockIds) == 1 && utils.Trim(block.RenderBlockContent()) != utils.Trim(parentSeed.Text) {
+			child = p.cloneChunkCandidate(parentSeed, parentSeed.Text)
+		} else {
+			child = p.toBlockChunkCandidate(block)
+		}
 		child.SectionPath = utils.BlankToDefault(child.SectionPath, parentSeed.SectionPath)
 		child.StructureNodeId = parentSeed.StructureNodeId
 		child.StructureNodeType = parentSeed.StructureNodeType
