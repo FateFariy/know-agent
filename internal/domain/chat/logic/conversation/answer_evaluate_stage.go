@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -53,8 +54,16 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 		Answer:   convCtx.Answer(),
 	}
 	ctx = vo.WithTrace(context.Background(), convCtx.Trace)
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerEvaluate, enum.ExecutionModeRetrieval.String(),
+		&vo.StageInput{SummaryText: "正在评估回答质量。"})
+
+	snapshot := make(map[string]any, len(a.evaluator)+1)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(a.evaluator))
 	for _, evaluator := range a.evaluator {
 		go func(evaluator evaluate.Evaluator) {
+			defer wg.Done()
 			info := &callbacks.RunInfo{
 				StartTime: time.Now(),
 				Component: "rag_eval_metrics",
@@ -69,7 +78,20 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 				return
 			}
 			callbacks.OnEnd(valueCtx, score)
+			mu.Lock()
+			snapshot[evaluator.Name()] = score
+			mu.Unlock()
 		}(evaluator)
 	}
+
+	// 等待所有评估器完成后，将评估结果快照记录到阶段 OnEnd
+	go func() {
+		wg.Wait()
+		snapshot["evaluatorCount"] = len(a.evaluator)
+		ctx = vo.OnEnd(ctx, &vo.StageOutput{
+			SummaryText: "回答质量评估完成。",
+			Snapshot:    snapshot,
+		})
+	}()
 	return nil
 }

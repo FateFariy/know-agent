@@ -138,18 +138,6 @@ onBeforeUnmount(() => {
           />
         </button>
         <button
-          v-for="opt in KB_MODE_OPTIONS"
-          :key="opt.value"
-          :aria-pressed="store.knowledgeBaseSelectionMode === opt.value"
-          :class="{ 'chat-input__chip--active': store.knowledgeBaseSelectionMode === opt.value }"
-          :disabled="store.isStreaming"
-          class="chat-input__chip"
-          type="button"
-          @click="selectKbMode(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-        <button
           :aria-label="store.isStreaming ? '停止生成' : '发送消息'"
           :class="{
             'chat-input__submit--streaming': store.isStreaming,
