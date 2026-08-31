@@ -88,15 +88,15 @@ func (p *ProfileGenerateImpl) buildProfile(document *entity.Document, parsedText
 	}
 	docType := resolveStructuralDocumentType(sectionTitles, supportsItemLookup, len(sectionTitles) >= 2)
 	coreTopics := p.buildCoreTopics(document, sectionTitles)
-	exampleQuestions := utils.FilterUniqueLimit(coreTopics, 6, func(topic string) (string, bool) {
-		return topic + "包含哪些内容？", true
+	exampleQuestions := utils.FilterMapUniqueLimit(coreTopics, 6, func(topic string) (string, string, bool) {
+		return topic, topic + "包含哪些内容？", true
 	})
 	profile := &entity.DocumentProfile{
 		DocumentId:           document.ID,
 		DocumentType:         docType,
 		CoreTopics:           utils.ToCompactJSON(coreTopics),
 		ExampleQuestions:     utils.ToCompactJSON(exampleQuestions),
-		DocumentSummary:      p.buildSummary(document, sectionTitles, parsedText),
+		DocumentSummary:      p.buildSummary(sectionTitles, parsedText),
 		SupportsGraphOutline: utils.Ternary(len(sectionTitles) >= 2, 1, 0),
 		SupportsItemLookup:   utils.Ternary(supportsItemLookup, 1, 0),
 		GraphFriendly:        utils.Ternary(supportsItemLookup || len(sectionTitles) >= 2, 1, 0),
@@ -122,11 +122,8 @@ func (p *ProfileGenerateImpl) buildCoreTopics(document *entity.Document, section
 }
 
 // buildSummary 构造文档摘要：拼接主要章节标题 + 正文开头片段
-func (p *ProfileGenerateImpl) buildSummary(document *entity.Document, sectionTitles []string, parsedText string) string {
+func (p *ProfileGenerateImpl) buildSummary(sectionTitles []string, parsedText string) string {
 	var builder strings.Builder
-	builder.WriteString("文档《")
-	builder.WriteString(utils.BlankToDefault(utils.Trim(document.DocumentName), "未命名文档"))
-	builder.WriteString("》")
 	if len(sectionTitles) > 0 {
 		sectionTitles = utils.Limit(sectionTitles, 4)
 		builder.WriteString("主要涵盖：")

@@ -53,7 +53,6 @@ type RewriteConf struct {
 type RagConf struct {
 	Enabled                        bool                  `json:",default=true"`                           // 是否启用RAG
 	NoEvidenceReply                string                `json:",default=当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。"` // 无证据时的回复
-	SystemPrompt                   string                `json:",optional"`                               // 系统提示词（可选）
 	ChannelTimeout                 time.Duration         `json:",default=5s"`                             // 通道超时时间
 	SubQuestionTimeout             time.Duration         `json:",default=12s"`                            // 子问题超时时间
 	CandidateTopK                  int                   `json:",default=40"`                             // 候选集TopK

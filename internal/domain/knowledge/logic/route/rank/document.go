@@ -32,7 +32,7 @@ func NewDocumentRanker(repo adapter.KnowledgeRepository, docGateway adapter.Docu
 	}
 }
 
-// Rank 对文档进行打分，并将 top-score 的文档返回
+// Rank 根据文档画像对文档进行打分，并将 top-score 的文档返回
 //
 // 打分策略：语义分 + 词面辅助分 + 关键词命中分 + 与 topScope 匹配加分 + 主题关系加分
 // 低置信度扩展：当置信度 < 阈值时，将允许范围内的文档作为零分候选补充

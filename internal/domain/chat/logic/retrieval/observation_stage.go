@@ -100,16 +100,8 @@ func (s *ObservationStage) recordRetrievalResultObservations(ctx context.Context
 		return nil
 	}
 
-	expectedCandidateCount := s.rawCandidateCount(state.ChannelResults)
-
-	results, err := s.projectRetrievalResults(trace, state)
-	if err != nil {
-		logx.Warnf("投影检索候选观测数据失败: subQuestionIndex=%d, expectedCandidateCount=%d, error=%v",
-			state.Input.SubQuestionIndex, expectedCandidateCount, err)
-		return err
-	}
-
-	if err = s.repo.InsertRetrievalResults(ctx, results); err != nil {
+	results := s.projectRetrievalResults(trace, state)
+	if err := s.repo.InsertRetrievalResults(ctx, results); err != nil {
 		logx.Warnf("写入检索结果观测数据失败: subQuestionIndex=%d, error=%v",
 			state.Input.SubQuestionIndex, err)
 		return err
@@ -119,7 +111,7 @@ func (s *ObservationStage) recordRetrievalResultObservations(ctx context.Context
 }
 
 // projectRetrievalResults 将原始/过滤/融合/重排/最终文档投影为 ChatRetrievalResult 列表
-func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, state *RetrievalState) ([]*entity.ChatRetrievalResult, error) {
+func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, state *RetrievalState) []*entity.ChatRetrievalResult {
 	// 构建最终文档 FinalRank 映射（按 ParentChunkId）
 	finalRankMap := make(map[int64]int)
 	for i, doc := range state.FinalDocs {
@@ -151,7 +143,10 @@ func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, 
 		}
 	}
 
-	results := make([]*entity.ChatRetrievalResult, 0, s.rawCandidateCount(state.ChannelResults))
+	iteratee := func(acc int, r *RetrievalChannelResult) int { return acc + len(r.RawDocuments) }
+	rawCandidateCount := utils.Reduce(state.ChannelResults, iteratee, 0)
+
+	results := make([]*entity.ChatRetrievalResult, 0, rawCandidateCount)
 	for _, result := range state.ChannelResults {
 		channelName := result.Name
 		for i, doc := range result.RawDocuments {
@@ -185,16 +180,7 @@ func (s *ObservationStage) projectRetrievalResults(trace *vo.ConversationTrace, 
 		}
 	}
 
-	return results, nil
-}
-
-// rawCandidateCount 统计原始结果的候选文档总数
-func (s *ObservationStage) rawCandidateCount(rawResults []*RetrievalChannelResult) int {
-	count := 0
-	for _, r := range rawResults {
-		count += len(r.RawDocuments)
-	}
-	return count
+	return results
 }
 
 // resolveGateFilteredReason 根据渠道类型返回闸门过滤原因

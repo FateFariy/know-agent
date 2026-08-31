@@ -26,9 +26,8 @@ var _ ConditionalStage = (*EvidenceBudgetStage)(nil)
 
 type EvidenceBudgetStage struct {
 	promptRenderer               adapter.PromptRenderer
-	totalEvidenceBudget          int    // 总证据预算（字符数）
-	perSubQuestionEvidenceBudget int    // 每个子问题的证据预算（字符数）
-	systemPrompt                 string // 系统提示词
+	totalEvidenceBudget          int // 总证据预算（字符数）
+	perSubQuestionEvidenceBudget int // 每个子问题的证据预算（字符数）
 }
 
 func NewEvidenceBudgetStage(svcCtx *svc.ServiceContext, promptRenderer adapter.PromptRenderer) *EvidenceBudgetStage {
@@ -36,7 +35,6 @@ func NewEvidenceBudgetStage(svcCtx *svc.ServiceContext, promptRenderer adapter.P
 		promptRenderer:               promptRenderer,
 		totalEvidenceBudget:          svcCtx.Config.Chat.Rag.TotalEvidenceMaxChars,
 		perSubQuestionEvidenceBudget: svcCtx.Config.Chat.Rag.PerSubQuestionEvidenceMaxChars,
-		systemPrompt:                 svcCtx.Config.Chat.Rag.SystemPrompt,
 	}
 }
 
@@ -111,9 +109,11 @@ func (s *EvidenceBudgetStage) assemble(plan *vo.ConversationExecutionPlan) (*vo.
 		"subQuestions":         s.buildSubQuestions(plan),
 		"evidenceBlocks":       s.buildEvidenceBlocks(plan.RetrievalResult, budget),
 	})
+	rendered, _ := s.promptRenderer.Render(enum.RagAnswerSystem, nil)
+	systemPrompt := utils.Trim(rendered)
 
 	return &vo.RagPromptAssemblyResult{
-		SystemPrompt:             s.buildSystemPrompt(),
+		SystemPrompt:             systemPrompt,
 		UserPrompt:               strutil.Trim(userPrompt),
 		TotalBudget:              budget.totalBudget,
 		PerSubQuestionBudget:     budget.perSubQuestionBudget,
@@ -137,15 +137,6 @@ func (s *EvidenceBudgetStage) buildSubQuestions(plan *vo.ConversationExecutionPl
 		b.WriteString("\n")
 	}
 	return utils.Trim(b.String())
-}
-
-// buildSystemPrompt 构建 system prompt
-func (s *EvidenceBudgetStage) buildSystemPrompt() string {
-	if utils.IsNotBlank(s.systemPrompt) {
-		return utils.Trim(s.systemPrompt)
-	}
-	rendered, _ := s.promptRenderer.Render(enum.RagAnswerSystem, nil)
-	return utils.Trim(rendered)
 }
 
 // buildEvidenceBlocks 组装证据块（每个子问题对应一个块）

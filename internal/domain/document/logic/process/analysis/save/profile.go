@@ -36,9 +36,6 @@ func (p *ProfileGeneratePhase) Execute(ctx context.Context, saveCtx *Context) er
 		return nil
 	}
 
-	profile, err := p.gen.Generate(ctx, saveCtx.DocumentId, saveCtx.AnalysisResult, saveCtx.StructureNodes)
-	if err != nil {
-		return err
-	}
-	return p.repo.SaveProfile(ctx, profile)
+	_, err := p.gen.Generate(ctx, saveCtx.DocumentId, saveCtx.AnalysisResult, saveCtx.StructureNodes)
+	return err
 }

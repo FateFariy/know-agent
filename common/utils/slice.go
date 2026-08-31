@@ -221,3 +221,14 @@ func MapKeys[K comparable, V any](m map[K]V) []K {
 func ForEach[T any](s []T, iteratee func(index int, item T)) {
 	slice.ForEach(s, iteratee)
 }
+
+// Reduce 减少切片，返回累积结果
+func Reduce[T, V any](s []T, iteratee func(acc V, item T) V, initial V) V {
+	accumulator := initial
+
+	for _, v := range s {
+		accumulator = iteratee(accumulator, v)
+	}
+
+	return accumulator
+}

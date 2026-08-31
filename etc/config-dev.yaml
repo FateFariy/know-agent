@@ -103,7 +103,6 @@ Chat:
     Enabled: true
     RerankEnabled: true
     NoEvidenceReply:
-    SystemPrompt:
     ChannelTimeout: 5s
     SubQuestionTimeout: 12s
     KeywordTopK: 8
