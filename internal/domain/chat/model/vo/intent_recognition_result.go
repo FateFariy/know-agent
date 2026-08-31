@@ -156,10 +156,10 @@ func (i *IntentRecognitionResult) GetStructureNavigationIntent() *StructureNavig
 func (i *IntentRecognitionResult) ResolveNoEvidenceReply(requiresFreshSearch bool) string {
 	queryType := utils.BlankToDefault(i.QueryType, enum.QueryTypeDocumentQA)
 	if queryType == enum.QueryTypeCapabilityQuery {
-		return "当前你正在使用“当前文档问答”模式，我会优先基于所选文档回答。这个问题更像是在询问助手能力，而不是当前文档内容。如果你想了解我能做什么，请切换到“开放式提问”模式。"
+		return "我只能基于知识库内容回答，这个问题更像是在询问助手能力，而不是知识库内容。你可以补充更具体的标题、术语或关键词后再试。"
 	}
-	if queryType == enum.QueryTypeOpenChat || requiresFreshSearch {
-		return "当前你正在使用“当前文档问答”模式，我只能基于所选文档回答。这个问题更像开放式提问，例如天气、最新信息或一般交流。如果你想继续问这类问题，请切换到“开放式提问”模式。"
+	if requiresFreshSearch {
+		return "我只能基于知识库已收录的内容回答，无法获取实时或最新的外部信息（例如天气、行情、新闻）。你可以补充更具体的标题、术语或关键词后再试。"
 	}
 	return "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。"
 }

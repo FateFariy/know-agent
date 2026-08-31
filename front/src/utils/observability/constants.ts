@@ -39,7 +39,6 @@ export const EXECUTION_MODE_LABELS: Record<ExecutionModeType, string> = {
   graph_only: '结构图直答',
   graph_then_evidence: '结构图定位后取证据',
   retrieval: '检索问答',
-  react_agent: '开放式 ReAct Agent ',
   clarification: '路由澄清',
 }
 
@@ -95,6 +94,5 @@ export const STAGE_USAGE_NAMES: Record<string, string> = {
   rewrite: '问题改写',
   summary: '会话记忆压缩',
   rag_answer: '回答生成',
-  recommendation: '推荐问题',
-  react_agent_turn: 'Agent 推理'
+  recommendation: '推荐问题'
 }

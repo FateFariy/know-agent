@@ -237,7 +237,7 @@
                       "hitSelectedDocument",
                       "confidence",
                       "routeStatus",
-                      "errorMsg",
+                      "reason",
                       "createTime"
                     ],
                     "properties": {
@@ -251,10 +251,6 @@
                       },
                       "createTime": {
                         "description": "创建时间",
-                        "type": "string"
-                      },
-                      "errorMsg": {
-                        "description": "错误信息",
                         "type": "string"
                       },
                       "exchangeId": {
@@ -275,6 +271,10 @@
                       },
                       "question": {
                         "description": "用户提问",
+                        "type": "string"
+                      },
+                      "reason": {
+                        "description": "选择理由",
                         "type": "string"
                       },
                       "rewriteQuestion": {
@@ -1230,7 +1230,7 @@
       }
     }
   },
-  "x-date": "2026-08-25 11:15:14",
+  "x-date": "2026-08-31 20:39:23",
   "x-description": "This is a goctl generated swagger file.",
   "x-github": "https://github.com/zeromicro/go-zero",
   "x-go-zero-doc": "https://go-zero.dev/",

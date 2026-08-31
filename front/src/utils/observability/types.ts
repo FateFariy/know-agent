@@ -1,6 +1,6 @@
 import type {ChatToolTrace, RetrievalResultResp, SearchReference} from '@/types'
 
-export type ExecutionModeType = 'graph_only' | 'graph_then_evidence' | 'retrieval' | 'react_agent' | 'clarification'
+export type ExecutionModeType = 'graph_only' | 'graph_then_evidence' | 'retrieval' | 'clarification'
 export type RelationType = 'FOLLOW_UP' | 'TOPIC_SWITCH' | 'FRESH_TOPIC' | 'UNKNOWN'
 export type RetrievalModeType =
   'DIRECT_QUERY'

@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	OpenChat = "open_chat"
 	AutoDoc  = "auto_document"
 	Document = "document"
 )
@@ -28,13 +27,6 @@ func (r *ChatReq) Validate() (err error) {
 		return fmt.Errorf("question 不能为空")
 	}
 	switch r.ChatMode {
-	case OpenChat:
-		if r.KnowledgeBaseSelectionMode != "none" {
-			return fmt.Errorf("open_chat 模式 KnowledgeBaseSelectionMode 必须为 'none'")
-		}
-		if r.SelectedDocumentId != "" {
-			return fmt.Errorf("open_chat 模式 SelectedDocumentId 必须为空")
-		}
 	case AutoDoc:
 		if r.KnowledgeBaseSelectionMode != "all" {
 			return fmt.Errorf("auto_document 模式 KnowledgeBaseSelectionMode 必须为 'all'")

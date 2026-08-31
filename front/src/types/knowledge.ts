@@ -103,7 +103,7 @@ export interface KnowledgeRouteTraceItem {
   hitSelectedDocument: number;
   confidence: number;
   routeStatus: string;
-  errorMsg: string;
+  reason: string;
   createTime: string;
 }
 

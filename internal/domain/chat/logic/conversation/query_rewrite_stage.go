@@ -14,8 +14,8 @@ import (
 )
 
 // QueryRewriteStage 问题改写阶段
-// 负责对所有非 OpenChat 模式的问题进行改写，生成检索友好的问题表达和子问题拆分。
-// 仅当 RAG 开启时执行，OpenChat 模式跳过。
+// 负责对所有问题进行改写，生成检索友好的问题表达和子问题拆分。
+// 仅当 RAG 开启时执行。
 type QueryRewriteStage struct {
 	rewriter        QueryRewriter
 	enabled         bool
@@ -48,11 +48,8 @@ func (q *QueryRewriteStage) Order() int {
 	return enum.ConversationTraceStageRewrite.Order
 }
 
-// ShouldExecute 仅当非开放闲聊且执行计划已就绪时执行（RAG 未启用作为错误在 Execute 中处理）
+// ShouldExecute 仅当执行计划已就绪时执行（RAG 未启用作为错误在 Execute 中处理）
 func (q *QueryRewriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
-	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return false
-	}
 	return convCtx.ExecutionPlan.Load() != nil
 }
 

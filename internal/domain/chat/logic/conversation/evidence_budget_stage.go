@@ -48,11 +48,8 @@ func (s *EvidenceBudgetStage) Order() int {
 	return enum.ConversationTraceStageEvidenceBudget.Order
 }
 
-// ShouldExecute 仅当非开放闲聊、执行计划与检索结果就绪且语义缓存未命中时执行
+// ShouldExecute 仅当执行计划与检索结果就绪且语义缓存未命中时执行
 func (s *EvidenceBudgetStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
-	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return false
-	}
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil || execPlan.RetrievalResult == nil {
 		return false

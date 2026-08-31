@@ -72,6 +72,6 @@ type KnowledgeBaseLogic interface {
 
 // KnowledgeBaseRetrievalLogic 知识库检索范围
 type KnowledgeBaseRetrievalLogic interface {
-	// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
-	DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
+	// DetermineKnowledgeScope 根据知识库选择模式解析检索范围
+	DetermineKnowledgeScope(ctx context.Context, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error)
 }

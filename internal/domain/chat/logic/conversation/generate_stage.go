@@ -67,8 +67,6 @@ func (g *GenerateStage) Execute(ctx context.Context, convCtx *Context) error {
 		return g.clarificationExecute(ctx, convCtx)
 	case enum.ExecutionModeRetrieval:
 		return g.ragExecute(ctx, convCtx)
-	case enum.ExecutionModeReactAgent:
-		return g.agentExecute(ctx, convCtx)
 	}
 
 	return nil
@@ -148,30 +146,6 @@ func (g *GenerateStage) ragExecute(ctx context.Context, convCtx *Context) error 
 		return err
 	}
 	return g.channel(ctx, convCtx, streamCh)
-}
-
-func (g *GenerateStage) agentExecute(ctx context.Context, convCtx *Context) error {
-	//plan := convCtx.ExecutionPlan.Load()
-	//
-	// 	publishThinking(convCtx, "问题涉及多方面信息，交由 ReAct Agent 综合回答。")
-	//
-	// 	agentStage, err := e.tracer.OnStart(ctx, convCtx.Trace, vo.ConversationTraceStageReActAgent,
-	// 		e.Mode().Name(), "ReAct Agent 正在思考与执行。", nil)
-	//
-	// 	streamCh, err := e.reactAgent.Stream(ctx, plan.Question)
-	// 	if err != nil {
-	// 		logx.Errorf("ReAct Agent 调用失败: conversationId=%s err=%v", convCtx.ConversationId, err)
-	// 		e.tracer.OnErr(ctx, agentStage, "ReAct Agent 执行失败。", err, nil)
-	// 		publishText(convCtx, utils.BlankToDefault(plan.NoEvidenceReply, defaultNoEvidenceReply))
-	// 		return nil, err
-	// 	}
-	//
-	// 	snapshot := map[string]any{
-	// 		"firstResponseTimeMs": convCtx.FirstResponseTimeMs.Load(),
-	// 		"answerLength":        convCtx.AnswerLength(),
-	// 	}
-	// 	_ = e.tracer.OnEnd(ctx, agentStage, "ReAct Agent 回答完成。", snapshot)
-	return nil
 }
 
 func (g *GenerateStage) channel(ctx context.Context, convCtx *Context, ch <-chan string) error {

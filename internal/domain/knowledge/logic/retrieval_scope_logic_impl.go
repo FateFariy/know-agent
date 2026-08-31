@@ -29,8 +29,8 @@ func NewKnowledgeBaseRetrievalScopeLogicImpl(repo adapter.KnowledgeRepository, d
 	}
 }
 
-// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
-func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error) {
+// DetermineKnowledgeScope 根据知识库选择模式解析检索范围
+func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx context.Context, selectMode string, kbIds []string) (*aggregate.KnowledgeBaseSelectionSnapshot, error) {
 	// 解析选择模式
 	resolvedMode := utils.BlankToDefault(selectMode, enum.KbSelectionModeNone)
 
@@ -38,8 +38,8 @@ func (s *KnowledgeBaseRetrievalScopeLogicImpl) DetermineKnowledgeScope(ctx conte
 		SelectionMode:     enum.KbSelectionModeNone,
 		RagRuntimeOptions: s.resolver.ResolveRagRuntimeOptions(nil),
 	}
-	// 开放式聊天或无选择模式时返回空快照
-	if chatMode == "open_chat" || resolvedMode == enum.KbSelectionModeNone {
+	// 无选择模式时返回空快照
+	if resolvedMode == enum.KbSelectionModeNone {
 		return snapshot, nil
 	}
 

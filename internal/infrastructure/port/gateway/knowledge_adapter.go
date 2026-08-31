@@ -34,9 +34,9 @@ func NewKnowledgeAdapter(l logic.KnowledgeBaseRetrievalLogic, repo adapter.Knowl
 	}
 }
 
-// DetermineKnowledgeScope 根据聊天模式和知识库选择模式解析检索范围
-func (r *KnowledgeAdapter) DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*cvo.KnowledgeBaseSelectionSnapshot, error) {
-	snapshot, err := r.l.DetermineKnowledgeScope(ctx, chatMode, selectMode, kbIds)
+// DetermineKnowledgeScope 根据知识库选择模式解析检索范围
+func (r *KnowledgeAdapter) DetermineKnowledgeScope(ctx context.Context, selectMode string, kbIds []string) (*cvo.KnowledgeBaseSelectionSnapshot, error) {
+	snapshot, err := r.l.DetermineKnowledgeScope(ctx, selectMode, kbIds)
 	return convert.ToKnowledgeBaseSelectionSnapshot(snapshot), err
 }
 

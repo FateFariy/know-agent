@@ -4,7 +4,7 @@ export interface ChatReq {
   question: string;
   conversationId?: string;
   /** 聊天模式 */
-  chatMode: 'document' | 'open_chat' | 'auto_document';
+  chatMode: 'document' | 'auto_document';
   selectedDocumentId?: string;
   /** 知识库选择模式：document=跟随选中文档 / none=不使用知识库 / all=全部知识库 */
   knowledgeBaseSelectionMode: KnowledgeBaseSelectionMode;
@@ -431,9 +431,6 @@ export interface Snapshot {
   // ANSWER_GENERATE 阶段
   firstResponseTimeMs?: number;
   answerLength?: number;
-
-  // REACT_AGENT 阶段
-  usedTools?: string[];
 
   // RECOMMENDATION 阶段
   recommendationCount?: number;

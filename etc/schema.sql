@@ -686,7 +686,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_route_trace`
     `hit_selected_document`              TINYINT COMMENT '是否命中选中文档',
     `confidence`                         DECIMAL(10, 4) NOT NULL DEFAULT 0 COMMENT '置信度',
     `route_status`                       TINYINT        NOT NULL DEFAULT 0 COMMENT '路由状态',
-    `error_msg`                          TEXT COMMENT '错误信息',
+    `reason`                             TEXT COMMENT '选择理由',
     `create_time`                        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`                        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`                            TINYINT        NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
@@ -765,17 +765,17 @@ CREATE TABLE IF NOT EXISTS `knowledge_topic_node`
 -- 27. 语义缓存条目表
 CREATE TABLE IF NOT EXISTS `chat_cache_entry`
 (
-    `id`                   BIGINT       NOT NULL COMMENT '主键ID',
-    `chat_mode`            INT          NOT NULL DEFAULT 0 COMMENT '会话模式',
+    `id`                   BIGINT   NOT NULL COMMENT '主键ID',
+    `chat_mode`            INT      NOT NULL DEFAULT 0 COMMENT '会话模式',
     `allowed_document_ids` JSON COMMENT '允许文档ID',
     `allowed_task_ids`     JSON COMMENT '允许任务ID',
     `knowledge_base_ids`   JSON COMMENT '知识库ID列表',
     `query_text`           TEXT COMMENT '用户查询文本',
     `execution`            JSON COMMENT '执行结果缓存',
     `answer_draft`         TEXT COMMENT '回答草稿',
-    `create_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`              TINYINT      NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
+    `create_time`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`              TINYINT  NOT NULL DEFAULT 1 COMMENT '删除标记(0:未删除,1:已删除)',
     PRIMARY KEY (`id`),
     INDEX `idx_chat_mode` (`chat_mode`),
     INDEX `idx_query_text` (`query_text`(255))

@@ -35,7 +35,7 @@
 - **结构化文档解析**：识别标题层级、章节、列表、表格、引用、附录等结构信号，构造文档骨架并自动生成最优分块策略。
 - **高质量分块**：内置 `Recursive / Semantic / LLM` 等多种分块策略，自动按文档特征推荐，支持人工微调。
 - **混合检索与重排**：向量召回 + 关键词召回 + RRF 融合 + 可选 Rerank，统一召回质量。
-- **多模式对话**：`document / open_chat / auto_document` 三种模式，按需切换纯文档问答、自由对话或自动路由。
+- **多模式对话**：`document / auto_document` 两种模式，按需切换指定文档问答或自动路由，全部回答均基于知识库检索证据生成。
 - **会话级记忆压缩**：基于 `summary_compression` 策略，自动生成结构化长期记忆，兼顾长上下文与成本。
 - **在线回答评估**：内置 RAG 评估器（Faithfulness / Relevancy / Context Precision / Context Recall），在每轮对话的回答评估阶段对答案实时打分。
 - **引用溯源与可观测**：每一次会话均产出 `DebugTrace` + `StageTrace` + `ChannelExecution` + `RetrievalResult`，可逐阶段回放。
@@ -77,7 +77,7 @@
 
 ### 3. 智能问答
 - 流式聊天（SSE）
-- 多模式：`document` / `open_chat` / `auto_document`
+- 多模式：`document` / `auto_document`
 - 查询改写（Query Rewrite + Sub-Question）
 - 多通道检索（向量 + 关键词 + RRF 融合 + Rerank）
 - 会话级长期记忆 + 上下文压缩
@@ -100,8 +100,9 @@
 | 执行模式 | 触发条件 | 场景 |
 | --- | --- | --- |
 | `retrieval` | `document` / `auto_document` | 基于知识库的检索问答（默认） |
-| `clarification` | 意图模糊 / 上下文不足 | 反问澄清，补全信息后再答 |
-| 开放式自由对话 | `open_chat` | 不依赖文档的自由多轮对话 |
+| `clarification` | 知识范围不可执行 / 意图模糊 | 反问澄清，补全信息后再答 |
+
+> 项目仅面向 RAG 场景，所有问答均基于知识库检索证据生成，不提供不依赖知识库的开放式自由对话。
 
 ### 6. 记忆与上下文
 - `summary_compression`：定时压缩历史，生成结构化 `SummaryPayload`（目标 / 事实 / 偏好 / 已解决 / 待办 / 检索提示）
@@ -341,8 +342,7 @@ know-agent/
   ▼
 [6] RouteStage ── 依据 ChatQueryMode / 意图：
   │   - document / auto_document → retrieval（检索问答）
-  │   - 意图不清 → clarification（反问澄清）
-  │   - open_chat → 开放式自由对话
+  │   - 知识范围不可执行 / 意图不清 → clarification（反问澄清）
   │
   ▼
 [7] RetrievalStage ── 多通道检索（Vector + Keyword）── RRF 融合 + Rerank

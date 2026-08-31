@@ -53,7 +53,7 @@ func (s *SemanticCacheStage) Order() int {
 	return enum.ConversationTraceStageSemanticCache.Order
 }
 
-// ShouldExecute 仅当语义缓存已启用、执行计划就绪且非实时/时间敏感/开放闲聊时执行
+// ShouldExecute 仅当语义缓存已启用、执行计划就绪且非实时/时间敏感时执行
 func (s *SemanticCacheStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
 	if !s.enabled || s.store == nil {
 		return false
@@ -62,11 +62,7 @@ func (s *SemanticCacheStage) ShouldExecute(ctx context.Context, convCtx *Context
 	if execPlan == nil {
 		return false
 	}
-	if execPlan.RequiresRealTimeSearch || execPlan.RequiresCurrentDateAnchoring ||
-		convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return false
-	}
-	return true
+	return !execPlan.RequiresRealTimeSearch && !execPlan.RequiresCurrentDateAnchoring
 }
 
 func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) error {

@@ -63,9 +63,6 @@ export function formatChatMode(value: string | undefined): string {
   if (value === 'auto_document') {
     return '自动知识问答'
   }
-  if (value === 'open_chat') {
-    return '开放式提问'
-  }
   return value || '未知模式'
 }
 

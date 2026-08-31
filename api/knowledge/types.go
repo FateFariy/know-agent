@@ -40,7 +40,7 @@ type KnowledgeRouteTraceItem struct {
 	HitSelectedDocument int     `json:"hitSelectedDocument"` // 是否命中选中文档
 	Confidence          float64 `json:"confidence"`          // 置信度
 	RouteStatus         string  `json:"routeStatus"`         // 路由状态
-	ErrorMsg            string  `json:"errorMsg"`            // 错误信息
+	Reason              string  `json:"reason"`              // 选择理由
 	CreateTime          string  `json:"createTime"`          // 创建时间
 }
 

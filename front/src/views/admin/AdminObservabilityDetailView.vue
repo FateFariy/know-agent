@@ -172,7 +172,7 @@ function findStageTrace(stageTitle: string): ConversationTraceStage | null {
     return null
   }
   if (stageTitle.includes('检索执行')) {
-    return stageTraces.value.find((item) => item.stageCode === 'RAG_RETRIEVE' || item.stageCode === 'REACT_AGENT') || null
+    return stageTraces.value.find((item) => item.stageCode === 'RAG_RETRIEVE') || null
   }
   if (stageTitle.includes('前置编排')) {
     return stageTraces.value.find((item) => item.stageCode === 'INTENT') || null

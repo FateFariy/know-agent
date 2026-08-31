@@ -7,7 +7,6 @@ import {
   formatConfidence,
   formatRelationType,
   formatRetrievalMode,
-  formatToolName,
   formatUsageStageName
 } from './utils'
 import {
@@ -78,8 +77,6 @@ function handleStageType(
       return handleEvidenceBudgetStage(snapshot)
     case 'ANSWER_GENERATE':
       return handleAnswerGenerateStage(snapshot, exchange)
-    case 'REACT_AGENT':
-      return handleReactAgentStage(snapshot)
     case 'RECOMMENDATION':
       return handleRecommendationStage(snapshot, exchange)
     case 'FINALIZE':
@@ -315,26 +312,11 @@ function handleAnswerGenerateStage(snapshot: Snapshot, exchange: ConversationExc
   pushPair(advancedItems, '本轮回答全文', exchange?.answer || '', { code: true })
   listSections.push({
     label: '这一阶段的模型使用',
-    items: stageUsageDetails(exchange, ['rag_answer', 'react_agent_turn']),
+    items: stageUsageDetails(exchange, ['rag_answer']),
     ordered: false
   })
 
   return { summaryItems, listSections, tableSections: [], advancedItems }
-}
-
-/** 处理 REACT_AGENT 阶段 */
-function handleReactAgentStage(snapshot: Snapshot): StageContent {
-  const summaryItems: TextBlock[] = []
-  const listSections: StageInspectorSection[] = []
-
-  pushPair(summaryItems, '使用组件数', snapshot.usedTools?.length)
-  listSections.push({
-    label: '使用组件',
-    items: snapshot.usedTools?.map(formatToolName) || [],
-    ordered: false
-  })
-
-  return { summaryItems, listSections, tableSections: [], advancedItems: [] }
 }
 
 /** 处理 RECOMMENDATION 阶段 */

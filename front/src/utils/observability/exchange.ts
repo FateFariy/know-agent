@@ -197,14 +197,11 @@ function buildExecutionStage(
   listBlocks: ListBlock[],
   advancedListBlocks: ListBlock[]
 ): ExchangeStage {
-  const isAgentMode = trace?.executionMode === 'REACT_AGENT'
   return {
     key: 'execution',
     eyebrow: '2. 执行过程',
-    title: isAgentMode ? 'Agent 执行' : '检索执行',
-    subtitle: isAgentMode
-      ? '如果结果不对，先看 Agent 有没有调用工具、工具回来了什么。'
-      : '如果结果不对，先看检索通道、执行节点和最终证据组织是否正常。',
+    title: '检索执行',
+    subtitle: '如果结果不对，先看检索通道、执行节点和最终证据组织是否正常。',
     tone: 'warning',
     chips: buildChips(
       ...(trace?.usedChannels || []).map((item) => ({

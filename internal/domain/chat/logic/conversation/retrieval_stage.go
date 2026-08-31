@@ -29,11 +29,8 @@ func (r *RetrievalStage) Order() int {
 	return enum.ConversationTraceStageRAGRetrieve.Order
 }
 
-// ShouldExecute 非开放闲聊且语义缓存未命中时执行（执行计划缺失作为错误在 Execute 中处理）
+// ShouldExecute 语义缓存未命中时执行（执行计划缺失作为错误在 Execute 中处理）
 func (r *RetrievalStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
-	if convCtx.ChatMode == enum.ChatQueryModeOpenChat {
-		return false
-	}
 	return !convCtx.cache.IsCacheHit()
 }
 

@@ -208,7 +208,7 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		conversationId = utils.GenerateUUIDWithoutHyphen()
 	}
 
-	selectionSnapshot, err := c.baseGateway.DetermineKnowledgeScope(ctx, cmd.ChatMode, cmd.KnowledgeBaseSelectionMode, cmd.SelectedKnowledgeBaseIds)
+	selectionSnapshot, err := c.baseGateway.DetermineKnowledgeScope(ctx, cmd.KnowledgeBaseSelectionMode, cmd.SelectedKnowledgeBaseIds)
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +219,6 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		ChatMode:                       enum.ToChatQueryMode(cmd.ChatMode),
 		KnowledgeBaseSelectionSnapshot: selectionSnapshot,
 		Sink:                           sink,
-	}
-	if selectionSnapshot.SelectionModeName() == enum.KbSelectionModeNone {
-		convCtx.ChatMode = enum.ChatQueryModeOpenChat
 	}
 
 	// 当指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID

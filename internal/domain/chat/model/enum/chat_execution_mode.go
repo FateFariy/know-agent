@@ -8,9 +8,10 @@ import "github.com/duke-git/lancet/v2/enum"
 
 type ExecutionMode = *enum.Item[int]
 
+// 执行模式以 {"value":N,"name":"..."} 形式持久化在语义缓存条目中，因此取值固定不复用：
+// 2 为已下线的开放式 ReAct Agent 模式（react_agent），保留空档避免历史数据错位。
 var (
-	ExecutionModeRetrieval     = enum.NewItem(1, "retrieval")     // 普通知识库检索问答模式
-	ExecutionModeReactAgent    = enum.NewItem(2, "react_agent")   // 开放式 ReAct Agent 模式
+	ExecutionModeRetrieval     = enum.NewItem(1, "retrieval")     // 知识库检索问答模式
 	ExecutionModeClarification = enum.NewItem(3, "clarification") // 澄清模式
 )
 
@@ -33,7 +34,6 @@ const (
 	ragRetrieve    = "RAG_RETRIEVE"
 	evidenceBudget = "EVIDENCE_BUDGET"
 	answerGenerate = "ANSWER_GENERATE"
-	reActAgent     = "REACT_AGENT"
 	answerEvaluate = "ANSWER_EVALUATE"
 	recommendation = "RECOMMENDATION"
 	cacheWrite     = "CACHE_WRITE"
@@ -49,7 +49,6 @@ var (
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
 	ConversationTraceStageEvidenceBudget = &ConversationTraceStage{evidenceBudget, "证据评估与预算控制", 60}
 	ConversationTraceStageAnswerGenerate = &ConversationTraceStage{answerGenerate, "回答生成", 70}
-	ConversationTraceStageReActAgent     = &ConversationTraceStage{reActAgent, "ReAct Agent", 75}
 	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 76}
 	ConversationTraceStageRecommendation = &ConversationTraceStage{recommendation, "推荐问题", 80}
 	ConversationTraceStageCacheWrite     = &ConversationTraceStage{cacheWrite, "缓存写入", 85}

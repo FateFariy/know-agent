@@ -79,5 +79,5 @@ type PromptRenderer interface {
 
 type KnowledgeBaseGateway interface {
 	// DetermineKnowledgeScope 确定知识范围
-	DetermineKnowledgeScope(ctx context.Context, chatMode, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
+	DetermineKnowledgeScope(ctx context.Context, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
 }

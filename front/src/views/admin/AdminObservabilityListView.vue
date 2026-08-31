@@ -260,7 +260,6 @@ onMounted(loadSessions)
           <option value="ALL">全部模式</option>
           <option value="DOCUMENT">当前文档问答</option>
           <option value="AUTO_DOCUMENT">自动知识问答</option>
-          <option value="OPEN_CHAT">开放式提问</option>
         </select>
       </label>
 

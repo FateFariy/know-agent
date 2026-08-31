@@ -36,7 +36,6 @@ export interface NormalizedRouteTrace extends KnowledgeRouteTraceItem {
   statusKey: RouteStatusKey
   statusLabel: string
   statusTone: StatusTone
-  reason: string
   hitTop3: boolean
   missedTop3: boolean
   candidateDocumentCount: number
@@ -195,7 +194,7 @@ export function normalizeRouteTrace(record: KnowledgeRouteTraceItem): Normalized
     statusKey: statusMeta.key,
     statusLabel: statusMeta.label,
     statusTone: statusMeta.tone,
-    reason: record.errorMsg || topDocument?.reason || '',
+    reason: record.reason || topDocument?.reason || '',
     hitTop3: record.hitSelectedDocument === 1,
     missedTop3: record.hitSelectedDocument === 0,
     candidateDocumentCount: documents.length,

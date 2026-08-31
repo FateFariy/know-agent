@@ -114,7 +114,7 @@ func (r *KnowledgeRouteImpl) buildTrace(routeCtx *Context, decision *vo.Knowledg
 	}
 	if decision != nil {
 		trace.Confidence = decision.Confidence
-		trace.ErrorMsg = strutil.Trim(decision.Reason)
+		trace.Reason = strutil.Trim(decision.Reason)
 		trace.SelectedKnowledgeBaseIdsJson = utils.ToCompactJSON(routeCtx.SelectedKnowledgeBaseIds)
 		trace.SelectedKnowledgeBaseNamesJson = utils.ToCompactJSON(routeCtx.SelectedKnowledgeBaseNames)
 		trace.AllowedDocumentIdsJson = utils.ToCompactJSON(routeCtx.AllowedDocumentIds)

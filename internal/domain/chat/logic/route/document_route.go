@@ -196,7 +196,6 @@ func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSecti
 // ============================================================
 
 // resolveSection 章节定位只允许精确锚点：章节号精确、引号标题精确、导航索引命中。
-// 不再用正文 contains 打分或短语剥离作为结构锚点权威来源；未命中时返回 nil，交混合检索处理。
 func (r *DocumentRouterImpl) resolveSection(ctx context.Context, documentId int64,
 	originalQuestion, rewrittenQuestion string) *vo.GraphSection {
 

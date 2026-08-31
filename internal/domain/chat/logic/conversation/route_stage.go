@@ -18,7 +18,6 @@ const (
 
 // RouteStage 路由判定阶段
 // 负责根据 chatMode 分发到对应的路由策略：
-//   - OpenChat：直接走 ReactAgent 模式
 //   - Document：指定文档问答，在选定的文档内做意图路由
 //   - AutoDocument：自动知识路由 + 选文档 + 文档内导航
 type RouteStage struct {
@@ -70,17 +69,13 @@ func (r *RouteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
 // Execute 执行路由判定
 //
 // 根据 chatMode 分发到对应的路由策略：
-//  1. OpenChat → prepareOpenChat（开放式 Agent）
-//  2. Document → prepareDocumentMode（指定文档问答）
-//  3. AutoDocument → prepareAutoDocumentMode（自动知识路由 + 文档内导航）
+//  1. Document → prepareDocumentMode（指定文档问答）
+//  2. AutoDocument → prepareAutoDocumentMode（自动知识路由 + 文档内导航）
 func (r *RouteStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
 
 	var err error
 	switch convCtx.ChatMode {
-	case enum.ChatQueryModeOpenChat:
-		// 开放式聊天：直接走 ReactAgent
-		err = r.prepareOpenChat(ctx, convCtx, execPlan)
 	case enum.ChatQueryModeDocument:
 		// 指定文档问答：路由到所选文档内做导航
 		err = r.prepareDocumentMode(ctx, convCtx, execPlan)
@@ -95,32 +90,6 @@ func (r *RouteStage) Execute(ctx context.Context, convCtx *Context) error {
 	}
 
 	convCtx.SetExecutePlan(execPlan)
-	return nil
-}
-
-// ============================================================================
-// 路由策略：OpenChat
-// ============================================================================
-
-// prepareOpenChat 开放式聊天：直接走 ReactAgent 模式，不做文档路由与检索准备。
-//
-// 步骤：
-//  1. 设置执行模式为 ExecutionModeReactAgent
-//  2. 启动并完成路由追踪阶段，写入快照（chatMode / executionMode / 时间信号）
-func (r *RouteStage) prepareOpenChat(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
-	// 设置执行模式为 ReactAgent（完全由下游 Agent 自主规划）
-	execPlan.Mode = enum.ExecutionModeReactAgent
-
-	// 启动路由追踪阶段
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeReactAgent.String(), &vo.StageInput{SummaryText: "路由到开放式 Agent。", Snapshot: nil})
-	snapshot := map[string]any{
-		"chatMode":                     enum.ChatQueryModeName(convCtx.ChatMode),
-		"executionMode":                enum.ExecutionModeReactAgent.String(),
-		"requiresRealTimeSearch":       execPlan.RequiresRealTimeSearch,
-		"requiresCurrentDateAnchoring": execPlan.RequiresCurrentDateAnchoring,
-	}
-	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "已判定走开放式 Agent 路径。", Snapshot: snapshot})
-
 	return nil
 }
 
