@@ -29,7 +29,7 @@ func NewRetrievalEngine(svcCtx *svc.ServiceContext, repo adapter.ChatRepository,
 		NewParentElevationStage(docGateway, maxChars),
 		NewRerankStage(reranker),
 		NewFinalTopKStage(),
-		NewGraphRAGCanonicalStage(),
+		NewTopDocumentSummaryStage(),
 		NewObservationStage(repo),
 	)
 	return &Engine{
