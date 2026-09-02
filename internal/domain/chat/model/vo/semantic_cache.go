@@ -14,7 +14,6 @@ type CacheScope struct {
 
 // CachedExecution 语义缓存仅保留可安全复用的执行产物
 type CachedExecution struct {
-	Mode                 enum.ExecutionMode       // 执行模式
 	RetrievalPlan        *RetrievalPlan           // 检索计划
 	RetrievalResult      *RetrievalResult         // 检索结果
 	PromptAssemblyResult *RagPromptAssemblyResult // Prompt 组装结果

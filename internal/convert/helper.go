@@ -71,13 +71,8 @@ func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat
 		return nil
 	}
 
-	mode := src.ExecutionModeName
-	if mode == "" && src.ExecutionMode != nil {
-		mode = src.ExecutionMode.Name()
-	}
 	return &chat.DocumentNavigationDecision{
 		NavigationAction: src.NavigationAction,
-		ExecutionMode:    mode,
 		StructureAnchor:  ToChatStructureAnchor(src.StructureAnchor),
 		ItemAnchor:       ToChatItemAnchor(src.ItemAnchor),
 		//RetrievalPlan:     ToChatRetrievalQuestionPlan(src.RetrievalPlan),

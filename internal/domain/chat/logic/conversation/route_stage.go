@@ -9,7 +9,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/svc"
 )
 
 const (
@@ -27,7 +26,6 @@ type RouteStage struct {
 	knowledgeRouter KnowledgeRouter
 	documentRouter  DocumentRouter
 	docGateway      adapter.DocumentGateway
-	noEvidenceReply string
 }
 
 var _ Stage = (*RouteStage)(nil)
@@ -35,7 +33,6 @@ var _ Stage = (*RouteStage)(nil)
 var _ ConditionalStage = (*RouteStage)(nil)
 
 func NewRouteStage(
-	svcCtx *svc.ServiceContext,
 	repo adapter.ChatRepository,
 	knowledgeRouter KnowledgeRouter,
 	documentRouter DocumentRouter,
@@ -46,7 +43,6 @@ func NewRouteStage(
 		knowledgeRouter: knowledgeRouter,
 		documentRouter:  documentRouter,
 		docGateway:      docGateway,
-		noEvidenceReply: svcCtx.Config.Chat.Rag.NoEvidenceReply,
 	}
 }
 
@@ -170,7 +166,6 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "知识范围路由完成。", Snapshot: snapshot})
 
 	if !allowedScope.Executable() {
-		execPlan.Mode = enum.ExecutionModeClarification
 		execPlan.ClarificationReply = "当前选择的知识范围没有可检索的已就绪文档，请重新选择知识库或等待文档完成索引。"
 		execPlan.ClarificationReason = allowedScope.Reason
 		return nil
@@ -216,7 +211,6 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 
 	// 构造路由结果快照（执行模式 / 章节提示 / 条目编号 / 摘要文本），写入追踪
 	snapshot := map[string]any{
-		"executionMode":     navigationDecision.ExecutionModeName,
 		"targetSectionHint": utils.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
 		"navigationSummary": utils.Trim(navigationDecision.SummaryText),
 	}
@@ -238,15 +232,13 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	execPlan.RecentEvidenceAnchors = anchors
 
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
-	execPlan.Mode = navigationDecision.ExecutionMode
 	execPlan.NavigationDecision = navigationDecision
-	execPlan.ApplyNoEvidenceReply()
 	execPlan.RetrievalPlan = r.buildRetrievalPlan(convCtx, execPlan)
 
 	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
-	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', executionMode=%s, targetSection='%s",
+	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', targetSection='%s",
 		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), utils.Trim(convCtx.Question),
-		execPlan.RewriteQuestion, execPlan.Mode.Name(), navigationDecision.StructureAnchor.TargetSectionHint)
+		execPlan.RewriteQuestion, navigationDecision.StructureAnchor.TargetSectionHint)
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
 

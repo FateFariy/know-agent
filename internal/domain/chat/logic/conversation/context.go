@@ -221,22 +221,6 @@ func (c *Context) AnswerLength() int {
 	return utils.Len(c.answerBuffer.String())
 }
 
-// ExecutionModeName 获取执行模式名称
-func (c *Context) ExecutionModeName() string {
-	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
-		return execPlan.ExecutionModeName()
-	}
-	return ""
-}
-
-// NeedClarification 是否需要澄清
-func (c *Context) NeedClarification() bool {
-	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
-		return execPlan.Mode == enum.ExecutionModeClarification && len(execPlan.ClarificationOptions) > 0
-	}
-	return false
-}
-
 // ClarificationOptions 获取澄清选项
 func (c *Context) ClarificationOptions() []string {
 	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
@@ -320,7 +304,6 @@ func (c *Context) applyCachedExecution(ce *vo.CachedExecution) {
 	if ce == nil || ep == nil {
 		return
 	}
-	ep.Mode = ce.Mode
 	ep.RetrievalPlan = ce.RetrievalPlan
 	ep.RetrievalResult = ce.RetrievalResult
 	ep.PromptAssemblyResult = ce.PromptAssemblyResult

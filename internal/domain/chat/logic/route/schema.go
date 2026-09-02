@@ -56,6 +56,25 @@ func (n *navigationExtractor) resolveExplicitItemIndex() *int {
 	return nil
 }
 
+// resolveAction 从问题文本推断结构导航动作（结构导航分支的兜底，无显式意图信号时也可靠）
+func (n *navigationExtractor) resolveAction() string {
+	text := utils.Trim(n.text)
+	if text == "" {
+		return ""
+	}
+	// 章节编号 / "第N章/节/小节" / 引号标题 → 章节定位类动作
+	if sectionCodePattern.MatchString(text) ||
+		chineseSectionReferencePattern.MatchString(text) ||
+		quotedTextPattern.MatchString(text) {
+		return "SECTION_NAVIGATION"
+	}
+	// "第N步" → 步骤定位类动作
+	if stepReferencePattern.MatchString(text) {
+		return "STEP_NAVIGATION"
+	}
+	return ""
+}
+
 // detectFacet 检测问题维度
 func (n *navigationExtractor) detectFacet() string {
 	if sectionCodePattern.MatchString(n.text) ||

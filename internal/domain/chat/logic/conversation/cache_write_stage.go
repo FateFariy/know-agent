@@ -94,7 +94,6 @@ func buildCachedExecution(plan *vo.ConversationExecutionPlan) *vo.CachedExecutio
 		return nil
 	}
 	return &vo.CachedExecution{
-		Mode:                 plan.Mode,
 		RetrievalPlan:        plan.RetrievalPlan,
 		RetrievalResult:      plan.RetrievalResult,
 		PromptAssemblyResult: plan.PromptAssemblyResult,

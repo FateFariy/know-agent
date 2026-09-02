@@ -7,7 +7,7 @@ import (
 	"time"
 
 	arkemb "github.com/cloudwego/eino-ext/components/embedding/ark"
-	"github.com/cloudwego/eino-ext/components/model/agenticark"
+	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
@@ -35,8 +35,8 @@ type ServiceContext struct {
 	Rdb        *redis.Client
 	RedSync    *redsync.Redsync
 	Emb        embedding.Embedder
-	ChatModel  model.BaseModel[*einoschema.AgenticMessage]
-	JudgeModel model.BaseModel[*einoschema.AgenticMessage]
+	ChatModel  model.BaseModel[*einoschema.Message]
+	JudgeModel model.BaseModel[*einoschema.Message]
 	Milvus     *milvusclient.Client
 }
 
@@ -125,8 +125,8 @@ func NewArkEmbedding(ctx context.Context, c *config.Config) embedding.Embedder {
 	return emb
 }
 
-func NewArkChatModel(ctx context.Context, c *config.LLMConf) *agenticark.Model {
-	chatModel, err := agenticark.New(ctx, &agenticark.Config{
+func NewArkChatModel(ctx context.Context, c *config.LLMConf) *ark.ChatModel {
+	chatModel, err := ark.NewChatModel(ctx, &ark.ChatModelConfig{
 		APIKey:      c.ApiKey,
 		Model:       c.Model,
 		MaxTokens:   utils.Pointer(c.MaxTokens),

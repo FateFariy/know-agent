@@ -56,9 +56,7 @@ func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
 	// - 否则，拉取最近交互记录，由 recommender 基于当前问答与历史生成推荐
 	var recommendations []string
 	var err error
-	if convCtx.NeedClarification() {
-		recommendations = convCtx.ClarificationOptions()
-	} else if r.enabled {
+	if r.enabled {
 		recentExchanges := r.fetchRecentExchanges(ctx, convCtx.ConversationId, convCtx.ExchangeId)
 		recommendations, err = r.recommender.Generate(ctx, convCtx.Question, convCtx.Answer(), recentExchanges)
 		if err != nil {

@@ -24,20 +24,20 @@ import (
 )
 
 // ChatModelImpl 可观测的聊天模型服务, 封装模型调用, 提供使用量统计、耗时追踪和错误记录能力
-type ChatModelImpl[M adk.MessageType] struct {
-	chatModel  eino.BaseModel[M]
-	judgeModel eino.BaseModel[M]
+type ChatModelImpl struct {
+	chatModel  eino.BaseModel[*schema.Message]
+	judgeModel eino.BaseModel[*schema.Message]
 	provider   string
 	options    *model.Options
 }
 
 // NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
-func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.AgenticMessage] {
+func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl {
 	observability.RegisterModelUsageHandler(svcCtx.Config.ChatModel)
 
 	provider := resolveProvider(svcCtx.ChatModel)
 	conf := svcCtx.Config.ChatModel[provider]
-	return &ChatModelImpl[*schema.AgenticMessage]{
+	return &ChatModelImpl{
 		chatModel:  svcCtx.ChatModel,
 		judgeModel: svcCtx.JudgeModel,
 		provider:   provider,
@@ -52,7 +52,7 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl[*schema.Agentic
 }
 
 // Generate 同步调用模型，返回文本响应
-func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
+func (o *ChatModelImpl) Generate(ctx context.Context, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	// 调用底层模型执行生成
 	response, err := o.getChatModel(opts...).Generate(ctx, o.buildPrompt(systemPrompt, userPrompt), o.convertOptions(opts...)...)
 	if err != nil {
@@ -66,7 +66,7 @@ func (o *ChatModelImpl[M]) Generate(ctx context.Context, systemPrompt, userPromp
 }
 
 // GenerateWithTrace 同步调用模型，返回文本响应，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
+func (o *ChatModelImpl) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
 	ctx = OnStart(ctx, meta, input)
 
@@ -87,7 +87,7 @@ func (o *ChatModelImpl[M]) GenerateWithTrace(ctx context.Context, stage, systemP
 }
 
 // Stream 流式调用模型，返回响应通道和错误，同时记录使用量轨迹
-func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (<-chan string, error) {
+func (o *ChatModelImpl) Stream(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (<-chan string, error) {
 	meta, input := o.buildModelUsageInput(stage, systemPrompt, userPrompt, opts...)
 	ctx = OnStart(ctx, meta, input)
 
@@ -153,7 +153,7 @@ func (o *ChatModelImpl[M]) Stream(ctx context.Context, stage, systemPrompt, user
 }
 
 // buildModelUsageInput 构建模型使用量追踪的元信息和输入参数
-func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...common.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
+func (o *ChatModelImpl) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...common.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
 	options := common.GetImplSpecificOptions(o.options, opts...)
 	meta := &vo.ModelCallMeta{
 		Stage:     stage,
@@ -168,32 +168,20 @@ func (o *ChatModelImpl[M]) buildModelUsageInput(stage, systemPrompt, userPrompt 
 }
 
 // buildPrompt 构建提示词
-func (o *ChatModelImpl[M]) buildPrompt(systemPrompt, userPrompt string) []M {
+func (o *ChatModelImpl) buildPrompt(systemPrompt, userPrompt string) []*schema.Message {
 	if userPrompt == "" {
 		panic("userPrompt is empty")
 	}
-	var zero M
-	switch any(zero).(type) {
-	case *schema.AgenticMessage:
-		messages := []*schema.AgenticMessage{
-			schema.UserAgenticMessage(userPrompt),
-		}
-		if systemPrompt != "" {
-			messages = append(messages, schema.SystemAgenticMessage(systemPrompt))
-		}
-		return any(messages).([]M)
-	default:
-		messages := []*schema.Message{
-			schema.UserMessage(userPrompt),
-		}
-		if systemPrompt != "" {
-			messages = append(messages, schema.SystemMessage(systemPrompt))
-		}
-		return any(messages).([]M)
+	messages := []*schema.Message{
+		schema.UserMessage(userPrompt),
 	}
+	if systemPrompt != "" {
+		messages = append(messages, schema.SystemMessage(systemPrompt))
+	}
+	return messages
 }
 
-func (o *ChatModelImpl[M]) getChatModel(opts ...common.Option) eino.BaseModel[M] {
+func (o *ChatModelImpl) getChatModel(opts ...common.Option) eino.BaseModel[*schema.Message] {
 	opt := common.GetImplSpecificOptions(o.options, opts...)
 	if opt.Function == "judge" {
 		return o.judgeModel
@@ -202,7 +190,7 @@ func (o *ChatModelImpl[M]) getChatModel(opts ...common.Option) eino.BaseModel[M]
 }
 
 // convertOptions 转换模型调用选项
-func (o *ChatModelImpl[M]) convertOptions(opts ...common.Option) []eino.Option {
+func (o *ChatModelImpl) convertOptions(opts ...common.Option) []eino.Option {
 	options := make([]eino.Option, len(opts))
 	opt := common.GetImplSpecificOptions(o.options, opts...)
 	if opt.Model != "" {

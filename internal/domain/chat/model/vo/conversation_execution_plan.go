@@ -8,7 +8,6 @@ import (
 // ConversationExecutionPlan 对话执行计划（聚合根的一部分）
 // 用于存储一次对话执行前的完整计划信息，包括查询改写、检索策略、历史压缩等。
 type ConversationExecutionPlan struct {
-	Mode                         enum.ExecutionMode          // 执行模式
 	ChatMode                     enum.ChatQueryMode          // 对话模式/查询模式
 	OriginalQuestion             string                      // 原始问题
 	AgentQuestion                string                      // 代理问题
@@ -36,14 +35,6 @@ type ConversationExecutionPlan struct {
 	ClarificationReply           string                      // 澄清回复
 	ClarificationOptions         []string                    // 澄清选项列表
 	ClarificationReason          string                      // 澄清原因文本
-}
-
-// ExecutionModeName 获取执行模式名称
-func (p *ConversationExecutionPlan) ExecutionModeName() string {
-	if p.Mode == nil {
-		return ""
-	}
-	return p.Mode.Name()
 }
 
 // HasRetrievalQuestion 是否有检索问题
