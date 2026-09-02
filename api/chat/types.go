@@ -235,7 +235,6 @@ type ConversationTraceStage struct {
 
 type DocumentNavigationDecision struct {
 	NavigationAction  string                       `json:"navigationAction"`  // 导航动作
-	ExecutionMode     string                       `json:"executionMode"`     // 执行模式
 	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
 	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
 	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划

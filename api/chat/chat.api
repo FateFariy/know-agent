@@ -176,7 +176,6 @@ type (
 	}
 	// 调试轨迹
 	ChatDebugTrace {
-		ExecutionMode                 string                      `json:"executionMode"` // 执行模式
 		ChatMode                      string                      `json:"chatMode"` // 聊天模式
 		OriginalQuestion              string                      `json:"originalQuestion"` // 原始问题
 		RewriteQuestion               string                      `json:"rewriteQuestion"` // 重写问题
@@ -212,7 +211,6 @@ type (
 	// 文档导航决策
 	DocumentNavigationDecision {
 		NavigationAction  string                       `json:"navigationAction"` // 导航动作
-		ExecutionMode     string                       `json:"executionMode"` // 执行模式
 		StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"` // 结构锚点
 		ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"` // 项目锚点
 		RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"` // 检索问题计划
@@ -295,7 +293,6 @@ type (
 		StageOrder    int    `json:"stageOrder"` // 阶段顺序
 		StageLevel    int    `json:"stageLevel"` // 阶段层级
 		ParentStageId string `json:"parentStageId"` // 父阶段ID
-		ExecutionMode string `json:"executionMode"` // 执行模式
 		StageState    int    `json:"stageState"` // 阶段状态
 		StartTime     string `json:"startTime"` // 开始时间
 		EndTime       string `json:"endTime"` // 结束时间

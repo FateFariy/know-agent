@@ -1,10 +1,11 @@
-package conversation
+package middleware
 
 import (
 	"context"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
@@ -14,13 +15,13 @@ import (
 // MemoryLoadMiddleware 装载会话记忆并组装初始执行计划，同时把
 // 记忆摘要与时效/实时检索规则判断注入 agent 系统指令
 type MemoryLoadMiddleware struct {
-	BaseAgentMiddleware
-	memoryManager           SessionMemoryManager
+	conversation.BaseAgentMiddleware
+	memoryManager           conversation.SessionMemoryManager
 	planningHistoryMaxChars int // 规划历史最大字符数
 }
 
 // NewMemoryLoadMiddleware 创建记忆装载中间件
-func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager SessionMemoryManager) *MemoryLoadMiddleware {
+func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager conversation.SessionMemoryManager) *MemoryLoadMiddleware {
 	return &MemoryLoadMiddleware{
 		memoryManager:           memoryManager,
 		planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
@@ -31,9 +32,9 @@ func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager SessionMe
 func (m *MemoryLoadMiddleware) Name() string { return "memory-load" }
 
 // BeforeAgent 装载记忆 → 组装执行计划 → 追加指令提示
-func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *Context, input *BeforeAgentInput) (*BeforeAgentOutput, error) {
+func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *conversation.BeforeAgentInput) (*conversation.BeforeAgentOutput, error) {
 	if convCtx == nil {
-		return &BeforeAgentOutput{Instruction: input.Instruction}, nil
+		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, nil
 	}
 
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
@@ -41,7 +42,7 @@ func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *Context
 	history, err := m.load(ctx, convCtx)
 	if err != nil {
 		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
-		return &BeforeAgentOutput{Instruction: input.Instruction}, err
+		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, err
 	}
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: history.BuildSnapshot()})
 
@@ -52,11 +53,11 @@ func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *Context
 		}
 		instruction += strings.Join(hints, "\n")
 	}
-	return &BeforeAgentOutput{Instruction: instruction}, nil
+	return &conversation.BeforeAgentOutput{Instruction: instruction}, nil
 }
 
 // load 装载会话记忆（长期摘要、近期转录、压缩信息），并组装初始执行计划
-func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *Context) (*aggregate.Conversation, error) {
+func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.Context) (*aggregate.Conversation, error) {
 	memoryContext, err := m.memoryManager.LoadMemoryContext(ctx, convCtx.ConversationId)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *Context) (*agg
 }
 
 // buildInstructionHints 组装待注入指令的动态提示
-func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *Context) []string {
+func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *conversation.Context) []string {
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil {
 		return nil
@@ -104,7 +105,7 @@ func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *Context) []string 
 		return nil
 	}
 
-	analyzer := NewQueryAnalyzer(question)
+	analyzer := conversation.NewQueryAnalyzer(question)
 	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
 	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 	execPlan.RequiresRealTimeSearch = requiresRealTimeSearch

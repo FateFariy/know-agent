@@ -14,6 +14,7 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/agent/middleware"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -75,7 +76,7 @@ func WithMiddleware(middlewares ...conversation.AgentMiddleware) Option {
 	return func(r *EinoAgentRunner) {
 		handlers := make([]adk.TypedChatModelAgentMiddleware[*schema.Message], 0, len(middlewares))
 		for _, m := range middlewares {
-			handlers = append(handlers, NewEinoAdapter(m))
+			handlers = append(handlers, middleware.NewEinoAdapter(m))
 		}
 		r.middlewares = append(r.middlewares, handlers...)
 	}

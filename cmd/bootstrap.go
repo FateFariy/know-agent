@@ -5,6 +5,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/middleware"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
@@ -30,8 +31,9 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/knowledge/logic/route/rank"
 	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/infrastructure/persistence"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/agent"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/agent/check"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/cache"
-	"github.com/swiftbit/know-agent/internal/infrastructure/port/check"
 	portconfig "github.com/swiftbit/know-agent/internal/infrastructure/port/config"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/emb"
 	"github.com/swiftbit/know-agent/internal/infrastructure/port/gateway"
@@ -104,16 +106,22 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chainRuntime := conversation.NewRuntimeRegistry()
+	// MemoryLoad 已中间件化：由 conversation.MemoryLoadMiddleware 在 deep agent
+	// BeforeAgent 时装载记忆并注入指令，不再作为链上阶段（随 AgentStage 装配接入）。
+	// Agentic 化：检索/证据预算/生成已迁移为 KnowledgeBaseSearchTool、EvidenceRenderer
+	// 与答案输出中间件（随 AgentStage 装配接入），不再作为链上阶段。
+	_ = retrievalEngine
+
+	memoryLoadMiddleware := middleware.NewMemoryLoadMiddleware(serviceContext, memoryManageImpl)
+	agentRunner := agent.NewEinoAgentRunner(serviceContext, agent.WithMiddleware(memoryLoadMiddleware))
+
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
-		conversation.NewMemoryLoadStage(serviceContext, chatRepo, memoryManageImpl),
 		conversation.NewIntentRecognizeStage(intentRecognizer),
 		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
 		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore),
-		conversation.NewRouteStage(serviceContext, chatRepo, knowledgeAdapter, documentRouter, documentForChat),
-		conversation.NewRetrievalStage(retrievalEngine),
-		conversation.NewEvidenceBudgetStage(serviceContext, renderer),
-		conversation.NewGenerateStage(chatModel),
+		conversation.NewRouteStage(chatRepo, knowledgeAdapter, documentRouter, documentForChat),
+		conversation.NewAgentStage(agentRunner),
 		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore),
 		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),
 		conversation.NewRecommendStage(serviceContext, chatRepo, memoryManageImpl, recommender),

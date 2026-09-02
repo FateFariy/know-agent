@@ -127,7 +127,6 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 			"entryId":       hit.Entry.ID,
 			"similarity":    hit.Similarity,
 			"reuseStrategy": s.reuseStrategy,
-			"executionMode": hit.Entry.Execution.Mode.Name(),
 			"answerLength":  len(hit.Entry.AnswerDraft),
 		},
 	})

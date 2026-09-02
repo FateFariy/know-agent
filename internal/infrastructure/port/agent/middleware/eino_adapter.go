@@ -1,10 +1,9 @@
-package agent
+package middleware
 
 import (
 	"context"
 
 	"github.com/cloudwego/eino/adk"
-	"github.com/cloudwego/eino/schema"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 )
@@ -45,23 +44,7 @@ func (a *EinoAdapter) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgen
 	return ctx, runCtx, nil
 }
 
-// AfterModelRewriteState 在每次模型调用后，若本轮产出终态答复文本（最近的无工具调用
-// Assistant 消息），则通知领域中间件。文本后续如何处置由领域中间件决策。
-func (a *EinoAdapter) AfterModelRewriteState(ctx context.Context, state *adk.ChatModelAgentState, mc *adk.ModelContext) (context.Context, *adk.ChatModelAgentState, error) {
-	if a.middleware == nil {
-		return ctx, state, nil
-	}
-	text, ok := lastAssistantReply(state)
-	if !ok {
-		return ctx, state, nil
-	}
-	if err := a.middleware.OnModelText(ctx, conversation.AgentContextFrom(ctx), text); err != nil {
-		return ctx, state, err
-	}
-	return ctx, state, nil
-}
-
-// AfterAgent 在 agent 正常进入终态后通知领域中间件。
+// AfterAgent 在 agent 正常进入终态后通知领域中间件
 func (a *EinoAdapter) AfterAgent(ctx context.Context, state *adk.ChatModelAgentState) (context.Context, error) {
 	if a.middleware == nil {
 		return ctx, nil
@@ -70,22 +53,4 @@ func (a *EinoAdapter) AfterAgent(ctx context.Context, state *adk.ChatModelAgentS
 		return ctx, err
 	}
 	return ctx, nil
-}
-
-// lastAssistantReply 从会话尾部向前取最近一条无工具调用的 Assistant 消息作为终态答复文本。
-func lastAssistantReply(state *adk.ChatModelAgentState) (string, bool) {
-	if state == nil {
-		return "", false
-	}
-	for i := len(state.Messages) - 1; i >= 0; i-- {
-		msg := state.Messages[i]
-		if msg == nil || msg.Role != schema.Assistant {
-			continue
-		}
-		if len(msg.ToolCalls) > 0 {
-			return "", false
-		}
-		return msg.Content, msg.Content != ""
-	}
-	return "", false
 }

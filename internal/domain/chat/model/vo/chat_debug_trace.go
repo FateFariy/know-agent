@@ -96,10 +96,6 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 		return trace
 	}
 
-	// 基础模式
-	if execPlan.Mode != nil {
-		trace.ExecutionMode = execPlan.Mode.Name()
-	}
 	trace.ChatMode = execPlan.ChatMode
 
 	// 问题相关

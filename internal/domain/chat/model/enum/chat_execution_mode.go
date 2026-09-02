@@ -32,8 +32,6 @@ const (
 	semanticCache  = "SEMANTIC_CACHE"
 	route          = "ROUTE"
 	ragRetrieve    = "RAG_RETRIEVE"
-	evidenceBudget = "EVIDENCE_BUDGET"
-	answerGenerate = "ANSWER_GENERATE"
 	answerEvaluate = "ANSWER_EVALUATE"
 	recommendation = "RECOMMENDATION"
 	cacheWrite     = "CACHE_WRITE"
@@ -47,8 +45,8 @@ var (
 	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
-	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 76}
-	ConversationTraceStageRecommendation = &ConversationTraceStage{recommendation, "推荐问题", 80}
-	ConversationTraceStageCacheWrite     = &ConversationTraceStage{cacheWrite, "缓存写入", 85}
+	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 60}
+	ConversationTraceStageRecommendation = &ConversationTraceStage{recommendation, "推荐问题", 70}
+	ConversationTraceStageCacheWrite     = &ConversationTraceStage{cacheWrite, "缓存写入", 80}
 	ConversationTraceStageFinalize       = &ConversationTraceStage{finalize, "收尾归档", 90}
 )

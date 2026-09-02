@@ -209,7 +209,6 @@ func ToChatExchangeTraceStageModel(source *entity.ChatExchangeTraceStage) *model
 		modelChatExchangeTraceStage.StageOrder = (*source).StageOrder
 		modelChatExchangeTraceStage.StageLevel = (*source).StageLevel
 		modelChatExchangeTraceStage.ParentStageId = (*source).ParentStageId
-		modelChatExchangeTraceStage.ExecutionMode = (*source).ExecutionMode
 		modelChatExchangeTraceStage.StageState = (*source).StageState
 		modelChatExchangeTraceStage.StartTime = (*source).StartTime
 		modelChatExchangeTraceStage.EndTime = (*source).EndTime
@@ -450,7 +449,6 @@ func pEntityChatExchangeTraceStageToPChatConversationTraceStage(source *entity.C
 		chatConversationTraceStage.StageOrder = (*source).StageOrder
 		chatConversationTraceStage.StageLevel = (*source).StageLevel
 		chatConversationTraceStage.ParentStageId = Int64ToString((*source).ParentStageId)
-		chatConversationTraceStage.ExecutionMode = (*source).ExecutionMode
 		chatConversationTraceStage.StageState = (*source).StageState
 		chatConversationTraceStage.StartTime = pTimeTimeToString((*source).StartTime)
 		chatConversationTraceStage.EndTime = pTimeTimeToString((*source).EndTime)

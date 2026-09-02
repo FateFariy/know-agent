@@ -1,10 +1,11 @@
-package conversation
+package tool
 
 import (
 	"context"
 	"errors"
 
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -15,12 +16,12 @@ const (
 // KnowledgeBaseSearchTool 知识库检索工具
 // 基于当前执行计划执行检索、把结果回填执行计划、发布检索笔记与已用渠道，最终将证据渲染为带编号引用的文本返回给 agent
 type KnowledgeBaseSearchTool struct {
-	retriever        Retriever
-	evidenceRenderer *EvidenceRenderer
+	retriever        conversation.Retriever
+	evidenceRenderer *conversation.EvidenceRenderer
 }
 
 // NewKnowledgeBaseSearchTool 创建知识库检索工具
-func NewKnowledgeBaseSearchTool(retriever Retriever, evidenceRenderer *EvidenceRenderer) *KnowledgeBaseSearchTool {
+func NewKnowledgeBaseSearchTool(retriever conversation.Retriever, evidenceRenderer *conversation.EvidenceRenderer) *KnowledgeBaseSearchTool {
 	return &KnowledgeBaseSearchTool{
 		retriever:        retriever,
 		evidenceRenderer: evidenceRenderer,
@@ -32,7 +33,7 @@ func NewKnowledgeBaseSearchTool(retriever Retriever, evidenceRenderer *EvidenceR
 // query 非空且与当前计划检索问题不同时，临时以 query 单子问题执行检索；
 // topK 大于 0 时覆盖计划最终预算。检索结果会回填执行计划供后续引用发布与缓存写入。
 func (t *KnowledgeBaseSearchTool) Search(ctx context.Context, query string, topK int) (string, error) {
-	convCtx := AgentContextFrom(ctx)
+	convCtx := conversation.AgentContextFrom(ctx)
 	if convCtx == nil {
 		return "", errors.New("知识库检索缺少会话上下文")
 	}
@@ -97,7 +98,7 @@ func (t *KnowledgeBaseSearchTool) resolvePlan(execPlan *vo.ConversationExecution
 }
 
 // afterRetrieve 检索完成后下发思考事件与已用渠道（引用发布由答案输出中间件统一负责）。
-func (t *KnowledgeBaseSearchTool) afterRetrieve(ctx context.Context, convCtx *Context, result *vo.RetrievalResult) error {
+func (t *KnowledgeBaseSearchTool) afterRetrieve(ctx context.Context, convCtx *conversation.Context, result *vo.RetrievalResult) error {
 	for _, note := range result.RetrievalNotes() {
 		if err := convCtx.PublishThinking(note); err != nil {
 			return err
