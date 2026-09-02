@@ -92,8 +92,7 @@ func (c *Chain) stop(ctx context.Context, convCtx *Context, reason string) (stri
 	}
 
 	responseMessage := "已停止会话生成"
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageFinalize, &vo.StageInput{SummaryText: "正在收尾停止中的会话。"})
 
 	// 发送 status 事件
 	err := convCtx.Sink.Status("⏹ "+reason, convCtx.ConversationId, convCtx.ExchangeId)
@@ -140,8 +139,7 @@ func (c *Chain) finishFailed(ctx context.Context, convCtx *Context, err error) {
 
 	// 开启finalize追踪阶段（失败时忽略错误，不影响主流程）
 	errorMessage := err.Error()
-	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾失败会话。"})
+	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize, &vo.StageInput{SummaryText: "正在收尾失败会话。"})
 
 	// 向下游发送失败事件
 	err = convCtx.Sink.Error(errorMessage, convCtx.ConversationId, convCtx.ExchangeId)

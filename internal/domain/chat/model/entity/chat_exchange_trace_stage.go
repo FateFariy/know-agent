@@ -14,7 +14,6 @@ type ChatExchangeTraceStage struct {
 	StageOrder     int        `gorm:"column:stage_order"`
 	StageLevel     int        `gorm:"column:stage_level"`
 	ParentStageId  int64      `gorm:"column:parent_stage_id"`
-	ExecutionMode  string     `gorm:"column:execution_mode"`
 	StageState     int        `gorm:"column:stage_state"`
 	StartTime      *time.Time `gorm:"column:start_time"`
 	EndTime        *time.Time `gorm:"column:end_time"`

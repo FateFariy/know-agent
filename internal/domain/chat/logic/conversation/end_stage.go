@@ -40,8 +40,7 @@ func (e *EndStage) Execute(ctx context.Context, convCtx *Context) error {
 	}
 
 	// 启动 finalize 与 recommendation 两个追踪阶段
-	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
+	finalizeCtx := vo.OnStart(ctx, enum.ConversationTraceStageFinalize, &vo.StageInput{SummaryText: "正在收尾已完成会话。"})
 
 	answer := convCtx.Answer()
 	uniqueReferences := convCtx.UniqueReferences()

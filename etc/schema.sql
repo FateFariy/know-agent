@@ -93,7 +93,6 @@ CREATE TABLE IF NOT EXISTS `chat_exchange_trace_stage`
     `stage_order`     INT          NOT NULL DEFAULT 0 COMMENT '阶段顺序',
     `stage_level`     INT          NOT NULL DEFAULT 0 COMMENT '阶段层级',
     `parent_stage_id` BIGINT       NOT NULL DEFAULT 0 COMMENT '父阶段ID',
-    `execution_mode`  VARCHAR(50)  NOT NULL DEFAULT '' COMMENT '执行模式',
     `stage_state`     TINYINT      NOT NULL DEFAULT 0 COMMENT '阶段状态',
     `start_time`      DATETIME COMMENT '开始时间',
     `end_time`        DATETIME COMMENT '结束时间',

@@ -48,8 +48,7 @@ func (s *CacheWriteStage) ShouldExecute(ctx context.Context, convCtx *Context) b
 
 func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 启动缓存写入追踪阶段
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageCacheWrite, enum.ExecutionModeRetrieval.String(),
-		&vo.StageInput{SummaryText: "正在回写语义缓存。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageCacheWrite, &vo.StageInput{SummaryText: "正在回写语义缓存。"})
 
 	// 路径1 & 2：Put 写入（新条目或命中后答案更新）
 	plan := convCtx.ExecutionPlan.Load()

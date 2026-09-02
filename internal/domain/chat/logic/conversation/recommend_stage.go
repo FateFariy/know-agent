@@ -43,8 +43,7 @@ func (r *RecommendStage) Order() int {
 
 func (r *RecommendStage) Execute(ctx context.Context, convCtx *Context) error {
 	// 启动 recommendation 阶段
-	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation,
-		convCtx.ExecutionModeName(), &vo.StageInput{SummaryText: "正在生成推荐追问。"})
+	recommendCtx := vo.OnStart(ctx, enum.ConversationTraceStageRecommendation, &vo.StageInput{SummaryText: "正在生成推荐追问。"})
 
 	// 发送 final 事件
 	_ = convCtx.PublishFinish()

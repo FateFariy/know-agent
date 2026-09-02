@@ -39,7 +39,7 @@ func (h *HistoryPlanningContext) BuildStructuredText() string {
 	// 追加章节
 	appendSection := func(title, content string) {
 		trim := strutil.Trim(content)
-		if trim != "" {
+		if trim == "" {
 			return
 		}
 		if sb.Len() > 0 {
@@ -65,7 +65,7 @@ func (h *HistoryPlanningContext) BuildStructuredText() string {
 		count := 0
 		for _, v := range values {
 			trim := strutil.Trim(v)
-			if trim != "" {
+			if trim == "" {
 				continue
 			}
 			sb.WriteString("- ")

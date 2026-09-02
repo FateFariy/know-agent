@@ -100,7 +100,7 @@ func (d *DocumentChunk) EnrichFromMetadata(metadata *DocumentMetadata) {
 	if utils.IsBlank(d.DocumentName) && utils.IsNotBlank(metadata.DocumentName) {
 		d.DocumentName = metadata.DocumentName
 	}
-	if d.KnowledgeBaseId != 0 && metadata.KnowledgeBaseId != 0 {
+	if d.KnowledgeBaseId == 0 && metadata.KnowledgeBaseId != 0 {
 		d.KnowledgeBaseId = metadata.KnowledgeBaseId
 	}
 	if utils.IsBlank(d.KnowledgeBaseName) && utils.IsNotBlank(metadata.KnowledgeBaseName) {

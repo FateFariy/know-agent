@@ -13,7 +13,6 @@ type RetrievalPlan struct {
 	SuggestedIntents          []string                     // 建议的检索意图列表
 	ScopeMode                 string                       // 知识库选择模式
 	KnowledgeBaseIds          []int64                      // 知识库ID列表
-	AllowedDocumentScope      []int64                      // 允许的文档范围ID列表
 	DocumentScope             []int64                      // 文档范围ID列表
 	TaskScope                 []int64                      // 任务范围ID列表
 	MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件

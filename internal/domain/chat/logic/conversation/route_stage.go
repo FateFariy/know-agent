@@ -14,6 +14,8 @@ import (
 
 const (
 	recommendationThreshold = 0.55
+	maxSnippetChars         = 300
+	maxRecentExchanges      = 3
 )
 
 // RouteStage 路由判定阶段
@@ -105,18 +107,6 @@ func (r *RouteStage) Execute(ctx context.Context, convCtx *Context) error {
 //  3. 记录影子路由（便于后续优化自动路由；失败不影响业务流程）
 //  4. 调用文档内路由与终稿组装（routeAndFinalizePlan）
 func (r *RouteStage) prepareDocumentMode(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
-	// 解析知识库选择快照，确定允许执行的知识范围
-	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
-
-	// 校验所选文档/任务是否在允许范围内
-	// 先执行基础校验（非零），再执行范围一致性校验
-	if convCtx.SelectedDocumentId == 0 || convCtx.SelectedTaskId == 0 {
-		return fmt.Errorf("当前文档问答模式缺少有效的文档范围")
-	}
-	if !allowedScope.Consistent || !allowedScope.Contains(convCtx.SelectedDocumentId, convCtx.SelectedTaskId) {
-		return fmt.Errorf("所选文档/任务不在当前允许的知识范围之内")
-	}
-
 	// 记录影子路由（仅用于离线分析，失败只告警）
 	if err := r.knowledgeRouter.RecordShadowRoute(ctx, NewKnowledgeRouteInput(convCtx, execPlan.RewriteQuestion)); err != nil {
 		logx.Warnf("记录影子路由失败: %v", err)
@@ -142,7 +132,7 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
 
 	// 启动路由阶段追踪（标识为 auto_document）
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, "auto_document", &vo.StageInput{SummaryText: "正在执行知识范围、主题、候选文档路由。", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, &vo.StageInput{SummaryText: "正在执行知识范围、主题、候选文档路由。", Snapshot: nil})
 
 	// 执行知识路由（原始问题 + 改写问题做双路输入）
 	routeDecision, err := r.knowledgeRouter.Route(ctx, NewKnowledgeRouteInput(convCtx, execPlan.RewriteQuestion))
@@ -207,8 +197,8 @@ func (r *RouteStage) prepareAutoDocumentMode(ctx context.Context, convCtx *Conte
 //  5. 组装最终执行计划（执行模式 / 导航决策 / 无证据回复提示）
 //  6. 打印关键编排结果并返回
 func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context, execPlan *vo.ConversationExecutionPlan) error {
-	// 启动文档内路由阶段追踪，并以 "混合检索" 为默认模式名
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, enum.ExecutionModeRetrieval.Name(), &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
+	// 启动文档内路由阶段追踪
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, &vo.StageInput{SummaryText: "正在判定图查询还是混合检索。", Snapshot: nil})
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
 	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
@@ -332,7 +322,6 @@ func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.Conversat
 		SuggestedIntents:          intentResult.SuggestedChannels(),
 		ScopeMode:                 snapshot.SelectionModeName(),
 		KnowledgeBaseIds:          utils.Copy(snapshot.SelectedKnowledgeBaseIds),
-		AllowedDocumentScope:      utils.Copy(snapshot.SelectedDocumentIds()),
 		DocumentScope:             utils.Copy(documentScope),
 		TaskScope:                 utils.Copy(taskScope),
 		MetadataFilters:           vo.NewMetadataFilters(questionPlan.RetrievalQuestion, intentResult),

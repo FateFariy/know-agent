@@ -51,8 +51,7 @@ func (a *AnswerEvaluateStage) Execute(ctx context.Context, convCtx *Context) err
 		Answer:   convCtx.Answer(),
 	}
 	ctx = vo.WithTrace(context.Background(), convCtx.Trace)
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerEvaluate, enum.ExecutionModeRetrieval.String(),
-		&vo.StageInput{SummaryText: "正在评估回答质量。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageAnswerEvaluate, &vo.StageInput{SummaryText: "正在评估回答质量。"})
 
 	snapshot := make(map[string]any, len(a.evaluator)+1)
 	var mu sync.Mutex

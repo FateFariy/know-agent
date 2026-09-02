@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultNoEvidenceReply = "当前没有足够证据支持明确回答。"
+	defaultNoEvidenceReply = "未检索到相关结果，建议调整查询条件后重试，如修改检索问题"
 )
 
 // KnowledgeBaseSearchTool 知识库检索工具
@@ -59,7 +59,7 @@ func (t *KnowledgeBaseSearchTool) Search(ctx context.Context, query string, topK
 	}
 
 	if result.IsEmpty() {
-		return utils.BlankToDefault(execPlan.NoEvidenceReply, defaultNoEvidenceReply), nil
+		return defaultNoEvidenceReply, nil
 	}
 	return t.evidenceRenderer.RenderEvidence(result), nil
 }

@@ -69,7 +69,7 @@ func (q *QueryRewriteStage) Execute(ctx context.Context, convCtx *Context) error
 		SummaryText: "正在生成检索友好的问题表达。",
 		Snapshot:    q.buildRewriteStageSnapshot(question, historySummary, nil),
 	}
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, enum.ExecutionModeRetrieval.String(), input)
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRewrite, input)
 
 	// 调用改写逻辑（原始问题 + 历史摘要 → 改写问题 + 子问题）
 	rewriteResult, err := q.rewriter.Rewrite(ctx, question, historySummary)

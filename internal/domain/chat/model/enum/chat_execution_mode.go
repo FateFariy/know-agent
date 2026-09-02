@@ -47,8 +47,6 @@ var (
 	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
-	ConversationTraceStageEvidenceBudget = &ConversationTraceStage{evidenceBudget, "证据评估与预算控制", 60}
-	ConversationTraceStageAnswerGenerate = &ConversationTraceStage{answerGenerate, "回答生成", 70}
 	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 76}
 	ConversationTraceStageRecommendation = &ConversationTraceStage{recommendation, "推荐问题", 80}
 	ConversationTraceStageCacheWrite     = &ConversationTraceStage{cacheWrite, "缓存写入", 85}

@@ -22,9 +22,6 @@ type BeforeAgentOutput struct {
 // 每个方法只描述一次「时机」，是否发布文本、吞并、与其他中间件协作等业务逻辑
 // 由中间件实现自行决策。一个领域中间件对应挂载一个基础设施层适配器，多个中间件
 // 的执行顺序由 eino Handlers 注册顺序保证。
-//
-// 领域中间件的具体实现位于领域层；由基础设施层适配为 eino 的
-// adk.TypedChatModelAgentMiddleware[*schema.Message] 后挂载到 deep agent。
 type AgentMiddleware interface {
 	// Name 中间件名称（日志与追踪使用）
 	Name() string

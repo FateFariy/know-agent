@@ -79,7 +79,7 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 			"reuseStrategy":       s.reuseStrategy,
 		},
 	}
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageSemanticCache, enum.ExecutionModeRetrieval.String(), input)
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageSemanticCache, input)
 
 	// 故障降级：查询失败视为未命中，不阻塞主链路
 	hit, err := s.store.Search(ctx, &SearchInput{

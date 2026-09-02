@@ -38,8 +38,7 @@ func (i *IntentRecognizeStage) ShouldExecute(ctx context.Context, convCtx *Conte
 func (i *IntentRecognizeStage) Execute(ctx context.Context, convCtx *Context) error {
 	execPlan := convCtx.ExecutionPlan.Load()
 
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageIntent,
-		enum.ChatQueryModeName(convCtx.ChatMode), &vo.StageInput{SummaryText: "正在分析用户意图。"})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageIntent, &vo.StageInput{SummaryText: "正在分析用户意图。"})
 
 	input := &RecognitionInput{
 		OriginalQuestion:         execPlan.OriginalQuestion,
