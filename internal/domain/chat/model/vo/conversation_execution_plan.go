@@ -1,8 +1,6 @@
 package vo
 
 import (
-	"time"
-
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
@@ -32,14 +30,12 @@ type ConversationExecutionPlan struct {
 	HistoryCoveredExchangeCount  int                         // 覆盖的历史记录交换计数
 	HistoryCompressionCount      int                         // 历史压缩计数
 	RecentEvidenceAnchors        EvidenceAnchors             // 最近证据锚点
-	CurrentDate                  time.Time                   // 当前日期
 	CurrentDateText              string                      // 当前日期文本表示
 	RequiresRealTimeSearch       bool                        // 是否需要实时搜索
 	RequiresCurrentDateAnchoring bool                        // 是否需要当前日期锚定
 	ClarificationReply           string                      // 澄清回复
 	ClarificationOptions         []string                    // 澄清选项列表
 	ClarificationReason          string                      // 澄清原因文本
-	NoEvidenceReply              string                      // 无证据回复文本
 }
 
 // ExecutionModeName 获取执行模式名称
@@ -72,12 +68,4 @@ func (p *ConversationExecutionPlan) SubQuestions() []string {
 		return nil
 	}
 	return p.RetrievalPlan.QuestionPlan.SubQuestions
-}
-
-// ApplyNoEvidenceReply 应用无证据回复
-func (p *ConversationExecutionPlan) ApplyNoEvidenceReply() {
-	if p == nil {
-		return
-	}
-	p.NoEvidenceReply = p.RecognitionResult.ResolveNoEvidenceReply(p.RequiresRealTimeSearch)
 }

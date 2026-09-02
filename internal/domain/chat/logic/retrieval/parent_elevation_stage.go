@@ -118,26 +118,19 @@ func (s *ParentElevationStage) buildParentEvidenceDocument(parentChunk *vo.Docum
 	multiChannelWeight := utils.Ternary(len(channels) > 1, 0.10, 0.0)
 	parentScore := maxScore * (1.0 + supportWeight + multiChannelWeight)
 
-	return &vo.DocumentChunk{
-		ID:                fmt.Sprintf("parent-%s", parentChunk.ID),
-		Score:             parentScore,
-		Content:           s.renderParentEvidenceText(parentChunk, childDocuments, maxChars),
-		SourceType:        parentChunk.SourceType,
-		Channel:           utils.Ternary(len(channels) > 1, "hybrid", channels[0]),
-		TaskId:            parentChunk.TaskId,
-		ParentChunkId:     utils.StringToInt64(parentChunk.ID),
-		DocumentId:        parentChunk.DocumentId,
-		ChunkNo:           parentChunk.ChunkNo,
-		SectionPath:       parentChunk.SectionPath,
-		StructureNodeId:   parentChunk.StructureNodeId,
-		StructureNodeType: parentChunk.StructureNodeType,
-		CanonicalPath:     parentChunk.CanonicalPath,
-		ItemIndex:         parentChunk.ItemIndex,
-		OriginalSnippet:   parentChunk.Content,
-		IsElevated:        1,
-		ParentChunkNo:     parentChunk.ChunkNo,
-		Extra:             bestChild.Extra,
-	}
+	chunk := *parentChunk
+	chunk.ID = fmt.Sprintf("parent-%s", parentChunk.ID)
+	chunk.Content = s.renderParentEvidenceText(parentChunk, childDocuments, maxChars)
+	chunk.Score = parentScore
+	chunk.DocumentName = bestChild.DocumentName
+	chunk.KnowledgeBaseId = bestChild.KnowledgeBaseId
+	chunk.KnowledgeBaseName = bestChild.KnowledgeBaseName
+	chunk.Channel = utils.Ternary(len(channels) > 1, "hybrid", channels[0])
+	chunk.ParentChunkId = utils.StringToInt64(parentChunk.ID)
+	chunk.IsElevated = 1
+	chunk.Extra = bestChild.Extra
+
+	return &chunk
 }
 
 // todo 待优化完善，目前先简单选择score最高的子块作为代表

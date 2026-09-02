@@ -234,7 +234,18 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		convCtx.SelectedDocumentId = documents[index].DocumentId
 		convCtx.SelectedDocumentName = documents[index].DocumentName
 		convCtx.SelectedTaskId = documents[index].LastIndexTaskId
+
+		allowedScope := selectionSnapshot.ResolveAllowedExecutionScope()
+
+		// 校验所选文档/任务是否在允许范围内
+		if convCtx.SelectedDocumentId == 0 || convCtx.SelectedTaskId == 0 {
+			return nil, fmt.Errorf("当前文档问答模式缺少有效的文档范围")
+		}
+		if !allowedScope.Consistent || !allowedScope.Contains(convCtx.SelectedDocumentId, convCtx.SelectedTaskId) {
+			return nil, fmt.Errorf("所选文档/任务不在当前允许的知识范围之内")
+		}
 	}
+
 	return convCtx, nil
 }
 

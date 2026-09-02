@@ -17,19 +17,18 @@ type RetrievalChannelResult struct {
 
 // ExecutionInput 是编译后的不可变检索执行请求，针对单次 RetrievalPlan 执行查询编译一次
 type ExecutionInput struct {
-	SubQuestionIndex     int
-	SubQuestion          string
-	ContextHints         []string
-	ScopeMode            string
-	KnowledgeBaseIds     []int64
-	AllowedDocumentScope []int64
-	DocumentScope        []int64
-	TaskScope            []int64
-	Filters              *vo.RetrievalMetadataFilters
-	Channels             []*vo.RetrievalChannelPlan
-	TableIntent          *vo.TableIntent
-	GraphIntent          *vo.GraphIntent
-	RaptorIntent         *vo.RaptorIntent
+	SubQuestionIndex int
+	SubQuestion      string
+	ContextHints     []string
+	ScopeMode        string
+	KnowledgeBaseIds []int64
+	DocumentScope    []int64
+	TaskScope        []int64
+	Filters          *vo.RetrievalMetadataFilters
+	Channels         []*vo.RetrievalChannelPlan
+	TableIntent      *vo.TableIntent
+	GraphIntent      *vo.GraphIntent
+	RaptorIntent     *vo.RaptorIntent
 }
 
 // newRetrievalExecutionInput 从 RetrievalPlan 和 RetrievalExecutionQuery 编译检索执行请求
@@ -48,19 +47,18 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 		return nil, fmt.Errorf("execution query does not match RetrievalPlan question plan")
 	}
 	input := &ExecutionInput{
-		SubQuestionIndex:     query.Index,
-		SubQuestion:          query.SubQuestion,
-		ContextHints:         utils.Copy(query.ContextHints),
-		ScopeMode:            plan.ScopeMode,
-		KnowledgeBaseIds:     utils.Copy(plan.KnowledgeBaseIds),
-		AllowedDocumentScope: utils.Copy(plan.AllowedDocumentScope),
-		DocumentScope:        utils.Copy(plan.DocumentScope),
-		TaskScope:            utils.Copy(plan.TaskScope),
-		Filters:              plan.MetadataFilters.Clone(),
-		Channels:             utils.Map(plan.Channels, func(p *vo.RetrievalChannelPlan) *vo.RetrievalChannelPlan { return p.Clone() }),
-		TableIntent:          plan.TableIntent.Clone(),
-		GraphIntent:          plan.GraphIntent.Clone(),
-		RaptorIntent:         plan.RaptorIntent.Clone(),
+		SubQuestionIndex: query.Index,
+		SubQuestion:      query.SubQuestion,
+		ContextHints:     utils.Copy(query.ContextHints),
+		ScopeMode:        plan.ScopeMode,
+		KnowledgeBaseIds: utils.Copy(plan.KnowledgeBaseIds),
+		DocumentScope:    utils.Copy(plan.DocumentScope),
+		TaskScope:        utils.Copy(plan.TaskScope),
+		Filters:          plan.MetadataFilters.Clone(),
+		Channels:         utils.Map(plan.Channels, func(p *vo.RetrievalChannelPlan) *vo.RetrievalChannelPlan { return p.Clone() }),
+		TableIntent:      plan.TableIntent.Clone(),
+		GraphIntent:      plan.GraphIntent.Clone(),
+		RaptorIntent:     plan.RaptorIntent.Clone(),
 	}
 
 	if err = input.validate(); err != nil {

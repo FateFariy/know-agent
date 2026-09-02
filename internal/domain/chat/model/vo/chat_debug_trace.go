@@ -130,8 +130,6 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	// 检索子问题
 	trace.SubQuestions = append(trace.SubQuestions, execPlan.RetrievalPlan.QuestionPlan.SubQuestions...)
 
-	trace.NoEvidenceReply = execPlan.NoEvidenceReply
-
 	return trace
 }
 

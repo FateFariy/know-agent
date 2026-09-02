@@ -51,17 +51,16 @@ type RewriteConf struct {
 
 // RagConf RAG配置
 type RagConf struct {
-	Enabled                        bool                  `json:",default=true"`                           // 是否启用RAG
-	NoEvidenceReply                string                `json:",default=当前没有从已接入文档中检索到足够证据，暂时不能给出可靠结论。"` // 无证据时的回复
-	ChannelTimeout                 time.Duration         `json:",default=5s"`                             // 通道超时时间
-	SubQuestionTimeout             time.Duration         `json:",default=12s"`                            // 子问题超时时间
-	CandidateTopK                  int                   `json:",default=40"`                             // 候选集TopK
-	FinalTopK                      int                   `json:",default=6"`                              // 最终结果TopK
-	ParentEvidenceMaxChars         int                   `json:",default=2200"`                           // 父证据最大字符数
-	PlanningHistoryMaxChars        int                   `json:",default=1600"`                           // 规划历史最大字符数
-	QuestionHistoryMaxChars        int                   `json:",default=1000"`                           // 问题历史最大字符数
-	TotalEvidenceMaxChars          int                   `json:",default=5200"`                           // 总证据最大字符数
-	PerSubQuestionEvidenceMaxChars int                   `json:",default=2200"`                           // 每个子问题证据最大字符数
+	Enabled                        bool                  `json:",default=true"` // 是否启用RAG
+	ChannelTimeout                 time.Duration         `json:",default=5s"`   // 通道超时时间
+	SubQuestionTimeout             time.Duration         `json:",default=12s"`  // 子问题超时时间
+	CandidateTopK                  int                   `json:",default=40"`   // 候选集TopK
+	FinalTopK                      int                   `json:",default=6"`    // 最终结果TopK
+	ParentEvidenceMaxChars         int                   `json:",default=2200"` // 父证据最大字符数
+	PlanningHistoryMaxChars        int                   `json:",default=1600"` // 规划历史最大字符数
+	QuestionHistoryMaxChars        int                   `json:",default=1000"` // 问题历史最大字符数
+	TotalEvidenceMaxChars          int                   `json:",default=5200"` // 总证据最大字符数
+	PerSubQuestionEvidenceMaxChars int                   `json:",default=2200"` // 每个子问题证据最大字符数
 	Keyword                        KeywordConf           // 关键词通道
 	Vector                         VectorConf            // 向量通道
 	Table                          TableConf             // 表格通道

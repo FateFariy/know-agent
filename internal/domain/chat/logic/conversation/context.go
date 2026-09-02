@@ -39,7 +39,6 @@ type Context struct {
 	SelectedDocumentName           string                                       // 选中的文档名
 	SelectedTaskId                 int64                                        // 选中的任务ID
 	KnowledgeBaseSelectionSnapshot *vo.KnowledgeBaseSelectionSnapshot           // 知识库选择快照
-	CurrentDate                    time.Time                                    // 当前日期
 	CurrentDateText                string                                       // 当前日期文本
 	ExecutionPlan                  atomic.Pointer[vo.ConversationExecutionPlan] // 执行计划
 	DebugTrace                     atomic.Pointer[vo.ChatDebugTrace]            // 调试追踪
@@ -71,8 +70,8 @@ func (c *Context) Finalize(exchange *entity.ChatExchange) {
 	c.UsedTools = list.NewCopyOnWriteList[string](nil)
 	c.StartTime = time.Now()
 	loc, _ := time.LoadLocation(Zone)
-	c.CurrentDate = time.Now().In(loc)
-	c.CurrentDateText = fmt.Sprintf("%s（%s）", c.CurrentDate.Format(time.DateOnly), weekdayMap[c.CurrentDate.Weekday()])
+	currentDate := time.Now().In(loc)
+	c.CurrentDateText = fmt.Sprintf("%s（%s）", currentDate.Format(time.DateOnly), weekdayMap[currentDate.Weekday()])
 }
 
 // BuildChatExchange 构建会话交换对象
