@@ -1,4 +1,4 @@
-package middleware
+package agent
 
 import (
 	"context"
@@ -20,8 +20,8 @@ type EinoAdapter struct {
 
 var _ adk.ChatModelAgentMiddleware = (*EinoAdapter)(nil)
 
-// NewEinoAdapter 创建单个领域中间件的 eino 适配器。
-func NewEinoAdapter(middleware conversation.AgentMiddleware) *EinoAdapter {
+// NewEinoMiddlewareAdapter 创建单个领域中间件的 eino 适配器
+func NewEinoMiddlewareAdapter(middleware conversation.AgentMiddleware) *EinoAdapter {
 	return &EinoAdapter{
 		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
 		middleware:                   middleware,

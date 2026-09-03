@@ -47,9 +47,9 @@ type Context struct {
 	Sink                           adapter.Sink                                 // 消息发送器
 	answerBuffer                   strings.Builder                              // 响应内容缓冲区
 	mu                             sync.Mutex                                   // 响应内容缓冲区锁
-	ThinkingSteps                  *list.CopyOnWriteList[string]                // 思考步骤列表
-	References                     *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
-	UsedTools                      *list.CopyOnWriteList[string]                // 已使用的工具集合
+	thinkingSteps                  *list.CopyOnWriteList[string]                // 思考步骤列表
+	references                     *list.CopyOnWriteList[*vo.SearchReference]   // 引用列表
+	usedTools                      *list.CopyOnWriteList[string]                // 已使用的工具集合
 	Recommendations                []string                                     // 推荐追问列表
 	cache                          *semanticCacheCtx                            // 语义缓存状态（集中管理）
 	StartTime                      time.Time                                    // 开始时间（毫秒精度）
@@ -65,9 +65,9 @@ func (c *Context) Finalize(exchange *entity.ChatExchange) {
 	c.DebugTrace.Store(vo.NewChatDebugTrace(nil))
 	c.Trace = vo.NewConversationTrace(c.ConversationId, exchange.ID, c.TraceId)
 	c.LeaseKey = chatRunningLeasePrefix + c.ConversationId
-	c.ThinkingSteps = list.NewCopyOnWriteList[string](nil)
-	c.References = list.NewCopyOnWriteList[*vo.SearchReference](nil)
-	c.UsedTools = list.NewCopyOnWriteList[string](nil)
+	c.thinkingSteps = list.NewCopyOnWriteList[string](nil)
+	c.references = list.NewCopyOnWriteList[*vo.SearchReference](nil)
+	c.usedTools = list.NewCopyOnWriteList[string](nil)
 	c.StartTime = time.Now()
 	loc, _ := time.LoadLocation(Zone)
 	currentDate := time.Now().In(loc)
@@ -104,7 +104,7 @@ func (c *Context) PublishThinking(content string) error {
 	if c == nil || utils.IsBlank(content) {
 		return nil
 	}
-	c.ThinkingSteps.AddAll([]string{content})
+	c.thinkingSteps.AddAll([]string{content})
 	return c.Sink.Thinking(content, c.ConversationId, c.ExchangeId)
 }
 
@@ -121,7 +121,7 @@ func (c *Context) PublishReferences(refs []*vo.SearchReference) error {
 	if c == nil || len(refs) == 0 {
 		return nil
 	}
-	c.References.AddAll(refs)
+	c.references.AddAll(refs)
 	return c.Sink.References(refs, c.ConversationId, c.ExchangeId)
 }
 
@@ -168,24 +168,24 @@ func (c *Context) ReleaseResources() {
 // AddUsedTools 添加已使用的工具
 func (c *Context) AddUsedTools(tools ...string) {
 	for _, tool := range tools {
-		if !c.UsedTools.Contain(tool) && utils.IsNotBlank(tool) {
-			c.UsedTools.Add(tool)
+		if !c.usedTools.Contain(tool) && utils.IsNotBlank(tool) {
+			c.usedTools.Add(tool)
 		}
 	}
 }
 
 // SnapshotUsedTools 获取已使用的工具列表的快照
 func (c *Context) SnapshotUsedTools() []string {
-	return c.UsedTools.SubList(0, c.UsedTools.Size())
+	return c.usedTools.SubList(0, c.usedTools.Size())
 }
 
 // UniqueReferences 获取唯一引用列表
 func (c *Context) UniqueReferences() []*vo.SearchReference {
-	size := c.References.Size()
+	size := c.references.Size()
 	if size == 0 {
 		return nil
 	}
-	references := c.References.SubList(0, size)
+	references := c.references.SubList(0, size)
 	return utils.Distinct(references, func(ref *vo.SearchReference) string {
 		return ref.UniqueKey()
 	})
@@ -193,11 +193,11 @@ func (c *Context) UniqueReferences() []*vo.SearchReference {
 
 // SnapshotThinkingSteps 获取思考步骤列表的快照
 func (c *Context) SnapshotThinkingSteps() []string {
-	size := c.ThinkingSteps.Size()
+	size := c.thinkingSteps.Size()
 	if size == 0 {
 		return nil
 	}
-	return c.ThinkingSteps.SubList(0, size)
+	return c.thinkingSteps.SubList(0, size)
 }
 
 // WriteAnswerBuffer 写入响应内容缓冲区

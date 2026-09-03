@@ -14,7 +14,6 @@ import (
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
-	"github.com/swiftbit/know-agent/internal/infrastructure/port/agent/middleware"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -65,9 +64,13 @@ func WithInstruction(instruction string) Option {
 }
 
 // WithTools 追加 eino 工具
-func WithTools(tools ...tool.BaseTool) Option {
+func WithTools(tools ...conversation.Tool[any, any]) Option {
 	return func(r *EinoAgentRunner) {
-		r.tools = append(r.tools, tools...)
+		einoTools := make([]tool.BaseTool, 0, len(tools))
+		for _, t := range tools {
+			einoTools = append(einoTools, NewEinoToolAdapter(t))
+		}
+		r.tools = append(r.tools, einoTools...)
 	}
 }
 
@@ -76,7 +79,7 @@ func WithMiddleware(middlewares ...conversation.AgentMiddleware) Option {
 	return func(r *EinoAgentRunner) {
 		handlers := make([]adk.TypedChatModelAgentMiddleware[*schema.Message], 0, len(middlewares))
 		for _, m := range middlewares {
-			handlers = append(handlers, middleware.NewEinoAdapter(m))
+			handlers = append(handlers, NewEinoMiddlewareAdapter(m))
 		}
 		r.middlewares = append(r.middlewares, handlers...)
 	}
@@ -109,7 +112,7 @@ func NewEinoAgentRunner(svcCtx *svc.ServiceContext, opts ...Option) *EinoAgentRu
 }
 
 // Run 执行一次 deep agent 会话，流式输出思考过程与最终回答。
-// 结果与思考过程分别累积在 convCtx（Answer / ThinkingSteps），并通过 Sink 实时推送前端。
+// 结果与思考过程分别累积在 convCtx（Answer / thinkingSteps），并通过 Sink 实时推送前端。
 func (r *EinoAgentRunner) Run(ctx context.Context, convCtx *conversation.Context) error {
 	if convCtx == nil {
 		return errors.New("convCtx 不能为空")
