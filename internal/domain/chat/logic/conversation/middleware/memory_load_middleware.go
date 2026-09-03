@@ -4,7 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/aggregate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
@@ -12,18 +14,24 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// MemoryLoadMiddleware 装载会话记忆并组装初始执行计划，同时把
-// 记忆摘要与时效/实时检索规则判断注入 agent 系统指令
+const (
+	maxEvidenceAnchorSnippetChars = 300 // 证据锚点内容片段最大字符数
+	maxRecentExchanges            = 3   // 追问承接最多回溯的对话轮次
+)
+
+// MemoryLoadMiddleware 装载会话记忆并组装初始执行计划，同时把记忆摘要与时效/实时检索规则判断、上一轮证据锚点（追问承接）作为Agent指令注入
 type MemoryLoadMiddleware struct {
 	conversation.BaseAgentMiddleware
 	memoryManager           conversation.SessionMemoryManager
-	planningHistoryMaxChars int // 规划历史最大字符数
+	repo                    adapter.ChatRepository // 用于加载最近证据锚点
+	planningHistoryMaxChars int                    // 规划历史最大字符数
 }
 
 // NewMemoryLoadMiddleware 创建记忆装载中间件
-func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager conversation.SessionMemoryManager) *MemoryLoadMiddleware {
+func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager conversation.SessionMemoryManager, repo adapter.ChatRepository) *MemoryLoadMiddleware {
 	return &MemoryLoadMiddleware{
 		memoryManager:           memoryManager,
+		repo:                    repo,
 		planningHistoryMaxChars: svcCtx.Config.Chat.Rag.PlanningHistoryMaxChars,
 	}
 }
@@ -70,6 +78,8 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 	// 当前问题 + 近期对话转录，用于后续改写与检索
 	recentQuestions := utils.Trim(memoryContext.RecentQuestionTranscript)
 	questionHistoryContext := vo.NewQuestionHistoryContext(recentQuestions, m.planningHistoryMaxChars)
+	// 追问承接：装配上一轮证据锚点
+	anchors := m.loadFollowUpAnchors(ctx, convCtx)
 
 	// 组装初始执行计划（所有检索/改写字段先以原始问题为兜底值，防止空值扩散）todo 这部分后续可能删除
 	execPlan := &vo.ConversationExecutionPlan{
@@ -88,9 +98,25 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 		HistoryCoveredExchangeCount: memoryContext.CoveredExchangeCount,
 		HistoryCompressionCount:     memoryContext.CompressionCount,
 		CurrentDateText:             convCtx.CurrentDateText,
+		RecentEvidenceAnchors:       anchors,
 	}
 	convCtx.SetExecutePlan(execPlan)
+
 	return memoryContext, nil
+}
+
+// loadFollowUpAnchors 加载并过滤上一轮证据锚点（失败仅告警，不阻断 agent）
+func (m *MemoryLoadMiddleware) loadFollowUpAnchors(ctx context.Context, convCtx *conversation.Context) vo.EvidenceAnchors {
+	anchors, err := m.loadRecentEvidenceAnchors(ctx, convCtx.ConversationId)
+	if err != nil {
+		logx.Warnf("加载最近证据锚点失败, conversationId=%s, err=%v", convCtx.ConversationId, err)
+		return nil
+	}
+	docIds := []int64{convCtx.SelectedDocumentId}
+	if convCtx.ChatMode == enum.ChatQueryModeAutoDocument {
+		docIds = convCtx.KnowledgeBaseSelectionSnapshot.SelectedDocumentIds()
+	}
+	return filterEvidenceAnchorsByDocument(anchors, docIds...)
 }
 
 // buildInstructionHints 组装待注入指令的动态提示
@@ -111,17 +137,56 @@ func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *conversation.Conte
 	execPlan.RequiresCurrentDateAnchoring = requiresCurrentDateAnchoring
 
 	var hints []string
-	if utils.IsNotBlank(convCtx.CurrentDateText) {
-		hints = append(hints, "当前日期："+convCtx.CurrentDateText+"。")
+	addHint := func(condition bool, content string) {
+		if condition {
+			hints = append(hints, content)
+		}
 	}
-	if requiresCurrentDateAnchoring {
-		hints = append(hints, "当前问题包含相对时间或强时效表达（如“今天、明天、现在、最新、本周、本月”等），涉及日期必须以此为准，不要用检索结果中的旧日期替代今天。")
-	}
-	if requiresRealTimeSearch {
-		hints = append(hints, "当前问题需要核实最新信息，检索证据不足或日期滞后时请明确说明不确定性，不要编造。")
-	}
-	if utils.IsNotBlank(execPlan.HistorySummary) {
-		hints = append(hints, "相关会话背景：\n"+execPlan.HistorySummary)
-	}
+	addHint(utils.IsNotBlank(convCtx.CurrentDateText), "当前日期："+convCtx.CurrentDateText+"。")
+	addHint(requiresCurrentDateAnchoring, "当前问题包含相对时间或强时效表达（如“今天、明天、现在、最新、本周、本月”等），涉及日期必须以此为准，不要用检索结果中的旧日期替代今天。")
+	addHint(requiresRealTimeSearch, "当前问题需要核实最新信息，检索证据不足或日期滞后时请明确说明不确定性，不要编造。")
+	addHint(utils.IsNotBlank(execPlan.HistorySummary), "相关会话背景：\n"+execPlan.HistorySummary)
+	addHint(len(execPlan.RecentEvidenceAnchors) > 0, execPlan.RecentEvidenceAnchors.RenderFollowUpHint())
+
 	return hints
+}
+
+// loadRecentEvidenceAnchors 从最近几轮已完成回答中加载证据锚点（追问承接信息源）。
+// 锚点仅依赖会话历史，与路由决策无关，在 agent 启动前装配。
+func (m *MemoryLoadMiddleware) loadRecentEvidenceAnchors(ctx context.Context, conversationId string) (vo.EvidenceAnchors, error) {
+	if conversationId == "" {
+		return nil, nil
+	}
+	exchanges, err := m.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
+	if err != nil || len(exchanges) == 0 {
+		return nil, err
+	}
+
+	var anchors vo.EvidenceAnchors
+	for _, exchange := range exchanges {
+		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
+			continue
+		}
+		for _, ref := range exchange.References {
+			anchor := ref.ToEvidenceAnchor(maxEvidenceAnchorSnippetChars)
+			if anchor == nil {
+				continue
+			}
+			anchors = append(anchors, anchor)
+			if len(anchors) >= maxRecentExchanges {
+				return anchors, nil
+			}
+		}
+	}
+	return anchors, nil
+}
+
+// filterEvidenceAnchorsByDocument 保留属于指定文档集合内的证据锚点；文档集合为空时原样返回。
+func filterEvidenceAnchorsByDocument(anchors vo.EvidenceAnchors, allDocumentIds ...int64) vo.EvidenceAnchors {
+	if len(anchors) == 0 || len(allDocumentIds) == 0 {
+		return anchors
+	}
+	return utils.Filter(anchors, func(anchor *vo.EvidenceAnchor) bool {
+		return anchor != nil && utils.ContainsAny(allDocumentIds, anchor.DocumentId)
+	})
 }

@@ -1,11 +1,11 @@
-package route
+package tool
 
 import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
-// NavigationInput 文档内结构路由的轻量输入
+// NavigationInput 文档内结构路由
 type NavigationInput struct {
 	DocumentId      int64                               // 文档 ID
 	Question        string                              // 原始问题
@@ -62,9 +62,7 @@ func (n *NavigationInput) PrimaryRetrievalIntent() enum.RetrievalIntent {
 	return enum.RetrievalIntentGeneral
 }
 
-// ResolveAction 解析高置信结构导航动作。
-// 仅当 HasStructureNav 标志或意图为 STRUCTURE 时，按问题文本正则推导结构语法动作；
-// 否则返回空串，说明不命中结构导航分支，走普通混合检索。
+// ResolveAction 解析高置信结构导航动作
 func (n *NavigationInput) ResolveAction() string {
 	if n == nil || !n.HasStructureNav || n.QueryType != enum.QueryTypeStructureNavigation {
 		return ""

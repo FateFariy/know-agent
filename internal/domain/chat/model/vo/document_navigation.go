@@ -4,13 +4,11 @@ import "github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 
 // DocumentNavigationDecision 文档问答路由结果
 type DocumentNavigationDecision struct {
-	NavigationAction  enum.DocumentNavigationAction `json:"navigationAction"`  // 导航动作
-	StructureAnchor   *ConversationStructureAnchor  `json:"structureAnchor"`   // 结构锚点
-	ItemAnchor        *ConversationItemAnchor       `json:"itemAnchor"`        // 项目锚点
-	RetrievalIntent   enum.RetrievalIntent          `json:"retrievalIntent"`   // 检索意图
-	SummaryText       string                        `json:"summaryText"`       // 摘要文本
-	QueryContextHints []string                      `json:"queryContextHints"` // 查询上下文提示
-	SoftSectionHints  []string                      `json:"softSectionHints"`  // 软章节提示
+	NavigationAction enum.DocumentNavigationAction `json:"navigationAction"` // 导航动作
+	StructureAnchor  *ConversationStructureAnchor  `json:"structureAnchor"`  // 结构锚点
+	ItemAnchor       *ConversationItemAnchor       `json:"itemAnchor"`       // 项目锚点
+	RetrievalIntent  enum.RetrievalIntent          `json:"retrievalIntent"`  // 检索意图
+	SummaryText      string                        `json:"summaryText"`      // 摘要文本
 }
 
 // PrimaryIntent 获取主要检索意图

@@ -73,10 +73,7 @@ func ToChatDocumentNavigationDecision(src *cvo.DocumentNavigationDecision) *chat
 		NavigationAction: src.NavigationAction,
 		StructureAnchor:  ToChatStructureAnchor(src.StructureAnchor),
 		ItemAnchor:       ToChatItemAnchor(src.ItemAnchor),
-		//RetrievalPlan:     ToChatRetrievalQuestionPlan(src.RetrievalPlan),
-		SummaryText:       src.SummaryText,
-		QueryContextHints: append([]string(nil), src.QueryContextHints...),
-		SoftSectionHints:  append([]string(nil), src.SoftSectionHints...),
+		SummaryText:      src.SummaryText,
 	}
 }
 

@@ -13,8 +13,6 @@ import (
 
 const (
 	recommendationThreshold = 0.55
-	maxSnippetChars         = 300
-	maxRecentExchanges      = 3
 )
 
 // RouteStage 路由判定阶段
@@ -218,19 +216,6 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
 	}
 
-	anchors, err := r.loadRecentEvidenceAnchors(ctx, convCtx.ConversationId, maxRecentExchanges)
-	if err != nil {
-		ctx = vo.OnError(ctx, "加载最近证据锚点失败。", err)
-		return err
-	}
-	if convCtx.ChatMode == enum.ChatQueryModeDocument {
-		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.SelectedDocumentId)
-	} else {
-		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.KnowledgeBaseSelectionSnapshot.SelectedDocumentIds()...)
-	}
-	execPlan.QuestionHistoryContext.ApplyFollowUpAndEvidence(convCtx.Question, execPlan.RecognitionResult, anchors)
-	execPlan.RecentEvidenceAnchors = anchors
-
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
 	execPlan.NavigationDecision = navigationDecision
 	execPlan.RetrievalPlan = r.buildRetrievalPlan(convCtx, execPlan)
@@ -243,46 +228,6 @@ func (r *RouteStage) routeAndFinalizePlan(ctx context.Context, convCtx *Context,
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
 
 	return nil
-}
-
-// loadRecentEvidenceAnchors 加载最近的证据锚点，从对话历史中抽取追问可继承的结构锚点
-func (r *RouteStage) loadRecentEvidenceAnchors(ctx context.Context, conversationId string, limit int) (vo.EvidenceAnchors, error) {
-	if conversationId == "" || limit <= 0 {
-		return nil, nil
-	}
-
-	exchanges, err := r.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
-	if err != nil || len(exchanges) == 0 {
-		return nil, err
-	}
-
-	var anchors vo.EvidenceAnchors
-	for _, exchange := range exchanges {
-		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
-			continue
-		}
-		for _, ref := range exchange.References {
-			anchor := ref.ToEvidenceAnchor(maxSnippetChars)
-			if anchor == nil {
-				continue
-			}
-			anchors = append(anchors, anchor)
-			if len(anchors) >= limit {
-				return anchors, nil
-			}
-		}
-	}
-	return anchors, nil
-}
-
-func (r *RouteStage) filterValidEvidenceAnchors(anchors vo.EvidenceAnchors, allDocumentIds ...int64) vo.EvidenceAnchors {
-	if len(anchors) == 0 || len(allDocumentIds) == 0 {
-		return anchors
-	}
-
-	return utils.Filter(anchors, func(anchor *vo.EvidenceAnchor) bool {
-		return anchor != nil && (utils.ContainsAny(allDocumentIds, anchor.DocumentId))
-	})
 }
 
 // buildRetrievalPlan

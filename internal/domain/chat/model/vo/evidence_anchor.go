@@ -8,6 +8,11 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 )
 
+const (
+	maxFollowUpHintAnchors   = 3   // 追问提示最多展示的锚点数
+	followUpHintSnippetChars = 120 // 追问提示中锚点片段最大字符数
+)
+
 type EvidenceAnchor struct {
 	DocumentId        int64   // 文档ID
 	DocumentName      string  // 文档名称
@@ -122,4 +127,41 @@ func (anchors EvidenceAnchors) ResolveTopic() string {
 	}
 	anchor := anchors[0]
 	return utils.BlankToDefault(anchor.SectionPath, anchor.DocumentName)
+}
+
+// RenderFollowUpHint 渲染上一轮证据落点的精简提示，供 agent 指令注入。
+// 仅用于解析追问中的指代与定位检索，不作为当前回答的事实来源。
+func (anchors EvidenceAnchors) RenderFollowUpHint() string {
+	if len(anchors) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i, a := range anchors {
+		if i >= maxFollowUpHintAnchors {
+			break
+		}
+		if a == nil {
+			continue
+		}
+		b.WriteString("- 文档：")
+		b.WriteString(utils.BlankToDefault(utils.Trim(a.DocumentName), "未命名"))
+		if utils.IsNotBlank(a.SectionPath) {
+			b.WriteString("；章节：")
+			b.WriteString(utils.Trim(a.SectionPath))
+		}
+		if a.ItemIndex > 0 {
+			b.WriteString("；条目：")
+			b.WriteString(utils.ToString(a.ItemIndex))
+		}
+		if utils.IsNotBlank(a.Snippet) {
+			b.WriteString("\n  片段：")
+			b.WriteString(utils.ClipHead(utils.Trim(a.Snippet), followUpHintSnippetChars))
+		}
+		b.WriteByte('\n')
+	}
+	body := utils.Trim(b.String())
+	if body == "" {
+		return ""
+	}
+	return "上一轮回答的证据落点（仅用于解析“那个”“上面 [编号]”等指代，不作为事实来源）：\n" + body
 }

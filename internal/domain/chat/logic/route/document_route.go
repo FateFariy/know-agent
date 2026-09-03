@@ -8,6 +8,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/tool"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -46,7 +47,7 @@ func NewDocumentRouter(querier GraphQuerier, indexer NavigationIndexer) *Documen
 //  3. 高置信结构导航时走结构树确定性查询
 //  4. 明确编号项时作为结构锚点软辅助混合检索
 //  5. 其余按普通文档问题处理
-func (r *DocumentRouterImpl) Route(ctx context.Context, input *NavigationInput) (*vo.DocumentNavigationDecision, error) {
+func (r *DocumentRouterImpl) Route(ctx context.Context, input *tool.NavigationInput) (*vo.DocumentNavigationDecision, error) {
 	if input == nil {
 		return nil, fmt.Errorf("输入为空")
 	}
@@ -131,7 +132,7 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *NavigationInput) 
 
 // buildDecision 构建导航决策
 func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSection,
-	itemIndex *int, navInput *NavigationInput, retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
+	itemIndex *int, navInput *tool.NavigationInput, retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
 
 	decision := &vo.DocumentNavigationDecision{
 		NavigationAction: action,
