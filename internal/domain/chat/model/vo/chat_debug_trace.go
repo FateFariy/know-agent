@@ -5,6 +5,7 @@ import (
 
 	list "github.com/duke-git/lancet/v2/datastructure/list"
 
+	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 )
 
@@ -127,12 +128,15 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 
 // AddToolTraces 添加工具调用轨迹
 func (t *ChatDebugTrace) AddToolTraces(traces ...*ChatToolTrace) {
+	if t == nil {
+		return
+	}
 	t.toolTraces.AddAll(traces)
 }
 
 // AddModelUsageTrace 添加模型使用轨迹
 func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
-	if trace == nil {
+	if t == nil || trace == nil {
 		return
 	}
 	t.ModelUsageTraces = append(t.ModelUsageTraces, trace)
@@ -140,25 +144,32 @@ func (t *ChatDebugTrace) AddModelUsageTrace(trace *ChatModelUsageTrace) {
 
 // AddUsedChannels 添加使用的渠道
 func (t *ChatDebugTrace) AddUsedChannels(channels ...string) {
-	t.usedChannels.AddAll(channels)
-}
-
-func (t *ChatDebugTrace) SetUsedChannels(channels ...string) {
-	t.usedChannels.Clear()
-	t.usedChannels.AddAll(channels)
+	if t == nil {
+		return
+	}
+	for _, channel := range channels {
+		if !t.usedChannels.Contain(channel) && utils.IsNotBlank(channel) {
+			t.usedChannels.Add(channel)
+		}
+	}
 }
 
 func (t *ChatDebugTrace) AddRetrievalNotes(notes ...string) {
-	t.retrievalNotes.AddAll(notes)
-}
-
-func (t *ChatDebugTrace) SetRetrievalNotes(notes ...string) {
-	t.retrievalNotes.Clear()
-	t.retrievalNotes.AddAll(notes)
+	if t == nil {
+		return
+	}
+	for _, note := range notes {
+		if !t.retrievalNotes.Contain(note) && utils.IsNotBlank(note) {
+			t.retrievalNotes.Add(note)
+		}
+	}
 }
 
 // Serialize 序列化调试轨迹
 func (t *ChatDebugTrace) Serialize() string {
+	if t == nil {
+		return ""
+	}
 	t.UsedChannels = t.usedChannels.SubList(0, t.usedChannels.Size())
 	t.ToolTraces = t.toolTraces.SubList(0, t.toolTraces.Size())
 	t.RetrievalNotes = t.retrievalNotes.SubList(0, t.retrievalNotes.Size())

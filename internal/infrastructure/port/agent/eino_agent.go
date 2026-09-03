@@ -7,13 +7,15 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/deep"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/middleware"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/tool"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -30,7 +32,7 @@ type EinoAgentRunner struct {
 	description string
 	instruction string
 	chatModel   model.BaseChatModel
-	tools       []tool.BaseTool
+	tools       []einotool.BaseTool
 	middlewares []adk.TypedChatModelAgentMiddleware[*schema.Message]
 
 	runner  *adk.Runner
@@ -64,9 +66,9 @@ func WithInstruction(instruction string) Option {
 }
 
 // WithTools 追加 eino 工具
-func WithTools(tools ...conversation.Tool[any, any]) Option {
+func WithTools(tools ...tool.Tool[any, any]) Option {
 	return func(r *EinoAgentRunner) {
-		einoTools := make([]tool.BaseTool, 0, len(tools))
+		einoTools := make([]einotool.BaseTool, 0, len(tools))
 		for _, t := range tools {
 			einoTools = append(einoTools, NewEinoToolAdapter(t))
 		}
@@ -75,7 +77,7 @@ func WithTools(tools ...conversation.Tool[any, any]) Option {
 }
 
 // WithMiddleware 追加领域层 Agent 中间件
-func WithMiddleware(middlewares ...conversation.AgentMiddleware) Option {
+func WithMiddleware(middlewares ...middleware.AgentMiddleware) Option {
 	return func(r *EinoAgentRunner) {
 		handlers := make([]adk.TypedChatModelAgentMiddleware[*schema.Message], 0, len(middlewares))
 		for _, m := range middlewares {
@@ -183,11 +185,11 @@ func (r *EinoAgentRunner) consumeMessageStream(convCtx *conversation.Context, st
 			}
 		}
 		if chunk.Content != "" {
-			plan := convCtx.ExecutionPlan.Load()
-			if plan == nil || plan.RetrievalResult == nil {
+			result := convCtx.ExecutionPlan.Load().RetrievalResult
+			if result == nil {
 				return nil
 			}
-			refs := plan.RetrievalResult.FlattenReferences()
+			refs := result.FlattenReferences()
 			if err = convCtx.PublishReferences(refs); err != nil {
 				logx.Warnf("发布引用失败: %v", err)
 			}

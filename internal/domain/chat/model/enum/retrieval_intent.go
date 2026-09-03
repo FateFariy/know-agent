@@ -9,15 +9,15 @@ import (
 type RetrievalIntent = string
 
 const (
-	RetrievalIntentGeneral   RetrievalIntent = "GENERAL"
-	RetrievalIntentTable     RetrievalIntent = "TABLE"
-	RetrievalIntentGraphRAG  RetrievalIntent = "GRAPH_RAG"
-	RetrievalIntentRaptor    RetrievalIntent = "RAPTOR"
-	RetrievalIntentStructure RetrievalIntent = "STRUCTURE"
+	RetrievalIntentGeneral   RetrievalIntent = "general"
+	RetrievalIntentTable     RetrievalIntent = "table"
+	RetrievalIntentGraphRAG  RetrievalIntent = "graph_rag"
+	RetrievalIntentRaptor    RetrievalIntent = "raptor"
+	RetrievalIntentStructure RetrievalIntent = "structure"
 )
 
 // ParseRetrievalIntents 解析字符串列表为 RetrievalIntent 列表，去重并忽略无效值
-// 特殊处理：VECTOR/BM25/KEYWORD 映射为 GENERAL
+// 特殊处理：vector/bm25/keyword 映射为 general
 func ParseRetrievalIntents(raws []string) []RetrievalIntent {
 	if len(raws) == 0 {
 		return nil
@@ -31,8 +31,8 @@ func ParseRetrievalIntents(raws []string) []RetrievalIntent {
 			continue
 		}
 
-		// VECTOR/BM25/KEYWORD 映射为 GENERAL
-		if normalized == "VECTOR" || normalized == "BM25" || normalized == "KEYWORD" {
+		// vector/bm25/keyword 映射为 general
+		if normalized == "vector" || normalized == "bm25" || normalized == "keyword" {
 			if !seen[RetrievalIntentGeneral] {
 				seen[RetrievalIntentGeneral] = true
 				result = append(result, RetrievalIntentGeneral)

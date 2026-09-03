@@ -1,6 +1,10 @@
-package conversation
+package middleware
 
-import "context"
+import (
+	"context"
+
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+)
 
 // BeforeAgentInput BeforeAgent 入参
 type BeforeAgentInput struct {
@@ -22,10 +26,10 @@ type AgentMiddleware interface {
 	Name() string
 
 	// BeforeAgent agent 启动前回调
-	BeforeAgent(ctx context.Context, convCtx *Context, input *BeforeAgentInput) (*BeforeAgentOutput, error)
+	BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *BeforeAgentInput) (*BeforeAgentOutput, error)
 
 	// AfterAgent agent 正常进入终态后回调
-	AfterAgent(ctx context.Context, convCtx *Context) error
+	AfterAgent(ctx context.Context, convCtx *conversation.Context) error
 }
 
 // BaseAgentMiddleware 中间件空实现，嵌入后按需覆写单个时机即可
@@ -35,7 +39,7 @@ type BaseAgentMiddleware struct{}
 func (b *BaseAgentMiddleware) Name() string { return "" }
 
 // BeforeAgent 默认不改动指令
-func (b *BaseAgentMiddleware) BeforeAgent(_ context.Context, _ *Context, input *BeforeAgentInput) (*BeforeAgentOutput, error) {
+func (b *BaseAgentMiddleware) BeforeAgent(_ context.Context, _ *conversation.Context, input *BeforeAgentInput) (*BeforeAgentOutput, error) {
 	if input == nil {
 		return nil, nil
 	}
@@ -43,4 +47,6 @@ func (b *BaseAgentMiddleware) BeforeAgent(_ context.Context, _ *Context, input *
 }
 
 // AfterAgent 默认无操作
-func (b *BaseAgentMiddleware) AfterAgent(_ context.Context, _ *Context) error { return nil }
+func (b *BaseAgentMiddleware) AfterAgent(_ context.Context, _ *conversation.Context) error {
+	return nil
+}

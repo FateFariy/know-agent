@@ -6,6 +6,7 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
@@ -13,11 +14,13 @@ import (
 const (
 	defaultNoEvidenceReply = "未检索到相关结果，建议调整查询条件后重试，如修改检索问题"
 	toolDescription        = "根据用户输入的问题在知识库中检索证据。query 为字符串数组：若原问题包含多个独立子问题，请拆分为多个子问题后传入，工具会并行检索并返回合并证据。"
+	queryCharMinLength     = 5
 )
 
 type SearchKnowledgeBaseInput struct {
-	Query []string `json:"query" jsonschema_description:"待检索的子问题字符串数组：若原问题包含多个独立子问题，可拆分后一次传入，每一项必须是一句完整的自然语言问句（含主谓宾、必要上下文与问号），而非一组关键词碎片。必填" jsonschema:"required"`
-	TopK  int      `json:"top_k,omitempty" jsonschema_description:"每个子问题返回的检索结果数量，默认 5"`
+	QueryType        enum.QueryType         `json:"query_type" jsonschema_description:"用户原始问题类型" jsonschema:"enum=document_qa,enum=follow_up,enum=structure_navigation,enum=table_query,enum=graph_relation,enum=global_summary,enum=capability_query"`
+	SubQuestions     []string               `json:"subquestions" jsonschema_description:"待检索的子问题字符串数组：若原问题包含多个独立子问题，可拆分后一次传入，每一项必须是一句完整的自然语言问句（含主谓宾、必要上下文与问号），而非一组关键词碎片。必填" jsonschema:"required"`
+	RetrievalIntents []enum.RetrievalIntent `json:"retrieval_intents" jsonschema_description:"检索意图" jsonschema:"enum=general,enum=table,enum=graph_rag,enum=raptor,enum=structure"`
 }
 
 // KnowledgeBaseSearchTool 知识库检索工具
@@ -56,22 +59,14 @@ func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, input *SearchKnowl
 		return "", errors.New("知识库检索时执行计划未就绪")
 	}
 
-	plan := t.resolvePlan(execPlan, query, topK)
-	if plan == nil {
-		return "", errors.New("知识库检索计划未就绪，请先完成知识范围/文档结构路由")
-	}
-
-	result, err := t.retriever.Retrieve(ctx, plan)
+	execPlan.RetrievalPlan.QuestionPlan = newQuestionPlan(execPlan, input)
+	result, err := t.retriever.Retrieve(ctx, execPlan.RetrievalPlan)
 	if err != nil {
 		return "", err
 	}
-	execPlan.RetrievalPlan = plan
 	execPlan.RetrievalResult = result
 	convCtx.SetExecutePlan(execPlan)
-
-	if err = t.afterRetrieve(ctx, convCtx, result); err != nil {
-		return "", err
-	}
+	t.afterRetrieve(convCtx, result)
 
 	if result.IsEmpty() {
 		return defaultNoEvidenceReply, nil
@@ -79,47 +74,61 @@ func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, input *SearchKnowl
 	return t.evidenceRenderer.RenderEvidence(result), nil
 }
 
-// resolvePlan 解析待执行的检索计划：优先复用路由阶段已生成的计划，query/topK
-// 仅在明确给出时覆盖计划（浅拷贝，避免污染执行计划对象）。
-func (t *KnowledgeBaseSearchTool) resolvePlan(execPlan *vo.ConversationExecutionPlan, query string, topK int) *vo.RetrievalPlan {
-	plan := execPlan.RetrievalPlan
-	if plan == nil {
-		return nil
-	}
-	overrideQuery := ""
-	if q := utils.CompactWhitespace(query); q != "" {
-		overrideQuery = q
-	}
-	if overrideQuery == "" && (topK <= 0 || topK == plan.FinalTopK) {
-		return plan
-	}
-
-	cloned := *plan
-	if overrideQuery != "" {
-		cloned.QuestionPlan = &vo.RetrievalQuestionPlan{
-			Question:         overrideQuery,
-			ExecutionQueries: []*vo.RetrievalExecutionQuery{{Index: 1, SubQuestion: overrideQuery}},
-			SubQuestions:     []string{overrideQuery},
-		}
-	}
-	if topK > 0 {
-		cloned.FinalTopK = topK
-	}
-	return &cloned
-}
-
-// afterRetrieve 检索完成后下发思考事件与已用渠道（引用发布由答案输出中间件统一负责）。
-func (t *KnowledgeBaseSearchTool) afterRetrieve(ctx context.Context, convCtx *conversation.Context, result *vo.RetrievalResult) error {
-	for _, note := range result.RetrievalNotes() {
-		if err := convCtx.PublishThinking(note); err != nil {
-			return err
-		}
-	}
+// afterRetrieve 检索完成后添加已用渠道
+func (t *KnowledgeBaseSearchTool) afterRetrieve(convCtx *conversation.Context, result *vo.RetrievalResult) {
 	channels := result.UsedChannels()
 	convCtx.AddUsedTools(channels...)
-	if debugTrace := convCtx.DebugTrace.Load(); debugTrace != nil {
-		debugTrace.SetUsedChannels(channels...)
-		debugTrace.SetRetrievalNotes(result.RetrievalNotes()...)
+	debugTrace := convCtx.DebugTrace.Load()
+	debugTrace.AddUsedChannels(channels...)
+	debugTrace.AddRetrievalNotes(result.RetrievalNotes()...)
+}
+
+// newQuestionPlan 构建检索问题计划
+func newQuestionPlan(exec *vo.ConversationExecutionPlan, input *SearchKnowledgeBaseInput) *vo.RetrievalQuestionPlan {
+	currentQuestion := utils.CompactWhitespace(exec.OriginalQuestion)
+	rewrittenQuestion := utils.CompactWhitespace(exec.RewriteQuestion)
+	question := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
+
+	var inheritedAnchors []*vo.RetrievalContextAnchor
+	if input.QueryType == enum.QueryTypeFollowUp {
+		keyOf := func(anchor *vo.EvidenceAnchor) (string, *vo.RetrievalContextAnchor, bool) {
+			if inherited := anchor.ToRetrievalContextAnchor(); inherited != nil {
+				return inherited.UniqueKey(), inherited, true
+			}
+			return "", nil, false
+		}
+		inheritedAnchors = utils.FilterMapUniqueLimit(exec.RecentEvidenceAnchors, 5, keyOf)
 	}
-	return nil
+	contextHints := make([]string, 0, len(inheritedAnchors))
+	for _, anchor := range inheritedAnchors {
+		contextHints = append(contextHints, anchor.AnchorHint())
+	}
+
+	of := func(sq string) (string, string, bool) {
+		sq = utils.CompactWhitespace(sq)
+		return sq, sq, utils.Len(sq) >= queryCharMinLength
+	}
+	subQuestions := utils.FilterMapUniqueLimit(input.SubQuestions, 5, of)
+	if len(subQuestions) == 0 && utils.IsNotBlank(question) {
+		subQuestions = append(subQuestions, question)
+	}
+
+	executionQueries := make([]*vo.RetrievalExecutionQuery, 0, len(subQuestions))
+	for i, sq := range subQuestions {
+		executionQueries = append(executionQueries, &vo.RetrievalExecutionQuery{
+			Index:        i + 1,
+			SubQuestion:  sq,
+			ContextHints: append([]string{}, contextHints...),
+		})
+	}
+
+	return &vo.RetrievalQuestionPlan{
+		Question:                 question,
+		ExecutionQueries:         executionQueries,
+		FollowUp:                 len(inheritedAnchors) > 0,
+		HistoryInherited:         len(inheritedAnchors) > 0,
+		HistoryInheritanceSource: utils.Ternary(len(inheritedAnchors) > 0, "FINAL_EVIDENCE_ANCHOR", "NONE"),
+		InheritedContextAnchors:  inheritedAnchors,
+		SubQuestions:             subQuestions,
+	}
 }

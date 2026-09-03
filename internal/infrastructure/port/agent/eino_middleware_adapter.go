@@ -6,6 +6,7 @@ import (
 	"github.com/cloudwego/eino/adk"
 
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/middleware"
 )
 
 // EinoAdapter 将单个领域 AgentMiddleware 适配为 eino 的 ChatModelAgentMiddleware（*schema.Message）。
@@ -15,13 +16,13 @@ import (
 //   - 把 eino 生命周期状态翻译为领域时机（终态答复文本、指令修正回写等）
 type EinoAdapter struct {
 	*adk.BaseChatModelAgentMiddleware
-	middleware conversation.AgentMiddleware
+	middleware middleware.AgentMiddleware
 }
 
 var _ adk.ChatModelAgentMiddleware = (*EinoAdapter)(nil)
 
 // NewEinoMiddlewareAdapter 创建单个领域中间件的 eino 适配器
-func NewEinoMiddlewareAdapter(middleware conversation.AgentMiddleware) *EinoAdapter {
+func NewEinoMiddlewareAdapter(middleware middleware.AgentMiddleware) *EinoAdapter {
 	return &EinoAdapter{
 		BaseChatModelAgentMiddleware: &adk.BaseChatModelAgentMiddleware{},
 		middleware:                   middleware,
@@ -33,7 +34,7 @@ func (a *EinoAdapter) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgen
 	if a.middleware == nil {
 		return ctx, runCtx, nil
 	}
-	output, err := a.middleware.BeforeAgent(ctx, conversation.AgentContextFrom(ctx), &conversation.BeforeAgentInput{
+	output, err := a.middleware.BeforeAgent(ctx, conversation.AgentContextFrom(ctx), &middleware.BeforeAgentInput{
 		Instruction: runCtx.Instruction,
 	})
 	if err != nil {

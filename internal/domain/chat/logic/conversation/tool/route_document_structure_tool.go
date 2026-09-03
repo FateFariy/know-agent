@@ -75,6 +75,8 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
 	execPlan.NavigationDecision = navigationDecision
+	convCtx.AddUsedTools("route_document_structure_tool")
+
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
 
 	return nil, nil

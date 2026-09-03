@@ -21,7 +21,7 @@ const (
 //
 // 必须注册在 MemoryLoadMiddleware 之后（依赖其创建的 execPlan 与检索计划）。
 type KnowledgeRouteMiddleware struct {
-	conversation.BaseAgentMiddleware
+	BaseAgentMiddleware
 	knowledgeRouter conversation.KnowledgeRouter
 }
 
@@ -34,13 +34,13 @@ func NewKnowledgeRouteMiddleware(knowledgeRouter conversation.KnowledgeRouter) *
 func (m *KnowledgeRouteMiddleware) Name() string { return "knowledge-route" }
 
 // BeforeAgent 在 agent 启动前按 ChatMode 执行知识路由
-func (m *KnowledgeRouteMiddleware) BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *conversation.BeforeAgentInput) (*conversation.BeforeAgentOutput, error) {
+func (m *KnowledgeRouteMiddleware) BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *BeforeAgentInput) (*BeforeAgentOutput, error) {
 	if convCtx == nil {
-		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, nil
+		return &BeforeAgentOutput{Instruction: input.Instruction}, nil
 	}
 	execPlan := convCtx.ExecutionPlan.Load()
 	if execPlan == nil {
-		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, nil
+		return &BeforeAgentOutput{Instruction: input.Instruction}, nil
 	}
 
 	switch convCtx.ChatMode {
@@ -50,10 +50,10 @@ func (m *KnowledgeRouteMiddleware) BeforeAgent(ctx context.Context, convCtx *con
 		}
 	case enum.ChatQueryModeAutoDocument:
 		if err := m.routeAutoDocument(ctx, convCtx, execPlan); err != nil {
-			return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, err
+			return &BeforeAgentOutput{Instruction: input.Instruction}, err
 		}
 	}
-	return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, nil
+	return &BeforeAgentOutput{Instruction: input.Instruction}, nil
 }
 
 // routeAutoDocument 自动文档问答：范围解析 → 知识路由 → 选择主文档写回，

@@ -22,7 +22,7 @@ const (
 
 // MemoryLoadMiddleware 装载会话记忆并组装初始执行计划，同时把记忆摘要与时效/实时检索规则判断、上一轮证据锚点（追问承接）作为Agent指令注入
 type MemoryLoadMiddleware struct {
-	conversation.BaseAgentMiddleware
+	BaseAgentMiddleware
 	memoryManager           conversation.SessionMemoryManager
 	repo                    adapter.ChatRepository // 用于加载最近证据锚点
 	planningHistoryMaxChars int                    // 规划历史最大字符数
@@ -41,9 +41,9 @@ func NewMemoryLoadMiddleware(svcCtx *svc.ServiceContext, memoryManager conversat
 func (m *MemoryLoadMiddleware) Name() string { return "memory-load" }
 
 // BeforeAgent 装载记忆 → 组装执行计划 → 追加指令提示
-func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *conversation.BeforeAgentInput) (*conversation.BeforeAgentOutput, error) {
+func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *conversation.Context, input *BeforeAgentInput) (*BeforeAgentOutput, error) {
 	if convCtx == nil {
-		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, nil
+		return &BeforeAgentOutput{Instruction: input.Instruction}, nil
 	}
 
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageMemory, &vo.StageInput{SummaryText: "正在装载会话记忆与最近窗口。"})
@@ -51,7 +51,7 @@ func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *convers
 	history, err := m.load(ctx, convCtx)
 	if err != nil {
 		ctx = vo.OnError(ctx, "会话记忆装载失败。", err)
-		return &conversation.BeforeAgentOutput{Instruction: input.Instruction}, err
+		return &BeforeAgentOutput{Instruction: input.Instruction}, err
 	}
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "会话记忆装载完成。", Snapshot: history.BuildSnapshot()})
 
@@ -62,7 +62,7 @@ func (m *MemoryLoadMiddleware) BeforeAgent(ctx context.Context, convCtx *convers
 		}
 		instruction += strings.Join(hints, "\n")
 	}
-	return &conversation.BeforeAgentOutput{Instruction: instruction}, nil
+	return &BeforeAgentOutput{Instruction: instruction}, nil
 }
 
 // load 装载会话记忆（长期摘要、近期转录、压缩信息），并组装初始执行计划
@@ -145,7 +145,7 @@ func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *conversation.Conte
 		return nil
 	}
 
-	analyzer := conversation.NewQueryAnalyzer(question)
+	analyzer := NewQueryAnalyzer(question)
 	requiresCurrentDateAnchoring := analyzer.RequiresCurrentDateAnchoring()
 	requiresRealTimeSearch := analyzer.RequiresRealTimeSearch()
 	execPlan.RequiresRealTimeSearch = requiresRealTimeSearch
@@ -213,7 +213,7 @@ func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.Conversation
 	if runtime == nil {
 		runtime = vo.NewDefaultRagRuntimeOptions()
 	}
-	questionPlan := newQuestionPlan(execPlan)
+
 	hybrid := runtime.Hybrid
 	if hybrid == nil {
 		hybrid = vo.NewDefaultHybridOptions()
@@ -228,7 +228,6 @@ func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.Conversation
 		taskScope = []int64{convCtx.SelectedTaskId}
 	}
 	return &vo.RetrievalPlan{
-		QuestionPlan:       questionPlan,
 		ChatMode:           enum.ChatQueryModeName(chatMode),
 		PrimaryIntent:      enum.RetrievalIntentGeneral,
 		ScopeMode:          snapshot.SelectionModeName(),
@@ -244,56 +243,6 @@ func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.Conversation
 		FinalTopK:          runtime.FinalTopK,
 		SubQuestionTimeout: runtime.SubQuestionTimeout,
 		NavigationAction:   execPlan.NavigationDecision.NavigationActionText(),
-	}
-}
-
-// newQuestionPlan 构建检索问题计划
-func newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.RetrievalQuestionPlan {
-	currentQuestion := utils.CompactWhitespace(exec.OriginalQuestion)
-	rewrittenQuestion := utils.CompactWhitespace(exec.RewriteQuestion)
-	question := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
-
-	var inheritedAnchors []*vo.RetrievalContextAnchor
-	if exec.RecognitionResult != nil && exec.RecognitionResult.QueryType == enum.QueryTypeFollowUp {
-		keyOf := func(anchor *vo.EvidenceAnchor) (string, *vo.RetrievalContextAnchor, bool) {
-			if inherited := anchor.ToRetrievalContextAnchor(); inherited != nil {
-				return inherited.UniqueKey(), inherited, true
-			}
-			return "", nil, false
-		}
-		inheritedAnchors = utils.FilterMapUniqueLimit(exec.RecentEvidenceAnchors, 5, keyOf)
-	}
-	contextHints := make([]string, 0, len(inheritedAnchors))
-	for _, anchor := range inheritedAnchors {
-		contextHints = append(contextHints, anchor.AnchorHint())
-	}
-
-	of := func(sq string) (string, string, bool) {
-		sq = utils.CompactWhitespace(sq)
-		return sq, sq, sq != ""
-	}
-	subQuestions := utils.FilterMapUniqueLimit(exec.RewriteSubQuestions, 5, of)
-	if len(subQuestions) == 0 && utils.IsNotBlank(question) {
-		subQuestions = append(subQuestions, question)
-	}
-
-	executionQueries := make([]*vo.RetrievalExecutionQuery, 0, len(subQuestions))
-	for i, sq := range subQuestions {
-		executionQueries = append(executionQueries, &vo.RetrievalExecutionQuery{
-			Index:        i + 1,
-			SubQuestion:  sq,
-			ContextHints: append([]string{}, contextHints...),
-		})
-	}
-
-	return &vo.RetrievalQuestionPlan{
-		Question:                 question,
-		ExecutionQueries:         executionQueries,
-		FollowUp:                 len(inheritedAnchors) > 0,
-		HistoryInherited:         len(inheritedAnchors) > 0,
-		HistoryInheritanceSource: utils.Ternary(len(inheritedAnchors) > 0, "FINAL_EVIDENCE_ANCHOR", "NONE"),
-		InheritedContextAnchors:  inheritedAnchors,
-		SubQuestions:             subQuestions,
 	}
 }
 
