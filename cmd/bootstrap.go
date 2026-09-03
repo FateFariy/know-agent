@@ -7,7 +7,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/middleware"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/intent"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/recommend"
@@ -55,10 +54,11 @@ import (
 func bootstrap(c *config.Config) *server.Server {
 	serviceContext := svc.NewServiceContext(c)
 
+	embedder := emb.NewOllamaEmbedder(serviceContext)
 	checkPointStore := check.NewMemoryCheckPointStore()
 	localConfig := portconfig.NewLocalConfig(serviceContext)
 	milvusKeyword := keyword.NewMilvusKeyword(serviceContext)
-	milvusVector := vector.NewMilvusVector(serviceContext)
+	milvusVector := vector.NewMilvusVector(serviceContext, embedder)
 	rocketMQMessageProducer := mq.NewRocketMQMessageProducer(serviceContext)
 	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
 	chatModel := llm.NewChatModelImpl(serviceContext)
@@ -67,7 +67,6 @@ func bootstrap(c *config.Config) *server.Server {
 	minioStorage := storage.NewMinioStorage(serviceContext)
 	elasticStorage := storage.NewElasticStorage(serviceContext)
 	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
-	embedder := emb.NewEmbedder(serviceContext)
 	semanticCacheStore := cache.NewSemanticCache(serviceContext)
 
 	documentRepo := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
@@ -91,7 +90,6 @@ func bootstrap(c *config.Config) *server.Server {
 	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
-	intentRecognizer := intent.NewCompositeIntentRecognizer(chatModel, renderer)
 	recommender := recommend.NewQuestionRecommendImpl(serviceContext, renderer, chatModel)
 	channels := []retrieval.Retrieval{
 		channel.NewVectorRetrievalChannel(serviceContext, milvusVector),
@@ -117,7 +115,6 @@ func bootstrap(c *config.Config) *server.Server {
 
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
-		conversation.NewIntentRecognizeStage(intentRecognizer),
 		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
 		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore),
 		conversation.NewRouteStage(chatRepo, knowledgeAdapter, documentRouter, documentForChat),
@@ -169,7 +166,7 @@ func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatMo
 	return chunk.NewChunkStrategyRegistry(chunkers)
 }
 
-func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.Embedder) []evaluate.Evaluator {
+func NewAnswerEvaluators(llm model.ChatModel, renderer adapter.PromptRenderer, emb *emb.OllamaEmbedder) []evaluate.Evaluator {
 	return []evaluate.Evaluator{
 		evaluate.NewAnswerFaithfulnessEvaluator(llm, renderer),
 		evaluate.NewAnswerRelevancyEvaluator(llm, renderer, emb),

@@ -55,7 +55,7 @@ func (b *Base) DeleteByDocumentId(ctx context.Context, documentId int64) error {
 // Search 检索
 func (b *Base) Search(ctx context.Context, query *channel.DocumentRetrieve) ([]*cvo.DocumentChunk, error) {
 	filterExpr := b.buildFilterExpr(query)
-	retrievedDocs, err := b.retriever.Retrieve(ctx, query.RetrievalQuery, retriever.WithTopK(query.TopK), retrievermilvus.WithFilter(filterExpr))
+	retrievedDocs, err := b.retriever.Retrieve(ctx, query.Question, retriever.WithTopK(query.TopK), retrievermilvus.WithFilter(filterExpr))
 	if err != nil {
 		return nil, err
 	}

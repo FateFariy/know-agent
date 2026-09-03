@@ -15,7 +15,6 @@ type LLMConf struct {
 // EmbeddingConf 嵌入配置
 type EmbeddingConf struct {
 	Model      string // 模型名称
-	APIKey     string // API密钥
-	APIType    string `json:",default=text,options=text|multi_modal"` // API类型
 	Dimensions int    // 嵌入维度
+	BaseURL    string `json:",default=http://localhost:11434"` // Ollama 服务地址
 }

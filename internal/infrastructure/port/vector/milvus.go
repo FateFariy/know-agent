@@ -9,6 +9,7 @@ import (
 	indexmilvus "github.com/cloudwego/eino-ext/components/indexer/milvus2"
 	retrievermilvus "github.com/cloudwego/eino-ext/components/retriever/milvus2"
 	"github.com/cloudwego/eino-ext/components/retriever/milvus2/search_mode"
+	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
@@ -31,10 +32,10 @@ type MilvusVector struct {
 	model   string
 }
 
-func NewMilvusVector(svcCtx *svc.ServiceContext) *MilvusVector {
+func NewMilvusVector(svcCtx *svc.ServiceContext, embedder embedding.Embedder) *MilvusVector {
 	return &MilvusVector{
-		Base:    milvus.NewBase(svcCtx, newRetriever(svcCtx)),
-		indexer: newIndexer(svcCtx),
+		Base:    milvus.NewBase(svcCtx, newRetriever(svcCtx, embedder)),
+		indexer: newIndexer(svcCtx, embedder),
 		model:   svcCtx.Config.Embedding.Model,
 	}
 }
@@ -104,7 +105,7 @@ func (m *MilvusVector) toDocument(chunks []*entity.DocumentChunk) []*schema.Docu
 }
 
 // 创建索引器
-func newIndexer(svcCtx *svc.ServiceContext) indexer.Indexer {
+func newIndexer(svcCtx *svc.ServiceContext, embedder embedding.Embedder) indexer.Indexer {
 	indexerConfig := &indexmilvus.IndexerConfig{
 		ClientConfig: &milvusclient.ClientConfig{
 			Address: svcCtx.Config.Milvus.Addr,
@@ -116,7 +117,7 @@ func newIndexer(svcCtx *svc.ServiceContext) indexer.Indexer {
 			IndexBuilder: indexmilvus.NewHNSWIndexBuilder().WithM(16).WithEfConstruction(200),
 		},
 		Sparse:    &indexmilvus.SparseVectorConfig{},
-		Embedding: svcCtx.Emb,
+		Embedding: embedder,
 	}
 	indexerConfig.DocumentConverter = DocumentConverter(indexerConfig.Vector, indexerConfig.Sparse)
 	vecIndexer, err := indexmilvus.NewIndexer(context.Background(), indexerConfig)
@@ -127,7 +128,7 @@ func newIndexer(svcCtx *svc.ServiceContext) indexer.Indexer {
 }
 
 // 创建向量检索器
-func newRetriever(svcCtx *svc.ServiceContext) retriever.Retriever {
+func newRetriever(svcCtx *svc.ServiceContext, embedder embedding.Embedder) retriever.Retriever {
 	metricType := retrievermilvus.MetricType(strings.ToUpper(svcCtx.Config.Milvus.MetricType))
 	vecRetriever, err := retrievermilvus.NewRetriever(context.Background(), &retrievermilvus.RetrieverConfig{
 		ClientConfig: &milvusclient.ClientConfig{
@@ -136,7 +137,7 @@ func newRetriever(svcCtx *svc.ServiceContext) retriever.Retriever {
 		Collection: svcCtx.Config.Milvus.Collection,
 		TopK:       10,
 		SearchMode: search_mode.NewApproximate(metricType),
-		Embedding:  svcCtx.Emb,
+		Embedding:  embedder,
 	})
 	if err != nil {
 		panic(err)

@@ -54,10 +54,9 @@ StructureParsing:
   AmbiguityConfidenceCeil: 0.80
 
 Embedding:
-  Model: doubao-embedding-vision-251215
-  APIKey: REPLACE_YOUR_ARK_KEY
-  APIType: multi_modal
-  Dimensions: 1024
+  Model:
+  Dimensions:
+  BaseURL:
 
 Chunk:
   RecursiveMaxChars: 800

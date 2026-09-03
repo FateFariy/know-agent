@@ -3,12 +3,9 @@ package svc
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	arkemb "github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/go-playground/validator/v10"
@@ -34,7 +31,6 @@ type ServiceContext struct {
 	Db         *gorm.DB
 	Rdb        *redis.Client
 	RedSync    *redsync.Redsync
-	Emb        embedding.Embedder
 	ChatModel  model.BaseModel[*einoschema.Message]
 	JudgeModel model.BaseModel[*einoschema.Message]
 	Milvus     *milvusclient.Client
@@ -51,7 +47,6 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		Db:         NewMySQLDB(c),
 		Minio:      NewMinioClient(c),
 		RedSync:    NewRedSync(redisClient),
-		Emb:        NewArkEmbedding(ctx, c),
 		ChatModel:  NewArkChatModel(ctx, c.ChatModel["Ark"]),
 		JudgeModel: NewArkChatModel(ctx, c.JudgeModel["Ark"]),
 		Milvus:     NewMilvusClient(ctx, c),
@@ -105,24 +100,6 @@ func NewMinioClient(c *config.Config) *minio.Client {
 func NewRedSync(client *redis.Client) *redsync.Redsync {
 	pool := goredis.NewPool(client)
 	return redsync.New(pool)
-}
-
-// NewArkEmbedding 创建 ark embedding 模型
-func NewArkEmbedding(ctx context.Context, c *config.Config) embedding.Embedder {
-	apiType := arkemb.APITypeText
-	if strings.Contains(string(arkemb.APITypeMultiModal), c.Embedding.APIType) {
-		apiType = arkemb.APITypeMultiModal
-	}
-	emb, err := arkemb.NewEmbedder(ctx, &arkemb.EmbeddingConfig{
-		APIKey:     c.Embedding.APIKey,
-		Model:      c.Embedding.Model,
-		APIType:    utils.Pointer(apiType),
-		Dimensions: &c.Embedding.Dimensions,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return emb
 }
 
 func NewArkChatModel(ctx context.Context, c *config.LLMConf) *ark.ChatModel {
