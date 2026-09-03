@@ -10,14 +10,11 @@ import (
 // DocumentRetrieve 文档检索
 type DocumentRetrieve struct {
 	Question          string                   `json:"question"`          // 问题
-	RetrievalQuery    string                   `json:"retrievalQuery"`    // 检索查询
-	DocumentId        int64                    `json:"documentId"`        // 文档ID
-	TaskId            int64                    `json:"taskId"`            // 任务ID
 	DocumentIds       []int64                  `json:"documentIds"`       // 文档ID列表
 	TaskIds           []int64                  `json:"taskIds"`           // 任务ID列表
 	TopK              int                      `json:"topK"`              // 返回数量
 	Filters           *DocumentRetrieveFilters `json:"filters"`           // 过滤器
-	QueryContextHints []string                 `json:"queryContextHints"` // 查询上下文提示
+	QueryContextHints []string                 `json:"queryContextHints"` // 查询上下文提示（暂未使用）
 }
 
 // DocumentRetrieveFilters 文档检索过滤器
@@ -44,16 +41,10 @@ func NewDocumentRetrieve(channelName string, input *retrieval.ExecutionInput) (*
 
 	req := &DocumentRetrieve{
 		Question:          input.SubQuestion,
-		RetrievalQuery:    input.SubQuestion,
 		TopK:              channel.TopK,
 		QueryContextHints: input.ContextHints,
 		DocumentIds:       input.DocumentScope,
 		TaskIds:           input.TaskScope,
-	}
-
-	// 解析单文档/单任务作用域，返回主 ID
-	if len(input.DocumentScope) == 1 && len(input.TaskScope) == 1 {
-		req.DocumentId, req.TaskId = input.DocumentScope[0], input.TaskScope[0]
 	}
 
 	// 设置过滤器
@@ -77,6 +68,5 @@ func (d *DocumentRetrieveFilters) IsEmpty() bool {
 }
 
 func (d *DocumentRetrieve) Validate() bool {
-	return d != nil && len(d.DocumentIds) > 0 && len(d.TaskIds) > 0 &&
-		utils.IsNotBlank(d.Question) && utils.IsNotBlank(d.RetrievalQuery)
+	return d != nil && len(d.DocumentIds) > 0 && len(d.TaskIds) > 0 && utils.IsNotBlank(d.Question)
 }

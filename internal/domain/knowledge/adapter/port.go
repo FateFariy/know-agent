@@ -8,8 +8,8 @@ import (
 
 // Embedder 文本嵌入模型
 type Embedder interface {
-	// EmbedStrings 文本向量化
-	EmbedStrings(ctx context.Context, texts ...string) ([][]float64, error)
+	// Embedding 文本向量化
+	Embedding(ctx context.Context, texts ...string) ([][]float64, error)
 }
 
 type DocumentGateway interface {

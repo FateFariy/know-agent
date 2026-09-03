@@ -11,7 +11,13 @@ import (
 
 const (
 	defaultNoEvidenceReply = "未检索到相关结果，建议调整查询条件后重试，如修改检索问题"
+	toolDescription        = "根据用户输入的问题在知识库中检索证据。query 为字符串数组：若原问题包含多个独立子问题，请拆分为多个子问题后传入，工具会并行检索并返回合并证据。"
 )
+
+type SearchKnowledgeBaseInput struct {
+	Query []string `json:"query" jsonschema_description:"待检索的子问题字符串数组：若原问题包含多个独立子问题，可拆分后一次传入，每一项必须是一句完整的自然语言问句（含主谓宾、必要上下文与问号），而非一组关键词碎片。必填" jsonschema:"required"`
+	TopK  int      `json:"top_k,omitempty" jsonschema_description:"每个子问题返回的检索结果数量，默认 5"`
+}
 
 // KnowledgeBaseSearchTool 知识库检索工具
 // 基于当前执行计划执行检索、把结果回填执行计划、发布检索笔记与已用渠道，最终将证据渲染为带编号引用的文本返回给 agent
@@ -28,11 +34,18 @@ func NewKnowledgeBaseSearchTool(retriever conversation.Retriever, evidenceRender
 	}
 }
 
-// Search 执行一次知识库检索并返回渲染后的证据文本。
+func (t *KnowledgeBaseSearchTool) Info(ctx context.Context) *conversation.ToolInfo {
+	return &conversation.ToolInfo{
+		Name:        "knowledge_base_search_tool",
+		Description: toolDescription,
+	}
+}
+
+// Invoke 执行一次知识库检索并返回渲染后的证据文本。
 //
 // query 非空且与当前计划检索问题不同时，临时以 query 单子问题执行检索；
 // topK 大于 0 时覆盖计划最终预算。检索结果会回填执行计划供后续引用发布与缓存写入。
-func (t *KnowledgeBaseSearchTool) Search(ctx context.Context, query string, topK int) (string, error) {
+func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, args SearchKnowledgeBaseInput) (string, error) {
 	convCtx := conversation.AgentContextFrom(ctx)
 	if convCtx == nil {
 		return "", errors.New("知识库检索缺少会话上下文")
@@ -73,8 +86,7 @@ func (t *KnowledgeBaseSearchTool) resolvePlan(execPlan *vo.ConversationExecution
 		return nil
 	}
 	overrideQuery := ""
-	if q := utils.CompactWhitespace(query); q != "" &&
-		(plan.QuestionPlan == nil || plan.QuestionPlan.RetrievalQuestion != q) {
+	if q := utils.CompactWhitespace(query); q != "" {
 		overrideQuery = q
 	}
 	if overrideQuery == "" && (topK <= 0 || topK == plan.FinalTopK) {
@@ -84,11 +96,9 @@ func (t *KnowledgeBaseSearchTool) resolvePlan(execPlan *vo.ConversationExecution
 	cloned := *plan
 	if overrideQuery != "" {
 		cloned.QuestionPlan = &vo.RetrievalQuestionPlan{
-			CurrentQuestion:   overrideQuery,
-			RewrittenQuestion: overrideQuery,
-			RetrievalQuestion: overrideQuery,
-			ExecutionQueries:  []*vo.RetrievalExecutionQuery{{Index: 1, SubQuestion: overrideQuery}},
-			SubQuestions:      []string{overrideQuery},
+			Question:         overrideQuery,
+			ExecutionQueries: []*vo.RetrievalExecutionQuery{{Index: 1, SubQuestion: overrideQuery}},
+			SubQuestions:     []string{overrideQuery},
 		}
 	}
 	if topK > 0 {

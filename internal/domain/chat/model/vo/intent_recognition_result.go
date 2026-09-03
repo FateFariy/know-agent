@@ -26,11 +26,7 @@ func (i *IntentRecognitionResult) IsFollowUpQuestion(question string) bool {
 	if utils.IsBlank(question) {
 		return false
 	}
-	queryType := ""
-	if i != nil {
-		queryType = i.QueryType
-	}
-	return queryType == enum.QueryTypeFollowUp
+	return i != nil && i.QueryType == enum.QueryTypeFollowUp
 }
 
 // IsStructureNavigationConfident 判断结构导航意图是否置信度高
@@ -61,61 +57,6 @@ func (i *IntentRecognitionResult) HasSectionAnchor() bool {
 		}
 	}
 	return false
-}
-
-// PrimaryRetrievalIntent 获取主要检索意图
-func (i *IntentRecognitionResult) PrimaryRetrievalIntent() enum.RetrievalIntent {
-	if i == nil {
-		return enum.RetrievalIntentGeneral
-	}
-	queryType := utils.BlankToDefault(i.QueryType, enum.QueryTypeDocumentQA)
-	switch queryType {
-	case enum.QueryTypeStructureNavigation:
-		return enum.RetrievalIntentStructure
-	case enum.QueryTypeTableQuery:
-		return enum.RetrievalIntentTable
-	case enum.QueryTypeGraphRelation:
-		return enum.RetrievalIntentGraphRAG
-	case enum.QueryTypeGlobalSummary:
-		return enum.RetrievalIntentRaptor
-	}
-	// 从通道列表获取
-	for _, ch := range i.Channels {
-		switch ch {
-		case enum.RetrievalIntentTable:
-			return enum.RetrievalIntentTable
-		case enum.RetrievalIntentGraphRAG:
-			return enum.RetrievalIntentGraphRAG
-		case enum.RetrievalIntentRaptor:
-			return enum.RetrievalIntentRaptor
-		case enum.RetrievalIntentStructure:
-			return enum.RetrievalIntentStructure
-		}
-	}
-	return enum.RetrievalIntentGeneral
-}
-
-// GetConfidence 获取置信度
-func (i *IntentRecognitionResult) GetConfidence() float64 {
-	if i == nil {
-		return 0
-	}
-	return i.Confidence
-}
-
-// NormalizeConfidence 归一化置信度到[0, 1]范围
-func (i *IntentRecognitionResult) NormalizeConfidence() float64 {
-	if i == nil {
-		return 0
-	}
-	confidence := i.Confidence
-	if confidence > 1 {
-		return confidence / 100.0
-	}
-	if confidence < 0 {
-		return 0
-	}
-	return confidence
 }
 
 // GetEntities 获取实体列表
@@ -150,18 +91,6 @@ func (i *IntentRecognitionResult) GetStructureNavigationIntent() *StructureNavig
 		return nil
 	}
 	return i.StructureNavigationIntent
-}
-
-// ResolveNoEvidenceReply 根据是否需要实时搜索返回合适的无证据回复
-func (i *IntentRecognitionResult) ResolveNoEvidenceReply(requiresFreshSearch bool) string {
-	queryType := utils.BlankToDefault(i.QueryType, enum.QueryTypeDocumentQA)
-	if queryType == enum.QueryTypeCapabilityQuery {
-		return "我只能基于知识库内容回答，这个问题更像是在询问助手能力，而不是知识库内容。你可以补充更具体的标题、术语或关键词后再试。"
-	}
-	if requiresFreshSearch {
-		return "我只能基于知识库已收录的内容回答，无法获取实时或最新的外部信息（例如天气、行情、新闻）。你可以补充更具体的标题、术语或关键词后再试。"
-	}
-	return "当前没有从当前文档中检索到足够证据，暂时不能给出可靠结论。你可以补充更具体的标题、术语或关键词后再试。"
 }
 
 func (i *IntentRecognitionResult) SuggestedChannels() []string {

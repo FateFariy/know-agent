@@ -15,7 +15,7 @@ type RetrievalChannelResult struct {
 	AcceptedDocuments []*vo.DocumentChunk `json:"acceptedDocuments"`
 }
 
-// ExecutionInput 是编译后的不可变检索执行请求，针对单次 RetrievalPlan 执行查询编译一次
+// ExecutionInput 不可变检索执行请求
 type ExecutionInput struct {
 	SubQuestionIndex int
 	SubQuestion      string
@@ -26,9 +26,9 @@ type ExecutionInput struct {
 	TaskScope        []int64
 	Filters          *vo.RetrievalMetadataFilters
 	Channels         []*vo.RetrievalChannelPlan
-	TableIntent      *vo.TableIntent
-	GraphIntent      *vo.GraphIntent
-	RaptorIntent     *vo.RaptorIntent
+	TableIntent      *vo.TableIntent  // 表格意图（暂未使用）
+	GraphIntent      *vo.GraphIntent  // 图意图（暂未使用）
+	RaptorIntent     *vo.RaptorIntent // Raptor意图（暂未使用）
 }
 
 // newRetrievalExecutionInput 从 RetrievalPlan 和 RetrievalExecutionQuery 编译检索执行请求

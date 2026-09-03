@@ -43,7 +43,7 @@ func (r *Context) Embedding(ctx context.Context, embedder adapter.Embedder) {
 		r.Diagnostics["SEMANTIC_ROUTE_NOT_CONFIGURED"] = struct{}{}
 	}
 	if embedder != nil && r.RoutingText != "" {
-		vectors, err := embedder.EmbedStrings(ctx, r.RoutingText)
+		vectors, err := embedder.Embedding(ctx, r.RoutingText)
 		if err != nil || len(vectors) == 0 {
 			r.Diagnostics["SEMANTIC_QUERY_EMBEDDING_UNAVAILABLE"] = struct{}{}
 			return

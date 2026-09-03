@@ -8,36 +8,23 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 var (
-	// sectionCodePattern 匹配 1.2 / 3.4.5 这类章节编号
-	sectionCodePattern = regexp.MustCompile(`(\d+(?:\.\d+)+)`)
-
-	// chineseSectionReferencePattern 匹配"第 3 章 / 第三节 / 第 4 小节"
-	chineseSectionReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(章|节|小节)`)
-
-	// stepReferencePattern 匹配"第几步"
-	stepReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)
-
-	// ordinalReferencePattern 匹配"第几条/点/项/个"
-	ordinalReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*([条点项个])`)
-
-	// quotedTextPattern 匹配引号包裹的标题短语
-	quotedTextPattern = regexp.MustCompile(`["“']([^"”']{2,40})["”']`)
+	sectionCodePattern             = regexp.MustCompile(`(\d+(?:\.\d+)+)`)                    // 匹配 1.2 / 3.4.5 这类章节编号
+	chineseSectionReferencePattern = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*(章|节|小节)`) // 匹配"第 3 章 / 第三节 / 第 4 小节"
+	stepReferencePattern           = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*步`)        // 匹配"第几步"
+	ordinalReferencePattern        = regexp.MustCompile(`第\s*([0-9一二三四五六七八九十百]+)\s*([条点项个])`) // 匹配"第几条/点/项/个"
+	quotedTextPattern              = regexp.MustCompile(`["“']([^"”']{2,40})["”']`)           // 匹配引号包裹的标题短语
 )
 
-// structureNavigationConfidenceThreshold 结构导航置信度阈值
-const structureNavigationConfidenceThreshold = 0.65
-
 // DocumentRouterImpl 文档问答结构导航锚点解析器
-//
-// 本服务不承担"图直答/图定位取证"执行分叉，也不使用关键词、短语剥离或正文 contains 打分决定意图。
 // 它只做两件确定性的事：
-//  1. 把受控 QueryUnderstandingResult 里的结构导航意图翻译成结构导航动作（结构语法，非业务词）。
+//  1. 把受控的 NavigationInput 结构导航信号翻译成结构导航动作（结构语法，非业务词）。
+//     Agent 显式导航信号（HasStructureNav/QueryType/SectionAnchors，对应 route_document_structure
+//     工具 schema）优先；未提供时由问题文本规则兜底判定。
 //  2. 用精确锚点（章节号 / 引号标题精确 / 导航索引命中）定位结构节点，供确定性结构查询和软提示使用。
 type DocumentRouterImpl struct {
 	querier GraphQuerier      // 结构图谱查询
@@ -52,43 +39,25 @@ func NewDocumentRouter(querier GraphQuerier, indexer NavigationIndexer) *Documen
 	}
 }
 
-// Route 文档问答路由主入口（兼容旧调用方：RouteStage 等仍使用 conversation.DocumentRouteInput）。
-//
-// 旧链路的意图识别结果在本入口经 DocumentRouteInput.ResolveRoutingIntent 适配为
-// 轻量意图字段后填入 NavigationInput，本文件其余流程不再直接依赖 vo.IntentRecognitionResult。
-//
-// 执行流程（意图由 Agent 或识别结果提供，缺失时正则兜底）：
+// Route 文档问答路由主入口
+// 执行流程：
 //  1. 规范化输入（改写问题、子问题列表、拼接路由文本）
 //  2. 获取主要检索意图（缺省 GENERAL）
 //  3. 高置信结构导航时走结构树确定性查询
 //  4. 明确编号项时作为结构锚点软辅助混合检索
 //  5. 其余按普通文档问题处理
-func (r *DocumentRouterImpl) Route(ctx context.Context, input *conversation.DocumentRouteInput) (*vo.DocumentNavigationDecision, error) {
+func (r *DocumentRouterImpl) Route(ctx context.Context, input *NavigationInput) (*vo.DocumentNavigationDecision, error) {
 	if input == nil {
 		return nil, fmt.Errorf("输入为空")
 	}
-	hints := input.ResolveRoutingIntent(structureNavigationConfidenceThreshold)
-	navInput := &NavigationInput{
-		DocumentId:      input.DocumentId,
-		Question:        input.OriginalQuestion,
-		RewriteQuery:    input.RewrittenQuestion(),
-		SubQuestions:    input.SubQuestions(),
-		Intent:          hints.Intent,
-		SectionAnchors:  hints.SectionAnchors,
-		HasStructureNav: hints.HasStructureNav,
-		QueryType:       hints.QueryType,
-	}
-	return r.RouteByNavigation(ctx, navInput)
-}
 
-// RouteByNavigation 文档问答路由主入口（Agent 工具 / NavigationInput 输入）
-func (r *DocumentRouterImpl) RouteByNavigation(ctx context.Context, input *NavigationInput) (*vo.DocumentNavigationDecision, error) {
-	if input == nil {
-		return nil, fmt.Errorf("输入为空")
+	input.QueryType = utils.BlankToDefault(input.QueryType, enum.QueryTypeDocumentQA)
+	if len(input.Channels) == 0 {
+		input.Channels = append(input.Channels, enum.RetrievalIntentGeneral)
 	}
 
 	// 选取改写后的问题，无改写则回退原始问题
-	rewrittenQuestion := utils.BlankToDefault(input.RewriteQuery, input.Question)
+	rewrittenQuestion := utils.BlankToDefault(input.RewriteQuestion, input.Question)
 
 	// 从子问题列表
 	subQuestions := input.SubQuestions
@@ -99,17 +68,34 @@ func (r *DocumentRouterImpl) RouteByNavigation(ctx context.Context, input *Navig
 	// 拼接路由文本（原始 + 改写）
 	routeText := input.RouteText()
 
-	// 获取主要检索意图（Agent 提供或旧链路识别结果适配，缺省 GENERAL）
-	retrievalIntent := input.ResolveIntent()
+	extractor := newNavigationExtractor(routeText)
+	signals := extractor.detectNavigationTextSignals()
 
-	// 高置信结构导航：走结构树确定性查询
-	structureNavigationAction := input.ResolveAction()
+	// Agent 显式信号优先：任一导航字段已由 Agent 提供即不再做文本兜底覆盖
+	if input.HasStructureNav && (utils.IsBlank(input.QueryType) ||
+		len(input.SectionAnchors) == 0) {
+		if signals.hasStructureNav {
+			input.QueryType = enum.QueryTypeStructureNavigation
+			input.HasStructureNav = true
+			input.SectionAnchors = signals.sectionAnchors
+			if len(input.SectionAnchors) > 0 && !utils.ContainsAny(input.Channels, enum.RetrievalIntentStructure) {
+				input.Channels = append(input.Channels, enum.RetrievalIntentStructure)
+			}
+		}
+	}
+
+	// 获取主要检索意图
+	retrievalIntent := input.PrimaryRetrievalIntent()
+
+	// 高置信结构导航：走结构树确定性查询。
+	// 结构导航动作优先按文本语法解析（编号 / 第N章节 / 引号标题 / 步骤），
+	// 语法无法命中时回退到文本语义兜底动作（大纲 / 相邻章节 / 父章节定位）。
+	structureNavigationAction := utils.BlankToDefault(input.ResolveAction(), signals.action)
 	if structureNavigationAction != "" {
 		section := r.resolveSection(ctx, input.DocumentId, input.Question, rewrittenQuestion)
 		return r.buildDecision(structureNavigationAction, section, nil, input,
 			enum.RetrievalIntentStructure, "高置信结构导航走结构树确定性查询，结构结果作为检索上下文和观测信号。"), nil
 	}
-	extractor := newNavigationExtractor(routeText)
 
 	// 明确编号项（第 N 步 / 第 N 项）：作为结构锚点软辅助混合检索
 	itemIndex := extractor.resolveExplicitItemIndex()
@@ -177,18 +163,14 @@ func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSecti
 	}
 
 	// 构建摘要文本
-	var sb strings.Builder
-	sb.WriteString("retrievalIntent=")
-	sb.WriteString(utils.BlankToDefault(retrievalIntent, enum.RetrievalIntentGeneral))
-	sb.WriteString("; queryType=")
-	sb.WriteString(navInput.QueryType)
-	sb.WriteString("; reason=")
-	sb.WriteString(reason)
-	sb.WriteString("; section=")
-	sb.WriteString(displayTitle)
-	sb.WriteString("; itemIndex=")
-	sb.WriteString(fmt.Sprintf("%d", utils.PointerOrDefault(itemIndex, 0)))
-	decision.SummaryText = sb.String()
+	decision.SummaryText = fmt.Sprintf(
+		"retrievalIntent=%s; queryType=%s; reason=%s; section=%s; itemIndex=%d",
+		utils.BlankToDefault(retrievalIntent, enum.RetrievalIntentGeneral),
+		navInput.QueryType,
+		reason,
+		displayTitle,
+		utils.PointerOrDefault(itemIndex, 0),
+	)
 
 	logx.Infof("文档问答路由完成: action=%s, section='%s', reason='%s'", action, displayTitle, reason)
 
@@ -269,20 +251,13 @@ func (r *DocumentRouterImpl) resolveByQuotedTitle(ctx context.Context, documentI
 		return nil
 	}
 
-	for _, phrase := range quotedPhrases {
-		normalizedPhrase := normalizeText(phrase)
-		if len(normalizedPhrase) < 2 {
-			continue
-		}
-
-		for _, section := range sections {
-			normalizedTitle := normalizeText(section.Title)
-			normalizedDisplay := normalizeText(section.DisplayTitle())
-			normalizedPath := normalizeText(section.SectionPath)
-
-			if normalizedTitle == normalizedPhrase ||
-				normalizedDisplay == normalizedPhrase ||
-				strings.HasSuffix(normalizedPath, normalizedPhrase) {
+	for _, section := range sections {
+		normTitle := normalizeText(section.Title)
+		normDisplay := normalizeText(section.DisplayTitle())
+		normPath := normalizeText(section.SectionPath)
+		for _, phrase := range quotedPhrases {
+			normPhrase := normalizeText(phrase)
+			if normTitle == normPhrase || normDisplay == normPhrase || strings.HasSuffix(normPath, normPhrase) {
 				return section
 			}
 		}
@@ -319,21 +294,17 @@ func (r *DocumentRouterImpl) resolveByNavigationIndex(ctx context.Context, docum
 	return graphSection
 }
 
-// normalizeText 归一化文本用于精确匹配
+var textNormalizer = strings.NewReplacer(
+	" ", "", "\t", "", "\n", "",
+	">", "", "`", "", "*", "", "#", "", "_", "", "-", "",
+	"，", "", ",", "", "。", "", "；", "", ";", "",
+	"：", "", ":", "", "（", "", "）", "", "\"", "", "'", "",
+)
+
 func normalizeText(text string) string {
 	normalized := utils.Trim(text)
 	if normalized == "" {
 		return ""
 	}
-
-	// 清理特殊字符并转小写
-	replacer := strings.NewReplacer(
-		" ", "", "\t", "", "\n", "",
-		">", "", "`", "*", "", "#", "", "_", "", "-", "",
-		"，", "", ",", "", "。", "", "；", "", ";", "",
-		"：", "", ":", "", "（", "", "）", "",
-		"\"", "", "'", "",
-	)
-	cleaned := replacer.Replace(normalized)
-	return strings.ToLower(cleaned)
+	return strings.ToLower(textNormalizer.Replace(normalized))
 }

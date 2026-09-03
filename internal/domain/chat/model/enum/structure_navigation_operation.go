@@ -10,13 +10,13 @@ import (
 type StructureNavigationOperation = string
 
 const (
-	CurrentSection      StructureNavigationOperation = "CURRENT_SECTION"
-	ParentSection       StructureNavigationOperation = "PARENT_SECTION"
-	PreviousSibling     StructureNavigationOperation = "PREVIOUS_SIBLING"
-	NextSibling         StructureNavigationOperation = "NEXT_SIBLING"
-	DirectChildren      StructureNavigationOperation = "DIRECT_CHILDREN"
-	SectionWithSiblings StructureNavigationOperation = "SECTION_WITH_SIBLINGS"
-	SectionWithChildren StructureNavigationOperation = "SECTION_WITH_CHILDREN"
+	CurrentSection      StructureNavigationOperation = "CURRENT_SECTION"       // 当前章节
+	ParentSection       StructureNavigationOperation = "PARENT_SECTION"        // 父章节
+	PreviousSibling     StructureNavigationOperation = "PREVIOUS_SIBLING"      // 上一个兄弟章节
+	NextSibling         StructureNavigationOperation = "NEXT_SIBLING"          // 下一个兄弟章节
+	DirectChildren      StructureNavigationOperation = "DIRECT_CHILDREN"       // 直接子章节（仅一级）
+	SectionWithSiblings StructureNavigationOperation = "SECTION_WITH_SIBLINGS" // 当前章节及其兄弟章节
+	SectionWithChildren StructureNavigationOperation = "SECTION_WITH_CHILDREN" // 当前章节及其所有子章节
 )
 
 // ParseStructureOperations 解析字符串列表为 StructureNavigationOperation 列表，去重并忽略无效值

@@ -316,7 +316,7 @@ func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.Conversat
 		KnowledgeBaseIds:          utils.Copy(snapshot.SelectedKnowledgeBaseIds),
 		DocumentScope:             utils.Copy(documentScope),
 		TaskScope:                 utils.Copy(taskScope),
-		MetadataFilters:           vo.NewMetadataFilters(questionPlan.RetrievalQuestion, intentResult),
+		MetadataFilters:           vo.NewMetadataFilters(questionPlan.Question, intentResult),
 		Channels:                  channels,
 		StructureNavigation:       intentResult.StructureNavigationIntent.Clone(),
 		NavigationAction:          execPlan.NavigationDecision.NavigationActionText(),
@@ -341,7 +341,7 @@ func (r *RouteStage) buildRetrievalPlan(convCtx *Context, execPlan *vo.Conversat
 func (r *RouteStage) newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.RetrievalQuestionPlan {
 	currentQuestion := utils.CompactWhitespace(exec.OriginalQuestion)
 	rewrittenQuestion := utils.CompactWhitespace(exec.RewriteQuestion)
-	normalizedQuery := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
+	question := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
 
 	var inheritedAnchors []*vo.RetrievalContextAnchor
 	if exec.RecognitionResult != nil && exec.RecognitionResult.QueryType == enum.QueryTypeFollowUp {
@@ -363,8 +363,8 @@ func (r *RouteStage) newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.Ret
 		return sq, sq, sq != ""
 	}
 	subQuestions := utils.FilterMapUniqueLimit(exec.RewriteSubQuestions, 5, of)
-	if len(subQuestions) == 0 && utils.IsNotBlank(normalizedQuery) {
-		subQuestions = append(subQuestions, normalizedQuery)
+	if len(subQuestions) == 0 && utils.IsNotBlank(question) {
+		subQuestions = append(subQuestions, question)
 	}
 
 	executionQueries := make([]*vo.RetrievalExecutionQuery, 0, len(subQuestions))
@@ -377,9 +377,7 @@ func (r *RouteStage) newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.Ret
 	}
 
 	return &vo.RetrievalQuestionPlan{
-		CurrentQuestion:          currentQuestion,
-		RewrittenQuestion:        rewrittenQuestion,
-		RetrievalQuestion:        normalizedQuery,
+		Question:                 question,
 		ExecutionQueries:         executionQueries,
 		FollowUp:                 len(inheritedAnchors) > 0,
 		HistoryInherited:         len(inheritedAnchors) > 0,

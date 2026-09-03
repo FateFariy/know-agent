@@ -9,9 +9,7 @@ import (
 
 // RetrievalQuestionPlan 检索问题计划
 type RetrievalQuestionPlan struct {
-	CurrentQuestion          string                     // 当前问题
-	RewrittenQuestion        string                     // 改写后问题
-	RetrievalQuestion        string                     // 规范化检索问题
+	Question                 string                     // 当前问题
 	ExecutionQueries         []*RetrievalExecutionQuery // 执行查询列表
 	FollowUp                 bool                       // 是否追问
 	HistoryInherited         bool                       // 是否继承历史

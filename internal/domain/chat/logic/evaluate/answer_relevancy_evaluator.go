@@ -13,8 +13,8 @@ import (
 
 // Embedder 文本嵌入模型
 type Embedder interface {
-	// EmbedStrings 文本向量化
-	EmbedStrings(ctx context.Context, texts ...string) ([][]float64, error)
+	// Embedding 文本向量化
+	Embedding(ctx context.Context, texts ...string) ([][]float64, error)
 }
 
 // AnswerRelevancyEvaluator 答案相关性评估器
@@ -68,7 +68,7 @@ func (e *AnswerRelevancyEvaluator) computeScore(input *EvaluationInput, llmOutpu
 	if len(wrapper.GenerateQuestions) == 0 {
 		return 0, fmt.Errorf("LLM 未生成反推问题")
 	}
-	embeddings, err := e.emb.EmbedStrings(context.Background(), append([]string{input.Question}, wrapper.GenerateQuestions...)...)
+	embeddings, err := e.emb.Embedding(context.Background(), append([]string{input.Question}, wrapper.GenerateQuestions...)...)
 	if err != nil {
 		return 0, err
 	}

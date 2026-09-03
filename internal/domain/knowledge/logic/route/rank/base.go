@@ -45,7 +45,7 @@ func (b *base) computeSemanticScores(ctx context.Context, rankCtx *Context, rout
 	for start := 0; start < len(routeTexts); start += routeEmbeddingBatchSize {
 		end := min(start+routeEmbeddingBatchSize, len(routeTexts))
 		batch := routeTexts[start:end]
-		embeddings, err := b.embedder.EmbedStrings(ctx, batch...)
+		embeddings, err := b.embedder.Embedding(ctx, batch...)
 		if err != nil {
 			logx.Warnf("知识路由批量向量计算失败: batchStart=%d, size=%d, err=%v", start, len(batch), err)
 			rankCtx.Diagnostics["SEMANTIC_CANDIDATE_EMBEDDING_UNAVAILABLE"] = struct{}{}

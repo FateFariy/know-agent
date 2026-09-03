@@ -36,8 +36,6 @@ func ToChatDebugTrace(debugTraceJson string) *chat.ChatDebugTrace {
 		OriginalQuestion:              debugTrace.OriginalQuestion,
 		RewriteQuestion:               debugTrace.RewriteQuestion,
 		RewriteSubQuestions:           debugTrace.RewriteSubQuestions,
-		RetrievalQuestion:             debugTrace.RetrievalQuestion,
-		AgentQuestion:                 debugTrace.AgentQuestion,
 		NavigationDecision:            ToChatDocumentNavigationDecision(debugTrace.NavigationDecision),
 		HistorySummary:                debugTrace.HistorySummary,
 		LongTermSummary:               debugTrace.LongTermSummary,

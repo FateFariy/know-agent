@@ -75,7 +75,6 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 	execPlan := &vo.ConversationExecutionPlan{
 		ChatMode:                    convCtx.ChatMode,
 		OriginalQuestion:            convCtx.Question,
-		AgentQuestion:               convCtx.Question,
 		RewriteQuestion:             convCtx.Question,
 		RewriteSubQuestions:         []string{convCtx.Question},
 		HistorySummary:              historySummary,

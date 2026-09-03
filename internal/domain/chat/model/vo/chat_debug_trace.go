@@ -15,8 +15,6 @@ type ChatDebugTrace struct {
 	OriginalQuestion                string                                `json:"originalQuestion"`                // 原始问题
 	RewriteQuestion                 string                                `json:"rewriteQuestion"`                 // 重写问题
 	RewriteSubQuestions             []string                              `json:"rewriteSubQuestions"`             // 重写子问题列表
-	RetrievalQuestion               string                                `json:"rewrittenQuestion"`               // 检索问题
-	AgentQuestion                   string                                `json:"agentQuestion"`                   // Agent问题
 	NavigationDecision              *DocumentNavigationDecision           `json:"navigationDecision"`              // 文档导航决策
 	HistorySummary                  string                                `json:"historySummary"`                  // 历史摘要
 	LongTermSummary                 string                                `json:"longTermSummary"`                 // 长期摘要
@@ -102,8 +100,6 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace.OriginalQuestion = execPlan.OriginalQuestion
 	trace.RewriteQuestion = execPlan.RewriteQuestion
 	trace.RewriteSubQuestions = append(trace.RewriteSubQuestions, execPlan.RewriteSubQuestions...)
-	trace.RetrievalQuestion = execPlan.RetrievalPlan.QuestionPlan.RetrievalQuestion
-	trace.AgentQuestion = execPlan.AgentQuestion
 	trace.NavigationDecision = execPlan.NavigationDecision
 
 	// 历史摘要

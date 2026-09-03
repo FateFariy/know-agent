@@ -10,7 +10,6 @@ import (
 type ConversationExecutionPlan struct {
 	ChatMode                     enum.ChatQueryMode          // 对话模式/查询模式
 	OriginalQuestion             string                      // 原始问题
-	AgentQuestion                string                      // 代理问题
 	RewriteQuestion              string                      // 问题改写结果
 	RewriteSubQuestions          []string                    // 问题改写子问题列表
 	HistorySummary               string                      // 历史摘要
@@ -43,7 +42,7 @@ func (p *ConversationExecutionPlan) HasRetrievalQuestion() bool {
 		return false
 	}
 	questionPlan := p.RetrievalPlan.QuestionPlan
-	return questionPlan != nil && utils.IsNotBlank(questionPlan.RetrievalQuestion) && questionPlan.RetrievalQuestion != p.OriginalQuestion
+	return questionPlan != nil && utils.IsNotBlank(questionPlan.Question)
 }
 
 // HasHistoryContext 是否有历史上下文

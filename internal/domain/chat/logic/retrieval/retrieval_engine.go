@@ -43,7 +43,7 @@ func (e *Engine) Retrieve(ctx context.Context, plan *vo.RetrievalPlan) (*vo.Retr
 		return nil, err
 	}
 
-	retrievalResult := vo.NewRagRetrievalResult(plan.QuestionPlan.RetrievalQuestion)
+	retrievalResult := vo.NewRagRetrievalResult(plan.QuestionPlan.Question)
 
 	inputs := make([]*ExecutionInput, 0, len(plan.QuestionPlan.ExecutionQueries))
 	for _, query := range plan.QuestionPlan.ExecutionQueries {
