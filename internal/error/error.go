@@ -25,4 +25,5 @@ var (
 	ErrSessionRunning           = common.NewBizError(20024, "该会话当前正在执行中，请稍后再试")
 	ErrKnowledgeBaseDisabled    = common.NewBizError(20025, "知识库不存在或已停用: %d")
 	ErrKnowledgeBaseMissing     = common.NewBizError(20026, "请选择至少一个知识库")
+	ErrNoReadyDocuments         = common.NewBizError(20027, "当前选择的知识范围没有可检索的已就绪文档，请重新选择知识库或等待文档完成索引。")
 )

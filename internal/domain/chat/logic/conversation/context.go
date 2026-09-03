@@ -221,14 +221,6 @@ func (c *Context) AnswerLength() int {
 	return utils.Len(c.answerBuffer.String())
 }
 
-// ClarificationOptions 获取澄清选项
-func (c *Context) ClarificationOptions() []string {
-	if execPlan := c.ExecutionPlan.Load(); execPlan != nil {
-		return execPlan.ClarificationOptions
-	}
-	return nil
-}
-
 // DebugTraceJSON 序列化调试轨迹
 func (c *Context) DebugTraceJSON() string {
 	dt := c.DebugTrace.Load()
@@ -306,5 +298,4 @@ func (c *Context) applyCachedExecution(ce *vo.CachedExecution) {
 	}
 	ep.RetrievalPlan = ce.RetrievalPlan
 	ep.RetrievalResult = ce.RetrievalResult
-	ep.PromptAssemblyResult = ce.PromptAssemblyResult
 }

@@ -221,6 +221,14 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		Sink:                           sink,
 	}
 
+	// 解析知识库选择快照，确定允许执行的知识范围
+	allowedScope := convCtx.KnowledgeBaseSelectionSnapshot.ResolveAllowedExecutionScope()
+
+	// 范围不可执行：置澄清兜底，不写回主文档
+	if !allowedScope.Executable() {
+		return nil, errorx.ErrNoReadyDocuments
+	}
+
 	// 当指定文档 ID 时，验证该文档存在，并写入文档名与索引任务 ID
 	if cmd.SelectedDocumentId != 0 {
 		documents := utils.Ternary(cmd.KnowledgeBaseSelectionMode == enum.KbSelectionModeNone, nil, selectionSnapshot.AllowedDocuments)
@@ -234,8 +242,6 @@ func (c *ConversationLogicImpl) buildConversationContext(ctx context.Context, cm
 		convCtx.SelectedDocumentId = documents[index].DocumentId
 		convCtx.SelectedDocumentName = documents[index].DocumentName
 		convCtx.SelectedTaskId = documents[index].LastIndexTaskId
-
-		allowedScope := selectionSnapshot.ResolveAllowedExecutionScope()
 
 		// 校验所选文档/任务是否在允许范围内
 		if convCtx.SelectedDocumentId == 0 || convCtx.SelectedTaskId == 0 {

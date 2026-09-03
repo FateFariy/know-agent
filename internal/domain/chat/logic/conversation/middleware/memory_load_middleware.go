@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -83,24 +84,38 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 
 	// 组装初始执行计划（所有检索/改写字段先以原始问题为兜底值，防止空值扩散）todo 这部分后续可能删除
 	execPlan := &vo.ConversationExecutionPlan{
-		ChatMode:                    convCtx.ChatMode,
-		OriginalQuestion:            convCtx.Question,
-		RewriteQuestion:             convCtx.Question,
-		RewriteSubQuestions:         []string{convCtx.Question},
-		HistorySummary:              historySummary,
-		LongTermSummary:             memoryContext.LongTermSummary,
-		HistoryPlanningContext:      historyPlanningContext,
-		RecentHistoryTranscript:     memoryContext.RecentTranscript,
-		RecentQuestionTranscript:    memoryContext.RecentQuestionTranscript,
-		QuestionHistoryContext:      questionHistoryContext,
+		ChatMode:                 convCtx.ChatMode,
+		OriginalQuestion:         convCtx.Question,
+		RewriteQuestion:          convCtx.Question,
+		RewriteSubQuestions:      []string{convCtx.Question},
+		HistorySummary:           historySummary,
+		LongTermSummary:          memoryContext.LongTermSummary,
+		HistoryPlanningContext:   historyPlanningContext,
+		RecentHistoryTranscript:  memoryContext.RecentTranscript,
+		RecentQuestionTranscript: memoryContext.RecentQuestionTranscript,
+		QuestionHistoryContext:   questionHistoryContext,
+		NavigationDecision: &vo.DocumentNavigationDecision{
+			NavigationAction: enum.DocumentNavigationActionFreshTopic,
+			RetrievalIntent:  enum.RetrievalIntentGeneral,
+			SummaryText: fmt.Sprintf(
+				"retrievalIntent=%s; queryType=%s; reason=%s;",
+				enum.RetrievalIntentGeneral,
+				enum.QueryTypeDocumentQA,
+				"普通文档问题走混合检索",
+			),
+		},
 		HistoryCompressionApplied:   memoryContext.CompressionApplied,
 		HistoryCoveredExchangeId:    memoryContext.CoveredExchangeId,
 		HistoryCoveredExchangeCount: memoryContext.CoveredExchangeCount,
 		HistoryCompressionCount:     memoryContext.CompressionCount,
-		CurrentDateText:             convCtx.CurrentDateText,
 		RecentEvidenceAnchors:       anchors,
+		CurrentDateText:             convCtx.CurrentDateText,
 	}
 	convCtx.SetExecutePlan(execPlan)
+
+	// 检索计划前置构建：在 agent 启动前按对话范围组装基础计划，
+	// 路由/检索等工具后续在计划基础上回填补充（导航决策、子问题、topK 等）
+	execPlan.RetrievalPlan = buildRetrievalPlan(convCtx, execPlan)
 
 	return memoryContext, nil
 }
@@ -189,4 +204,106 @@ func filterEvidenceAnchorsByDocument(anchors vo.EvidenceAnchors, allDocumentIds 
 	return utils.Filter(anchors, func(anchor *vo.EvidenceAnchor) bool {
 		return anchor != nil && utils.ContainsAny(allDocumentIds, anchor.DocumentId)
 	})
+}
+
+// buildRetrievalPlan 前置构建检索执行计划（agent 启动前完成）
+func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.ConversationExecutionPlan) *vo.RetrievalPlan {
+	snapshot := convCtx.KnowledgeBaseSelectionSnapshot
+	runtime := snapshot.RagRuntimeOptions
+	if runtime == nil {
+		runtime = vo.NewDefaultRagRuntimeOptions()
+	}
+	questionPlan := newQuestionPlan(execPlan)
+	hybrid := runtime.Hybrid
+	if hybrid == nil {
+		hybrid = vo.NewDefaultHybridOptions()
+	}
+
+	channels := newChannelPlans(runtime, hybrid)
+	chatMode := execPlan.ChatMode
+	documentScope := snapshot.SelectedDocumentIds()
+	taskScope := snapshot.SelectedTaskIds()
+	if chatMode == enum.ChatQueryModeDocument {
+		documentScope = []int64{convCtx.SelectedDocumentId}
+		taskScope = []int64{convCtx.SelectedTaskId}
+	}
+	return &vo.RetrievalPlan{
+		QuestionPlan:       questionPlan,
+		ChatMode:           enum.ChatQueryModeName(chatMode),
+		PrimaryIntent:      enum.RetrievalIntentGeneral,
+		ScopeMode:          snapshot.SelectionModeName(),
+		KnowledgeBaseIds:   utils.Copy(snapshot.SelectedKnowledgeBaseIds),
+		DocumentScope:      utils.Copy(documentScope),
+		TaskScope:          utils.Copy(taskScope),
+		MetadataFilters:    vo.NewMetadataFilters(questionPlan.Question),
+		Channels:           channels,
+		RankFeatures:       vo.BuildRankFeatures(hybrid),
+		CandidateTopK:      runtime.CandidateTopK,
+		RerankTopK:         runtime.RerankCandidateTopK,
+		RerankEnabled:      runtime.RerankEnabled,
+		FinalTopK:          runtime.FinalTopK,
+		SubQuestionTimeout: runtime.SubQuestionTimeout,
+		NavigationAction:   execPlan.NavigationDecision.NavigationActionText(),
+	}
+}
+
+// newQuestionPlan 构建检索问题计划
+func newQuestionPlan(exec *vo.ConversationExecutionPlan) *vo.RetrievalQuestionPlan {
+	currentQuestion := utils.CompactWhitespace(exec.OriginalQuestion)
+	rewrittenQuestion := utils.CompactWhitespace(exec.RewriteQuestion)
+	question := utils.BlankToDefault(rewrittenQuestion, currentQuestion)
+
+	var inheritedAnchors []*vo.RetrievalContextAnchor
+	if exec.RecognitionResult != nil && exec.RecognitionResult.QueryType == enum.QueryTypeFollowUp {
+		keyOf := func(anchor *vo.EvidenceAnchor) (string, *vo.RetrievalContextAnchor, bool) {
+			if inherited := anchor.ToRetrievalContextAnchor(); inherited != nil {
+				return inherited.UniqueKey(), inherited, true
+			}
+			return "", nil, false
+		}
+		inheritedAnchors = utils.FilterMapUniqueLimit(exec.RecentEvidenceAnchors, 5, keyOf)
+	}
+	contextHints := make([]string, 0, len(inheritedAnchors))
+	for _, anchor := range inheritedAnchors {
+		contextHints = append(contextHints, anchor.AnchorHint())
+	}
+
+	of := func(sq string) (string, string, bool) {
+		sq = utils.CompactWhitespace(sq)
+		return sq, sq, sq != ""
+	}
+	subQuestions := utils.FilterMapUniqueLimit(exec.RewriteSubQuestions, 5, of)
+	if len(subQuestions) == 0 && utils.IsNotBlank(question) {
+		subQuestions = append(subQuestions, question)
+	}
+
+	executionQueries := make([]*vo.RetrievalExecutionQuery, 0, len(subQuestions))
+	for i, sq := range subQuestions {
+		executionQueries = append(executionQueries, &vo.RetrievalExecutionQuery{
+			Index:        i + 1,
+			SubQuestion:  sq,
+			ContextHints: append([]string{}, contextHints...),
+		})
+	}
+
+	return &vo.RetrievalQuestionPlan{
+		Question:                 question,
+		ExecutionQueries:         executionQueries,
+		FollowUp:                 len(inheritedAnchors) > 0,
+		HistoryInherited:         len(inheritedAnchors) > 0,
+		HistoryInheritanceSource: utils.Ternary(len(inheritedAnchors) > 0, "FINAL_EVIDENCE_ANCHOR", "NONE"),
+		InheritedContextAnchors:  inheritedAnchors,
+		SubQuestions:             subQuestions,
+	}
+}
+
+// newChannelPlans 构建检索通道计划列表
+func newChannelPlans(runtime *vo.RagRuntimeOptions, hybrid *vo.HybridOptions) []*vo.RetrievalChannelPlan {
+	return []*vo.RetrievalChannelPlan{
+		vo.NewVectorChannelPlan(true, runtime.VectorTopK, runtime.ChannelTimeout, hybrid.VectorWeight, runtime.MinVectorSimilarity),
+		vo.NewKeywordChannelPlan(runtime.KeywordChannelEnabled, runtime.KeywordTopK, runtime.ChannelTimeout, hybrid.KeywordWeight, runtime.KeywordRelativeScoreFloor),
+		vo.NewTableChannelPlan(runtime.TableChannelEnabled, runtime.CandidateTopK, runtime.ChannelTimeout, hybrid.TableWeight),
+		vo.NewGraphRAGChannelPlan(runtime.GraphRagChannelEnabled, runtime.GraphRagTopK, runtime.ChannelTimeout, hybrid.GraphRagWeight),
+		vo.NewRaptorChannelPlan(runtime.RaptorChannelEnabled, runtime.RaptorTopK, runtime.ChannelTimeout, hybrid.RaptorWeight),
+	}
 }

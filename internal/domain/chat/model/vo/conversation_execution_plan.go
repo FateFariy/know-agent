@@ -22,7 +22,6 @@ type ConversationExecutionPlan struct {
 	RecognitionResult            *IntentRecognitionResult    // 意图识别结果
 	RetrievalPlan                *RetrievalPlan              // 检索执行计划
 	RetrievalResult              *RetrievalResult            // 检索结果
-	PromptAssemblyResult         *RagPromptAssemblyResult    // 提示组装结果
 	HistoryCompressionApplied    bool                        // 是否应用历史压缩
 	HistoryCoveredExchangeId     int64                       // 覆盖的历史记录交换ID
 	HistoryCoveredExchangeCount  int                         // 覆盖的历史记录交换计数
@@ -31,8 +30,6 @@ type ConversationExecutionPlan struct {
 	CurrentDateText              string                      // 当前日期文本表示
 	RequiresRealTimeSearch       bool                        // 是否需要实时搜索
 	RequiresCurrentDateAnchoring bool                        // 是否需要当前日期锚定
-	ClarificationReply           string                      // 澄清回复
-	ClarificationOptions         []string                    // 澄清选项列表
 	ClarificationReason          string                      // 澄清原因文本
 }
 

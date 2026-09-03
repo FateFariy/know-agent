@@ -39,10 +39,10 @@ func (f *RetrievalMetadataFilters) Clone() *RetrievalMetadataFilters {
 }
 
 // NewMetadataFilters 构建检索元数据过滤条件
-func NewMetadataFilters(normalizedQuery string, intentResult *IntentRecognitionResult) *RetrievalMetadataFilters {
+func NewMetadataFilters(normalizedQuery string) *RetrievalMetadataFilters {
 	filters := &RetrievalMetadataFilters{}
 
-	if utils.IsBlank(normalizedQuery) && intentResult == nil {
+	if utils.IsBlank(normalizedQuery) {
 		return filters
 	}
 	fn := func(hints []string) []string {
@@ -58,11 +58,6 @@ func NewMetadataFilters(normalizedQuery string, intentResult *IntentRecognitionR
 	sectionHints := append([]string{}, decimalSectionPattern.FindAllString(normalizedQuery, -1)...)
 	sectionHints = append(sectionHints, namedSectionPattern.FindAllString(normalizedQuery, -1)...)
 	filters.SectionPathHints = fn(sectionHints)
-
-	// 基于意图结果补充实体提示
-	if intentResult != nil {
-		filters.EntityHints = fn(intentResult.Entities)
-	}
 
 	return filters
 }

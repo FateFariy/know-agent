@@ -44,10 +44,9 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 	convCtx := conversation.AgentContextFrom(ctx)
 	execPlan := convCtx.ExecutionPlan.Load()
 	// 启动文档内路由阶段追踪
-	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, &vo.StageInput{SummaryText: "正在进行图查询", Snapshot: nil})
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, &vo.StageInput{SummaryText: "正在进行结构导航查询", Snapshot: nil})
 
 	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
-	rewriteResult := vo.NewQuestionRewriteResult(execPlan.RewriteQuestion, execPlan.RewriteSubQuestions)
 	nav := &NavigationInput{
 		DocumentId:      convCtx.SelectedDocumentId,
 		Question:        input.Question,
@@ -74,27 +73,35 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
 	}
 
-	anchors, err := r.loadRecentEvidenceAnchors(ctx, convCtx.ConversationId, maxRecentExchanges)
-	if err != nil {
-		ctx = vo.OnError(ctx, "加载最近证据锚点失败。", err)
-		return err
-	}
-	if convCtx.ChatMode == enum.ChatQueryModeDocument {
-		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.SelectedDocumentId)
-	} else {
-		anchors = r.filterValidEvidenceAnchors(anchors, convCtx.KnowledgeBaseSelectionSnapshot.SelectedDocumentIds()...)
-	}
-	execPlan.QuestionHistoryContext.ApplyFollowUpAndEvidence(convCtx.Question, execPlan.RecognitionResult, anchors)
-	execPlan.RecentEvidenceAnchors = anchors
-
 	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
 	execPlan.NavigationDecision = navigationDecision
-	execPlan.RetrievalPlan = r.buildRetrievalPlan(convCtx, execPlan)
-
-	// 打印关键编排结果（会话ID、模式、原始问题、改写问题、检索问题、执行模式、目标章节）
-	logx.Infof("聊天编排完成: conversationId=%s, chatMode=%s, originalQuestion='%s', rewriteQuestion='%s', targetSection='%s",
-		convCtx.ConversationId, enum.ChatQueryModeName(convCtx.ChatMode), utils.Trim(convCtx.Question),
-		execPlan.RewriteQuestion, navigationDecision.StructureAnchor.TargetSectionHint)
-
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
+
+	return nil, nil
+}
+
+// copyStructureNavigationResult 复制结构导航结果 todo 待实现
+func copyStructureNavigationResult(decision *vo.DocumentNavigationDecision) *vo.StructureNavigationResult {
+	if decision == nil {
+		return nil
+	}
+	return nil
+}
+
+// copyStructureAnchor 复制结构锚点
+func copyStructureAnchor(decision *vo.DocumentNavigationDecision) *vo.ConversationStructureAnchor {
+	if decision == nil || decision.StructureAnchor == nil {
+		return nil
+	}
+	anchor := *decision.StructureAnchor
+	return &anchor
+}
+
+// copyItemAnchor 复制条目锚点
+func copyItemAnchor(decision *vo.DocumentNavigationDecision) *vo.ConversationItemAnchor {
+	if decision == nil || decision.ItemAnchor == nil {
+		return nil
+	}
+	item := *decision.ItemAnchor
+	return &item
 }
