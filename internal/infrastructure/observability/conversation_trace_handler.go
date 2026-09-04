@@ -64,7 +64,6 @@ func (t *ConversationTraceHandler) OnStart(ctx context.Context, info *callbacks.
 		StageName:      stageCode.Name,
 		StageOrder:     stageCode.Order,
 		StageLevel:     1,
-		ExecutionMode:  info.ExecutionMode,
 		StageState:     enum.ConversationTraceStageStateRunning,
 		StartTime:      utils.Pointer(info.StartTime),
 		SummaryText:    utils.Pointer(summaryText),

@@ -135,6 +135,20 @@ func (c *Context) PublishText(content string) error {
 	return c.Sink.Text(content, c.ConversationId, c.ExchangeId)
 }
 
+// ReusableCacheEvidence 若语义缓存命中「仅复用检索」策略，返回回填到执行计划的缓存检索结果；
+// 供缓存复用注入中间件在 agent 启动前把证据写入 system 指令，让 agent 直接基于证据作答而不再检索。
+// 未命中或命中「复用答案」策略（后者已在 AgentStage 短路、无需启动 agent）时返回 nil。
+func (c *Context) ReusableCacheEvidence() *vo.RetrievalResult {
+	if c == nil || !c.cache.IsCacheHit() || c.cache.ReuseStrategy() != enum.ReuseRetrievalOnly {
+		return nil
+	}
+	execPlan := c.ExecutionPlan.Load()
+	if execPlan == nil {
+		return nil
+	}
+	return execPlan.RetrievalResult
+}
+
 // PublishError 发布错误事件
 func (c *Context) PublishError(content string) error {
 	if c == nil || content == "" {
