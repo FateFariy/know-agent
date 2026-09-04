@@ -25,9 +25,8 @@ var outlineSectionHints = []string{
 
 // NavigationSignals 由问题文本规则兜底判定的结构导航信号
 type NavigationSignals struct {
-	HasStructureNav bool     // 文本命中结构导航语义（相邻/大纲/位置+锚点）
-	Action          string   // 推导的结构导航动作（语法正则解析不到时的语义兜底）
-	SectionAnchors  []string // 提取的显式章节锚点（编号 / 第N章节 / 引号标题）
+	Action         string   // 推导的结构导航动作（语法正则解析不到时的语义兜底）
+	SectionAnchors []string // 提取的显式章节锚点（编号 / 第N章节 / 引号标题）
 }
 
 // HasExplicitSectionAnchorText 判断问题文本是否含显式章节锚点（章节号 / 第N章节 / 引号标题）
@@ -118,18 +117,19 @@ func (n *navigationExtractor) detectNavigationTextSignals() *NavigationSignals {
 	location := utils.ContainsAnyString(normalized, sectionLocationHints)
 	outline := utils.ContainsAnyString(normalized, outlineSectionHints)
 
+	hasStructureNav := false
 	switch {
 	case outline:
-		signals.HasStructureNav = true
+		hasStructureNav = true
 		signals.Action = enum.DocumentNavigationActionChildSectionDescend
 	case adjacent:
-		signals.HasStructureNav = true
+		hasStructureNav = true
 		signals.Action = enum.DocumentNavigationActionSectionAdjacencyLookup
 	case location && hasExplicitAnchor:
-		signals.HasStructureNav = true
+		hasStructureNav = true
 		signals.Action = enum.DocumentNavigationActionAncestorSectionReturn
 	}
-	if signals.HasStructureNav {
+	if hasStructureNav {
 		signals.SectionAnchors = n.extractSectionAnchors()
 	}
 	return signals

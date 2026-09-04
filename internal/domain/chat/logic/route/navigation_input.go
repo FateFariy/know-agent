@@ -8,17 +8,15 @@ import (
 // NavigationInput 文档内结构路由输入
 type NavigationInput struct {
 	DocumentId       int64                         // 文档 ID
-	QueryType        string                        // 查询类型
 	Question         string                        // 原始问题
 	RewriteQuestion  string                        // 改写问题
 	SubQuestions     []string                      // 子问题列表
 	SectionAnchors   []string                      // 显式章节锚点
-	HasStructureNav  bool                          // 是否高置信结构导航
 	NavigationAction enum.DocumentNavigationAction // 导航动作
 	ItemIndex        *int                          //条目索引（第N步/条/点/项）
 }
 
-// Normalize 执行归一化：默认值填充、文本信号探测、冲突合并、最终动作解析
+// Normalize 执行归一化：默认值填充、文本信号探测、冲突合并
 func (n *NavigationInput) Normalize() {
 	if n == nil {
 		return
@@ -26,7 +24,6 @@ func (n *NavigationInput) Normalize() {
 
 	// 基础字段兜底
 	n.RewriteQuestion = utils.BlankToDefault(n.RewriteQuestion, n.Question)
-	n.QueryType = utils.BlankToDefault(n.QueryType, enum.QueryTypeDocumentQA)
 	if len(n.SubQuestions) == 0 {
 		n.SubQuestions = []string{n.RewriteQuestion}
 	}
@@ -39,92 +36,37 @@ func (n *NavigationInput) Normalize() {
 
 	// 冲突合并：自身显式字段优先，缺省项由文本信号补全
 	n.mergeNavigationSignals(signals, textItemIndex)
-
-	// 最终动作解析
-	n.NavigationAction = n.resolveFinalAction(signals)
 }
 
 // mergeNavigationSignals 合并导航信号，处理动作冲突。
 //
-// 信号优先级：Agent 显式提供的 NavigationAction 最高，其次自身结构导航声明，
-// 文本信号仅作缺失字段的兜底来源。冲突时（动作与 HasStructureNav/QueryType 矛盾），以显式动作为准校正其余字段。
+// 信号优先级：Agent 显式提供的 NavigationAction 最高，其次自身结构导航声明
 func (n *NavigationInput) mergeNavigationSignals(signals *NavigationSignals, textItemIndex *int) {
 	// Agent 显式提供导航动作：动作即最高级信号，直接按其校正结构导航声明
 	if n.NavigationAction != "" {
-		n.applyActionConsistency(signals, textItemIndex)
-		return
-	}
-	// 自身已声明结构导航：补齐缺失的 QueryType / 章节锚点
-	if n.HasStructureNav {
-		if n.QueryType == enum.QueryTypeDocumentQA {
-			n.QueryType = enum.QueryTypeStructureNavigation
+		// 结构导航类动作：强制结构导航声明与查询类型
+		if n.IsStructureNavigation() {
+			if len(n.SectionAnchors) == 0 {
+				n.SectionAnchors = append([]string{}, signals.SectionAnchors...)
+			}
+			return
 		}
-		if len(n.SectionAnchors) == 0 && signals.HasStructureNav {
-			n.SectionAnchors = append([]string{}, signals.SectionAnchors...)
-		}
-		return
-	}
 
-	// 自身未声明结构导航：仅当文本命中结构导航语义时升级
-	if signals.HasStructureNav {
-		n.HasStructureNav = true
-		if n.QueryType == enum.QueryTypeDocumentQA {
-			n.QueryType = enum.QueryTypeStructureNavigation
-		}
-		if len(n.SectionAnchors) == 0 {
-			n.SectionAnchors = append([]string{}, signals.SectionAnchors...)
+		if n.NavigationAction == enum.DocumentNavigationActionItemReference {
+			n.ItemIndex = textItemIndex
 		}
 		return
 	}
+	n.SectionAnchors = append([]string{}, signals.SectionAnchors...)
+
+	// 结构导航：文本语义动作优先，缺省用兜底动作
+	n.NavigationAction = utils.BlankToDefault(signals.Action, enum.DocumentNavigationActionFreshTopic)
 
 	// 普通问题：文本显式条目索引兜底
-	if n.ItemIndex == nil && len(n.SubQuestions) == 1 {
+	if len(n.SubQuestions) == 1 {
 		n.ItemIndex = textItemIndex
+		n.NavigationAction = enum.DocumentNavigationActionItemReference
 	}
-}
-
-// applyActionConsistency 依据 Agent 显式动作校正结构导航声明、QueryType、锚点与条目索引
-func (n *NavigationInput) applyActionConsistency(signals *NavigationSignals, textItemIndex *int) {
-	// 结构导航类动作：强制结构导航声明与查询类型
-	if n.IsStructureNavigation() {
-		n.HasStructureNav = true
-		n.QueryType = enum.QueryTypeStructureNavigation
-		if len(n.SectionAnchors) == 0 && signals.HasStructureNav {
-			n.SectionAnchors = append([]string{}, signals.SectionAnchors...)
-		}
-		return
-	}
-
-	// 非结构导航类动作（FRESH_TOPIC / ITEM_REFERENCE）：降级为普通文档问题
-	n.HasStructureNav = false
-	if n.QueryType == enum.QueryTypeStructureNavigation {
-		n.QueryType = enum.QueryTypeDocumentQA
-	}
-	// ITEM_REFERENCE 缺条目索引时用文本索引兜底
-	if n.NavigationAction == enum.DocumentNavigationActionItemReference && n.ItemIndex == nil {
-		n.ItemIndex = textItemIndex
-	}
-}
-
-// resolveFinalAction 解析最终导航动作
-func (n *NavigationInput) resolveFinalAction(signals *NavigationSignals) enum.DocumentNavigationAction {
-	// 显式动作优先
-	if n.NavigationAction != "" {
-		return n.NavigationAction
-	}
-	// 结构导航：文本语义动作优先，缺省用兜底动作
-	if n.HasStructureNav {
-		if signals.Action != "" {
-			return signals.Action
-		}
-		return enum.DocumentNavigationActionChildSectionDescend
-	}
-
-	// 普通问题：条目引用或新主题
-	if n.ItemIndex != nil {
-		return enum.DocumentNavigationActionItemReference
-	}
-	return enum.DocumentNavigationActionFreshTopic
 }
 
 // RouteText 拼接路由文本（原始 + 改写），供章节定位匹配使用
@@ -137,24 +79,6 @@ func (n *NavigationInput) RouteText() string {
 		text += " " + n.RewriteQuestion
 	}
 	return text
-}
-
-// RetrievalIntent 获取主要检索意图
-func (n *NavigationInput) RetrievalIntent() enum.RetrievalIntent {
-	if n == nil {
-		return enum.RetrievalIntentGeneral
-	}
-	switch n.QueryType {
-	case enum.QueryTypeStructureNavigation:
-		return enum.RetrievalIntentStructure
-	case enum.QueryTypeTableQuery:
-		return enum.RetrievalIntentTable
-	case enum.QueryTypeGraphRelation:
-		return enum.RetrievalIntentGraphRAG
-	case enum.QueryTypeGlobalSummary:
-		return enum.RetrievalIntentRaptor
-	}
-	return enum.RetrievalIntentGeneral
 }
 
 // HasSectionAnchor 判断是否携带非空显式章节锚点

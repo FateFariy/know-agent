@@ -8,7 +8,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -81,7 +80,6 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *NavigationInput) 
 func (r *DocumentRouterImpl) buildDecision(section *vo.GraphSection, navInput *NavigationInput, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{
 		NavigationAction: navInput.NavigationAction,
-		RetrievalIntent:  navInput.RetrievalIntent(),
 	}
 
 	// 构建结构锚点
@@ -109,14 +107,7 @@ func (r *DocumentRouterImpl) buildDecision(section *vo.GraphSection, navInput *N
 	}
 
 	// 构建摘要文本
-	decision.SummaryText = fmt.Sprintf(
-		"retrievalIntent=%s; queryType=%s; reason=%s; section=%s; itemIndex=%d",
-		utils.BlankToDefault(decision.RetrievalIntent, enum.RetrievalIntentGeneral),
-		navInput.QueryType,
-		reason,
-		displayTitle,
-		utils.PointerOrDefault(itemIndex, 0),
-	)
+	decision.SummaryText = fmt.Sprintf("reason=%s; section=%s; itemIndex=%d", reason, displayTitle, utils.PointerOrDefault(itemIndex, 0))
 
 	logx.Infof("文档问答路由完成: action=%s, section='%s', reason='%s'", navInput.NavigationAction, displayTitle, reason)
 

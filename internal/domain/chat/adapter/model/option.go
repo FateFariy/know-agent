@@ -10,6 +10,8 @@ type Options struct {
 	Temperature *float32
 	TopP        *float32
 	MaxTokens   int
+
+	Think string // 思考过程, true/false,"high"、"medium"、"low"
 }
 
 type Option = common.Option
@@ -45,5 +47,12 @@ func WithTopP(topP float32) Option {
 func WithMaxTokens(maxTokens int) Option {
 	return common.WrapImplSpecificOptFn(func(opt *Options) {
 		opt.MaxTokens = maxTokens
+	})
+}
+
+// WithThink 设置思考过程
+func WithThink(think string) Option {
+	return common.WrapImplSpecificOptFn(func(opt *Options) {
+		opt.Think = think
 	})
 }

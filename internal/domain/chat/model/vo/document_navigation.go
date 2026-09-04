@@ -7,16 +7,7 @@ type DocumentNavigationDecision struct {
 	NavigationAction enum.DocumentNavigationAction `json:"navigationAction"` // 导航动作
 	StructureAnchor  *ConversationStructureAnchor  `json:"structureAnchor"`  // 结构锚点
 	ItemAnchor       *ConversationItemAnchor       `json:"itemAnchor"`       // 项目锚点
-	RetrievalIntent  enum.RetrievalIntent          `json:"retrievalIntent"`  // 检索意图
 	SummaryText      string                        `json:"summaryText"`      // 摘要文本
-}
-
-// PrimaryIntent 获取主要检索意图
-func (d *DocumentNavigationDecision) PrimaryIntent() string {
-	if d == nil {
-		return enum.RetrievalIntentGeneral
-	}
-	return d.RetrievalIntent
 }
 
 func (d *DocumentNavigationDecision) NavigationActionText() string {

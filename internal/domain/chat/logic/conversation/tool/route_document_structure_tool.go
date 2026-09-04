@@ -11,11 +11,9 @@ import (
 )
 
 type RouteStructureInput struct {
-	Question         string                        `json:"query" jsonschema_description:"改写问题"`                // 改写问题
-	QueryType        string                        `json:"queryType" jsonschema_description:"查询类型"`            // 查询类型
-	NavigationAction enum.DocumentNavigationAction `json:"navigationAction" jsonschema_description:"导航动作"`     // 导航动作
-	SectionAnchors   []string                      `json:"sectionAnchors" jsonschema_description:"显式章节锚点"`     // 显式章节锚点
-	HasStructureNav  bool                          `json:"hasStructureNav" jsonschema_description:"是否高置信结构导航"` // 是否高置信结构导航
+	Question         string                        `json:"query" jsonschema_description:"改写问题"`            // 改写问题
+	NavigationAction enum.DocumentNavigationAction `json:"navigationAction" jsonschema_description:"导航动作"` // 导航动作
+	SectionAnchors   []string                      `json:"sectionAnchors" jsonschema_description:"显式章节锚点"` // 显式章节锚点
 }
 
 type RouteStructureOutput struct {
@@ -52,9 +50,7 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 		Question:         input.Question,
 		RewriteQuestion:  input.Question,
 		SubQuestions:     execPlan.SubQuestions(),
-		QueryType:        input.QueryType,
 		SectionAnchors:   input.SectionAnchors,
-		HasStructureNav:  input.HasStructureNav,
 		NavigationAction: input.NavigationAction,
 	}
 	navigationDecision, err := r.route.Route(ctx, nav)
