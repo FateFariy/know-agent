@@ -10,7 +10,6 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	errorx "github.com/swiftbit/know-agent/internal/error"
 )
 
@@ -123,9 +122,6 @@ func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) e
 		convCtx.ReleaseResources()
 		return nil
 	}
-
-	debugTrace := vo.NewChatDebugTrace(convCtx.ExecutionPlan.Load())
-	convCtx.DebugTrace.Store(debugTrace)
 
 	// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
 	if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {

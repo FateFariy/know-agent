@@ -2,33 +2,33 @@ Http:
   Name: rag
   Host: 0.0.0.0
   Port: 8080
-  Mode: dev
-#  Middlewares:
-#    Recover: false
-#    Timeout: false
+  Mode: pro
+  MaxBytes: 1048576000
+  Timeout: 30000
 
 Auth:
   AccessSecret: your-access-secret-key
   AccessExpire: 2h
 
 Mysql:
-  Endpoint: 10.104.0.165:3306
+  Endpoint: host.docker.internal:3306
   Username: root
   Password: "123456"
   DbName: rag
 
 Redis:
-  - Host: 10.104.0.165:6379
+  - Host: host.docker.internal:6379
     Type: node
     Weight: 100
 
 Minio:
-  Endpoint: 10.104.1.173:9000
+  Addr: host.docker.internal:9000
   AccessKeyID: minioadmin
   SecretAccessKey: minioadmin
   BucketName: agent-document
   ObjectPrefix: rag/document
   ParsedTextPrefix: rag/parsed-text
+  ParseArtifactPrefix: rag/parse-artifact
   UseSSL: false
 
 Neo4j:
@@ -40,37 +40,42 @@ Neo4j:
   QueryTimeoutSeconds: 5
 
 MQ:
-  Endpoint: 10.104.1.173:9876
+  Addr: 10.104.0.165:9876
   ParseTopic: know-agent-parse
   IndexTopic: know-agent-index
-  Enabled: false
-
-StructureParsing:
-  LLMDisambiguationEnabled: true
-  MaxAmbiguousSignalsPerCall: 8
-  ContextWindowLines: 2
-  MaxPlainHeadingChars: 32
-  AmbiguityConfidenceFloor: 0.45
-  AmbiguityConfidenceCeil: 0.80
+  Retry: 3
+  Enabled: true
 
 Embedding:
-  Model:
-  Dimensions:
-  BaseURL:
+  Model: qwen3-embedding:4b
+  Dimensions: 1024
+  BaseURL: http://10.104.1.173:11434
 
 Chunk:
   RecursiveMaxChars: 800
   RecursiveOverlapChars: 120
   SemanticMaxChars: 700
   SemanticMinChars: 240
+  ParentChunkMaxChars: 2200
+  ParentChunkOverlapChars: 180
+  ParentSemanticMaxChars: 1600
+  ParentSemanticMinChars: 480
   SemanticSimilarityThreshold: 0.18
   LlmEnabled: false
   LlmMaxChars: 3500
   RecommendLlmWhenLowQuality: true
 
+Gse:
+  DictPath: ""
+  StopPath: ""
+  UseHMM: false
+  AlphaNum: false
+
 Milvus:
-  Addr: 10.104.1.173:19530
-  Collection: document_chunk_collection
+  Addr: host.docker.internal:19530
+  Username: ""
+  Password: ""
+  Collection: document_chunk
   MetricType: COSINE
 
 Chat:
@@ -78,16 +83,17 @@ Chat:
   RecommendationEnabled: true
   Memory:
     StrategyType: summary_compression
-    HistorySummary:
-      Enabled: true
-      KeepRecentTurns: 3
-      CompressionBatchTurns: 3
-      MaxChars: 1024
-    RewriteHistoryTurns: 4
     RecentTranscriptMaxChars: 1024
     QuestionHistoryMaxChars: 512
     RewriteEnabled: true
     MaxSubQuestions: 5
+    HistorySummary:
+      Enabled: true
+      HistoryTurns: 6
+      KeepRecentTurns: 3
+      CompressionBatchTurns: 3
+      MaxChars: 1024
+      RecentTranscriptMaxChars: 2200
   Rewrite:
     Enabled: true
     MaxSubQuestions: 5
@@ -100,30 +106,71 @@ Chat:
     HistoryPreviewTurns: 3
   Rag:
     Enabled: true
-    RerankEnabled: true
-    NoEvidenceReply:
     ChannelTimeout: 5s
     SubQuestionTimeout: 12s
-    KeywordTopK: 8
-    VectorTopK: 8
     CandidateTopK: 10
     FinalTopK: 5
     ParentEvidenceMaxChars: 1024
-    MinVectorSimilarity: 0.5
-    KeywordRelativeScoreFloor: 0.35
-    RerankScoreThreshold: 0.7
     PlanningHistoryMaxChars: 2000
     QuestionHistoryMaxChars: 1000
     TotalEvidenceMaxChars: 5200
     PerSubQuestionEvidenceMaxChars: 2200
+    Keyword:
+      Enabled: true
+      TopK: 8
+      RelativeScoreFloor: 0.35
+    Vector:
+      Enabled: true
+      TopK: 8
+      MinSimilarity: 0.5
+    Table:
+      Enabled: true
+    GraphRag:
+      Enabled: true
+      TopK: 5
+      MaxHops: 2
+    Raptor:
+      Enabled: true
+      TopK: 5
+      SourceChunkTopK: 3
+      MaxClusterSize: 6
+      MaxLevels: 3
+      LlmSummaryEnabled: true
+      SummaryQualityFloor: 0.42
     Rerank:
-      Enabled: false
+      Enabled: true
       URL:
       ApiKey:
-      Model:
+      Model: qwen3-rerank
       TopN: 5
       ConnectTimeout: 3s
       ReadTimeout: 6s
+      ScoreThreshold: 0.0
+    Hybrid:
+      VectorWeight: 1.0
+      KeywordWeight: 1.0
+      TableWeight: 1.2
+      GraphRagWeight: 1.1
+      RaptorWeight: 1.05
+      RankWeight: 1.0
+      OriginalScoreWeight: 0.08
+      MetadataBoostWeight: 0.04
+      MaxMetadataBoost: 1.0
+    GraphRagQueryPlan:
+      Enabled: true
+    AutoRoute:
+      RecommendationThreshold: 0.55
+  SemanticCache:
+    Enabled: true
+    Collection: semantic_cache
+    SimilarityThreshold: 0.92
+    DirectHitThreshold: 0.90
+    RecallTopK: 3
+    ConfidenceFloor: 0.6
+    JudgeEnabled: false
+    JudgeTemperature: 0.1
+    ReuseAnswer: true
+    WriteTopic: know-agent-semantic-cache-write
   Agent:
     RecommendationEnabled: true
     MaxModelCallsPerRun: 8
@@ -132,25 +179,15 @@ Chat:
     MaxToolCallsPerThread: 30
     HistoryPreviewTurns: 4
     RecommendationTimeout: 5s
-    SystemPrompt:
-    RecommendationPrompt:
-  SemanticCache:
-    Enabled:
-    Collection:
-    SimilarityThreshold:
-    DirectHitThreshold:
-    RecallTopK:
-    ConfidenceFloor:
-    JudgeEnabled:
-    JudgeTemperature:
-    ReuseAnswer:
-    WriteTopic:
+    SystemPrompt: ""
+    RecommendationPrompt: ""
+
 ChatModel:
   Ark:
     Function: "chat"
-    Model: doubao-seed-2-0-mini-260428
-    BaseURL: https://ark.cn-beijing.volces.com/api/v3
-    ApiKey: REPLACE_YOUR_ARK_KEY
+    Model:
+    BaseURL:
+    ApiKey:
     Temperature: 0.1
     MaxTokens: 1024
     TopP: 0.3
@@ -160,9 +197,9 @@ ChatModel:
 JudgeModel:
   Ark:
     Function: "judge"
-    Model: deepseek-v4-flash-260425
-    BaseURL: https://ark.cn-beijing.volces.com/api/v3
-    ApiKey: REPLACE_YOUR_ARK_KEY
+    Model:
+    BaseURL:
+    ApiKey:
     Temperature: 0.0
     MaxTokens: 1024
     TopP: 0.3

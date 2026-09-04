@@ -27,7 +27,6 @@ type ConversationTraceStage struct {
 
 const (
 	memory         = "MEMORY"
-	intent         = "INTENT"
 	rewrite        = "REWRITE"
 	semanticCache  = "SEMANTIC_CACHE"
 	route          = "ROUTE"
@@ -41,7 +40,7 @@ const (
 var (
 	ConversationTraceStageMemory         = &ConversationTraceStage{memory, "会话记忆", 10}
 	ConversationTraceStageRewrite        = &ConversationTraceStage{rewrite, "问题改写", 20}
-	ConversationTraceStageSemanticCache  = &ConversationTraceStage{semanticCache, "语义缓存查询", 25}
+	ConversationTraceStageSemanticCache  = &ConversationTraceStage{semanticCache, "语义缓存查询", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
 	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 60}

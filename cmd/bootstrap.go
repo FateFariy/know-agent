@@ -69,6 +69,7 @@ func bootstrap(c *config.Config) *server.Server {
 	elasticStorage := storage.NewElasticStorage(serviceContext)
 	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
 	semanticCacheStore := cache.NewSemanticCache(serviceContext)
+	semanticCacheWriteConsumer := consumer.NewSemanticCacheWriteConsumer(serviceContext, semanticCacheStore)
 
 	documentRepo := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
 	tableRepo := persistence.NewTableRepository(serviceContext)
@@ -105,24 +106,23 @@ func bootstrap(c *config.Config) *server.Server {
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
 	chainRuntime := conversation.NewRuntimeRegistry()
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
-
-	// 知识路由中间件须排在 MemoryLoadMiddleware 之后（依赖其创建的 execPlan 与检索计划）
-	memoryLoadMiddleware := middleware.NewMemoryLoadMiddleware(serviceContext, memoryManageImpl, chatRepo)
-	knowledgeRouteMiddleware := middleware.NewKnowledgeRouteMiddleware(knowledgeAdapter)
+	contextInjectMiddleware := middleware.NewContextInjectMiddleware(serviceContext)
 	structureTool := tool.NewRouteDocumentStructureTool(documentRouter)
 	knowledgeBaseSearchTool := tool.NewKnowledgeBaseSearchTool(serviceContext, retrievalEngine)
 	agentRunner := agent.NewEinoAgentRunner(serviceContext,
-		agent.WithMiddleware(memoryLoadMiddleware, knowledgeRouteMiddleware),
+		agent.WithMiddleware(contextInjectMiddleware),
 		agent.WithTools(structureTool),
 		agent.WithTools(knowledgeBaseSearchTool),
 	)
 
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
+		conversation.NewMemoryLoadStage(serviceContext, memoryManageImpl, chatRepo),
 		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
-		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore),
+		conversation.NewRouteStage(chatRepo, knowledgeAdapter, documentForChat),
+		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore, chatModel, renderer),
 		conversation.NewAgentStage(agentRunner),
-		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore),
+		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore, rocketMQMessageProducer),
 		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),
 		conversation.NewRecommendStage(serviceContext, chatRepo, memoryManageImpl, recommender),
 		conversation.NewEndStage(chatRepo),
@@ -145,7 +145,7 @@ func bootstrap(c *config.Config) *server.Server {
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl, knowledgeBaseLogicImpl)
 	httpServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
 
-	return server.NewServer(httpServer, parseConsumer, buildIndexConsumer, rocketMQMessageProducer)
+	return server.NewServer(httpServer, parseConsumer, buildIndexConsumer, rocketMQMessageProducer, semanticCacheWriteConsumer)
 }
 
 func NewChunkStrategyRegistry(svcCtx *svc.ServiceContext, chatModel model.ChatModel, template adapter.PromptRenderer) *chunk.Registry {
