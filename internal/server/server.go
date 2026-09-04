@@ -14,18 +14,20 @@ import (
 )
 
 type Server struct {
-	HTTP               *rest.Server
-	parseConsumer      *consumer.ParseDocumentConsumer
-	buildIndexConsumer *consumer.BuildIndexConsumer
-	rocketMQProducer   *mq.RocketMQMessageProducer
+	HTTP                       *rest.Server
+	parseConsumer              *consumer.ParseDocumentConsumer
+	buildIndexConsumer         *consumer.BuildIndexConsumer
+	semanticCacheWriteConsumer *consumer.SemanticCacheWriteConsumer
+	rocketMQProducer           *mq.RocketMQMessageProducer
 }
 
-func NewServer(HTTP *rest.Server, parseConsumer *consumer.ParseDocumentConsumer, buildIndexConsumer *consumer.BuildIndexConsumer, rocketMQProducer *mq.RocketMQMessageProducer) *Server {
+func NewServer(HTTP *rest.Server, parseConsumer *consumer.ParseDocumentConsumer, buildIndexConsumer *consumer.BuildIndexConsumer, rocketMQProducer *mq.RocketMQMessageProducer, semanticCacheWriteConsumer *consumer.SemanticCacheWriteConsumer) *Server {
 	return &Server{
-		HTTP:               HTTP,
-		parseConsumer:      parseConsumer,
-		buildIndexConsumer: buildIndexConsumer,
-		rocketMQProducer:   rocketMQProducer,
+		HTTP:                       HTTP,
+		parseConsumer:              parseConsumer,
+		buildIndexConsumer:         buildIndexConsumer,
+		semanticCacheWriteConsumer: semanticCacheWriteConsumer,
+		rocketMQProducer:           rocketMQProducer,
 	}
 }
 
@@ -33,6 +35,7 @@ func (s *Server) Start() {
 	s.rocketMQProducer.Start()
 	s.parseConsumer.Start()
 	s.buildIndexConsumer.Start()
+	s.semanticCacheWriteConsumer.Start()
 	s.HTTP.Start()
 }
 

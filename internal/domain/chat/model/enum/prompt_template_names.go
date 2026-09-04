@@ -10,6 +10,6 @@ const (
 	AnswerRelevancyEvaluate    = "answer-relevancy-evaluate"
 	ContextPrecisionEvaluate   = "context-precision-evaluate"
 	ContextRecallEvaluate      = "context-recall-evaluate"
-	DocumentIntentRecognition  = "document-intent-recognition"
 	RecommendationUser         = "recommendation-user"
+	SemanticCacheJudge         = "semantic-cache-judge"
 )

@@ -36,8 +36,7 @@ const (
 	docIDsField     = "scope_document_ids"
 	taskIDsField    = "scope_task_ids"
 	kbIDsField      = "scope_knowledge_base_ids"
-	searchTopK      = 2
-	minSimMargin    = 0.1 // 最优与次优相似度的最小间隔(极差)，低于则判定为歧义/未命中
+	searchTopK      = 2 // TopK 未显式指定时的回退默认值
 	defaultCollName = "chat_cache"
 )
 
@@ -71,7 +70,6 @@ func NewSemanticCache(svcCtx *svc.ServiceContext) *SemanticCache {
 	}
 	sc := &SemanticCache{
 		milvusClient: svcCtx.Milvus,
-		emb:          svcCtx.Emb,
 		db:           svcCtx.Db,
 		collection:   collection,
 		dim:          svcCtx.Config.Embedding.Dimensions,
@@ -93,14 +91,38 @@ func (s *SemanticCache) embed(ctx context.Context, text string) (milvusentity.Fl
 	}), nil
 }
 
-// Search 在 scope 内对查询文本做 ANN 检索（向量化在内部完成），返回相似度达标的最相似完整
-// CacheEntry；未命中返回 (nil, nil)
-func (s *SemanticCache) Search(ctx context.Context, input *conversation.SearchInput) (*conversation.CacheHit, error) {
+// SearchCandidates 在 scope 内对查询文本做向量候选召回（向量化在内部完成），
+// 返回相似度 ≥ Threshold 且按相似度降序的完整候选；无候选返回 (nil, nil)
+func (s *SemanticCache) SearchCandidates(ctx context.Context, input *conversation.SearchInput) ([]*conversation.CacheHit, error) {
+	topK := input.TopK
+	if topK <= 0 {
+		topK = searchTopK
+	}
+	entries, err := s.annSearch(ctx, input, topK)
+	if err != nil {
+		return nil, err
+	}
+	hits := make([]*conversation.CacheHit, 0, len(entries))
+	for _, cand := range entries {
+		entry, err := s.loadEntry(ctx, cand.ID)
+		if err != nil {
+			return nil, err
+		}
+		if entry == nil {
+			continue // MySQL 真值缺失（已过期清理或软删除），跳过该候选
+		}
+		hits = append(hits, &conversation.CacheHit{Entry: entry, Similarity: cand.Similarity})
+	}
+	return hits, nil
+}
+
+// annSearch 执行 Milvus ANN 召回：按阈值过滤并按相似度降序，仅返回主键与相似度（真值回查见 SearchCandidates）
+func (s *SemanticCache) annSearch(ctx context.Context, input *conversation.SearchInput, topK int) ([]*entity.ChatCacheEntry, error) {
 	vec, err := s.embed(ctx, input.QueryText)
 	if err != nil {
 		return nil, fmt.Errorf("语义缓存: 向量化失败: %w", err)
 	}
-	opt := milvusclient.NewSearchOption(s.collection, searchTopK, []milvusentity.Vector{vec}).
+	opt := milvusclient.NewSearchOption(s.collection, topK, []milvusentity.Vector{vec}).
 		WithFilter(s.buildFilter(input.Scope)).
 		WithOutputFields(cacheIDField).
 		WithConsistencyLevel(milvusentity.ClBounded)
@@ -128,19 +150,7 @@ func (s *SemanticCache) Search(ctx context.Context, input *conversation.SearchIn
 		}
 	}
 	slices.SortFunc(entries, func(a, b *entity.ChatCacheEntry) int { return cmp.Compare(b.Similarity, a.Similarity) })
-
-	if len(entries) == 0 || (len(entries) > 1 && entries[0].Similarity-entries[1].Similarity < minSimMargin) {
-		return nil, nil
-	}
-
-	entry, err := s.loadEntry(ctx, entries[0].ID)
-	if err != nil {
-		return nil, err
-	}
-	if entry == nil {
-		return nil, nil
-	}
-	return &conversation.CacheHit{Entry: entry, Similarity: entries[0].Similarity}, nil
+	return entries, nil
 }
 
 // loadEntry 按主键从 MySQL 回查完整缓存真值

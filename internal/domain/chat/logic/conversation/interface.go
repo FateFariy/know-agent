@@ -110,24 +110,35 @@ type QuestionRecommender interface {
 	Generate(ctx context.Context, question, answer string, recentExchanges []*entity.ChatExchange) ([]string, error)
 }
 
-// CacheHit 语义缓存命中结果
+// CacheHit 语义缓存候选/命中结果（Entry 为完整真值，Similarity 为该条目与查询的相似度）
 type CacheHit struct {
 	Entry      *entity.ChatCacheEntry
 	Similarity float32
+	Confidence float32 // 命中判定置信度：直接命中=1.0，LLM 终判命中=模型返回置信度；召回阶段为 0
 }
 
-// SearchInput 聚合 ANN 检索所需的查询参数
+// SearchInput 聚合 ANN 召回所需的查询参数
 type SearchInput struct {
 	QueryText string         // 查询文本
-	Threshold float32        // 相似度阈值
+	Threshold float32        // 召回粗筛阈值：低于该相似度的候选不进入候选池
+	TopK      int            // 候选召回数上限（≤0 时由实现层回退默认值）
 	Scope     *vo.CacheScope // 检索作用域
 }
 
 // SemanticCacheStore 语义缓存存储接口
 type SemanticCacheStore interface {
-	// Search 在 scope 内对查询文本做 ANN 检索，返回相似度达标的最相似完整
-	Search(ctx context.Context, input *SearchInput) (*CacheHit, error)
+	// SearchCandidates 在 scope 内对查询文本做向量候选召回（向量化在实现层完成），
+	// 返回相似度 ≥ Threshold 且按相似度降序的完整候选列表；无候选返回 (nil, nil)。
+	// 命中与否的判定在业务层完成，存储层只负责召回候选。
+	SearchCandidates(ctx context.Context, input *SearchInput) ([]*CacheHit, error)
 
 	// Put 写入/更新一条缓存
 	Put(ctx context.Context, entry *entity.ChatCacheEntry) error
+}
+
+// MessageProducer 语义缓存写入消息生产者。领域层仅依赖此接口，实现由基础设施层提供。
+// 语义缓存启用后写入链路强制异步，主链路只投递消息，双写由消费端完成。
+type MessageProducer interface {
+	// Send 投递消息；topic 为目标主题，key 为幂等/分区键
+	Send(ctx context.Context, topic, key string, message any) error
 }

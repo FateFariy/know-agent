@@ -3,7 +3,7 @@ package config
 type LLMConf struct {
 	Function          string
 	Model             string
-	ApiKey            string
+	ApiKey            string `json:",optional"`
 	BaseURL           string
 	Temperature       float32 `json:",optional"`
 	MaxTokens         int     `json:",optional"`
