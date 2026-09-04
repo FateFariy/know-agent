@@ -16,7 +16,6 @@ type QuestionHistoryContext struct {
 	FollowUpQuestion  bool            // 是否为追问
 	TotalBudget       int             // 总预算字符数
 	RecentBudget      int             // 近期上下文实际长度
-	StructuredBudget  int             // 结构化上下文实际长度
 }
 
 // NewQuestionHistoryContext 构建提问历史上下文
@@ -37,39 +36,6 @@ func NewQuestionHistoryContext(recentQuestionTranscript string, maxChars int) *Q
 	historyContext.RecentBudget = utils.Len(userQuestions)
 
 	return historyContext
-}
-
-// ApplyFollowUpAndEvidence 根据意图识别结果和证据锚点，补充跟进判断、结构化上下文及最终渲染文本
-func (h *QuestionHistoryContext) ApplyFollowUpAndEvidence(question string, recognitionResult *IntentRecognitionResult, anchors EvidenceAnchors) {
-	if h == nil {
-		return
-	}
-	normalizedQuestion := utils.Trim(question)
-
-	// 判断是否为跟进问题
-	h.FollowUpQuestion = recognitionResult.IsFollowUpQuestion(normalizedQuestion)
-
-	// 过滤证据锚点（最多5个）
-	h.EvidenceAnchors = utils.FilterLimit(anchors, 5, func(anchor *EvidenceAnchor) bool {
-		return anchor.HasAnchorIdentity()
-	})
-
-	// 若既不是跟进问题，又没有有效的用户问题和锚点，则无需补充内容
-	if !h.FollowUpQuestion || (utils.IsBlank(h.RecentContext) && len(h.EvidenceAnchors) == 0) {
-		return
-	}
-
-	// 计算结构化部分的预算（总预算减去已用 RecentContext 长度）
-	structuredBudget := h.TotalBudget - h.RecentBudget
-	h.StructuredContext = h.EvidenceAnchors.RenderStructuredContext(structuredBudget)
-	h.StructuredBudget = utils.Len(h.StructuredContext)
-
-	// 组装最终渲染文本（结构化内容 + 用户问题）
-	renderedText := utils.JoinNonBlank("\n", h.StructuredContext, h.RecentContext)
-	if renderedText != "" || len(h.EvidenceAnchors) > 0 {
-		h.RenderedText = renderedText
-		h.ResolvedTopic = h.EvidenceAnchors.ResolveTopic()
-	}
 }
 
 // renderRecentUserQuestions 从原始转录中提取近期用户问题，并按预算渲染（含标题）

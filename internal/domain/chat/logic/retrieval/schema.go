@@ -46,6 +46,17 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 	if !plannedQuery.Equal(query) {
 		return nil, fmt.Errorf("execution query does not match RetrievalPlan question plan")
 	}
+	channels := enum.ConvertIntentsToChannels(plan.SuggestedIntents)
+	if len(channels) == 0 {
+		channels = append(channels, enum.RetrievalChannelKeyword, enum.RetrievalChannelVector)
+	}
+	channelPlans := make([]*vo.RetrievalChannelPlan, 0, len(channels))
+	for _, ch := range plan.Channels {
+		if utils.ContainsAny(channels, ch.Name) {
+			channelPlans = append(channelPlans, ch.Clone())
+		}
+	}
+
 	input := &ExecutionInput{
 		SubQuestionIndex: query.Index,
 		SubQuestion:      query.SubQuestion,
@@ -55,7 +66,7 @@ func newRetrievalExecutionInput(plan *vo.RetrievalPlan, query *vo.RetrievalExecu
 		DocumentScope:    utils.Copy(plan.DocumentScope),
 		TaskScope:        utils.Copy(plan.TaskScope),
 		Filters:          plan.MetadataFilters.Clone(),
-		Channels:         utils.Map(plan.Channels, func(p *vo.RetrievalChannelPlan) *vo.RetrievalChannelPlan { return p.Clone() }),
+		Channels:         channelPlans,
 		TableIntent:      plan.TableIntent.Clone(),
 		GraphIntent:      plan.GraphIntent.Clone(),
 		RaptorIntent:     plan.RaptorIntent.Clone(),

@@ -8,7 +8,6 @@ import (
 
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
-	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/tool"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
@@ -40,82 +39,30 @@ func NewDocumentRouter(querier GraphQuerier, indexer NavigationIndexer) *Documen
 	}
 }
 
-// Route 文档问答路由主入口
-// 执行流程：
-//  1. 规范化输入（改写问题、子问题列表、拼接路由文本）
-//  2. 获取主要检索意图（缺省 GENERAL）
-//  3. 高置信结构导航时走结构树确定性查询
-//  4. 明确编号项时作为结构锚点软辅助混合检索
-//  5. 其余按普通文档问题处理
-func (r *DocumentRouterImpl) Route(ctx context.Context, input *tool.NavigationInput) (*vo.DocumentNavigationDecision, error) {
+// Route 文档问答路由主入口：Router 只做「基于明确指令的查询执行与分发」
+//   - 结构导航类动作 → 走结构树确定性查询；
+//   - 其余 → 按条目/章节锚点做软辅助混合检索
+func (r *DocumentRouterImpl) Route(ctx context.Context, input *NavigationInput) (*vo.DocumentNavigationDecision, error) {
 	if input == nil {
 		return nil, fmt.Errorf("输入为空")
 	}
 
-	input.QueryType = utils.BlankToDefault(input.QueryType, enum.QueryTypeDocumentQA)
-	if len(input.Channels) == 0 {
-		input.Channels = append(input.Channels, enum.RetrievalIntentGeneral)
-	}
+	input.Normalize()
 
 	// 选取改写后的问题，无改写则回退原始问题
 	rewrittenQuestion := utils.BlankToDefault(input.RewriteQuestion, input.Question)
 
-	// 从子问题列表
-	subQuestions := input.SubQuestions
-	if len(subQuestions) == 0 {
-		subQuestions = []string{rewrittenQuestion}
-	}
-
-	// 拼接路由文本（原始 + 改写）
-	routeText := input.RouteText()
-
-	extractor := newNavigationExtractor(routeText)
-	signals := extractor.detectNavigationTextSignals()
-
-	// Agent 显式信号优先：任一导航字段已由 Agent 提供即不再做文本兜底覆盖
-	if input.HasStructureNav && (utils.IsBlank(input.QueryType) ||
-		len(input.SectionAnchors) == 0) {
-		if signals.hasStructureNav {
-			input.QueryType = enum.QueryTypeStructureNavigation
-			input.HasStructureNav = true
-			input.SectionAnchors = signals.sectionAnchors
-			if len(input.SectionAnchors) > 0 && !utils.ContainsAny(input.Channels, enum.RetrievalIntentStructure) {
-				input.Channels = append(input.Channels, enum.RetrievalIntentStructure)
-			}
-		}
-	}
-
-	// 获取主要检索意图
-	retrievalIntent := input.PrimaryRetrievalIntent()
-
-	// 高置信结构导航：走结构树确定性查询。
-	// 结构导航动作优先按文本语法解析（编号 / 第N章节 / 引号标题 / 步骤），
-	// 语法无法命中时回退到文本语义兜底动作（大纲 / 相邻章节 / 父章节定位）。
-	structureNavigationAction := utils.BlankToDefault(input.ResolveAction(), signals.action)
-	if structureNavigationAction != "" {
+	// 结构导航：走结构树确定性查询（动作已由归一器判定）
+	if input.IsStructureNavigation() {
 		section := r.resolveSection(ctx, input.DocumentId, input.Question, rewrittenQuestion)
-		return r.buildDecision(structureNavigationAction, section, nil, input,
-			enum.RetrievalIntentStructure, "高置信结构导航走结构树确定性查询，结构结果作为检索上下文和观测信号。"), nil
+		return r.buildDecision(section, input, "结构导航走结构树确定性查询，结构结果作为检索上下文和观测信号。"), nil
 	}
 
-	// 明确编号项（第 N 步 / 第 N 项）：作为结构锚点软辅助混合检索
-	itemIndex := extractor.resolveExplicitItemIndex()
-	if len(subQuestions) > 1 {
-		itemIndex = nil
-	}
-
-	hasExplicitStructureAnchor := itemIndex != nil ||
-		extractor.hasExplicitSectionAnchor() ||
-		input.HasSectionAnchor()
-
+	// 普通文档问题：条目 / 章节锚点作为软辅助混合检索
+	itemIndex := input.ItemIndex
 	var assistedSection *vo.GraphSection
-	if hasExplicitStructureAnchor {
+	if itemIndex != nil || input.HasSectionAnchor() {
 		assistedSection = r.resolveSection(ctx, input.DocumentId, input.Question, rewrittenQuestion)
-	}
-
-	action := enum.DocumentNavigationActionFreshTopic
-	if itemIndex != nil {
-		action = enum.DocumentNavigationActionItemReference
 	}
 
 	reason := "普通文档问题走混合检索"
@@ -123,7 +70,7 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *tool.NavigationIn
 		reason = "结构锚点仅作为软提示辅助混合检索"
 	}
 
-	return r.buildDecision(action, assistedSection, itemIndex, input, retrievalIntent, reason), nil
+	return r.buildDecision(assistedSection, input, reason), nil
 }
 
 // ============================================================
@@ -131,12 +78,10 @@ func (r *DocumentRouterImpl) Route(ctx context.Context, input *tool.NavigationIn
 // ============================================================
 
 // buildDecision 构建导航决策
-func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSection,
-	itemIndex *int, navInput *tool.NavigationInput, retrievalIntent enum.RetrievalIntent, reason string) *vo.DocumentNavigationDecision {
-
+func (r *DocumentRouterImpl) buildDecision(section *vo.GraphSection, navInput *NavigationInput, reason string) *vo.DocumentNavigationDecision {
 	decision := &vo.DocumentNavigationDecision{
-		NavigationAction: action,
-		RetrievalIntent:  retrievalIntent,
+		NavigationAction: navInput.NavigationAction,
+		RetrievalIntent:  navInput.RetrievalIntent(),
 	}
 
 	// 构建结构锚点
@@ -156,7 +101,7 @@ func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSecti
 		}
 	}
 
-	// 构建条目锚点
+	itemIndex := navInput.ItemIndex
 	if itemIndex != nil {
 		decision.ItemAnchor = &vo.ConversationItemAnchor{
 			ItemIndex: *itemIndex,
@@ -166,14 +111,14 @@ func (r *DocumentRouterImpl) buildDecision(action string, section *vo.GraphSecti
 	// 构建摘要文本
 	decision.SummaryText = fmt.Sprintf(
 		"retrievalIntent=%s; queryType=%s; reason=%s; section=%s; itemIndex=%d",
-		utils.BlankToDefault(retrievalIntent, enum.RetrievalIntentGeneral),
+		utils.BlankToDefault(decision.RetrievalIntent, enum.RetrievalIntentGeneral),
 		navInput.QueryType,
 		reason,
 		displayTitle,
 		utils.PointerOrDefault(itemIndex, 0),
 	)
 
-	logx.Infof("文档问答路由完成: action=%s, section='%s', reason='%s'", action, displayTitle, reason)
+	logx.Infof("文档问答路由完成: action=%s, section='%s', reason='%s'", navInput.NavigationAction, displayTitle, reason)
 
 	return decision
 }

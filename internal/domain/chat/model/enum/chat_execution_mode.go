@@ -42,7 +42,6 @@ var (
 	ConversationTraceStageMemory         = &ConversationTraceStage{memory, "会话记忆", 10}
 	ConversationTraceStageRewrite        = &ConversationTraceStage{rewrite, "问题改写", 20}
 	ConversationTraceStageSemanticCache  = &ConversationTraceStage{semanticCache, "语义缓存查询", 25}
-	ConversationTraceStageIntent         = &ConversationTraceStage{intent, "意图分析", 30}
 	ConversationTraceStageRoute          = &ConversationTraceStage{route, "路由判定", 40}
 	ConversationTraceStageRAGRetrieve    = &ConversationTraceStage{ragRetrieve, "RAG 检索", 50}
 	ConversationTraceStageAnswerEvaluate = &ConversationTraceStage{answerEvaluate, "回答评估", 60}

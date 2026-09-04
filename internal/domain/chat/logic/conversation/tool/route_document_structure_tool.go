@@ -5,17 +5,17 @@ import (
 
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
 type RouteStructureInput struct {
-	Question        string                              `json:"query" jsonschema_description:"改写问题"`                // 改写问题
-	QueryType       string                              `json:"queryType" jsonschema_description:"查询类型"`            // 查询类型
-	Channels        []enum.RetrievalChannel             `json:"channels" jsonschema_description:"检索通道"`             // 检索通道
-	Operations      []enum.StructureNavigationOperation `json:"operations"`                                         // 结构导航操作
-	SectionAnchors  []string                            `json:"sectionAnchors" jsonschema_description:"显式章节锚点"`     // 显式章节锚点
-	HasStructureNav bool                                `json:"hasStructureNav" jsonschema_description:"是否高置信结构导航"` // 是否高置信结构导航
+	Question         string                        `json:"query" jsonschema_description:"改写问题"`                // 改写问题
+	QueryType        string                        `json:"queryType" jsonschema_description:"查询类型"`            // 查询类型
+	NavigationAction enum.DocumentNavigationAction `json:"navigationAction" jsonschema_description:"导航动作"`     // 导航动作
+	SectionAnchors   []string                      `json:"sectionAnchors" jsonschema_description:"显式章节锚点"`     // 显式章节锚点
+	HasStructureNav  bool                          `json:"hasStructureNav" jsonschema_description:"是否高置信结构导航"` // 是否高置信结构导航
 }
 
 type RouteStructureOutput struct {
@@ -46,17 +46,16 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 	// 启动文档内路由阶段追踪
 	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRoute, &vo.StageInput{SummaryText: "正在进行结构导航查询", Snapshot: nil})
 
-	// 构造改写结果对象，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
-	nav := &NavigationInput{
-		DocumentId:      convCtx.SelectedDocumentId,
-		Question:        input.Question,
-		RewriteQuestion: input.Question,
-		SubQuestions:    nil,
-		QueryType:       input.QueryType,
-		Channels:        input.Channels,
-		Operations:      input.Operations,
-		SectionAnchors:  input.SectionAnchors,
-		HasStructureNav: input.HasStructureNav,
+	// 构造导航输入，调用 Router 做文档内意图路由（输出执行模式、章节锚点等）
+	nav := &route.NavigationInput{
+		DocumentId:       convCtx.SelectedDocumentId,
+		Question:         input.Question,
+		RewriteQuestion:  input.Question,
+		SubQuestions:     execPlan.SubQuestions(),
+		QueryType:        input.QueryType,
+		SectionAnchors:   input.SectionAnchors,
+		HasStructureNav:  input.HasStructureNav,
+		NavigationAction: input.NavigationAction,
 	}
 	navigationDecision, err := r.route.Route(ctx, nav)
 	if err != nil {

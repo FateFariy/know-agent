@@ -82,12 +82,13 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 	// 追问承接：装配上一轮证据锚点
 	anchors := m.loadFollowUpAnchors(ctx, convCtx)
 
-	// 组装初始执行计划（所有检索/改写字段先以原始问题为兜底值，防止空值扩散）todo 这部分后续可能删除
+	// 组装初始执行计划
+	question := utils.CompactWhitespace(convCtx.Question)
 	execPlan := &vo.ConversationExecutionPlan{
 		ChatMode:                 convCtx.ChatMode,
-		OriginalQuestion:         convCtx.Question,
-		RewriteQuestion:          convCtx.Question,
-		RewriteSubQuestions:      []string{convCtx.Question},
+		OriginalQuestion:         question,
+		RewriteQuestion:          question,
+		RewriteSubQuestions:      []string{question},
 		HistorySummary:           historySummary,
 		LongTermSummary:          memoryContext.LongTermSummary,
 		HistoryPlanningContext:   historyPlanningContext,
@@ -134,6 +135,35 @@ func (m *MemoryLoadMiddleware) loadFollowUpAnchors(ctx context.Context, convCtx 
 	return filterEvidenceAnchorsByDocument(anchors, docIds...)
 }
 
+// loadRecentEvidenceAnchors 从最近几轮已完成回答中加载证据锚点（追问承接信息源）
+func (m *MemoryLoadMiddleware) loadRecentEvidenceAnchors(ctx context.Context, conversationId string) (vo.EvidenceAnchors, error) {
+	if conversationId == "" {
+		return nil, nil
+	}
+	exchanges, err := m.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
+	if err != nil || len(exchanges) == 0 {
+		return nil, err
+	}
+
+	var anchors vo.EvidenceAnchors
+	for _, exchange := range exchanges {
+		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
+			continue
+		}
+		for _, ref := range exchange.References {
+			anchor := ref.ToEvidenceAnchor(maxEvidenceAnchorSnippetChars)
+			if anchor == nil {
+				continue
+			}
+			anchors = append(anchors, anchor)
+			if len(anchors) >= maxRecentExchanges {
+				return anchors, nil
+			}
+		}
+	}
+	return anchors, nil
+}
+
 // buildInstructionHints 组装待注入指令的动态提示
 func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *conversation.Context) []string {
 	execPlan := convCtx.ExecutionPlan.Load()
@@ -164,36 +194,6 @@ func (m *MemoryLoadMiddleware) buildInstructionHints(convCtx *conversation.Conte
 	addHint(len(execPlan.RecentEvidenceAnchors) > 0, execPlan.RecentEvidenceAnchors.RenderFollowUpHint())
 
 	return hints
-}
-
-// loadRecentEvidenceAnchors 从最近几轮已完成回答中加载证据锚点（追问承接信息源）。
-// 锚点仅依赖会话历史，与路由决策无关，在 agent 启动前装配。
-func (m *MemoryLoadMiddleware) loadRecentEvidenceAnchors(ctx context.Context, conversationId string) (vo.EvidenceAnchors, error) {
-	if conversationId == "" {
-		return nil, nil
-	}
-	exchanges, err := m.repo.ListRecentExchanges(ctx, conversationId, maxRecentExchanges)
-	if err != nil || len(exchanges) == 0 {
-		return nil, err
-	}
-
-	var anchors vo.EvidenceAnchors
-	for _, exchange := range exchanges {
-		if exchange == nil || !exchange.IsCompleted() || len(exchange.References) == 0 {
-			continue
-		}
-		for _, ref := range exchange.References {
-			anchor := ref.ToEvidenceAnchor(maxEvidenceAnchorSnippetChars)
-			if anchor == nil {
-				continue
-			}
-			anchors = append(anchors, anchor)
-			if len(anchors) >= maxRecentExchanges {
-				return anchors, nil
-			}
-		}
-	}
-	return anchors, nil
 }
 
 // filterEvidenceAnchorsByDocument 保留属于指定文档集合内的证据锚点；文档集合为空时原样返回。
@@ -228,21 +228,28 @@ func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.Conversation
 		taskScope = []int64{convCtx.SelectedTaskId}
 	}
 	return &vo.RetrievalPlan{
-		ChatMode:           enum.ChatQueryModeName(chatMode),
-		PrimaryIntent:      enum.RetrievalIntentGeneral,
-		ScopeMode:          snapshot.SelectionModeName(),
-		KnowledgeBaseIds:   utils.Copy(snapshot.SelectedKnowledgeBaseIds),
-		DocumentScope:      utils.Copy(documentScope),
-		TaskScope:          utils.Copy(taskScope),
-		MetadataFilters:    vo.NewMetadataFilters(questionPlan.Question),
-		Channels:           channels,
-		RankFeatures:       vo.BuildRankFeatures(hybrid),
-		CandidateTopK:      runtime.CandidateTopK,
-		RerankTopK:         runtime.RerankCandidateTopK,
-		RerankEnabled:      runtime.RerankEnabled,
-		FinalTopK:          runtime.FinalTopK,
-		SubQuestionTimeout: runtime.SubQuestionTimeout,
-		NavigationAction:   execPlan.NavigationDecision.NavigationActionText(),
+		ChatMode:                  enum.ChatQueryModeName(chatMode),
+		PrimaryIntent:             enum.RetrievalIntentGeneral,
+		ScopeMode:                 snapshot.SelectionModeName(),
+		KnowledgeBaseIds:          utils.Copy(snapshot.SelectedKnowledgeBaseIds),
+		DocumentScope:             utils.Copy(documentScope),
+		TaskScope:                 utils.Copy(taskScope),
+		MetadataFilters:           vo.NewMetadataFilters(execPlan.RewriteQuestion),
+		Channels:                  channels,
+		StructureNavigation:       nil,
+		NavigationAction:          execPlan.NavigationDecision.NavigationActionText(),
+		StructureNavigationResult: nil,
+		StructureAnchor:           nil,
+		ItemAnchor:                nil,
+		TableIntent:               nil,
+		GraphIntent:               nil,
+		RaptorIntent:              nil,
+		RankFeatures:              vo.BuildRankFeatures(hybrid),
+		CandidateTopK:             runtime.CandidateTopK,
+		RerankTopK:                runtime.RerankCandidateTopK,
+		RerankEnabled:             runtime.RerankEnabled,
+		FinalTopK:                 runtime.FinalTopK,
+		SubQuestionTimeout:        runtime.SubQuestionTimeout,
 	}
 }
 

@@ -23,11 +23,16 @@ var outlineSectionHints = []string{
 	"下级章节", "展开目录", "列出目录",
 }
 
-// navigationTextSignals 由问题文本规则兜底判定的结构导航信号
-type navigationTextSignals struct {
-	hasStructureNav bool     // 文本命中结构导航语义（相邻/大纲/位置+锚点）
-	action          string   // 推导的结构导航动作（语法正则解析不到时的语义兜底）
-	sectionAnchors  []string // 提取的显式章节锚点（编号 / 第N章节 / 引号标题）
+// NavigationSignals 由问题文本规则兜底判定的结构导航信号
+type NavigationSignals struct {
+	HasStructureNav bool     // 文本命中结构导航语义（相邻/大纲/位置+锚点）
+	Action          string   // 推导的结构导航动作（语法正则解析不到时的语义兜底）
+	SectionAnchors  []string // 提取的显式章节锚点（编号 / 第N章节 / 引号标题）
+}
+
+// HasExplicitSectionAnchorText 判断问题文本是否含显式章节锚点（章节号 / 第N章节 / 引号标题）
+func HasExplicitSectionAnchorText(text string) bool {
+	return newNavigationExtractor(text).hasExplicitSectionAnchor()
 }
 
 type navigationExtractor struct {
@@ -99,13 +104,11 @@ func (n *navigationExtractor) detectFacet() string {
 }
 
 // detectNavigationTextSignals 依据问题文本做确定性结构导航判定
-//
-// 判定语义迁移自意图识别下线前的 DeterministicFallbackRecognizer.navigationQuestion：
 //   - 目录/大纲询问（包含哪些章节…）→ 大纲导航 → CHILD_SECTION_DESCEND；
 //   - 相邻章节（上一节/下一节…）→ 相邻导航 → SECTION_ADJACENCY_LOOKUP；
 //   - 「位置询问 + 显式锚点」→ 父章节定位 → ANCESTOR_SECTION_RETURN。
-func (n *navigationExtractor) detectNavigationTextSignals() *navigationTextSignals {
-	signals := &navigationTextSignals{}
+func (n *navigationExtractor) detectNavigationTextSignals() *NavigationSignals {
+	signals := &NavigationSignals{}
 	normalized := utils.Trim(n.text)
 	if normalized == "" {
 		return signals
@@ -117,17 +120,17 @@ func (n *navigationExtractor) detectNavigationTextSignals() *navigationTextSigna
 
 	switch {
 	case outline:
-		signals.hasStructureNav = true
-		signals.action = enum.DocumentNavigationActionChildSectionDescend
+		signals.HasStructureNav = true
+		signals.Action = enum.DocumentNavigationActionChildSectionDescend
 	case adjacent:
-		signals.hasStructureNav = true
-		signals.action = enum.DocumentNavigationActionSectionAdjacencyLookup
+		signals.HasStructureNav = true
+		signals.Action = enum.DocumentNavigationActionSectionAdjacencyLookup
 	case location && hasExplicitAnchor:
-		signals.hasStructureNav = true
-		signals.action = enum.DocumentNavigationActionAncestorSectionReturn
+		signals.HasStructureNav = true
+		signals.Action = enum.DocumentNavigationActionAncestorSectionReturn
 	}
-	if signals.hasStructureNav {
-		signals.sectionAnchors = n.extractSectionAnchors()
+	if signals.HasStructureNav {
+		signals.SectionAnchors = n.extractSectionAnchors()
 	}
 	return signals
 }

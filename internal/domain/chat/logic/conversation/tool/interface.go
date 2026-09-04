@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/route"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 )
 
@@ -32,5 +33,5 @@ type Retriever interface {
 // DocumentRouter 文档路由器
 type DocumentRouter interface {
 	// Route 根据文档ID和问题进行文档内路由
-	Route(ctx context.Context, input *NavigationInput) (*vo.DocumentNavigationDecision, error)
+	Route(ctx context.Context, input *route.NavigationInput) (*vo.DocumentNavigationDecision, error)
 }

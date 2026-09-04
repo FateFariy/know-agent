@@ -19,7 +19,6 @@ type ConversationExecutionPlan struct {
 	RecentQuestionTranscript     string                      // 最近问题转录
 	QuestionHistoryContext       *QuestionHistoryContext     // 问题历史上下文
 	NavigationDecision           *DocumentNavigationDecision // 导航决策
-	RecognitionResult            *IntentRecognitionResult    // 意图识别结果
 	RetrievalPlan                *RetrievalPlan              // 检索执行计划
 	RetrievalResult              *RetrievalResult            // 检索结果
 	HistoryCompressionApplied    bool                        // 是否应用历史压缩

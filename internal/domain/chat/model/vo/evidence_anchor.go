@@ -86,49 +86,6 @@ func (a *EvidenceAnchor) ToRetrievalContextAnchor() *RetrievalContextAnchor {
 
 type EvidenceAnchors []*EvidenceAnchor
 
-// RenderStructuredContext 渲染结构化上下文（证据锚点列表）
-func (anchors EvidenceAnchors) RenderStructuredContext(budget int) string {
-	if len(anchors) == 0 || budget <= 0 {
-		return ""
-	}
-	builder := strings.Builder{}
-	appendAnchorField := func(name string, value any) {
-		text := utils.ToString(value)
-		if text == "" {
-			return
-		}
-		builder.WriteString(name)
-		builder.WriteString(": ")
-		builder.WriteString(text)
-		builder.WriteByte('\n')
-	}
-	builder.WriteString("上一轮可继承证据锚点（仅用于解析指代和限定范围，不作为事实证据）：\n")
-	for _, anchor := range anchors {
-		if anchor != nil {
-			builder.WriteString("- 文档: ")
-			builder.WriteString(utils.BlankToDefault(anchor.DocumentName, "-"))
-			builder.WriteByte('\n')
-			appendAnchorField("  章节", anchor.SectionPath)
-			appendAnchorField("  canonicalPath", anchor.CanonicalPath)
-			appendAnchorField("  structureNodeId", anchor.StructureNodeId)
-			appendAnchorField("  parentBlockId", anchor.ParentChunkId)
-			appendAnchorField("  chunkId", anchor.ChunkId)
-			appendAnchorField("  itemIndex", anchor.ItemIndex)
-			appendAnchorField("  snippet", utils.ClipHead(anchor.Snippet, 300))
-		}
-	}
-	return utils.ClipHead(strings.TrimSpace(builder.String()), budget)
-}
-
-// ResolveTopic 从锚点中推断主题（优先取 sectionPath，否则取 documentName）
-func (anchors EvidenceAnchors) ResolveTopic() string {
-	if len(anchors) == 0 {
-		return ""
-	}
-	anchor := anchors[0]
-	return utils.BlankToDefault(anchor.SectionPath, anchor.DocumentName)
-}
-
 // RenderFollowUpHint 渲染上一轮证据落点的精简提示，供 agent 指令注入。
 // 仅用于解析追问中的指代与定位检索，不作为当前回答的事实来源。
 func (anchors EvidenceAnchors) RenderFollowUpHint() string {

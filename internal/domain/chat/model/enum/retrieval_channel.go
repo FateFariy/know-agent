@@ -11,17 +11,30 @@ const (
 	RetrievalChannelRaptor   RetrievalChannel = "raptor"    // RAPTOR检索
 )
 
-//func RetrievalChannelCode(channel RetrievalChannel) int {
-//	switch channel {
-//	case RetrievalChannelVector:
-//		return 1
-//	case RetrievalChannelKeyword:
-//		return 2
-//	case RetrievalChannelRerank:
-//		return 3
-//	case RetrievalChannelHybrid:
-//		return 4
-//	default:
-//		return 0
-//	}
-//}
+// intentToChannelsMap 定义意图到渠道的映射关系
+var intentToChannelsMap = map[RetrievalIntent][]RetrievalChannel{
+	RetrievalIntentGeneral:  {RetrievalChannelVector, RetrievalChannelKeyword},
+	RetrievalIntentTable:    {RetrievalChannelTable},
+	RetrievalIntentGraphRAG: {RetrievalChannelGraphRAG},
+	RetrievalIntentRaptor:   {RetrievalChannelRaptor},
+}
+
+// ConvertIntentsToChannels 将检索意图列表转换为检索渠道列表（去重）
+func ConvertIntentsToChannels(intents []RetrievalIntent) []RetrievalChannel {
+	if len(intents) == 0 {
+		return nil
+	}
+
+	seen := make(map[RetrievalChannel]bool)
+	result := make([]RetrievalChannel, 0)
+
+	for _, intent := range intents {
+		for _, ch := range intentToChannelsMap[intent] {
+			if !seen[ch] {
+				seen[ch] = true
+				result = append(result, ch)
+			}
+		}
+	}
+	return result
+}

@@ -17,7 +17,6 @@ type RetrievalPlan struct {
 	TaskScope                 []int64                      // 任务范围ID列表
 	MetadataFilters           *RetrievalMetadataFilters    // 元数据过滤条件
 	Channels                  []*RetrievalChannelPlan      // 检索通道计划列表
-	StructureNavigation       *StructureNavigationIntent   // 结构导航意图
 	NavigationAction          string                       // 文档导航动作
 	StructureNavigationResult *StructureNavigationResult   // 结构导航结果
 	StructureAnchor           *ConversationStructureAnchor // 会话结构锚点

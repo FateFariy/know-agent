@@ -13,9 +13,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
-// QueryRewriteStage 问题改写阶段
-// 负责对所有问题进行改写，生成检索友好的问题表达和子问题拆分。
-// 仅当 RAG 开启时执行。
+// QueryRewriteStage 问题改写阶段，负责对所有问题进行改写，生成检索友好的问题表达和子问题拆分
 type QueryRewriteStage struct {
 	rewriter        QueryRewriter
 	enabled         bool
@@ -49,7 +47,7 @@ func (q *QueryRewriteStage) Order() int {
 }
 
 // ShouldExecute 仅当执行计划已就绪时执行（RAG 未启用作为错误在 Execute 中处理）
-func (q *QueryRewriteStage) ShouldExecute(ctx context.Context, convCtx *Context) bool {
+func (q *QueryRewriteStage) ShouldExecute(_ context.Context, convCtx *Context) bool {
 	return convCtx.ExecutionPlan.Load() != nil
 }
 
