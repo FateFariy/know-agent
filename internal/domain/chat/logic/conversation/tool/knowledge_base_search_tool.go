@@ -81,7 +81,9 @@ func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, input *SearchKnowl
 	if result.IsEmpty() {
 		return "未检索到相关结果，建议调整查询条件后重试，如修改检索问题", nil
 	}
-	return t.evidenceRenderer.RenderEvidence(result), nil
+	result.EvidenceText = t.evidenceRenderer.RenderEvidence(result)
+
+	return result.EvidenceText, nil
 }
 
 // afterRetrieve 检索完成后添加已用渠道

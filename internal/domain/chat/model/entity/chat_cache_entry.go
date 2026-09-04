@@ -26,8 +26,5 @@ func (e *ChatCacheEntry) Validate() bool {
 	if e.Execution.RetrievalResult.IsEmpty() {
 		return false
 	}
-	if e.Execution.PromptAssemblyResult == nil {
-		return false
-	}
 	return true
 }

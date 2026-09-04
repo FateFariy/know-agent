@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -358,7 +359,7 @@ func (d *DocumentRepositoryImpl) UpdateBatchChunkById(ctx context.Context, chunk
 		return errors.New("fields is empty")
 	}
 	assignments := clause.AssignmentColumns(fields)
-	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: gorm.Expr("NOW()")})
+	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: time.Now()})
 	return d.dbWithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: assignments,

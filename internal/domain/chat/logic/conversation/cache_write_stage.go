@@ -9,6 +9,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/entity"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/enum"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/domain/document/adapter"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -22,7 +23,7 @@ import (
 // 由独立消费者完成；向量化在消费端 store.Put 内部完成。投递失败仅告警，不阻塞主链路。
 type CacheWriteStage struct {
 	store      SemanticCacheStore
-	producer   MessageProducer
+	producer   adapter.MessageProducer
 	writeTopic string
 }
 
@@ -30,7 +31,7 @@ var _ Stage = (*CacheWriteStage)(nil)
 
 var _ ConditionalStage = (*CacheWriteStage)(nil)
 
-func NewCacheWriteStage(sevCtx *svc.ServiceContext, store SemanticCacheStore, producer MessageProducer) *CacheWriteStage {
+func NewCacheWriteStage(sevCtx *svc.ServiceContext, store SemanticCacheStore, producer adapter.MessageProducer) *CacheWriteStage {
 	sc := sevCtx.Config.Chat.SemanticCache
 	return &CacheWriteStage{
 		store:      store,
@@ -70,7 +71,7 @@ func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	})
 
 	plan := convCtx.ExecutionPlan.Load()
-	cachedExecution := buildCachedExecution(plan)
+	cachedExecution := &vo.CachedExecution{RetrievalResult: plan.RetrievalResult}
 	var answerDraft string
 	if convCtx.cache != nil && convCtx.cache.IsCacheHit() {
 		// 命中 + 复用检索结果：沿用既有检索结果，仅更新答案
@@ -114,15 +115,4 @@ func (s *CacheWriteStage) Execute(ctx context.Context, convCtx *Context) error {
 	logx.Infof("语义缓存写入消息已投递: conversationId=%s, cacheId=%d, queryText='%s'",
 		convCtx.ConversationId, entry.ID, utils.Trim(plan.RewriteQuestion))
 	return nil
-}
-
-// buildCachedExecution 从执行计划抽取可缓存执行产物（检索计划 + 检索结果）
-func buildCachedExecution(plan *vo.ConversationExecutionPlan) *vo.CachedExecution {
-	if plan == nil {
-		return nil
-	}
-	return &vo.CachedExecution{
-		RetrievalPlan:   plan.RetrievalPlan,
-		RetrievalResult: plan.RetrievalResult,
-	}
 }

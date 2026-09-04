@@ -66,7 +66,7 @@ func WithInstruction(instruction string) Option {
 }
 
 // WithTools 追加 eino 工具
-func WithTools(tools ...tool.Tool[any, any]) Option {
+func WithTools[I, O any](tools ...tool.Tool[I, O]) Option {
 	return func(r *EinoAgentRunner) {
 		einoTools := make([]einotool.BaseTool, 0, len(tools))
 		for _, t := range tools {

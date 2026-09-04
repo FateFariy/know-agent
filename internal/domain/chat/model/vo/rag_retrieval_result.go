@@ -10,6 +10,7 @@ import (
 type RetrievalResult struct {
 	RetrievalQuestion       string
 	SubQuestionEvidenceList []*SubQuestionEvidence
+	EvidenceText            string
 	retrievalNotes          *list.CopyOnWriteList[string]
 	usedChannels            *list.CopyOnWriteList[string]
 }

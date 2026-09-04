@@ -35,6 +35,7 @@ type ollamaGenerateReq struct {
 	Prompt      string         `json:"prompt"`
 	System      string         `json:"system,omitempty"`
 	Stream      bool           `json:"stream"`
+	Think       string         `json:"think,omitempty"`
 	Options     *ollamaOptions `json:"options,omitempty"`
 }
 
@@ -69,6 +70,7 @@ func NewOllamaModel(svcCtx *svc.ServiceContext) *OllamaModel {
 		options.Temperature = &conf.Temperature
 		options.MaxTokens = conf.MaxTokens
 		options.TopP = &conf.TopP
+		options.Think = "true"
 	}
 
 	return &OllamaModel{
@@ -207,9 +209,8 @@ func (o *OllamaModel) buildReq(systemPrompt, userPrompt string, stream bool, opt
 		Model:       opt.Model,
 		Prompt:      userPrompt,
 		Stream:      stream,
-	}
-	if systemPrompt != "" {
-		req.System = systemPrompt
+		System:      systemPrompt,
+		Think:       opt.Think,
 	}
 
 	options := &ollamaOptions{}

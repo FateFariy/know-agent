@@ -1620,7 +1620,6 @@ func ToKnowledgeRouteTraceModel(source *entity2.KnowledgeRouteTrace) *model.Know
 		modelKnowledgeRouteTrace.HitSelectedDocument = (*source).HitSelectedDocument
 		modelKnowledgeRouteTrace.Confidence = (*source).Confidence
 		modelKnowledgeRouteTrace.RouteStatus = (*source).RouteStatus
-		modelKnowledgeRouteTrace.ErrorMsg = NormalizeString((*source).Reason)
 		pModelKnowledgeRouteTrace = &modelKnowledgeRouteTrace
 	}
 	return pModelKnowledgeRouteTrace

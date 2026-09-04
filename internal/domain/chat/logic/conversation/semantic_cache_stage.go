@@ -107,7 +107,7 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	})
 
 	// 故障降级：查询失败视为未命中，不阻塞主链路
-	candidates, err := s.store.SearchCandidates(ctx, &SearchInput{
+	candidates, err := s.store.Search(ctx, &SearchInput{
 		Scope:     buildCacheScope(convCtx),
 		QueryText: execPlan.RewriteQuestion,
 		Threshold: s.similarityThreshold,
@@ -145,7 +145,7 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	}
 
 	// 回填必要字段
-	convCtx.applyCachedExecution(hit.Entry.Execution)
+	execPlan.RetrievalResult = hit.Entry.Execution.RetrievalResult
 	convCtx.cache.MarkCacheHit(hit)
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{

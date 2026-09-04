@@ -127,18 +127,11 @@ type SearchInput struct {
 
 // SemanticCacheStore 语义缓存存储接口
 type SemanticCacheStore interface {
-	// SearchCandidates 在 scope 内对查询文本做向量候选召回（向量化在实现层完成），
+	// Search 在 scope 内对查询文本做向量候选召回（向量化在实现层完成），
 	// 返回相似度 ≥ Threshold 且按相似度降序的完整候选列表；无候选返回 (nil, nil)。
 	// 命中与否的判定在业务层完成，存储层只负责召回候选。
-	SearchCandidates(ctx context.Context, input *SearchInput) ([]*CacheHit, error)
+	Search(ctx context.Context, input *SearchInput) ([]*CacheHit, error)
 
 	// Put 写入/更新一条缓存
 	Put(ctx context.Context, entry *entity.ChatCacheEntry) error
-}
-
-// MessageProducer 语义缓存写入消息生产者。领域层仅依赖此接口，实现由基础设施层提供。
-// 语义缓存启用后写入链路强制异步，主链路只投递消息，双写由消费端完成。
-type MessageProducer interface {
-	// Send 投递消息；topic 为目标主题，key 为幂等/分区键
-	Send(ctx context.Context, topic, key string, message any) error
 }

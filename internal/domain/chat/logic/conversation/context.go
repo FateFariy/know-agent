@@ -288,14 +288,3 @@ func (c *semanticCacheCtx) CacheSimilarity() float32 {
 	}
 	return c.similarity
 }
-
-// applyCachedExecution 命中后将缓存的必要字段回填进当前执行计划，
-// 保留当前请求的私有上下文（历史/时间/追问锚点）不被覆盖
-func (c *Context) applyCachedExecution(ce *vo.CachedExecution) {
-	ep := c.ExecutionPlan.Load()
-	if ce == nil || ep == nil {
-		return
-	}
-	ep.RetrievalPlan = ce.RetrievalPlan
-	ep.RetrievalResult = ce.RetrievalResult
-}

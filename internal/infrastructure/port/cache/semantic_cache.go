@@ -9,10 +9,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/eino/components/embedding"
 	milvuscol "github.com/milvus-io/milvus/client/v2/column"
 	milvusentity "github.com/milvus-io/milvus/client/v2/entity"
+	"github.com/milvus-io/milvus/client/v2/index"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"gorm.io/gorm/clause"
 
@@ -36,7 +38,7 @@ const (
 	docIDsField     = "scope_document_ids"
 	taskIDsField    = "scope_task_ids"
 	kbIDsField      = "scope_knowledge_base_ids"
-	searchTopK      = 2 // TopK 未显式指定时的回退默认值
+	searchTopK      = 3
 	defaultCollName = "chat_cache"
 )
 
@@ -91,13 +93,10 @@ func (s *SemanticCache) embed(ctx context.Context, text string) (milvusentity.Fl
 	}), nil
 }
 
-// SearchCandidates 在 scope 内对查询文本做向量候选召回（向量化在内部完成），
+// Search 在 scope 内对查询文本做向量候选召回（向量化在内部完成），
 // 返回相似度 ≥ Threshold 且按相似度降序的完整候选；无候选返回 (nil, nil)
-func (s *SemanticCache) SearchCandidates(ctx context.Context, input *conversation.SearchInput) ([]*conversation.CacheHit, error) {
-	topK := input.TopK
-	if topK <= 0 {
-		topK = searchTopK
-	}
+func (s *SemanticCache) Search(ctx context.Context, input *conversation.SearchInput) ([]*conversation.CacheHit, error) {
+	topK := max(input.TopK, searchTopK)
 	entries, err := s.annSearch(ctx, input, topK)
 	if err != nil {
 		return nil, err
@@ -107,9 +106,6 @@ func (s *SemanticCache) SearchCandidates(ctx context.Context, input *conversatio
 		entry, err := s.loadEntry(ctx, cand.ID)
 		if err != nil {
 			return nil, err
-		}
-		if entry == nil {
-			continue // MySQL 真值缺失（已过期清理或软删除），跳过该候选
 		}
 		hits = append(hits, &conversation.CacheHit{Entry: entry, Similarity: cand.Similarity})
 	}
@@ -122,10 +118,14 @@ func (s *SemanticCache) annSearch(ctx context.Context, input *conversation.Searc
 	if err != nil {
 		return nil, fmt.Errorf("语义缓存: 向量化失败: %w", err)
 	}
+	annParam := index.NewCustomAnnParam()
+	annParam.WithRadius(float64(input.Threshold))
+	annParam.WithRangeFilter(1.0)
+
 	opt := milvusclient.NewSearchOption(s.collection, topK, []milvusentity.Vector{vec}).
 		WithFilter(s.buildFilter(input.Scope)).
 		WithOutputFields(cacheIDField).
-		WithConsistencyLevel(milvusentity.ClBounded)
+		WithConsistencyLevel(milvusentity.ClBounded).WithAnnParam(annParam)
 
 	results, err := s.milvusClient.Search(ctx, opt)
 	if err != nil {
@@ -144,9 +144,7 @@ func (s *SemanticCache) annSearch(ctx context.Context, input *conversation.Searc
 		}
 		ids := cv.Data()
 		for i := 0; i < len(ids) && i < len(rs.Scores); i++ {
-			if rs.Scores[i] >= input.Threshold {
-				entries = append(entries, &entity.ChatCacheEntry{ID: ids[i], Similarity: rs.Scores[i]})
-			}
+			entries = append(entries, &entity.ChatCacheEntry{ID: ids[i], Similarity: rs.Scores[i]})
 		}
 	}
 	slices.SortFunc(entries, func(a, b *entity.ChatCacheEntry) int { return cmp.Compare(b.Similarity, a.Similarity) })
@@ -171,7 +169,7 @@ func (s *SemanticCache) Put(ctx context.Context, entry *entity.ChatCacheEntry) e
 		entry.ID = utils.GetSnowflakeNextID()
 	}
 	assignments := clause.AssignmentColumns([]string{"answer_draft"})
-	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: gorm.Expr("NOW()")})
+	assignments = append(assignments, clause.Assignment{Column: clause.Column{Name: "update_time"}, Value: time.Now()})
 	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: assignments,

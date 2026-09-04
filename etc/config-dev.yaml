@@ -135,10 +135,16 @@ Chat:
     SystemPrompt:
     RecommendationPrompt:
   SemanticCache:
-    Enabled:         
+    Enabled:
     Collection:
-    SimilarityThreshold:           
+    SimilarityThreshold:
+    DirectHitThreshold:
+    RecallTopK:
+    ConfidenceFloor:
+    JudgeEnabled:
+    JudgeTemperature:
     ReuseAnswer:
+    WriteTopic:
 ChatModel:
   Ark:
     Function: "chat"
