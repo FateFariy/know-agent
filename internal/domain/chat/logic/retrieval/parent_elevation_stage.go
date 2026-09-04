@@ -129,7 +129,7 @@ func (s *ParentElevationStage) buildParentEvidenceDocument(parentChunk *vo.Docum
 	chunk.ParentChunkId = utils.StringToInt64(parentChunk.ID)
 	chunk.IsElevated = 1
 	chunk.Extra = bestChild.Extra
-
+	chunk.OriginalSnippet = parentChunk.Content
 	return &chunk
 }
 

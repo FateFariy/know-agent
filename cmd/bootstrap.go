@@ -69,7 +69,7 @@ func bootstrap(c *config.Config) *server.Server {
 	minioStorage := storage.NewMinioStorage(svcCtx)
 	elasticStorage := storage.NewElasticStorage(svcCtx)
 	gseTokenizer := tokenize.NewGseTokenizer(svcCtx)
-	semanticCacheStore := cache.NewSemanticCache(svcCtx)
+	semanticCacheStore := cache.NewSemanticCache(svcCtx, embedder)
 	semanticCacheWriteConsumer := consumer.NewSemanticCacheWriteConsumer(svcCtx, semanticCacheStore)
 
 	documentRepo := persistence.NewDocumentRepository(svcCtx, minioStorage, milvusVector)

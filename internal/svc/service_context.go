@@ -17,7 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 
 	"github.com/swiftbit/know-agent/common/utils"
@@ -25,15 +24,14 @@ import (
 )
 
 type ServiceContext struct {
-	Config     *config.Config
-	Validate   *validator.Validate
-	Minio      *minio.Client
-	Db         *gorm.DB
-	Rdb        *redis.Client
-	RedSync    *redsync.Redsync
-	ChatModel  model.BaseModel[*einoschema.Message]
-	JudgeModel model.BaseModel[*einoschema.Message]
-	Milvus     *milvusclient.Client
+	Config    *config.Config
+	Validate  *validator.Validate
+	Minio     *minio.Client
+	Db        *gorm.DB
+	Rdb       *redis.Client
+	RedSync   *redsync.Redsync
+	ChatModel model.BaseModel[*einoschema.Message]
+	Milvus    *milvusclient.Client
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {
@@ -41,15 +39,14 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return &ServiceContext{
-		Config:     c,
-		Validate:   validator.New(),
-		Rdb:        redisClient,
-		Db:         NewMySQLDB(c),
-		Minio:      NewMinioClient(c),
-		RedSync:    NewRedSync(redisClient),
-		ChatModel:  NewArkChatModel(ctx, c.ChatModel["Ark"]),
-		JudgeModel: NewArkChatModel(ctx, c.JudgeModel["Ark"]),
-		Milvus:     NewMilvusClient(ctx, c),
+		Config:    c,
+		Validate:  validator.New(),
+		Rdb:       redisClient,
+		Db:        NewMySQLDB(c),
+		Minio:     NewMinioClient(c),
+		RedSync:   NewRedSync(redisClient),
+		ChatModel: NewArkChatModel(ctx, c.ChatModel["Ark"]),
+		Milvus:    NewMilvusClient(ctx, c),
 	}
 }
 
@@ -58,7 +55,7 @@ func NewMySQLDB(c *config.Config) *gorm.DB {
 	m := c.Mysql
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", m.Username, m.Password, m.Endpoint, m.DbName)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger:         logger.Default.LogMode(logger.Info),
+		//Logger:         logger.Default.LogMode(logger.Info),
 		NamingStrategy: schema.NamingStrategy{SingularTable: true},
 	})
 	if err != nil {

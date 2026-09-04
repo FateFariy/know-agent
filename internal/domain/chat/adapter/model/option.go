@@ -5,13 +5,13 @@ import (
 )
 
 type Options struct {
-	Function    string
-	Model       string
-	Temperature *float32
-	TopP        *float32
-	MaxTokens   int
-
-	Think string // 思考过程, true/false,"high"、"medium"、"low"
+	Function      string
+	Model         string
+	Temperature   *float32
+	TopP          *float32
+	MaxTokens     int
+	Think         bool   // 是否开启思考
+	ThinkStrength string // 思考过程强度, "high"、"medium"、"low"
 }
 
 type Option = common.Option
@@ -51,8 +51,14 @@ func WithMaxTokens(maxTokens int) Option {
 }
 
 // WithThink 设置思考过程
-func WithThink(think string) Option {
+func WithThink(think bool) Option {
 	return common.WrapImplSpecificOptFn(func(opt *Options) {
 		opt.Think = think
+	})
+}
+
+func WithThinkStrength(thinkStrength string) Option {
+	return common.WrapImplSpecificOptFn(func(opt *Options) {
+		opt.ThinkStrength = thinkStrength
 	})
 }

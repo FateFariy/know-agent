@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/zeromicro/go-zero/rest/httpc"
@@ -34,7 +35,7 @@ type ollamaGenerateReq struct {
 	Prompt      string         `json:"prompt"`
 	System      string         `json:"system,omitempty"`
 	Stream      bool           `json:"stream"`
-	Think       string         `json:"think,omitempty"`
+	Think       any            `json:"think,omitempty"`
 	Options     *ollamaOptions `json:"options,omitempty"`
 }
 
@@ -57,7 +58,7 @@ type ollamaGenerateResp struct {
 // NewOllamaModel 创建一个调用 Ollama 的模型客户端。
 // baseURL 取自 ChatModel 配置中 "Ollama" 键的 BaseURL，缺失时回退到 http://localhost:11434。
 func NewOllamaModel(svcCtx *svc.ServiceContext) *OllamaModel {
-	conf := svcCtx.Config.ChatModel["Ollama"]
+	conf := svcCtx.Config.JudgeModel["Ollama"]
 	baseURL := "http://localhost:11434"
 	if conf != nil && conf.BaseURL != "" {
 		baseURL = conf.BaseURL
@@ -69,7 +70,7 @@ func NewOllamaModel(svcCtx *svc.ServiceContext) *OllamaModel {
 		options.Temperature = &conf.Temperature
 		options.MaxTokens = conf.MaxTokens
 		options.TopP = &conf.TopP
-		options.Think = "true"
+		options.Think = false
 	}
 
 	return &OllamaModel{
@@ -87,6 +88,10 @@ func (o *OllamaModel) Generate(ctx context.Context, systemPrompt, userPrompt str
 	return resp.Response, nil
 }
 
+var (
+	re = regexp.MustCompile(`(?s)<think>.*?</think>`)
+)
+
 // GenerateWithTrace 同步调用模型并返回文本响应，同时记录使用量轨迹
 func (o *OllamaModel) GenerateWithTrace(ctx context.Context, stage, systemPrompt, userPrompt string, opts ...common.Option) (string, error) {
 	opt := common.GetImplSpecificOptions(o.options, opts...)
@@ -98,7 +103,7 @@ func (o *OllamaModel) GenerateWithTrace(ctx context.Context, stage, systemPrompt
 		ctx = callbacks.OnError(ctx, err)
 		return "", err
 	}
-
+	resp.Response = re.ReplaceAllString(resp.Response, "")
 	ctx = callbacks.OnEnd(ctx, &ModelCallOutput{
 		SystemPrompt: systemPrompt,
 		UserPrompt:   userPrompt,

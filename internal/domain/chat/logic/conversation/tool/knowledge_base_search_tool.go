@@ -63,6 +63,9 @@ func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, input *SearchKnowl
 	if execPlan == nil {
 		return "", errors.New("知识库检索时执行计划未就绪")
 	}
+	ctx = vo.OnStart(ctx, enum.ConversationTraceStageRAGRetrieve, &vo.StageInput{
+		SummaryText: "开始进行 RAG 检索。", Snapshot: map[string]any{"input": input},
+	})
 
 	question := utils.BlankToDefault(execPlan.RewriteQuestion, execPlan.OriginalQuestion)
 	input.Normalize(question)
@@ -72,16 +75,22 @@ func (t *KnowledgeBaseSearchTool) Invoke(ctx context.Context, input *SearchKnowl
 	retrievalPlan.SuggestedIntents = input.RetrievalIntents
 	result, err := t.retriever.Retrieve(ctx, retrievalPlan)
 	if err != nil {
+		ctx = vo.OnError(ctx, "知识库检索失败", err)
 		return "", err
 	}
 	execPlan.RetrievalResult = result
 	convCtx.SetExecutePlan(execPlan)
 	t.afterRetrieve(convCtx, result)
 
+	result.EvidenceText = t.evidenceRenderer.RenderEvidence(result)
+	ctx = vo.OnEnd(ctx, &vo.StageOutput{
+		SummaryText: "RAG 检索完成。",
+		Snapshot:    result.EvidenceText,
+	})
+
 	if result.IsEmpty() {
 		return "未检索到相关结果，建议调整查询条件后重试，如修改检索问题", nil
 	}
-	result.EvidenceText = t.evidenceRenderer.RenderEvidence(result)
 
 	return result.EvidenceText, nil
 }

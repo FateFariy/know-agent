@@ -23,5 +23,5 @@ type KnowledgeRouteTrace struct {
 	HitSelectedDocument            *int    `gorm:"column:hit_selected_document;type:tinyint"`             // 是否命中选中文档（1是，0否）
 	Confidence                     float64 `gorm:"column:confidence;type:decimal(10,4)"`                  // 置信度
 	RouteStatus                    int     `gorm:"column:route_status;type:tinyint"`                      // 路由状态
-	ErrorMsg                       string  `gorm:"column:error_msg;type:text"`                            // 错误信息
+	Reason                         string  `gorm:"column:reason;type:text"`                               // 错误信息
 }

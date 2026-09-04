@@ -124,7 +124,7 @@ func (s *StartStage) activateGeneration(ctx context.Context, convCtx *Context) e
 	}
 
 	// 发送"正在分析问题上下文"的思考事件，便于客户端感知流程
-	if err := convCtx.PublishThinking("正在分析问题上下文。"); err != nil {
+	if err := convCtx.PublishThinking("正在分析问题上下文..."); err != nil {
 		return err
 	}
 

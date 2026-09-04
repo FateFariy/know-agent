@@ -34,7 +34,7 @@ func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl {
 	conf := svcCtx.Config.ChatModel[provider]
 	return &ChatModelImpl{
 		chatModel:  svcCtx.ChatModel,
-		judgeModel: svcCtx.JudgeModel,
+		judgeModel: svcCtx.ChatModel,
 		provider:   provider,
 		options: &model.Options{
 			Function:    "chat",

@@ -63,7 +63,7 @@ func (r *QuestionRecommendImpl) generateRecommendations(ctx context.Context, que
 	}
 
 	// 调用LLM生成推荐
-	content, err := r.chatModel.GenerateWithTrace(ctx, enum.ChatStageRecommend, "", userPrompt)
+	content, err := r.chatModel.GenerateWithTrace(ctx, enum.ChatStageRecommend, "", userPrompt, model.WithThink(false))
 	if strutil.IsBlank(content) {
 		return nil, err
 	}

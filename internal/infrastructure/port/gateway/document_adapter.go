@@ -171,6 +171,7 @@ func (a *DocumentAdapterForChat) FindParentChunks(ctx context.Context, ids []int
 			StructureNodeType: chunk.StructureNodeType,
 			CanonicalPath:     chunk.CanonicalPath,
 			ItemIndex:         chunk.ItemIndex,
+			OriginalSnippet:   chunk.ParentText,
 		})
 	}
 	return result, nil

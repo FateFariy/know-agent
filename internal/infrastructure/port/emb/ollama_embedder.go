@@ -15,8 +15,9 @@ import (
 // OllamaEmbedder 通过 Ollama 的 /api/embed HTTP 接口生成文本向量。
 // 请求格式见 https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
 type OllamaEmbedder struct {
-	endpoint string
-	model    string
+	endpoint   string
+	model      string
+	dimensions int
 }
 
 // ollamaEmbedReq 对应 Ollama /api/embed 请求体
@@ -24,6 +25,7 @@ type ollamaEmbedReq struct {
 	ContentType string   `header:"Content-Type"`
 	Model       string   `json:"model"`
 	Input       []string `json:"input"`
+	Dimensions  int      `json:"dimensions"`
 }
 
 // ollamaEmbedResp 对应 Ollama /api/embed 响应体
@@ -36,8 +38,9 @@ type ollamaEmbedResp struct {
 // baseURL 为 Ollama 服务地址，如 http://localhost:11434；model 为已拉取的向量模型名，如 embeddinggemma。
 func NewOllamaEmbedder(svcCtx *svc.ServiceContext) *OllamaEmbedder {
 	return &OllamaEmbedder{
-		endpoint: strings.TrimRight(svcCtx.Config.Embedding.BaseURL, "/") + "/api/embed",
-		model:    svcCtx.Config.Embedding.Model,
+		endpoint:   strings.TrimRight(svcCtx.Config.Embedding.BaseURL, "/") + "/api/embed",
+		model:      svcCtx.Config.Embedding.Model,
+		dimensions: svcCtx.Config.Embedding.Dimensions,
 	}
 }
 
@@ -68,6 +71,7 @@ func (e *OllamaEmbedder) doEmbedRequest(ctx context.Context, texts []string) (*o
 		Model:       e.model,
 		Input:       texts,
 		ContentType: "application/json",
+		Dimensions:  e.dimensions,
 	}
 
 	httpResp, err := httpc.Do(ctx, http.MethodPost, e.endpoint, req)

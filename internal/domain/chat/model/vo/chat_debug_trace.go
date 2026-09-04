@@ -121,7 +121,7 @@ func NewChatDebugTrace(execPlan *ConversationExecutionPlan) *ChatDebugTrace {
 	trace.RequiresCurrentDateAnchoring = execPlan.RequiresCurrentDateAnchoring
 
 	// 检索子问题
-	trace.SubQuestions = append(trace.SubQuestions, execPlan.RetrievalPlan.QuestionPlan.SubQuestions...)
+	trace.SubQuestions = append(trace.SubQuestions, execPlan.RewriteSubQuestions...)
 
 	return trace
 }

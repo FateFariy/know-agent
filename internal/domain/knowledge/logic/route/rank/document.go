@@ -134,7 +134,7 @@ func (r *DocumentRanker) Rank(ctx context.Context, rankCtx *Context) error {
 	}
 
 	// 按得分降序排列并截断至候选数限制
-	slices.SortFunc(candidates, func(a, b *vo.DocumentRouteCandidate) int { return -cmp.Compare(a.Score, b.Score) })
+	slices.SortFunc(candidates, func(a, b *vo.DocumentRouteCandidate) int { return cmp.Compare(b.Score, a.Score) })
 	candidates = utils.Limit(candidates, documentCandidateLimit)
 	rankCtx.DocumentCandidates = candidates
 

@@ -25,10 +25,10 @@ func NewAgentStage(runner AgentRunner) *AgentStage {
 }
 
 // Name 阶段名称
-func (s *AgentStage) Name() string { return enum.ConversationTraceStageRAGRetrieve.Name }
+func (s *AgentStage) Name() string { return enum.ConversationTraceStageAgent.Name }
 
 // Order 阶段顺序
-func (s *AgentStage) Order() int { return enum.ConversationTraceStageRAGRetrieve.Order }
+func (s *AgentStage) Order() int { return enum.ConversationTraceStageAgent.Order }
 
 // Execute 执行 AgentStage。
 //

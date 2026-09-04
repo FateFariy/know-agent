@@ -65,13 +65,14 @@ type SemanticCache struct {
 
 var _ conversation.SemanticCacheStore = (*SemanticCache)(nil)
 
-func NewSemanticCache(svcCtx *svc.ServiceContext) *SemanticCache {
+func NewSemanticCache(svcCtx *svc.ServiceContext, emb embedding.Embedder) *SemanticCache {
 	collection := svcCtx.Config.Chat.SemanticCache.Collection
 	if collection == "" {
 		collection = defaultCollName
 	}
 	sc := &SemanticCache{
 		milvusClient: svcCtx.Milvus,
+		emb:          emb,
 		db:           svcCtx.Db,
 		collection:   collection,
 		dim:          svcCtx.Config.Embedding.Dimensions,

@@ -115,6 +115,7 @@ type CacheHit struct {
 	Entry      *entity.ChatCacheEntry
 	Similarity float32
 	Confidence float32 // 命中判定置信度：直接命中=1.0，LLM 终判命中=模型返回置信度；召回阶段为 0
+	Reason     string  // 命中原因
 }
 
 // SearchInput 聚合 ANN 召回所需的查询参数

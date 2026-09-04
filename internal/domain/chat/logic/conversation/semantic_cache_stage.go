@@ -140,13 +140,16 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 	if !hit.Entry.Validate() {
 		logx.Warnf("语义缓存条目校验失败，降级未命中: conversationId=%s", convCtx.ConversationId)
 		convCtx.cache.MarkCacheMiss()
-		ctx = vo.OnError(ctx, "语义缓存条目校验失败，降级未命中。", fmt.Errorf("cache entry validation failed, entryId=%d", hit.Entry.ID))
+		ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "语义缓存条目校验失败，降级未命中。"})
 		return nil
 	}
 
 	// 回填必要字段
 	execPlan.RetrievalResult = hit.Entry.Execution.RetrievalResult
 	convCtx.cache.MarkCacheHit(hit)
+	if err = convCtx.PublishThinking("分析用户意图... 该请求与历史成功执行的任务高度重合，置信度达标。已有成熟的回答草稿可以复用，跳过重复计算，直接生成最终回复。"); err != nil {
+		logx.Warnf("发布思考过程失败: conversationId=%s, error=%v", convCtx.ConversationId, err)
+	}
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{
 		SummaryText: "语义缓存命中，复用已有执行产物。",
@@ -155,6 +158,7 @@ func (s *SemanticCacheStage) Execute(ctx context.Context, convCtx *Context) erro
 			"entryId":       hit.Entry.ID,
 			"similarity":    hit.Similarity,
 			"confidence":    hit.Confidence,
+			"reason":        hit.Reason,
 			"reuseStrategy": s.reuseStrategy,
 			"answerLength":  len(hit.Entry.AnswerDraft),
 		},
@@ -230,6 +234,7 @@ func (s *SemanticCacheStage) judgeCacheEquivalence(ctx context.Context, query st
 	}
 	cand := candidates[targetIndex-1]
 	cand.Confidence = float32(output.Confidence)
+	cand.Reason = output.Reason
 	return cand
 }
 
@@ -246,7 +251,7 @@ func (s *SemanticCacheStage) renderAndJudge(ctx context.Context, query string, c
 	if err != nil {
 		return nil, fmt.Errorf("渲染语义缓存判定模板失败: %w", err)
 	}
-	response, err := s.llm.Generate(ctx, "", prompt, model.WithFunction("judge"), model.WithTemperature(s.judgeTemperature))
+	response, err := s.llm.Generate(ctx, "", prompt, model.WithFunction("judge"), model.WithTemperature(s.judgeTemperature), model.WithThink(false))
 	if err != nil {
 		return nil, fmt.Errorf("调用大模型判定失败: %w", err)
 	}
@@ -254,5 +259,6 @@ func (s *SemanticCacheStage) renderAndJudge(ctx context.Context, query string, c
 	if err = utils.Unmarshal(response, &output); err != nil {
 		return nil, fmt.Errorf("解析大模型判定结果失败: %w", err)
 	}
+	logx.Infof("语义缓存大模型终判结果: hit=%t, index=%d, confidence=%.4f, reason='%s'", output.Hit, output.Index, output.Confidence, output.Reason)
 	return &output, nil
 }
