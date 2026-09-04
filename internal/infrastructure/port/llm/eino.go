@@ -11,15 +11,12 @@ import (
 	"github.com/cloudwego/eino/components"
 	eino "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
-	"github.com/duke-git/lancet/v2/slice"
 
 	"github.com/swiftbit/know-agent/common"
 	"github.com/swiftbit/know-agent/common/logx"
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
-	"github.com/swiftbit/know-agent/internal/infrastructure/observability"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -31,10 +28,8 @@ type ChatModelImpl struct {
 	options    *model.Options
 }
 
-// NewChatModelImpl 创建可观测聊天模型实例（AgenticMessage 变体，用于对话问答）
+// NewChatModelImpl 创建可观测聊天模型实例
 func NewChatModelImpl(svcCtx *svc.ServiceContext) *ChatModelImpl {
-	observability.RegisterModelUsageHandler(svcCtx.Config.ChatModel)
-
 	provider := resolveProvider(svcCtx.ChatModel)
 	conf := svcCtx.Config.ChatModel[provider]
 	return &ChatModelImpl{
@@ -77,7 +72,7 @@ func (o *ChatModelImpl) GenerateWithTrace(ctx context.Context, stage, systemProm
 	}
 
 	responseText := extractResponseText(response)
-	ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+	ctx = callbacks.OnEnd(ctx, &ModelCallOutput{
 		SystemPrompt: systemPrompt,
 		UserPrompt:   userPrompt,
 		Response:     response,
@@ -141,7 +136,7 @@ func (o *ChatModelImpl) Stream(ctx context.Context, stage, systemPrompt, userPro
 			}
 		}
 
-		ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+		ctx = callbacks.OnEnd(ctx, &ModelCallOutput{
 			SystemPrompt: systemPrompt,
 			UserPrompt:   userPrompt,
 			Response:     chunk,
@@ -153,14 +148,14 @@ func (o *ChatModelImpl) Stream(ctx context.Context, stage, systemPrompt, userPro
 }
 
 // buildModelUsageInput 构建模型使用量追踪的元信息和输入参数
-func (o *ChatModelImpl) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...common.Option) (*vo.ModelCallMeta, *vo.ModelCallInput) {
+func (o *ChatModelImpl) buildModelUsageInput(stage, systemPrompt, userPrompt string, opts ...common.Option) (*ModelCallMeta, *ModelCallInput) {
 	options := common.GetImplSpecificOptions(o.options, opts...)
-	meta := &vo.ModelCallMeta{
+	meta := &ModelCallMeta{
 		Stage:     stage,
 		Provider:  o.provider,
 		ModelName: o.options.Model,
 	}
-	input := &vo.ModelCallInput{
+	input := &ModelCallInput{
 		Temperature: utils.PointerOrDefault(options.Temperature, 0.0),
 		TopP:        utils.PointerOrDefault(options.TopP, 0.0),
 	}
@@ -213,21 +208,10 @@ func extractResponseText(response any) string {
 	if response == nil {
 		return ""
 	}
-	switch resp := response.(type) {
-	case *schema.Message:
-		return resp.Content
-	case *schema.AgenticMessage:
-		// 模型可能把一次回复拆成多个文本块返回，需全部拼接，只取首块会造成内容截断
-		blocks := slice.Filter(resp.ContentBlocks, func(index int, item *schema.ContentBlock) bool {
-			return item.Type == schema.ContentBlockTypeAssistantGenText && item.AssistantGenText != nil
-		})
-		texts := slice.Map(blocks, func(index int, item *schema.ContentBlock) string {
-			return item.AssistantGenText.Text
-		})
-		return strings.Join(texts, "")
-	default:
-		return ""
+	if message, ok := response.(*schema.Message); ok {
+		return message.Content
 	}
+	return ""
 }
 
 // resolveProvider 解析模型提供商
@@ -239,7 +223,7 @@ func resolveProvider[M adk.MessageType](chatModel eino.BaseModel[M]) string {
 }
 
 // OnStart 构造模型使用量的 RunInfo 并调用 callbacks.OnStart，meta 存入 Payload 供三阶段访问
-func OnStart(ctx context.Context, meta *vo.ModelCallMeta, input *vo.ModelCallInput) context.Context {
+func OnStart(ctx context.Context, meta *ModelCallMeta, input *ModelCallInput) context.Context {
 	runInfo := &callbacks.RunInfo{
 		StageId:   utils.GetSnowflakeNextID(),
 		Payload:   meta,

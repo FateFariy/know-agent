@@ -53,32 +53,34 @@ import (
 )
 
 func bootstrap(c *config.Config) *server.Server {
-	serviceContext := svc.NewServiceContext(c)
+	svcCtx := svc.NewServiceContext(c)
 
-	embedder := emb.NewOllamaEmbedder(serviceContext)
+	embedder := emb.NewOllamaEmbedder(svcCtx)
 	checkPointStore := check.NewMemoryCheckPointStore()
-	localConfig := portconfig.NewLocalConfig(serviceContext)
-	milvusKeyword := keyword.NewMilvusKeyword(serviceContext)
-	milvusVector := vector.NewMilvusVector(serviceContext, embedder)
-	rocketMQMessageProducer := mq.NewRocketMQMessageProducer(serviceContext)
-	redisMutexLock := lock.NewRedisMutexLock(serviceContext)
-	chatModel := llm.NewChatModelImpl(serviceContext)
+	localConfig := portconfig.NewLocalConfig(svcCtx)
+	milvusKeyword := keyword.NewMilvusKeyword(svcCtx)
+	milvusVector := vector.NewMilvusVector(svcCtx, embedder)
+	rocketMQMessageProducer := mq.NewRocketMQMessageProducer(svcCtx)
+	redisMutexLock := lock.NewRedisMutexLock(svcCtx)
+	chatModel := llm.NewChatModelImpl(svcCtx)
+	ollamaModel := llm.NewOllamaModel(svcCtx)
 	renderer := prompt.NewRendererImpl()
-	dashScope := rerank.NewDashScope(serviceContext)
-	minioStorage := storage.NewMinioStorage(serviceContext)
-	elasticStorage := storage.NewElasticStorage(serviceContext)
-	gseTokenizer := tokenize.NewGseTokenizer(serviceContext)
-	semanticCacheStore := cache.NewSemanticCache(serviceContext)
-	semanticCacheWriteConsumer := consumer.NewSemanticCacheWriteConsumer(serviceContext, semanticCacheStore)
+	dashScope := rerank.NewDashScope(svcCtx)
+	minioStorage := storage.NewMinioStorage(svcCtx)
+	elasticStorage := storage.NewElasticStorage(svcCtx)
+	gseTokenizer := tokenize.NewGseTokenizer(svcCtx)
+	semanticCacheStore := cache.NewSemanticCache(svcCtx)
+	semanticCacheWriteConsumer := consumer.NewSemanticCacheWriteConsumer(svcCtx, semanticCacheStore)
 
-	documentRepo := persistence.NewDocumentRepository(serviceContext, minioStorage, milvusVector)
-	tableRepo := persistence.NewTableRepository(serviceContext)
-	chatRepo := persistence.NewChatRepository(serviceContext)
-	knowledgeRepo := persistence.NewKnowledgeRepository(serviceContext)
+	documentRepo := persistence.NewDocumentRepository(svcCtx, minioStorage, milvusVector)
+	tableRepo := persistence.NewTableRepository(svcCtx)
+	chatRepo := persistence.NewChatRepository(svcCtx)
+	knowledgeRepo := persistence.NewKnowledgeRepository(svcCtx)
 	documentForKnowledge := gateway.NewDocumentAdapterForKnowledge(documentRepo)
 	documentForChat := gateway.NewDocumentAdapterForChat(documentRepo)
 	observability.RegisterConversationTraceRecorder(chatRepo)
 	observability.RegisterRagEvalMetricsHandler(chatRepo)
+	observability.RegisterModelUsageHandler(svcCtx.Config.ChatModel)
 
 	retrievalScopeLogicImpl := knowlogic.NewKnowledgeBaseRetrievalScopeLogicImpl(knowledgeRepo, documentForKnowledge, localConfig)
 	opts := []rank.Option{rank.WithLexicalIndex(elasticStorage), rank.WithEmbedding(embedder)}
@@ -92,24 +94,24 @@ func bootstrap(c *config.Config) *server.Server {
 	knowledgeBaseLogicImpl := knowlogic.NewKnowledgeBaseLogicImpl(knowledgeRepo, documentForKnowledge)
 	knowledgeAdapter := gateway.NewKnowledgeAdapter(retrievalScopeLogicImpl, knowledgeRepo, knowledgeRouter, localConfig)
 
-	recommender := recommend.NewQuestionRecommendImpl(serviceContext, renderer, chatModel)
+	recommender := recommend.NewQuestionRecommendImpl(svcCtx, renderer, ollamaModel)
 	channels := []retrieval.Retrieval{
-		channel.NewVectorRetrievalChannel(serviceContext, milvusVector),
+		channel.NewVectorRetrievalChannel(svcCtx, milvusVector),
 		channel.NewKeywordRetrievalChannel(milvusKeyword),
 	}
 
 	rrfFusion := fuse.NewRRFFusion()
-	retrievalEngine := retrieval.NewRetrievalEngine(serviceContext, chatRepo, dashScope, channels, documentForChat, rrfFusion)
+	retrievalEngine := retrieval.NewRetrievalEngine(svcCtx, chatRepo, dashScope, channels, documentForChat, rrfFusion)
 
-	compressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepo, chatModel, renderer)
+	compressionStrategy := strategy.NewSummaryCompressionStrategy(svcCtx, chatRepo, chatModel, renderer)
 	memoryManageImpl := memory.NewSessionMemoryManageImpl(compressionStrategy)
-	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
+	rewriteImpl := rewrite.NewQueryRewriteImpl(svcCtx, ollamaModel, renderer)
 	chainRuntime := conversation.NewRuntimeRegistry()
 	documentRouter := route.NewDocumentRouter(documentForChat, nil)
-	contextInjectMiddleware := middleware.NewContextInjectMiddleware(serviceContext)
+	contextInjectMiddleware := middleware.NewContextInjectMiddleware(svcCtx)
 	structureTool := tool.NewRouteDocumentStructureTool(documentRouter)
-	knowledgeBaseSearchTool := tool.NewKnowledgeBaseSearchTool(serviceContext, retrievalEngine)
-	agentRunner := agent.NewEinoAgentRunner(serviceContext,
+	knowledgeBaseSearchTool := tool.NewKnowledgeBaseSearchTool(svcCtx, retrievalEngine)
+	agentRunner := agent.NewEinoAgentRunner(svcCtx,
 		agent.WithMiddleware(contextInjectMiddleware),
 		agent.WithTools(structureTool),
 		agent.WithTools(knowledgeBaseSearchTool),
@@ -117,33 +119,33 @@ func bootstrap(c *config.Config) *server.Server {
 
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
-		conversation.NewMemoryLoadStage(serviceContext, memoryManageImpl, chatRepo),
-		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
+		conversation.NewMemoryLoadStage(svcCtx, memoryManageImpl, chatRepo),
+		conversation.NewQueryRewriteStage(svcCtx, rewriteImpl),
 		conversation.NewRouteStage(chatRepo, knowledgeAdapter, documentForChat),
-		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore, chatModel, renderer),
+		conversation.NewSemanticCacheStage(svcCtx, semanticCacheStore, ollamaModel, renderer),
 		conversation.NewAgentStage(agentRunner),
-		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore, rocketMQMessageProducer),
-		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),
-		conversation.NewRecommendStage(serviceContext, chatRepo, memoryManageImpl, recommender),
+		conversation.NewCacheWriteStage(svcCtx, semanticCacheStore, rocketMQMessageProducer),
+		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(ollamaModel, renderer, embedder)),
+		conversation.NewRecommendStage(svcCtx, chatRepo, memoryManageImpl, recommender),
 		conversation.NewEndStage(chatRepo),
 	}
 	chain := conversation.NewChain(chatRepo, redisMutexLock, memoryManageImpl, chainRuntime, stages)
 	conversationLogicImpl := chatlogic.NewConversationLogicImpl(chatRepo, knowledgeAdapter, memoryManageImpl, redisMutexLock, checkPointStore, chain)
-	strategyRegistry := NewChunkStrategyRegistry(serviceContext, chatModel, renderer)
+	strategyRegistry := NewChunkStrategyRegistry(svcCtx, chatModel, renderer)
 
 	generateImpl := process.NewProfileGenerateImpl(documentRepo)
-	analysisChain := analysis.NewAnalysisChain(serviceContext, documentRepo, tableRepo, minioStorage, generateImpl, knowledgeAdapter)
+	analysisChain := analysis.NewAnalysisChain(svcCtx, documentRepo, tableRepo, minioStorage, generateImpl, knowledgeAdapter)
 	indexChain := index.NewBuildIndexChain(documentRepo, minioStorage, milvusVector, milvusKeyword, strategyRegistry, knowledgeAdapter, gseTokenizer)
 	asyncProcessImpl := process.NewAsyncProcessImpl(documentRepo, analysisChain, indexChain)
-	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(serviceContext, rocketMQMessageProducer, minioStorage, documentRepo, knowledgeAdapter)
+	lifecycleLogicImpl := doclogic.NewLifecycleLogicImpl(svcCtx, rocketMQMessageProducer, minioStorage, documentRepo, knowledgeAdapter)
 	profileLogicImpl := doclogic.NewProfileLogicImpl(documentRepo, minioStorage, generateImpl)
-	parseConsumer := consumer.NewParseDocumentConsumer(serviceContext, asyncProcessImpl)
-	buildIndexConsumer := consumer.NewBuildIndexConsumer(serviceContext, asyncProcessImpl)
+	parseConsumer := consumer.NewParseDocumentConsumer(svcCtx, asyncProcessImpl)
+	buildIndexConsumer := consumer.NewBuildIndexConsumer(svcCtx, asyncProcessImpl)
 
 	chatService := handler.NewChatService(conversationLogicImpl)
 	documentService := handler.NewDocumentService(lifecycleLogicImpl, profileLogicImpl)
 	knowledgeService := handler.NewKnowledgeService(knowledgeLogicImpl, knowledgeBaseLogicImpl)
-	httpServer := server.NewHTTPServer(serviceContext, documentService, chatService, knowledgeService)
+	httpServer := server.NewHTTPServer(svcCtx, documentService, chatService, knowledgeService)
 
 	return server.NewServer(httpServer, parseConsumer, buildIndexConsumer, rocketMQMessageProducer, semanticCacheWriteConsumer)
 }

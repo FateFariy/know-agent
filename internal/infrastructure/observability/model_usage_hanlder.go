@@ -12,6 +12,7 @@ import (
 	"github.com/swiftbit/know-agent/internal/config"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
+	"github.com/swiftbit/know-agent/internal/infrastructure/port/llm"
 )
 
 var _ callbacks.Handler = (*ModelUsageHandler)(nil)
@@ -35,11 +36,11 @@ func (h *ModelUsageHandler) OnStart(ctx context.Context, info *callbacks.RunInfo
 	if info.Component != "model_usage" {
 		return ctx
 	}
-	modelInput, ok := input.(*vo.ModelCallInput)
+	modelInput, ok := input.(*llm.ModelCallInput)
 	if !ok || modelInput == nil {
 		return ctx
 	}
-	meta, _ := info.Payload.(*vo.ModelCallMeta)
+	meta, _ := info.Payload.(*llm.ModelCallMeta)
 	logStageCallOptions(meta, modelInput)
 	return ctx
 }
@@ -53,7 +54,7 @@ func (h *ModelUsageHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, 
 	if trace == nil {
 		return ctx
 	}
-	modelOutput, ok := output.(*vo.ModelCallOutput)
+	modelOutput, ok := output.(*llm.ModelCallOutput)
 	if !ok || modelOutput == nil {
 		return ctx
 	}
@@ -77,8 +78,8 @@ func (h *ModelUsageHandler) OnError(ctx context.Context, info *callbacks.RunInfo
 }
 
 // buildUsageTrace 构建成功的使用量轨迹
-func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.ModelCallOutput, startTime time.Time) *vo.ChatModelUsageTrace {
-	meta, _ := info.Payload.(*vo.ModelCallMeta)
+func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *llm.ModelCallOutput, startTime time.Time) *vo.ChatModelUsageTrace {
+	meta, _ := info.Payload.(*llm.ModelCallMeta)
 
 	tokenUsage := resolveTokenUsage(output.Response)
 
@@ -119,7 +120,7 @@ func (h *ModelUsageHandler) buildUsageTrace(info *callbacks.RunInfo, output *vo.
 
 // buildFailedUsageTrace 构建失败的使用量轨迹
 func (h *ModelUsageHandler) buildFailedUsageTrace(info *callbacks.RunInfo, startTime time.Time) *vo.ChatModelUsageTrace {
-	meta, _ := info.Payload.(*vo.ModelCallMeta)
+	meta, _ := info.Payload.(*llm.ModelCallMeta)
 	stageName := ""
 	if meta != nil {
 		stageName = meta.Stage
@@ -134,7 +135,7 @@ func (h *ModelUsageHandler) buildFailedUsageTrace(info *callbacks.RunInfo, start
 }
 
 // resolveProvider 获取 provider
-func (h *ModelUsageHandler) resolveProvider(meta *vo.ModelCallMeta) string {
+func (h *ModelUsageHandler) resolveProvider(meta *llm.ModelCallMeta) string {
 	if meta != nil && meta.Provider != "" {
 		return meta.Provider
 	}
@@ -142,7 +143,7 @@ func (h *ModelUsageHandler) resolveProvider(meta *vo.ModelCallMeta) string {
 }
 
 // resolveModel 获取 model name
-func (h *ModelUsageHandler) resolveModel(meta *vo.ModelCallMeta) string {
+func (h *ModelUsageHandler) resolveModel(meta *llm.ModelCallMeta) string {
 	if meta != nil && meta.ModelName != "" {
 		return meta.ModelName
 	}
@@ -150,7 +151,7 @@ func (h *ModelUsageHandler) resolveModel(meta *vo.ModelCallMeta) string {
 }
 
 // estimateCost 估算调用成本
-func (h *ModelUsageHandler) estimateCost(meta *vo.ModelCallMeta, promptTokens, completionTokens int) float64 {
+func (h *ModelUsageHandler) estimateCost(meta *llm.ModelCallMeta, promptTokens, completionTokens int) float64 {
 	if promptTokens <= 0 && completionTokens <= 0 {
 		return 0
 	}
@@ -165,7 +166,7 @@ func (h *ModelUsageHandler) estimateCost(meta *vo.ModelCallMeta, promptTokens, c
 }
 
 // logStageCallOptions 记录阶段调用选项日志
-func logStageCallOptions(meta *vo.ModelCallMeta, input *vo.ModelCallInput) {
+func logStageCallOptions(meta *llm.ModelCallMeta, input *llm.ModelCallInput) {
 	modelName := ""
 	stage := ""
 	provider := ""

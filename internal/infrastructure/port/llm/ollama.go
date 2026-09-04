@@ -16,7 +16,6 @@ import (
 	"github.com/swiftbit/know-agent/common/utils"
 	"github.com/swiftbit/know-agent/internal/domain/callbacks"
 	"github.com/swiftbit/know-agent/internal/domain/chat/adapter/model"
-	"github.com/swiftbit/know-agent/internal/domain/chat/model/vo"
 	"github.com/swiftbit/know-agent/internal/svc"
 )
 
@@ -100,7 +99,7 @@ func (o *OllamaModel) GenerateWithTrace(ctx context.Context, stage, systemPrompt
 		return "", err
 	}
 
-	ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+	ctx = callbacks.OnEnd(ctx, &ModelCallOutput{
 		SystemPrompt: systemPrompt,
 		UserPrompt:   userPrompt,
 		ResponseText: resp.Response,
@@ -169,7 +168,7 @@ func (o *OllamaModel) Stream(ctx context.Context, stage, systemPrompt, userPromp
 			return
 		}
 
-		ctx = callbacks.OnEnd(ctx, &vo.ModelCallOutput{
+		ctx = callbacks.OnEnd(ctx, &ModelCallOutput{
 			SystemPrompt: systemPrompt,
 			UserPrompt:   userPrompt,
 			ResponseText: full.String(),
@@ -229,8 +228,8 @@ func (o *OllamaModel) buildReq(systemPrompt, userPrompt string, stream bool, opt
 }
 
 // buildTraceMeta 构造模型使用量轨迹的元信息
-func buildTraceMeta(stage, provider string, opt *model.Options) *vo.ModelCallMeta {
-	return &vo.ModelCallMeta{
+func buildTraceMeta(stage, provider string, opt *model.Options) *ModelCallMeta {
+	return &ModelCallMeta{
 		Stage:     stage,
 		Provider:  provider,
 		ModelName: opt.Model,
@@ -238,8 +237,8 @@ func buildTraceMeta(stage, provider string, opt *model.Options) *vo.ModelCallMet
 }
 
 // buildTraceInput 构造模型使用量轨迹的输入参数
-func buildTraceInput(opt *model.Options) *vo.ModelCallInput {
-	return &vo.ModelCallInput{
+func buildTraceInput(opt *model.Options) *ModelCallInput {
+	return &ModelCallInput{
 		Temperature: utils.PointerOrDefault(opt.Temperature, 0.0),
 		TopP:        utils.PointerOrDefault(opt.TopP, 0.0),
 	}
