@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"regexp"
 	"strconv"
 	"strings"
@@ -206,14 +204,8 @@ func GetStringFromMap(m map[string]any, key, defaultValue string) string {
 	return defaultValue
 }
 
-// CalcContentHash 计算内容的 SHA256 哈希值，用于产物去重和校验
-func CalcContentHash(parts ...string) string {
-	var builder strings.Builder
-	for _, part := range parts {
-		builder.WriteString(part)
-	}
-	hash := sha256.Sum256([]byte(builder.String()))
-	return hex.EncodeToString(hash[:])
+func ContainsAnyString(str string, substrs []string) bool {
+	return strutil.ContainsAny(str, substrs)
 }
 
 // Substring 截取字符串

@@ -6,6 +6,7 @@ import (
 	chatlogic "github.com/swiftbit/know-agent/internal/domain/chat/logic"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/middleware"
+	"github.com/swiftbit/know-agent/internal/domain/chat/logic/conversation/tool"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/evaluate"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory"
 	"github.com/swiftbit/know-agent/internal/domain/chat/logic/memory/strategy"
@@ -102,22 +103,24 @@ func bootstrap(c *config.Config) *server.Server {
 	compressionStrategy := strategy.NewSummaryCompressionStrategy(serviceContext, chatRepo, chatModel, renderer)
 	memoryManageImpl := memory.NewSessionMemoryManageImpl(compressionStrategy)
 	rewriteImpl := rewrite.NewQueryRewriteImpl(serviceContext, chatModel, renderer)
-	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 	chainRuntime := conversation.NewRuntimeRegistry()
-	// MemoryLoad 已中间件化：由 conversation.MemoryLoadMiddleware 在 deep agent
-	// BeforeAgent 时装载记忆并注入指令，不再作为链上阶段（随 AgentStage 装配接入）。
-	// Agentic 化：检索/证据预算/生成已迁移为 KnowledgeBaseSearchTool、EvidenceRenderer
-	// 与答案输出中间件（随 AgentStage 装配接入），不再作为链上阶段。
-	_ = retrievalEngine
+	documentRouter := route.NewDocumentRouter(documentForChat, nil)
 
-	memoryLoadMiddleware := middleware.NewMemoryLoadMiddleware(serviceContext, memoryManageImpl)
-	agentRunner := agent.NewEinoAgentRunner(serviceContext, agent.WithMiddleware(memoryLoadMiddleware))
+	// 知识路由中间件须排在 MemoryLoadMiddleware 之后（依赖其创建的 execPlan 与检索计划）
+	memoryLoadMiddleware := middleware.NewMemoryLoadMiddleware(serviceContext, memoryManageImpl, chatRepo)
+	knowledgeRouteMiddleware := middleware.NewKnowledgeRouteMiddleware(knowledgeAdapter)
+	structureTool := tool.NewRouteDocumentStructureTool(documentRouter)
+	knowledgeBaseSearchTool := tool.NewKnowledgeBaseSearchTool(serviceContext, retrievalEngine)
+	agentRunner := agent.NewEinoAgentRunner(serviceContext,
+		agent.WithMiddleware(memoryLoadMiddleware, knowledgeRouteMiddleware),
+		agent.WithTools(structureTool),
+		agent.WithTools(knowledgeBaseSearchTool),
+	)
 
 	stages := []conversation.Stage{
 		conversation.NewStartStage(chatRepo, chainRuntime, redisMutexLock),
 		conversation.NewQueryRewriteStage(serviceContext, rewriteImpl),
 		conversation.NewSemanticCacheStage(serviceContext, semanticCacheStore),
-		conversation.NewRouteStage(chatRepo, knowledgeAdapter, documentRouter, documentForChat),
 		conversation.NewAgentStage(agentRunner),
 		conversation.NewCacheWriteStage(serviceContext, semanticCacheStore),
 		conversation.NewAnswerEvaluateStage(NewAnswerEvaluators(chatModel, renderer, embedder)),

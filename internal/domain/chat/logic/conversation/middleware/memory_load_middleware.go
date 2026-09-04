@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/swiftbit/know-agent/common/logx"
@@ -85,26 +84,17 @@ func (m *MemoryLoadMiddleware) load(ctx context.Context, convCtx *conversation.C
 	// 组装初始执行计划
 	question := utils.CompactWhitespace(convCtx.Question)
 	execPlan := &vo.ConversationExecutionPlan{
-		ChatMode:                 convCtx.ChatMode,
-		OriginalQuestion:         question,
-		RewriteQuestion:          question,
-		RewriteSubQuestions:      []string{question},
-		HistorySummary:           historySummary,
-		LongTermSummary:          memoryContext.LongTermSummary,
-		HistoryPlanningContext:   historyPlanningContext,
-		RecentHistoryTranscript:  memoryContext.RecentTranscript,
-		RecentQuestionTranscript: memoryContext.RecentQuestionTranscript,
-		QuestionHistoryContext:   questionHistoryContext,
-		NavigationDecision: &vo.DocumentNavigationDecision{
-			NavigationAction: enum.DocumentNavigationActionFreshTopic,
-			RetrievalIntent:  enum.RetrievalIntentGeneral,
-			SummaryText: fmt.Sprintf(
-				"retrievalIntent=%s; queryType=%s; reason=%s;",
-				enum.RetrievalIntentGeneral,
-				enum.QueryTypeDocumentQA,
-				"普通文档问题走混合检索",
-			),
-		},
+		ChatMode:                    convCtx.ChatMode,
+		OriginalQuestion:            question,
+		RewriteQuestion:             question,
+		RewriteSubQuestions:         []string{question},
+		HistorySummary:              historySummary,
+		LongTermSummary:             memoryContext.LongTermSummary,
+		HistoryPlanningContext:      historyPlanningContext,
+		RecentHistoryTranscript:     memoryContext.RecentTranscript,
+		RecentQuestionTranscript:    memoryContext.RecentQuestionTranscript,
+		QuestionHistoryContext:      questionHistoryContext,
+		NavigationDecision:          &vo.DocumentNavigationDecision{NavigationAction: enum.DocumentNavigationActionFreshTopic},
 		HistoryCompressionApplied:   memoryContext.CompressionApplied,
 		HistoryCoveredExchangeId:    memoryContext.CoveredExchangeId,
 		HistoryCoveredExchangeCount: memoryContext.CoveredExchangeCount,
@@ -228,28 +218,21 @@ func buildRetrievalPlan(convCtx *conversation.Context, execPlan *vo.Conversation
 		taskScope = []int64{convCtx.SelectedTaskId}
 	}
 	return &vo.RetrievalPlan{
-		ChatMode:                  enum.ChatQueryModeName(chatMode),
-		PrimaryIntent:             enum.RetrievalIntentGeneral,
-		ScopeMode:                 snapshot.SelectionModeName(),
-		KnowledgeBaseIds:          utils.Copy(snapshot.SelectedKnowledgeBaseIds),
-		DocumentScope:             utils.Copy(documentScope),
-		TaskScope:                 utils.Copy(taskScope),
-		MetadataFilters:           vo.NewMetadataFilters(execPlan.RewriteQuestion),
-		Channels:                  channels,
-		StructureNavigation:       nil,
-		NavigationAction:          execPlan.NavigationDecision.NavigationActionText(),
-		StructureNavigationResult: nil,
-		StructureAnchor:           nil,
-		ItemAnchor:                nil,
-		TableIntent:               nil,
-		GraphIntent:               nil,
-		RaptorIntent:              nil,
-		RankFeatures:              vo.BuildRankFeatures(hybrid),
-		CandidateTopK:             runtime.CandidateTopK,
-		RerankTopK:                runtime.RerankCandidateTopK,
-		RerankEnabled:             runtime.RerankEnabled,
-		FinalTopK:                 runtime.FinalTopK,
-		SubQuestionTimeout:        runtime.SubQuestionTimeout,
+		ChatMode:           enum.ChatQueryModeName(chatMode),
+		PrimaryIntent:      enum.RetrievalIntentGeneral,
+		ScopeMode:          snapshot.SelectionModeName(),
+		KnowledgeBaseIds:   utils.Copy(snapshot.SelectedKnowledgeBaseIds),
+		DocumentScope:      utils.Copy(documentScope),
+		TaskScope:          utils.Copy(taskScope),
+		MetadataFilters:    vo.NewMetadataFilters(execPlan.RewriteQuestion),
+		Channels:           channels,
+		NavigationAction:   execPlan.NavigationDecision.NavigationActionText(),
+		RankFeatures:       vo.BuildRankFeatures(hybrid),
+		CandidateTopK:      runtime.CandidateTopK,
+		RerankTopK:         runtime.RerankCandidateTopK,
+		RerankEnabled:      runtime.RerankEnabled,
+		FinalTopK:          runtime.FinalTopK,
+		SubQuestionTimeout: runtime.SubQuestionTimeout,
 	}
 }
 

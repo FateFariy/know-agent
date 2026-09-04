@@ -10,7 +10,6 @@ type NavigationInput struct {
 	DocumentId       int64                         // 文档 ID
 	Question         string                        // 原始问题
 	RewriteQuestion  string                        // 改写问题
-	SubQuestions     []string                      // 子问题列表
 	SectionAnchors   []string                      // 显式章节锚点
 	NavigationAction enum.DocumentNavigationAction // 导航动作
 	ItemIndex        *int                          //条目索引（第N步/条/点/项）
@@ -24,9 +23,6 @@ func (n *NavigationInput) Normalize() {
 
 	// 基础字段兜底
 	n.RewriteQuestion = utils.BlankToDefault(n.RewriteQuestion, n.Question)
-	if len(n.SubQuestions) == 0 {
-		n.SubQuestions = []string{n.RewriteQuestion}
-	}
 
 	// 文本信号探测（兜底来源）
 	routeText := n.RouteText()
@@ -63,10 +59,8 @@ func (n *NavigationInput) mergeNavigationSignals(signals *NavigationSignals, tex
 	n.NavigationAction = utils.BlankToDefault(signals.Action, enum.DocumentNavigationActionFreshTopic)
 
 	// 普通问题：文本显式条目索引兜底
-	if len(n.SubQuestions) == 1 {
-		n.ItemIndex = textItemIndex
-		n.NavigationAction = enum.DocumentNavigationActionItemReference
-	}
+	n.ItemIndex = textItemIndex
+	n.NavigationAction = enum.DocumentNavigationActionItemReference
 }
 
 // RouteText 拼接路由文本（原始 + 改写），供章节定位匹配使用

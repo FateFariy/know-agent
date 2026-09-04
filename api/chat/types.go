@@ -31,8 +31,6 @@ type ChatDebugTrace struct {
 	OriginalQuestion              string                      `json:"originalQuestion"`              // 原始问题
 	RewriteQuestion               string                      `json:"rewriteQuestion"`               // 重写问题
 	RewriteSubQuestions           []string                    `json:"rewriteSubQuestions"`           // 重写子问题列表
-	RetrievalQuestion             string                      `json:"retrievalQuestion"`             // 检索问题
-	AgentQuestion                 string                      `json:"agentQuestion"`                 // Agent问题
 	NavigationDecision            *DocumentNavigationDecision `json:"navigationDecision"`            // 文档导航决策
 	HistorySummary                string                      `json:"historySummary"`                // 历史摘要
 	LongTermSummary               string                      `json:"longTermSummary"`               // 长期摘要
@@ -234,13 +232,10 @@ type ConversationTraceStage struct {
 }
 
 type DocumentNavigationDecision struct {
-	NavigationAction  string                       `json:"navigationAction"`  // 导航动作
-	StructureAnchor   *ConversationStructureAnchor `json:"structureAnchor"`   // 结构锚点
-	ItemAnchor        *ConversationItemAnchor      `json:"itemAnchor"`        // 项目锚点
-	RetrievalPlan     *RetrievalQuestionPlan       `json:"retrievalPlan"`     // 检索问题计划
-	SummaryText       string                       `json:"summaryText"`       // 摘要文本
-	QueryContextHints []string                     `json:"queryContextHints"` // 查询上下文提示
-	SoftSectionHints  []string                     `json:"softSectionHints"`  // 软章节提示
+	NavigationAction string                       `json:"navigationAction"` // 导航动作
+	StructureAnchor  *ConversationStructureAnchor `json:"structureAnchor"`  // 结构锚点
+	ItemAnchor       *ConversationItemAnchor      `json:"itemAnchor"`       // 项目锚点
+	SummaryText      string                       `json:"summaryText"`      // 摘要文本
 }
 
 type RetrievalObserveReq struct {

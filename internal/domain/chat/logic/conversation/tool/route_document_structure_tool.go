@@ -11,16 +11,18 @@ import (
 )
 
 type RouteStructureInput struct {
-	Question         string                        `json:"query" jsonschema_description:"改写问题"`            // 改写问题
-	NavigationAction enum.DocumentNavigationAction `json:"navigationAction" jsonschema_description:"导航动作"` // 导航动作
-	SectionAnchors   []string                      `json:"sectionAnchors" jsonschema_description:"显式章节锚点"` // 显式章节锚点
+	Question         string                        `json:"query" jsonschema:"required" jsonschema_description:"用户原始问题，原样传递，不要改写"`
+	NavigationAction enum.DocumentNavigationAction `json:"navigationAction" jsonschema:"required,enum=SECTION_ADJACENCY_LOOKUP,enum=CHILD_SECTION_DESCEND,enum=ITEM_REFERENCE,enum=FRESH_TOPIC,enum=TOPIC_CONTINUE,enum=TOPIC_SWITCH,enum=SIBLING_SECTION_SWITCH,enum=ANCESTOR_SECTION_RETURN" jsonschema_description:"导航动作类型，可选值：SECTION_ADJACENCY_LOOKUP（查询相邻章节）、CHILD_SECTION_DESCEND（展开下级章节）、ITEM_REFERENCE（定位到具体条目/步骤型问题）、FRESH_TOPIC（普通文档检索主题）、TOPIC_CONTINUE（继续当前主题）、TOPIC_SWITCH（切换主题）、SIBLING_SECTION_SWITCH（切换兄弟章节）、ANCESTOR_SECTION_RETURN（返回上级章节）"`
+	SectionAnchors   []string                      `json:"sectionAnchors,omitempty" jsonschema_description:"显式章节锚点列表，当用户明确指定了章节标识时传入，否则不传"`
 }
 
 type RouteStructureOutput struct {
-	Action        string `json:"action"`                  // fresh_topic / item_reference / structure_navigation
-	RetrievalMode string `json:"retrievalMode"`           // 恒为 RETRIEVAL
-	TargetSection string `json:"targetSection,omitempty"` // 结构锚点提示
-	ItemIndex     *int   `json:"itemIndex,omitempty"`
+	NavigationAction  enum.DocumentNavigationAction `json:"navigationAction"`  // 导航动作
+	RootSectionCode   string                        `json:"rootSectionCode"`   // 根章节代码
+	RootSectionTitle  string                        `json:"rootSectionTitle"`  // 根章节标题
+	TargetSectionHint string                        `json:"targetSectionHint"` // 目标章节提示
+	ItemIndex         int                           `json:"itemIndex"`         // 项目索引
+	ItemText          string                        `json:"itemText"`          // 项目文本
 }
 
 type RouteDocumentStructureTool struct {
@@ -33,8 +35,14 @@ func NewRouteDocumentStructureTool(route DocumentRouter) *RouteDocumentStructure
 
 func (r *RouteDocumentStructureTool) Info(ctx context.Context) *Info {
 	return &Info{
-		Name:        "route_document_structure",
-		Description: "Route document structure",
+		Name: "route_document_structure",
+		Description: `根据用户问题在文档结构中进行导航路由，确定目标章节和条目位置。
+				使用场景：当用户提问涉及文档中特定章节、段落、列表条目或需要在章节树中跳转（如“上一章”、“返回上级”、“查看第3节”）时使用此工具。
+				参数要求：
+				- query：用户的原始提问，请原样传入，不要进行改写。
+				- navigationAction：必须根据问题意图从指定的枚举值中选择一个精确匹配的动作。
+				- sectionAnchors：仅当用户明确提及章节编号/锚点（如“第2.1节”）时才传入，否则省略。
+				不适用场景：全文搜索、跨文档检索或纯知识问答（请使用其他工具）。`,
 	}
 }
 
@@ -49,11 +57,10 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 		DocumentId:       convCtx.SelectedDocumentId,
 		Question:         input.Question,
 		RewriteQuestion:  input.Question,
-		SubQuestions:     execPlan.SubQuestions(),
 		SectionAnchors:   input.SectionAnchors,
 		NavigationAction: input.NavigationAction,
 	}
-	navigationDecision, err := r.route.Route(ctx, nav)
+	decision, err := r.route.Route(ctx, nav)
 	if err != nil {
 		ctx = vo.OnError(ctx, "执行路由失败。", err)
 		return nil, err
@@ -61,28 +68,31 @@ func (r *RouteDocumentStructureTool) Invoke(ctx context.Context, input *RouteStr
 
 	// 构造路由结果快照（执行模式 / 章节提示 / 条目编号 / 摘要文本），写入追踪
 	snapshot := map[string]any{
-		"targetSectionHint": utils.Trim(navigationDecision.StructureAnchor.TargetSectionHint),
-		"navigationSummary": utils.Trim(navigationDecision.SummaryText),
+		"targetSectionHint": utils.Trim(decision.StructureAnchor.TargetSectionHint),
+		"navigationSummary": utils.Trim(decision.SummaryText),
 	}
-	if navigationDecision.ItemAnchor != nil {
-		snapshot["targetItemIndex"] = navigationDecision.ItemAnchor.ItemIndex
+	if decision.ItemAnchor != nil {
+		snapshot["targetItemIndex"] = decision.ItemAnchor.ItemIndex
 	}
 
-	// 组装最终执行计划：写入执行模式、导航决策、无证据回复提示、检索计划
-	execPlan.NavigationDecision = navigationDecision
-	convCtx.AddUsedTools("route_document_structure_tool")
+	execPlan.NavigationDecision = decision
+	execPlan.RetrievalPlan.ItemAnchor = copyItemAnchor(decision)
+	execPlan.RetrievalPlan.StructureAnchor = copyStructureAnchor(decision)
+	execPlan.RetrievalPlan.NavigationAction = decision.NavigationAction
+	convCtx.AddUsedTools("route_document_structure")
 
 	ctx = vo.OnEnd(ctx, &vo.StageOutput{SummaryText: "执行路由完成。", Snapshot: snapshot})
-
-	return nil, nil
-}
-
-// copyStructureNavigationResult 复制结构导航结果 todo 待实现
-func copyStructureNavigationResult(decision *vo.DocumentNavigationDecision) *vo.StructureNavigationResult {
-	if decision == nil {
-		return nil
+	output := &RouteStructureOutput{
+		NavigationAction:  decision.NavigationAction,
+		RootSectionCode:   decision.StructureAnchor.RootSectionCode,
+		RootSectionTitle:  decision.StructureAnchor.RootSectionTitle,
+		TargetSectionHint: decision.StructureAnchor.TargetSectionHint,
 	}
-	return nil
+	if decision.ItemAnchor != nil {
+		output.ItemIndex = decision.ItemAnchor.ItemIndex
+		output.ItemText = decision.ItemAnchor.ItemText
+	}
+	return output, nil
 }
 
 // copyStructureAnchor 复制结构锚点
