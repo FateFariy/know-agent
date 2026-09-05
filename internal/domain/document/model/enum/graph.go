@@ -58,21 +58,32 @@ const (
 	InvocationOutcomeEmpty           InvocationOutcome = "EMPTY"
 )
 
-// GraphRagEntityTypes 允许抽取的实体类型（小写归一化后匹配）
+// GraphRagEntityTypes 允许抽取的实体类型（中文法规领域受控列表，模板注入用）
 var GraphRagEntityTypes = map[string]struct{}{
-	"PERSON": {}, "ORG": {}, "ORGANIZATION": {}, "LOC": {}, "LOCATION": {}, "GPE": {},
-	"PRODUCT": {}, "EVENT": {}, "WORK_OF_ART": {}, "CONCEPT": {}, "TECH": {}, "PROJECT": {},
+	"法律": {}, "条款": {}, "机构": {}, "人员": {}, "行为": {},
+	"义务": {}, "处罚": {}, "产品": {}, "类别": {}, "标准": {}, "概念": {},
 }
 
-// GraphRagRelationWhitelist 关系类型白名单（relationType ENUM，落库前严格校验）
+// GraphRagRelationFallback 关系类型兜底值：白名单外一律落该关系类型，保留 predicate_quote 原文谓词
+const GraphRagRelationFallback = "RELATED_TO"
+
+// GraphRagRelationWhitelist 受控关系类型白名单（中文法规领域，命中→动态关系类型；未命中→RELATED_TO 兜底）
 var GraphRagRelationWhitelist = map[string]struct{}{
-	"RELATED_TO": {}, "BELONGS_TO": {}, "LOCATED_IN": {}, "WORKS_FOR": {}, "FOUNDED": {},
-	"PARTICIPATES_IN": {}, "USES": {}, "PRODUCES": {}, "COOPERATES_WITH": {}, "INVESTS_IN": {},
-	"ACQUIRED": {}, "COMPETES_WITH": {}, "SERVES": {}, "ALIAS_OF": {}, "BORN_IN": {},
-	"GRADUATED_FROM": {}, "REPRESENTATIVE_WORK": {}, "HEADQUARTERED_IN": {},
+	"属于": {}, "包含": {}, "类别编号": {}, "定义": {}, "适用于": {},
+	"引用": {}, "应当": {}, "不得": {}, "处以": {}, "关联": {},
 }
 
-// IsValidGraphRelation 校验关系类型是否在白名单内
+// NormalizeRelationType 归一化关系类型：白名单内原样返回，否则落 RELATED_TO 兜底
+func NormalizeRelationType(rt string) string {
+	if rt != "" {
+		if _, ok := GraphRagRelationWhitelist[rt]; ok {
+			return rt
+		}
+	}
+	return GraphRagRelationFallback
+}
+
+// IsValidGraphRelation 校验关系类型是否在受控白名单内
 func IsValidGraphRelation(rt string) bool {
 	if rt == "" {
 		return false
