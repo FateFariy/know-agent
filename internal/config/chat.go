@@ -105,9 +105,15 @@ type TableConf struct {
 
 // GraphRagConf 图RAG相关配置
 type GraphRagConf struct {
-	Enabled bool `json:",default=true"` // 是否启用图RAG
-	TopK    int  `json:",default=5"`    // 图RAG检索TopK
-	MaxHops int  `json:",default=2"`    // 最大跳数
+	Enabled            bool    `json:",default=false"`  // 启用开关
+	PageRankDamping    float64 `json:",default=0.85"`   // PageRank 阻尼系数
+	PageRankIterations int     `json:",default=20"`     // PageRank 迭代次数
+	LouvainResolution  float64 `json:",default=1.0"`    // Louvain 社区分辨率
+	EntityLabel        string  `json:",default=Entity"` // 实体节点标签
+	RelationshipType   string  `json:",default=REL"`    // 关系边类型
+	MaxHops            int     `json:",default=2"`      // 最大跳数
+	TopK               int     `json:",default=30"`     // 返回结果数
+	CommunityTopNodes  int     `json:",default=5"`      // 社区摘要节点数
 }
 
 type RaptorConf struct {

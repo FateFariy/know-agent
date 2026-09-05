@@ -5,7 +5,6 @@ const (
 	ChatQueryRewrite           = "chat-query-rewrite"
 	ConversationSummaryMerge   = "conversation-summary-merge"
 	ConversationSummarySystem  = "conversation-summary-system"
-	DocumentLlmSplit           = "document-llm-split"
 	AnswerFaithfulnessEvaluate = "answer-faithfulness-evaluate"
 	AnswerRelevancyEvaluate    = "answer-relevancy-evaluate"
 	ContextPrecisionEvaluate   = "context-precision-evaluate"

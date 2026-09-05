@@ -43,7 +43,7 @@ type IndexingConfigResolver interface {
 }
 
 type GraphRagBuilder interface {
-	RebuildDocumentGraph(ctx context.Context, documentId, taskId int64, chunks []*entity.DocumentChunk) (*vo.GraphRagBuildResult, error)
+	RebuildDocumentGraph(ctx context.Context, documentId, taskId, knowledgeBaseId int64, chunks []*entity.DocumentChunk) (*vo.GraphRagBuildResult, error)
 }
 
 type Tokenizer interface {

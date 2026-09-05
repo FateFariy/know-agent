@@ -58,3 +58,11 @@ type PromptRenderer interface {
 	// Render 渲染提示词
 	Render(templateName string, variables map[string]any) (string, error)
 }
+
+// GraphStore 知识图谱存储（Neo4j 等图数据库）
+type GraphStore interface {
+	// ApplyConstraints 执行图谱约束/索引脚本
+	ApplyConstraints(ctx context.Context, cypher string) error
+	// CommitGraph 写入（覆盖）单篇文档的图谱
+	CommitGraph(ctx context.Context, snapshot *entity.GraphSnapshot) error
+}

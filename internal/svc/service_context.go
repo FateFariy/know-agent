@@ -14,7 +14,9 @@ import (
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -32,6 +34,7 @@ type ServiceContext struct {
 	RedSync   *redsync.Redsync
 	ChatModel model.BaseModel[*einoschema.Message]
 	Milvus    *milvusclient.Client
+	Neo4j     neo4j.DriverWithContext
 }
 
 func NewServiceContext(c *config.Config) *ServiceContext {
@@ -47,6 +50,7 @@ func NewServiceContext(c *config.Config) *ServiceContext {
 		RedSync:   NewRedSync(redisClient),
 		ChatModel: NewArkChatModel(ctx, c.ChatModel["Ark"]),
 		Milvus:    NewMilvusClient(ctx, c),
+		Neo4j:     NewNeo4jClient(c.Neo4j),
 	}
 }
 
@@ -121,4 +125,24 @@ func NewMilvusClient(ctx context.Context, c *config.Config) *milvusclient.Client
 		panic(err)
 	}
 	return client
+}
+
+// NewNeo4jClient 创建 Neo4j 驱动；未启用或连接失败均返回 nil（不阻断主流程）
+func NewNeo4jClient(c config.Neo4jConf) neo4j.DriverWithContext {
+	if !c.Enabled {
+		return nil
+	}
+	driver, err := neo4j.NewDriverWithContext(c.Uri, neo4j.BasicAuth(c.Username, c.Password, ""))
+	if err != nil {
+		logx.Errorf("neo4j 驱动初始化失败: %v", err)
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = driver.VerifyConnectivity(ctx); err != nil {
+		logx.Errorf("neo4j 连接不可用，已跳过图谱能力: %v", err)
+		_ = driver.Close(ctx)
+		return nil
+	}
+	return driver
 }

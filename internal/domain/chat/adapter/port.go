@@ -81,3 +81,9 @@ type KnowledgeBaseGateway interface {
 	// DetermineKnowledgeScope 确定知识范围
 	DetermineKnowledgeScope(ctx context.Context, selectMode string, kbIds []string) (*vo.KnowledgeBaseSelectionSnapshot, error)
 }
+
+// GraphGateway 图谱检索网关（查询已构建的实体-关系子图）
+type GraphGateway interface {
+	// QueryGraph 根据实体名查询 N 跳子图上下文
+	QueryGraph(ctx context.Context, req *vo.GraphQuery) (*vo.GraphContext, error)
+}

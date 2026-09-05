@@ -12,7 +12,7 @@ var (
 	ErrStrategyStepEmpty        = common.NewBizError(20007, "当前没有可执行的策略步骤")
 	ErrIndexTaskRunning         = common.NewBizError(20008, "当前文档已有索引任务正在执行")
 	ErrDocumentStorageFailed    = common.NewBizError(20011, "文件存储失败：%s")
-	ErrGraphRagBuildFailed      = common.NewBizError(20012, "GraphRag 已构建失败")
+	ErrGraphRagBuildFailed      = common.NewBizError(20012, "Graph 已构建失败")
 	ErrDocumentIndexUnavailable = common.NewBizError(20014, "文档当前没有可用索引：%s")
 	ErrTaskNotFound             = common.NewBizError(20016, "任务不存在：%d")
 	ErrParentBlockMissing       = common.NewBizError(20017, "当前方案缺少父块流水线，无法生成 Parent-Child 结构")

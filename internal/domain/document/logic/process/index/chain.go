@@ -25,7 +25,7 @@ func NewBuildIndexChain(
 	registry *chunk.Registry,
 	resolver IndexingConfigResolver,
 	tokenizer Tokenizer,
-	// builder GraphRagBuilder,
+	builder GraphRagBuilder,
 ) *BuildIndexChain {
 	stages := []Stage{
 		NewPreparationStage(repo, storage),                    // 1. 准备阶段：加载任务、验证状态、下载原始文本内容、推进任务状态
@@ -33,8 +33,8 @@ func NewBuildIndexChain(
 		NewChunkPostPhase(repo),                               // 3. 切块后处理阶段：构建父子块实体并持久化
 		NewVectorizePhase(repo, vecIndexer),                   // 4. 向量化阶段：批量向量化并回写状态
 		NewKeywordIndexStage(repo, keyIndexer),                // 5. 关键词索引阶段：构建关键词索引
-		//NewGraphRagPhase(repo, builder),                             // 6. GraphRAG构建阶段：构建实体关系图谱
-		NewCompletionStage(repo), // 7. 完成阶段：事务性更新任务/方案/文档状态
+		NewGraphRagPhase(repo, builder),                       // 6. GraphRAG 构建阶段：构建实体关系图谱
+		NewCompletionStage(repo),                              // 7. 完成阶段：事务性更新任务/方案/文档状态
 	}
 	return &BuildIndexChain{stages: stages}
 }
@@ -48,8 +48,9 @@ func (c *BuildIndexChain) Run(ctx context.Context, buildCtx *Context) error {
 
 		if err := phase.Execute(ctx, buildCtx); err != nil {
 			if errors.Is(err, errorx.ErrGraphRagBuildFailed) {
-				logx.Warnf("[BuildIndexChain] 阶段 %s 执行失败: %v", phaseName, err)
-				return nil
+				// 图谱构建为增强依赖：失败仅降级告警，不阻断后续阶段（其余阶段含 ResumeCommittedGraph 幂等跳过判断，完成阶段正常收尾）
+				logx.Warnf("[BuildIndexChain] 阶段 %s 执行失败(降级处理，继续后续阶段): %v", phaseName, err)
+				continue
 			}
 			logx.Errorf("[BuildIndexChain] 阶段 %s 执行失败: %v", phaseName, err)
 			return fmt.Errorf("阶段 %s 执行失败: %w", phaseName, err)

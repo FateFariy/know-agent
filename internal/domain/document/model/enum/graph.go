@@ -57,3 +57,35 @@ const (
 	InvocationOutcomeDisabled        InvocationOutcome = "DISABLED"
 	InvocationOutcomeEmpty           InvocationOutcome = "EMPTY"
 )
+
+// GraphRagEntityTypes 允许抽取的实体类型（小写归一化后匹配）
+var GraphRagEntityTypes = map[string]struct{}{
+	"PERSON": {}, "ORG": {}, "ORGANIZATION": {}, "LOC": {}, "LOCATION": {}, "GPE": {},
+	"PRODUCT": {}, "EVENT": {}, "WORK_OF_ART": {}, "CONCEPT": {}, "TECH": {}, "PROJECT": {},
+}
+
+// GraphRagRelationWhitelist 关系类型白名单（relationType ENUM，落库前严格校验）
+var GraphRagRelationWhitelist = map[string]struct{}{
+	"RELATED_TO": {}, "BELONGS_TO": {}, "LOCATED_IN": {}, "WORKS_FOR": {}, "FOUNDED": {},
+	"PARTICIPATES_IN": {}, "USES": {}, "PRODUCES": {}, "COOPERATES_WITH": {}, "INVESTS_IN": {},
+	"ACQUIRED": {}, "COMPETES_WITH": {}, "SERVES": {}, "ALIAS_OF": {}, "BORN_IN": {},
+	"GRADUATED_FROM": {}, "REPRESENTATIVE_WORK": {}, "HEADQUARTERED_IN": {},
+}
+
+// IsValidGraphRelation 校验关系类型是否在白名单内
+func IsValidGraphRelation(rt string) bool {
+	if rt == "" {
+		return false
+	}
+	_, ok := GraphRagRelationWhitelist[rt]
+	return ok
+}
+
+// IsValidGraphEntityType 校验实体类型是否允许
+func IsValidGraphEntityType(t string) bool {
+	if t == "" {
+		return false
+	}
+	_, ok := GraphRagEntityTypes[t]
+	return ok
+}

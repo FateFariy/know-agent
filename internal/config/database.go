@@ -9,7 +9,7 @@ type MysqlConf struct {
 
 type Neo4jConf struct {
 	Enabled             bool   `json:",default=false"`
-	Uri                 string `json:",default=bolt://127.0.0.1:7687"`
+	Uri                 string `json:",default=neo4j://127.0.0.1:7687"`
 	Username            string `json:",default=neo4j"`
 	Password            string `json:",default=neo4j"`
 	Database            string `json:",default=neo4j"`
